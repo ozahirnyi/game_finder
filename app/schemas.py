@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from datetime import datetime
 
 
@@ -10,7 +10,7 @@ class GameRead(BaseModel):
     id: str
     title: str
     notes: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime
 
 class GameUpdate(BaseModel):
     title: str | None = None

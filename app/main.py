@@ -1,37 +1,49 @@
 from fastapi import FastAPI, Depends, HTTPException
-import uuid
-from datetime import datetime
 from app.schemas import GameCreate, GameRead, GameUpdate
+from app.store import (
+    create_game as store_create_game,
+    get_game as store_get_game,
+    update_game as store_update_game,
+    delete_game as store_delete_game,
+    list_games,
+)
 from app.store import get_store
+
 app = FastAPI()
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
 @app.get("/games", response_model=list[GameRead])
-def games(store: dict = Depends(get_store)):
-    return list(store.values())
+def games(store: dict[str, dict] = Depends(get_store)):
+    return list_games(store)
+
+
 @app.post("/games", status_code=201, response_model=GameRead)
-def create_game(game: GameCreate, store = Depends(get_store)):
-    game_id = str(uuid.uuid4())
-    game_data = game.model_dump()
-    game_data["id"] = game_id
-    game_data["created_at"] = datetime.utcnow()
-    store[game_id] = game_data
-    return game_data
+def create_game(game: GameCreate, store: dict[str, dict] = Depends(get_store)):
+    return store_create_game(store, game.model_dump())
+
+
 @app.patch("/games/{id}", response_model=GameRead)
-def update_game(id: str, game: GameUpdate, store = Depends(get_store)):
-    if id not in store:
+def update_game(id: str, game: GameUpdate, store: dict[str, dict] = Depends(get_store)):
+    updated = store_update_game(store, id, game.model_dump(exclude_unset=True))
+    if not updated:
         raise HTTPException(status_code=404, detail="Game not found")
-    update_data = game.model_dump(exclude_unset=True, exclude={"id"})
-    store[id].update(update_data)
-    return store[id]
+    return updated
+
+
 @app.get("/games/{id}", response_model=GameRead)
-def get_game(id: str, store = Depends(get_store)):
-    if id not in store:
+def get_game(id: str, store: dict[str, dict] = Depends(get_store)):
+    game = store_get_game(store, id)
+    if not game:
         raise HTTPException(status_code=404, detail="Game not found")
-    return store[id]
+    return game
+
 @app.delete("/games/{id}", status_code=204)
-def delete_game(id: str, store = Depends(get_store)):
-    if id not in store:
+def delete_game(id: str, store: dict[str, dict] = Depends(get_store)):
+    ok = store_delete_game(store, id)
+    if not ok:
         raise HTTPException(status_code=404, detail="Game not found")
-    del store[id]
+    return
