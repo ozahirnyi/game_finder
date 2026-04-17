@@ -6,10 +6,12 @@ from app.store import (
     update_game as store_update_game,
     delete_game as store_delete_game,
     list_games,
+    get_store,
 )
-from app.store import get_store
+
 
 app = FastAPI()
+
 
 @app.get("/health")
 def health():
@@ -28,7 +30,7 @@ def create_game(game: GameCreate, store: dict[str, dict] = Depends(get_store)):
 
 @app.patch("/games/{id}", response_model=GameRead)
 def update_game(id: str, game: GameUpdate, store: dict[str, dict] = Depends(get_store)):
-    updated = store_update_game(store, id, game.model_dump(exclude_unset=True))
+    updated = store_update_game(store, id, game.model_dump(exclude_unset=True, exclude={"id"}))
     if not updated:
         raise HTTPException(status_code=404, detail="Game not found")
     return updated
@@ -40,6 +42,7 @@ def get_game(id: str, store: dict[str, dict] = Depends(get_store)):
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     return game
+
 
 @app.delete("/games/{id}", status_code=204)
 def delete_game(id: str, store: dict[str, dict] = Depends(get_store)):
