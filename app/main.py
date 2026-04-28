@@ -1,13 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
+import uuid
+
+from fastapi import FastAPI, Depends, HTTPException, Response
+from sqlalchemy.orm import Session
+
+from app.database import get_db
 from app.schemas import GameCreate, GameRead, GameUpdate
-from app.store import (
-    create_game as store_create_game,
-    get_game as store_get_game,
-    update_game as store_update_game,
-    delete_game as store_delete_game,
-    list_games,
-    get_store,
-)
+from app.crud import list_games, update_game, create_game, get_game, delete_game
 
 
 app = FastAPI()
@@ -19,34 +17,34 @@ def health():
 
 
 @app.get("/games", response_model=list[GameRead])
-def games(store: dict[str, dict] = Depends(get_store)):
-    return list_games(store)
+def list_game_route(db: Session = Depends(get_db)):
+    return list_games(db)
 
 
 @app.post("/games", status_code=201, response_model=GameRead)
-def create_game(game: GameCreate, store: dict[str, dict] = Depends(get_store)):
-    return store_create_game(store, game.model_dump())
+def create_game_route(game: GameCreate, db: Session = Depends(get_db)):
+    return create_game(db, game.model_dump())
 
 
 @app.patch("/games/{id}", response_model=GameRead)
-def update_game(id: str, game: GameUpdate, store: dict[str, dict] = Depends(get_store)):
-    updated = store_update_game(store, id, game.model_dump(exclude_unset=True, exclude={"id"}))
-    if not updated:
-        raise HTTPException(status_code=404, detail="Game not found")
+def update_game_route(id: uuid.UUID, game: GameUpdate, db: Session = Depends(get_db)):
+    updated = update_game(db, id, game.model_dump(exclude_unset=True))
+    if updated is None:
+        raise HTTPException(404, "Game not found")
     return updated
 
 
 @app.get("/games/{id}", response_model=GameRead)
-def get_game(id: str, store: dict[str, dict] = Depends(get_store)):
-    game = store_get_game(store, id)
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found")
+def get_game_route(id: uuid.UUID, db: Session = Depends(get_db)):
+    game = get_game(db, id)
+    if game is None:
+        raise HTTPException(404, "Game not found")
     return game
 
 
 @app.delete("/games/{id}", status_code=204)
-def delete_game(id: str, store: dict[str, dict] = Depends(get_store)):
-    ok = store_delete_game(store, id)
+def delete_game_route(id: uuid.UUID, db: Session = Depends(get_db)):
+    ok = delete_game(db, id)
     if not ok:
-        raise HTTPException(status_code=404, detail="Game not found")
+        raise HTTPException(404, "Game not found")
     return

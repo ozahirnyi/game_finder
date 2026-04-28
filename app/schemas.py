@@ -1,19 +1,22 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
+from typing import Optional
+import uuid
 
 
 class GameCreate(BaseModel):
-    title: str
-    notes: str | None = None
+    title: str = Field(max_length=30)
+    notes: Optional[str] = Field(default=None, max_length=255)
 
 
 class GameRead(BaseModel):
-    id: str
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
     title: str
-    notes: str | None = None
+    notes: Optional[str] = None
     created_at: datetime
 
 
 class GameUpdate(BaseModel):
-    title: str | None = None
-    notes: str | None = None
+    title: Optional[str] = Field(default=None, max_length=255)
+    notes: Optional[str] = Field(default=None, max_length=255)
