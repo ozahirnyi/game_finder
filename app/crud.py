@@ -1,4 +1,5 @@
 from app.database import Game
+import uuid
 
 
 def list_games(db):
@@ -12,7 +13,7 @@ def create_game(db, data):
     db.refresh(game)
     return game
 
-def update_game(db, game_id: str, data):
+def update_game(db, game_id: uuid.UUID, data):
     game = db.query(Game).filter(Game.id == game_id).first()
     if game is None:
         return None
@@ -26,14 +27,14 @@ def update_game(db, game_id: str, data):
 
 
 
-def get_game(db, game_id: str):
+def get_game(db, game_id: uuid.UUID):
     game = db.query(Game).filter(Game.id == game_id).first()
     if game is None:
         return None
     return game
 
 
-def delete_game(db, game_id: str):
+def delete_game(db, game_id: uuid.UUID):
     game = db.query(Game).filter(Game.id == game_id).first()
     if game is None:
         return False

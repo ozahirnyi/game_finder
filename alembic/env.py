@@ -5,6 +5,9 @@ from sqlalchemy import pool
 
 from alembic import context
 
+import os
+from dotenv import load_dotenv
+
 from app.database import Base
 
 # this is the Alembic Config object, which provides
@@ -27,6 +30,8 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+load_dotenv()
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -40,7 +45,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = config.get_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
     context.configure(
         url=url,
         target_metadata=target_metadata,

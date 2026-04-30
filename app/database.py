@@ -1,12 +1,20 @@
 import uuid
+import os
+from dotenv import load_dotenv
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import create_engine, String, DateTime
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 
-DATABASE_URL = "postgresql://postgres:1234@localhost:5432/gamefinder"
-engine = create_engine(DATABASE_URL, echo=True)
+
+load_dotenv()
+echo = os.getenv("DEBUG", "false").lower() == "true"
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL is not set")
+engine = create_engine(DATABASE_URL, echo=echo)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

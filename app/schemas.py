@@ -5,7 +5,7 @@ import uuid
 
 
 class GameCreate(BaseModel):
-    title: str = Field(max_length=30)
+    title: str = Field(max_length=255)
     notes: Optional[str] = Field(default=None, max_length=255)
 
 
