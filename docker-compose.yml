@@ -1,0 +1,16 @@
+
+services:
+  db:
+    image: postgres:15
+    container_name: gamefinder-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: gamefinder
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
