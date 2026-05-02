@@ -1,5 +1,5 @@
-from app.database import Game
 import uuid
+from app.database import Game
 
 
 def list_games(db):

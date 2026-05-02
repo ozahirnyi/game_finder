@@ -30,7 +30,7 @@ def create_game_route(game: GameCreate, db: Session = Depends(get_db)):
 def update_game_route(id: uuid.UUID, game: GameUpdate, db: Session = Depends(get_db)):
     updated = update_game(db, id, game.model_dump(exclude_unset=True))
     if updated is None:
-        raise HTTPException(404, "Game not found")
+        raise HTTPException(status_code=404, detail="Game not found")
     return updated
 
 
@@ -38,7 +38,7 @@ def update_game_route(id: uuid.UUID, game: GameUpdate, db: Session = Depends(get
 def get_game_route(id: uuid.UUID, db: Session = Depends(get_db)):
     game = get_game(db, id)
     if game is None:
-        raise HTTPException(404, "Game not found")
+        raise HTTPException(status_code=404, detail="Game not found")
     return game
 
 
@@ -46,5 +46,5 @@ def get_game_route(id: uuid.UUID, db: Session = Depends(get_db)):
 def delete_game_route(id: uuid.UUID, db: Session = Depends(get_db)):
     ok = delete_game(db, id)
     if not ok:
-        raise HTTPException(404, "Game not found")
+        raise HTTPException(status_code=404, detail="Game not found")
     return
