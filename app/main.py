@@ -18,24 +18,24 @@ def health():
 
 
 @app.get("/games", response_model=list[GameRead])
-def list_game_route(db: Session = Depends(get_db),current_user = Depends(get_current_user)):
+def list_game_route(db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
     return list_games(db, current_user.id)
 
 
 @app.post("/games", status_code=201, response_model=GameRead)
-def create_game_route(game: GameCreate,db: Session = Depends(get_db),current_user = Depends(get_current_user)):
+def create_game_route(game: GameCreate,db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
     return create_game(db, game.model_dump(), current_user.id)
 
 
 @app.patch("/games/{id}", response_model=GameRead)
-def update_game_route(id: uuid.UUID,game: GameUpdate,db: Session = Depends(get_db),current_user = Depends(get_current_user)):
+def update_game_route(id: uuid.UUID,game: GameUpdate,db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
     updated = update_game(db, id, game.model_dump(exclude_unset=True), current_user.id)
     if updated is None:
         raise HTTPException(status_code=404, detail="Game not found")
     return updated
 
 @app.get("/games/{id}", response_model=GameRead)
-def get_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user = Depends(get_current_user)):
+def get_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
     game = get_game(db, id, current_user.id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -43,7 +43,7 @@ def get_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user = De
 
 
 @app.delete("/games/{id}", status_code=204)
-def delete_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user = Depends(get_current_user)):
+def delete_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
     ok = delete_game(db, id, current_user.id)
     if not ok:
         raise HTTPException(status_code=404, detail="Game not found")

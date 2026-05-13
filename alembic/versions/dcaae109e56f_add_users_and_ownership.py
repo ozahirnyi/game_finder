@@ -28,10 +28,34 @@ def upgrade() -> None:
         sa.Column("password_hash", sa.String(length=255), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("email"),
-    )
-    op.add_column("games",sa.Column("owner_id", sa.UUID(), nullable=False),)
-    op.create_foreign_key("fk_games_owner_id_users","games","users",["owner_id"],["id"],)
+        sa.UniqueConstraint("email"),)
+    op.add_column(
+        "games",
+        sa.Column("owner_id", sa.UUID(), nullable=True),)
+    op.execute("""
+        INSERT INTO users (id, email, password_hash, created_at)
+        VALUES (
+            '00000000-0000-0000-0000-000000000000',
+            'migration@example.com',
+            '$2b$12$ApBrmzoBrYMWEOd9/NEmaue7u9AT4wumcXUWuEGNC18BjmvIJAj/C',
+            NOW()
+        )
+    """)
+    op.execute("""
+        UPDATE games
+        SET owner_id = '00000000-0000-0000-0000-000000000000'
+        WHERE owner_id IS NULL
+    """)
+    op.alter_column(
+        "games",
+        "owner_id",
+        nullable=False,)
+    op.create_foreign_key(
+        "fk_games_owner_id_users",
+        "games",
+        "users",
+        ["owner_id"],
+        ["id"],)
     # ### end Alembic commands ###
 
 
