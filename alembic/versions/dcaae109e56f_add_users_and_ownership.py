@@ -32,20 +32,24 @@ def upgrade() -> None:
     op.add_column(
         "games",
         sa.Column("owner_id", sa.UUID(), nullable=True),)
-    op.execute("""
-        INSERT INTO users (id, email, password_hash, created_at)
-        VALUES (
-            '00000000-0000-0000-0000-000000000000',
-            'migration@example.com',
-            '$2b$12$ApBrmzoBrYMWEOd9/NEmaue7u9AT4wumcXUWuEGNC18BjmvIJAj/C',
-            NOW()
-        )
-    """)
-    op.execute("""
-        UPDATE games
-        SET owner_id = '00000000-0000-0000-0000-000000000000'
-        WHERE owner_id IS NULL
-    """)
+    conn = op.get_bind()
+    has_existing_games = conn.execute(
+        sa.text("SELECT 1 FROM games LIMIT 1")).first()
+    if has_existing_games:
+        op.execute("""
+            INSERT INTO users (id, email, password_hash, created_at)
+            VALUES (
+                '00000000-0000-0000-0000-000000000000',
+                'migration@example.com',
+                '!',
+                NOW()
+            )
+        """)
+        op.execute("""
+            UPDATE games
+            SET owner_id = '00000000-0000-0000-0000-000000000000'
+            WHERE owner_id IS NULL
+        """)
     op.alter_column(
         "games",
         "owner_id",
