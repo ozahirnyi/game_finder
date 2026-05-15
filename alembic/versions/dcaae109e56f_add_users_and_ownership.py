@@ -33,9 +33,9 @@ def upgrade() -> None:
         "games",
         sa.Column("owner_id", sa.UUID(), nullable=True),)
     conn = op.get_bind()
-    has_existing_games = conn.execute(
-        sa.text("SELECT 1 FROM games LIMIT 1")).first()
-    if has_existing_games:
+    has_orphans = conn.execute(
+        sa.text("SELECT 1 FROM games WHERE owner_id IS NULL LIMIT 1")).first()
+    if has_orphans:
         op.execute("""
             INSERT INTO users (id, email, password_hash, created_at)
             VALUES (
