@@ -75,6 +75,15 @@ Until the repo contains app code, **Phase 1** can live as `scripts/rawg_cli.py`;
 
 ---
 
+## API security notes
+
+Protected `/games` endpoints require a Bearer JWT token.
+
+Access to another user's game returns `404 Not Found`
+instead of `403 Forbidden` to avoid leaking resource existence.
+
+---
+
 ## License
 
 Add a `LICENSE` before publishing to GitHub if you want this to be clearly open source.
