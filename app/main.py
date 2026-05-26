@@ -79,13 +79,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": token, "token_type": "bearer"}
 
 
-@app.get("/redis-test")
-async def redis_test():
-    await redis_client.set("test", "hello", ex=60)
-    value = await redis_client.get("test")
-    return {"value": value}
-
-
 @app.get("/search/games")
 async def search(q: str, page: int = 1):
     q = q.strip().lower()
@@ -95,7 +88,7 @@ async def search(q: str, page: int = 1):
         raise HTTPException(status_code=400, detail="page must be >= 1")
     key = build_cache_key("search", q=q, page=page)
     async def fetch():
-        return await fetch_rawg_games(q)
+        return await fetch_rawg_games(q, page=page)
     try:
         return await get_json_cached(key,CACHE_TTL,fetch)
     except RAWGError as e:

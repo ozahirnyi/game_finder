@@ -29,6 +29,8 @@ async def fetch_rawg_games(query: str, page: int = 1) -> dict[str, Any]:
             response.raise_for_status()
         except httpx.TimeoutException as e:
             raise RAWGError("RAWG request timeout",status_code=504) from e
+        except httpx.RequestError as e:
+            raise RAWGError("RAWG connection error",status_code=502) from e
         except httpx.HTTPStatusError as e:
             raise RAWGError(f"RAWG HTTP error: {e.response.status_code}",status_code=502) from e
     data = response.json()
@@ -43,7 +45,3 @@ async def fetch_rawg_games(query: str, page: int = 1) -> dict[str, Any]:
             for game in data.get("results", [])
         ]
     }
-
-
-async def fetch(query: str, page: int = 1) -> dict[str, Any]:
-    return await fetch_rawg_games(query, page=page)
