@@ -1,6 +1,4 @@
 import uuid
-from typing import Callable, Awaitable, Any
-from urllib import request
 
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -8,7 +6,6 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.cache import build_cache_key, get_json_cached
 from app.integrations.rawg import fetch_rawg_games, RAWGError
-from app.redis_client import redis_client
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.database import get_db, User
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead

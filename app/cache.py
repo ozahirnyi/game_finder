@@ -3,12 +3,9 @@ import json
 import logging
 from typing import Callable, Awaitable, Any
 from app.redis_client import redis_client
-from urllib.parse import urlencode
 
 
 logger = logging.getLogger(__name__)
-
-
 
 
 def build_cache_key(prefix: str, **params) -> str:
@@ -26,8 +23,6 @@ async def get_json_cached(key: str, ttl: int, fetch_fn: Callable[[], Awaitable[A
     try:
         cached = await redis_client.get(key)
         if cached:
-            if isinstance(cached, (bytes, bytearray)):
-                cached = cached.decode()
             try:
                 logger.info(f"cache HIT: {key}")
                 return json.loads(cached)
