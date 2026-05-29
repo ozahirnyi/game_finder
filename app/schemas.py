@@ -36,3 +36,14 @@ class UserRead(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+
+
+class GameSearchItem(BaseModel):
+    id: int | None = None
+    name: str | None = None
+    released: str | None = None
+    background_image: str | None = None
+
+
+class GameSearchResponse(BaseModel):
+    results: list[GameSearchItem]
