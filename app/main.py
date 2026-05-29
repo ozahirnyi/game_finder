@@ -1,15 +1,30 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import uuid
 
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
+
+from app.cache import build_cache_key, get_json_cached
+from app.integrations.rawg import fetch_rawg_games, RAWGError
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.database import get_db, User
-from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead
+from app.schemas import (
+    GameCreate,
+    GameRead,
+    GameSearchResponse,
+    GameUpdate,
+    UserCreate,
+    UserRead,
+)
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
 
 
 app = FastAPI()
+CACHE_TTL = 3600
 
 
 @app.get("/health")
@@ -70,3 +85,22 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token(db_user.id)
     return {"access_token": token, "token_type": "bearer"}
+
+
+@app.get("/search/games", response_model=GameSearchResponse)
+async def search(q: str, page: int = 1) -> GameSearchResponse:
+    q = q.strip().lower()
+    if not q:
+        raise HTTPException(status_code=400, detail="q cannot be empty")
+    if page < 1:
+        raise HTTPException(status_code=400, detail="page must be >= 1")
+    key = build_cache_key("search", q=q, page=page)
+    async def fetch():
+        return await fetch_rawg_games(q, page=page)
+    try:
+        data = await get_json_cached(key, CACHE_TTL, fetch)
+        return GameSearchResponse.model_validate(data)
+    except RAWGError as e:
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=str(e))
