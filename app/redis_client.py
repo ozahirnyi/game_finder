@@ -1,8 +1,6 @@
 import os
-from dotenv import load_dotenv
-from redis.asyncio import Redis
 
-load_dotenv()
+from redis.asyncio import Redis
 
 REDIS_URL = os.getenv("REDIS_URL")
 if not REDIS_URL:
