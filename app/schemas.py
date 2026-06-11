@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 import uuid
 
 
@@ -36,3 +36,18 @@ class UserRead(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+
+
+class RecommendationRequest(BaseModel):
+    prompt: str
+    liked_game_ids: list[int] = []
+
+
+class RecommendationItem(BaseModel):
+    title: str
+    reason: str
+    tags: List[str]
+
+
+class RecommendationResponse(BaseModel):
+    recommendations: List[RecommendationItem]

@@ -44,6 +44,44 @@ The project grows **incrementally** in a single repo (not a chain of throwaway e
 Detailed specs and checklists live in **ClickUp** (Game Finder Phase 1–7 tasks) or in `progression_bot/scripts/clickup_create_gamefinder_roadmap.py` (phase description text).
 
 ---
+## AI Endpoint
+
+### POST `/recommendations`
+
+Generates game recommendations using an LLM based on user prompt and preferences.
+
+### Request
+
+```json
+{
+  "prompt": "I like dark RPG games",
+  "liked_game_ids": [1, 2, 3]
+}
+Response
+{
+  "recommendations": [
+    {
+      "title": "Game name",
+      "reason": "Why it matches user preferences",
+      "tags": ["rpg", "dark", "story"]
+    }
+  ]
+}
+```
+
+---
+
+## Rate limiting
+
+```markdown
+## Rate Limiting
+
+- `/search/games`: 30 requests/min per IP
+- `/recommendations`: 5 requests/min per IP
+
+If limit is exceeded → `429 Too Many Requests`
+        
+---
 
 ## Stack (expected)
 
@@ -70,8 +108,55 @@ pip install -r requirements.txt   # appears after you bootstrap FastAPI
 cp .env.example .env
 # Fill in: RAWG, DATABASE_URL, REDIS_URL, SECRET_KEY, …
 ```
+---
+## Running with Docker
 
-Until the repo contains app code, **Phase 1** can live as `scripts/rawg_cli.py`; then add `app/` and Compose.
+```bash
+docker compose up --build
+```
+This starts:
+
+- FastAPI app
+- PostgreSQL
+- Redis
+
+```markdown
+## Services
+
+| Service | Description |
+|--------|-------------|
+| app | FastAPI backend |
+| db | PostgreSQL |
+| redis | cache layer |
+```
+---
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| DATABASE_URL | PostgreSQL connection string |
+| REDIS_URL | Redis connection |
+| RAWG_API_KEY | Game API key |
+| OPENAI_API_KEY | AI provider key |
+| SECRET_KEY | JWT signing key |
+
+---
+## Deployment
+
+The backend is deployed and accessible at:
+
+https://game-finder.up.railway.app
+
+### API Docs:
+https://game-finder.up.railway.app/docs
+
+---
+## Smoke Tests
+
+- GET `/health`
+- GET `/docs`
+- GET `/search/games?q=witcher`
+- POST `/recommendations`
 
 ---
 

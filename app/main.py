@@ -1,18 +1,31 @@
 import uuid
-
-from fastapi import FastAPI, Depends, HTTPException
+from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
-
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from app.openai_client import get_recommendation
 from app.cache import build_cache_key, get_json_cached
 from app.integrations.rawg import fetch_rawg_games, RAWGError
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.database import get_db, User
-from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead
+from app.database import get_db, User, Base, engine, wait_for_db
+from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    wait_for_db(engine)
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
 CACHE_TTL = 3600
 
 
@@ -77,7 +90,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 
 @app.get("/search/games")
-async def search(q: str, page: int = 1):
+@limiter.limit("30/minute")
+async def search(request: Request, q: str, page: int = 1):
     q = q.strip().lower()
     if not q:
         raise HTTPException(status_code=400, detail="q cannot be empty")
@@ -92,3 +106,21 @@ async def search(q: str, page: int = 1):
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e))
+
+
+@app.post("/recommendations")
+@limiter.limit("5/minute")
+async def recommendations(request: Request, data: RecommendationRequest):
+    if not data.prompt.strip():
+        raise HTTPException(status_code=400)
+    result = get_recommendation(
+        data.prompt,
+        data.liked_game_ids)
+    return result
+
+
+@app.exception_handler(RateLimitExceeded)
+def rate_limit_handler(request: Request,exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests"})
