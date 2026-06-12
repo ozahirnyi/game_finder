@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import uuid
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
@@ -101,7 +105,8 @@ async def search(request: Request, q: str, page: int = 1):
     async def fetch():
         return await fetch_rawg_games(q, page=page)
     try:
-        return await get_json_cached(key,CACHE_TTL,fetch)
+        data = await get_json_cached(key, CACHE_TTL, fetch)
+        return GameSearchResponse.model_validate(data)
     except RAWGError as e:
         raise HTTPException(
             status_code=e.status_code,
