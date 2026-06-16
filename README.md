@@ -57,7 +57,9 @@ Generates game recommendations using an LLM based on user prompt and preferences
   "prompt": "I like dark RPG games",
   "liked_game_ids": [1, 2, 3]
 }
+```
 Response
+```json
 {
   "recommendations": [
     {

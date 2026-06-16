@@ -1,8 +1,9 @@
 import json
 import os
 from dotenv import load_dotenv
+from fastapi import HTTPException
 from openai import OpenAI
-from openai import (APIConnectionError,RateLimitError,APIStatusError,OpenAIError)
+from openai import (APIConnectionError,RateLimitError)
 from app.schemas import RecommendationResponse
 
 load_dotenv()
@@ -68,8 +69,8 @@ def get_recommendation(prompt: str, liked_game_ids: list[str]) -> dict:
         validated = RecommendationResponse(**data)
         return validated.model_dump()
     except RateLimitError:
-        return {"error": "AI service busy"}
+        raise HTTPException(status_code=503,detail="AI service busy")
     except APIConnectionError:
-        return {"error": "AI service unavailable"}
+        raise HTTPException(status_code=503,detail="Service Unavailable")
     except Exception:
-        return {"error": "AI failed to produce valid response"}
+        raise HTTPException(status_code=502,detail="Bad Gateway")

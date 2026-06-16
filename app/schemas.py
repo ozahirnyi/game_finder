@@ -40,7 +40,7 @@ class UserLogin(BaseModel):
 
 class RecommendationRequest(BaseModel):
     prompt: str
-    liked_game_ids: list[int] = []
+    liked_game_ids: list[str] = []
 
 
 class RecommendationItem(BaseModel):
@@ -51,3 +51,14 @@ class RecommendationItem(BaseModel):
 
 class RecommendationResponse(BaseModel):
     recommendations: List[RecommendationItem]
+
+
+class GameSearchItem(BaseModel):
+    id: int | None = None
+    name: str | None = None
+    released: str | None = None
+    background_image: str | None = None
+
+
+class GameSearchResponse(BaseModel):
+    results: list[GameSearchItem]

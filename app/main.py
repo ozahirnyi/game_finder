@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
@@ -12,7 +13,8 @@ from app.cache import build_cache_key, get_json_cached
 from app.integrations.rawg import fetch_rawg_games, RAWGError
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.database import get_db, User, Base, engine, wait_for_db
-from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest
+from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, \
+    RecommendationResponse, GameSearchResponse
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
 
 
@@ -89,7 +91,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": token, "token_type": "bearer"}
 
 
-@app.get("/search/games")
+@app.get("/search/games",response_model=GameSearchResponse)
 @limiter.limit("30/minute")
 async def search(request: Request, q: str, page: int = 1):
     q = q.strip().lower()
@@ -108,19 +110,18 @@ async def search(request: Request, q: str, page: int = 1):
             detail=str(e))
 
 
-@app.post("/recommendations")
+@app.post("/recommendations",response_model=RecommendationResponse)
 @limiter.limit("5/minute")
 async def recommendations(request: Request, data: RecommendationRequest):
     if not data.prompt.strip():
-        raise HTTPException(status_code=400)
-    result = get_recommendation(
+        raise HTTPException(status_code=400,detail="prompt cannot be empty")
+    result = await asyncio.to_thread(
+        get_recommendation,
         data.prompt,
-        data.liked_game_ids)
+        data.liked_game_ids,)
     return result
 
 
 @app.exception_handler(RateLimitExceeded)
 def rate_limit_handler(request: Request,exc: RateLimitExceeded):
-    return JSONResponse(
-        status_code=429,
-        content={"detail": "Too many requests"})
+    return JSONResponse(status_code=429,content={"detail": "Too many requests"})
