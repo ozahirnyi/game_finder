@@ -40,7 +40,7 @@ class UserLogin(BaseModel):
 
 class RecommendationRequest(BaseModel):
     prompt: str
-    liked_game_ids: list[str] = []
+    liked_game_ids: list[int] = []
 
 
 class RecommendationItem(BaseModel):

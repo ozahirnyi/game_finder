@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from fastapi import HTTPException
 from openai import OpenAI
 from openai import (APIConnectionError,RateLimitError)
+from app.cache import logger
 from app.schemas import RecommendationResponse
 
 load_dotenv()
@@ -54,10 +55,13 @@ def build_prompt(prompt: str, liked_game_ids: list[str]) -> str:
     """.strip()
 
 
-def get_recommendation(prompt: str, liked_game_ids: list[str]) -> dict:
-    client = get_client()
+def get_recommendation(prompt: str, liked_game_ids: list[int]) -> dict:
+    try:
+        client = get_client()
+    except Exception:
+        raise HTTPException(status_code=503,detail="Service Unavailable")
     if not prompt or not prompt.strip():
-        raise ValueError("Prompt cannot be empty")
+        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
     prompt_text = build_prompt(prompt, liked_game_ids)
     try:
         response = client.responses.create(
@@ -72,5 +76,8 @@ def get_recommendation(prompt: str, liked_game_ids: list[str]) -> dict:
         raise HTTPException(status_code=503,detail="AI service busy")
     except APIConnectionError:
         raise HTTPException(status_code=503,detail="Service Unavailable")
-    except Exception:
-        raise HTTPException(status_code=502,detail="Bad Gateway")
+    except (ValueError, KeyError):
+        raise HTTPException(status_code=500, detail="AI response invalid")
+    except Exception as e:
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail="Internal AI error")
