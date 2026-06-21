@@ -53,6 +53,7 @@ def update_game_route(id: uuid.UUID,game: GameUpdate,db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Game not found")
     return updated
 
+
 @app.get("/games/{id}", response_model=GameRead)
 def get_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
     game = get_game(db, id, current_user.id)

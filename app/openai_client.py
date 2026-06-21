@@ -24,7 +24,7 @@ def parse_ai_response(text: str) -> dict:
         raise ValueError("AI returned invalid JSON")
 
 
-def build_prompt(prompt: str, liked_game_ids: list[str]) -> str:
+def build_prompt(prompt: str, liked_game_ids: list[int]) -> str:
     liked = ", ".join(map(str, liked_game_ids)) if liked_game_ids else "none"
     return f"""
     You are a game recommendation system.
