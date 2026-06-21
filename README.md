@@ -44,6 +44,7 @@ The project grows **incrementally** in a single repo (not a chain of throwaway e
 Detailed specs and checklists live in **ClickUp** (Game Finder Phase 1–7 tasks) or in `progression_bot/scripts/clickup_create_gamefinder_roadmap.py` (phase description text).
 
 ---
+
 ## AI Endpoint
 
 ### POST `/recommendations`
@@ -58,7 +59,8 @@ Generates game recommendations using an LLM based on user prompt and preferences
   "liked_game_ids": [1, 2, 3]
 }
 ```
-Response
+
+### Response
 ```json
 {
   "recommendations": [
@@ -73,16 +75,13 @@ Response
 
 ---
 
-## Rate limiting
-
-```markdown
 ## Rate Limiting
 
 - `/search/games`: 30 requests/min per IP
 - `/recommendations`: 5 requests/min per IP
 
 If limit is exceeded → `429 Too Many Requests`
-        
+
 ---
 
 ## Stack (expected)
@@ -110,7 +109,9 @@ pip install -r requirements.txt   # appears after you bootstrap FastAPI
 cp .env.example .env
 # Fill in: RAWG, DATABASE_URL, REDIS_URL, SECRET_KEY, …
 ```
+
 ---
+
 ## Running with Docker
 
 ```bash
@@ -122,16 +123,18 @@ This starts:
 - PostgreSQL
 - Redis
 
-```markdown
+---
+
 ## Services
 
 | Service | Description |
-|--------|-------------|
+|---------|-------------|
 | app | FastAPI backend |
 | db | PostgreSQL |
 | redis | cache layer |
-```
+
 ---
+
 ## Environment Variables
 
 | Variable | Description |
@@ -143,6 +146,7 @@ This starts:
 | SECRET_KEY | JWT signing key |
 
 ---
+
 ## Deployment
 
 The backend is deployed and accessible at:
@@ -153,6 +157,7 @@ https://game-finder.up.railway.app
 https://game-finder.up.railway.app/docs
 
 ---
+
 ## Smoke Tests
 
 - GET `/health`
