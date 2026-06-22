@@ -1,13 +1,14 @@
 import json
 import os
-import redis
+import logging
+import redis.asyncio as redis
 from dotenv import load_dotenv
 
-
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 
 try:
@@ -16,22 +17,24 @@ except Exception:
     redis_client = None
 
 
-def cache_get(key: str):
+async def cache_get(key: str):
     if not redis_client:
         return None
     try:
-        value = redis_client.get(key)
+        value = await redis_client.get(key)
         if not value:
             return None
         return json.loads(value)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Redis read failed: {e}")
         return None
 
 
-def cache_set(key: str, value, ttl: int):
+async def cache_set(key: str, value, ttl: int):
     if not redis_client:
+        logger.warning("Redis is not initialized")
         return
     try:
-        redis_client.setex(key,ttl,json.dumps(value))
-    except Exception:
-        return
+        await redis_client.setex(key,ttl,json.dumps(value))
+    except Exception as e:
+        logger.warning(f"Redis write failed: {e}")

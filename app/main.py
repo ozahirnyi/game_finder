@@ -74,7 +74,12 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     existing_user = get_user_by_email(db, user.email)
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists")
-    hashed_password = hash_password(user.password)
+    try:
+        hashed_password = hash_password(user.password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Password hashing failed")
     new_user = create_user(db, user.email, hashed_password)
     return new_user
 
