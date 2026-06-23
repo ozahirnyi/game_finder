@@ -1,3 +1,4 @@
+import time
 import uuid
 import os
 from dotenv import load_dotenv
@@ -6,6 +7,7 @@ from typing import Optional
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import create_engine, String, DateTime, ForeignKey
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.exc import OperationalError
 
 
 load_dotenv()
@@ -51,3 +53,14 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def wait_for_db(engine):
+    for i in range(30):
+        try:
+            with engine.connect():
+                return
+        except OperationalError:
+            print(f"DB not ready... retry {i+1}/30")
+            time.sleep(1)
+    raise Exception("DB not ready after retries")
