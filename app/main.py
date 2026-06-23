@@ -1,29 +1,33 @@
-from dotenv import load_dotenv
-
-load_dotenv()
-
+import asyncio
 import uuid
-
-from fastapi import FastAPI, Depends, HTTPException
+from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
-
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from app.openai_client import get_recommendation
 from app.cache import build_cache_key, get_json_cached
 from app.integrations.rawg import fetch_rawg_games, RAWGError
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.database import get_db, User
-from app.schemas import (
-    GameCreate,
-    GameRead,
-    GameSearchResponse,
-    GameUpdate,
-    UserCreate,
-    UserRead,
-)
+from app.database import get_db, User, Base, engine, wait_for_db
+from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, \
+    RecommendationResponse, GameSearchResponse
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    wait_for_db(engine)
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
 CACHE_TTL = 3600
 
 
@@ -49,6 +53,7 @@ def update_game_route(id: uuid.UUID,game: GameUpdate,db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Game not found")
     return updated
 
+
 @app.get("/games/{id}", response_model=GameRead)
 def get_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
     game = get_game(db, id, current_user.id)
@@ -69,7 +74,12 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     existing_user = get_user_by_email(db, user.email)
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists")
-    hashed_password = hash_password(user.password)
+    try:
+        hashed_password = hash_password(user.password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Password hashing failed")
     new_user = create_user(db, user.email, hashed_password)
     return new_user
 
@@ -87,8 +97,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": token, "token_type": "bearer"}
 
 
-@app.get("/search/games", response_model=GameSearchResponse)
-async def search(q: str, page: int = 1) -> GameSearchResponse:
+@app.get("/search/games",response_model=GameSearchResponse)
+@limiter.limit("30/minute")
+async def search(request: Request, q: str, page: int = 1):
     q = q.strip().lower()
     if not q:
         raise HTTPException(status_code=400, detail="q cannot be empty")
@@ -98,9 +109,25 @@ async def search(q: str, page: int = 1) -> GameSearchResponse:
     async def fetch():
         return await fetch_rawg_games(q, page=page)
     try:
-        data = await get_json_cached(key, CACHE_TTL, fetch)
-        return GameSearchResponse.model_validate(data)
+        return await get_json_cached(key,CACHE_TTL,fetch)
     except RAWGError as e:
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e))
+
+
+@app.post("/recommendations",response_model=RecommendationResponse)
+@limiter.limit("5/minute")
+async def recommendations(request: Request, data: RecommendationRequest):
+    if not data.prompt.strip():
+        raise HTTPException(status_code=400,detail="prompt cannot be empty")
+    result = await asyncio.to_thread(
+        get_recommendation,
+        data.prompt,
+        data.liked_game_ids,)
+    return result
+
+
+@app.exception_handler(RateLimitExceeded)
+def rate_limit_handler(request: Request,exc: RateLimitExceeded):
+    return JSONResponse(status_code=429,content={"detail": "Too many requests"})
