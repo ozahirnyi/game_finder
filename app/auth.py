@@ -24,8 +24,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 def hash_password(password: str) -> str:
-    if len(password.encode("utf-8")) > 72:
-        raise ValueError("Password too long")
     return pwd_context.hash(password)
 
 
