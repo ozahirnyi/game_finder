@@ -7,6 +7,7 @@ import uuid
 class GameCreate(BaseModel):
     title: str = Field(max_length=255)
     notes: Optional[str] = Field(default=None, max_length=255)
+    info: Optional[str] = Field(default=None, max_length=500)
 
 
 class GameRead(BaseModel):
@@ -14,11 +15,11 @@ class GameRead(BaseModel):
     id: uuid.UUID
     title: str
     notes: Optional[str] = None
+    info: Optional[str] = None
     created_at: datetime
 
 
 class GameUpdate(BaseModel):
-    title: Optional[str] = Field(default=None, max_length=255)
     notes: Optional[str] = Field(default=None, max_length=255)
 
 
@@ -62,3 +63,14 @@ class GameSearchItem(BaseModel):
 
 class GameSearchResponse(BaseModel):
     results: list[GameSearchItem]
+
+
+class GameCatalogDetail(BaseModel):
+    id: int
+    name: str
+    released: str | None = None
+    background_image: str | None = None
+    description_raw: str | None = None
+    rating: float | None = None
+    genres: list[str] = []
+    platforms: list[str] = []
