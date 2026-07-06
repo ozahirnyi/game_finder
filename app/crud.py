@@ -19,6 +19,8 @@ def update_game(db, game_id: uuid.UUID, data, current_user):
     game = (db.query(Game).filter(Game.id == game_id,Game.owner_id == current_user).first())
     if game is None:
         return None
+    if "title" in data:
+        game.title = data["title"]
     if "notes" in data:
         game.notes = data["notes"]
     db.commit()

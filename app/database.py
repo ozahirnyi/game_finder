@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import create_engine, String, DateTime, ForeignKey, inspect, text
+from sqlalchemy import create_engine, String, DateTime, ForeignKey
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.exc import OperationalError
 
@@ -18,31 +18,6 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set")
 engine = create_engine(DATABASE_URL, echo=echo)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def ensure_runtime_columns() -> None:
-    inspector = inspect(engine)
-    if "games" not in inspector.get_table_names():
-        return
-
-    game_columns = {column["name"] for column in inspector.get_columns("games")}
-    if "info" in game_columns:
-        return
-
-    with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE games ADD COLUMN info VARCHAR(500)"))
-        conn.execute(
-            text(
-                """
-                UPDATE games
-                SET info = notes,
-                    notes = NULL
-                WHERE notes LIKE 'Released:%'
-                   OR notes LIKE 'Rating:%'
-                   OR notes LIKE 'Platforms:%'
-                """
-            )
-        )
 
 
 class Base(DeclarativeBase):

@@ -14,7 +14,7 @@ from app.openai_client import get_recommendation
 from app.cache import build_cache_key, get_json_cached
 from app.integrations.rawg import fetch_rawg_game_detail, fetch_rawg_games, RAWGError
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.database import get_db, User, Base, engine, wait_for_db, ensure_runtime_columns
+from app.database import get_db, User, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
@@ -34,8 +34,6 @@ def get_allowed_origins() -> list[str]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     wait_for_db(engine)
-    Base.metadata.create_all(bind=engine)
-    ensure_runtime_columns()
     yield
 
 

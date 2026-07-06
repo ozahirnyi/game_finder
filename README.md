@@ -115,7 +115,9 @@ cp .env.example .env
 ## Running with Docker
 
 ```bash
-docker compose up --build
+docker compose up -d db redis
+docker compose run --rm app alembic upgrade head
+docker compose up --build app
 ```
 This starts:
 
@@ -127,10 +129,12 @@ This starts:
 
 ## Running API + Web
 
-Start the API stack first:
+Start the database/cache, run migrations, then start the API:
 
 ```bash
-docker compose up --build
+docker compose up -d db redis
+docker compose run --rm app alembic upgrade head
+docker compose up --build app
 ```
 
 In a second terminal, start the Next.js frontend:
@@ -164,6 +168,7 @@ RAWG_API_KEY=your-rawg-key
 RAWG_TIMEOUT_SECONDS=12
 OPENAI_API_KEY=your-openai-key
 OPENAI_TIMEOUT_SECONDS=8
+AI_FALLBACK_ENABLED=true
 SECRET_KEY=your-secret-key
 ```
 
@@ -172,6 +177,8 @@ On Railway, set `FRONTEND_ORIGINS` to the comma-separated list of frontend URLs 
 ```bash
 FRONTEND_ORIGINS=http://localhost:3000,https://your-gamefinder-frontend.railway.app
 ```
+
+Set `AI_FALLBACK_ENABLED=false` in production if you want `/recommendations` to fail visibly with `503` when OpenAI is unavailable instead of returning local fallback recommendations.
 
 Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy. If you prefer pnpm later, enable it with Corepack and run the equivalent install/dev commands inside `web/`.
 

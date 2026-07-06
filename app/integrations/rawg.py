@@ -6,7 +6,19 @@ from typing import Any
 
 RAWG_BASE_URL = "https://api.rawg.io/api"
 RAWG_API_KEY = os.getenv("RAWG_API_KEY")
-RAWG_TIMEOUT_SECONDS = float(os.getenv("RAWG_TIMEOUT_SECONDS", "12"))
+
+
+def get_float_env(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
+
+
+RAWG_TIMEOUT_SECONDS = get_float_env("RAWG_TIMEOUT_SECONDS", 12.0)
 
 
 class RAWGError(Exception):
