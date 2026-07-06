@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 import uuid
 
 
@@ -20,6 +20,7 @@ class GameRead(BaseModel):
 
 
 class GameUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=255)
     notes: Optional[str] = Field(default=None, max_length=255)
 
 
@@ -41,17 +42,17 @@ class UserLogin(BaseModel):
 
 class RecommendationRequest(BaseModel):
     prompt: str
-    liked_game_ids: list[int] = []
+    liked_game_ids: list[int] = Field(default_factory=list)
 
 
 class RecommendationItem(BaseModel):
     title: str
     reason: str
-    tags: List[str]
+    tags: list[str] = Field(default_factory=list)
 
 
 class RecommendationResponse(BaseModel):
-    recommendations: List[RecommendationItem]
+    recommendations: list[RecommendationItem] = Field(default_factory=list)
 
 
 class GameSearchItem(BaseModel):
@@ -72,5 +73,5 @@ class GameCatalogDetail(BaseModel):
     background_image: str | None = None
     description_raw: str | None = None
     rating: float | None = None
-    genres: list[str] = []
-    platforms: list[str] = []
+    genres: list[str] = Field(default_factory=list)
+    platforms: list[str] = Field(default_factory=list)

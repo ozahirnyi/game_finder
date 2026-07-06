@@ -10,6 +10,17 @@ from app.schemas import RecommendationResponse
 load_dotenv()
 
 
+def fallback_enabled() -> bool:
+    return os.getenv("AI_FALLBACK_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def fallback_or_raise(prompt: str, reason: str) -> dict:
+    if fallback_enabled():
+        logger.warning("%s; using fallback recommendations", reason)
+        return fallback_recommendations(prompt)
+    raise HTTPException(status_code=503, detail=reason)
+
+
 def get_client() -> OpenAI:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -124,13 +135,12 @@ def get_recommendation(prompt: str, liked_game_ids: list[int]) -> dict:
     try:
         client = get_client()
     except Exception:
-        logger.warning("OPENAI_API_KEY is missing or invalid; using fallback recommendations")
-        return fallback_recommendations(prompt)
+        return fallback_or_raise(prompt, "OPENAI_API_KEY is missing or invalid")
     if not prompt or not prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
     prompt_text = build_prompt(prompt, liked_game_ids)
     try:
-        timeout = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "8"))
+        timeout = float(os.getenv("OPENAI_TIMEOUT_SECONDS") or "8")
         response = client.responses.create(
             model="gpt-4.1-mini",
             input=prompt_text,
@@ -140,14 +150,11 @@ def get_recommendation(prompt: str, liked_game_ids: list[int]) -> dict:
         validated = RecommendationResponse(**data)
         return validated.model_dump()
     except RateLimitError:
-        logger.warning("OpenAI rate limit reached; using fallback recommendations")
-        return fallback_recommendations(prompt)
+        return fallback_or_raise(prompt, "OpenAI rate limit reached")
     except APIConnectionError:
-        logger.warning("OpenAI connection failed; using fallback recommendations")
-        return fallback_recommendations(prompt)
+        return fallback_or_raise(prompt, "OpenAI connection failed")
     except (ValueError, KeyError):
-        logger.warning("OpenAI response was invalid; using fallback recommendations")
-        return fallback_recommendations(prompt)
+        return fallback_or_raise(prompt, "OpenAI response was invalid")
     except Exception as e:
         logger.exception(e)
-        return fallback_recommendations(prompt)
+        return fallback_or_raise(prompt, "OpenAI recommendations failed")
