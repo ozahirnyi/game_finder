@@ -1,6 +1,6 @@
 from app.integrations.rawg import get_float_env
 from app.main import get_allowed_origins
-from app.openai_client import fallback_or_raise
+from app.openai_client import fallback_or_raise, get_recommendation
 from fastapi import HTTPException
 
 
@@ -39,3 +39,58 @@ def test_ai_fallback_can_be_disabled(monkeypatch):
         assert exc.detail == "OpenAI unavailable"
     else:
         raise AssertionError("fallback_or_raise should raise when fallback is disabled")
+
+
+def test_missing_openai_key_does_not_use_fallback(monkeypatch):
+    monkeypatch.setenv("AI_FALLBACK_ENABLED", "true")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    try:
+        get_recommendation("dark rpg", [])
+    except HTTPException as exc:
+        assert exc.status_code == 503
+        assert exc.detail == "OpenAI client is not configured"
+    else:
+        raise AssertionError("missing OPENAI_API_KEY should not return fallback recommendations")
+
+
+def test_invalid_openai_timeout_does_not_use_fallback(monkeypatch):
+    class FakeResponses:
+        def create(self, **_kwargs):
+            raise AssertionError("client call should not happen when timeout config is invalid")
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    monkeypatch.setenv("AI_FALLBACK_ENABLED", "true")
+    monkeypatch.setenv("OPENAI_TIMEOUT_SECONDS", "not-a-number")
+    monkeypatch.setattr("app.openai_client.get_client", lambda: FakeClient())
+
+    try:
+        get_recommendation("dark rpg", [])
+    except HTTPException as exc:
+        assert exc.status_code == 503
+        assert exc.detail == "OPENAI_TIMEOUT_SECONDS must be a number"
+    else:
+        raise AssertionError("invalid OPENAI_TIMEOUT_SECONDS should not return fallback recommendations")
+
+
+def test_unexpected_openai_client_error_does_not_use_fallback(monkeypatch):
+    class FakeResponses:
+        def create(self, **_kwargs):
+            raise RuntimeError("SDK mismatch")
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    monkeypatch.setenv("AI_FALLBACK_ENABLED", "true")
+    monkeypatch.setenv("OPENAI_TIMEOUT_SECONDS", "8")
+    monkeypatch.setattr("app.openai_client.get_client", lambda: FakeClient())
+
+    try:
+        get_recommendation("dark rpg", [])
+    except HTTPException as exc:
+        assert exc.status_code == 500
+        assert exc.detail == "OpenAI recommendations failed"
+    else:
+        raise AssertionError("unexpected OpenAI client errors should not return fallback recommendations")

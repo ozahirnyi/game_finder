@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import HTTPException
 from openai import OpenAI
-from openai import (APIConnectionError,RateLimitError)
+from openai import APIConnectionError, APIStatusError, APITimeoutError, AuthenticationError, PermissionDeniedError, RateLimitError
 from app.cache import logger
 from app.schemas import RecommendationResponse
 
@@ -19,6 +19,10 @@ def fallback_or_raise(prompt: str, reason: str) -> dict:
         logger.warning("%s; using fallback recommendations", reason)
         return fallback_recommendations(prompt)
     raise HTTPException(status_code=503, detail=reason)
+
+
+def openai_config_error(reason: str) -> HTTPException:
+    return HTTPException(status_code=503, detail=reason)
 
 
 def get_client() -> OpenAI:
@@ -132,15 +136,19 @@ def fallback_recommendations(prompt: str) -> dict:
 
 
 def get_recommendation(prompt: str, liked_game_ids: list[int]) -> dict:
-    try:
-        client = get_client()
-    except Exception:
-        return fallback_or_raise(prompt, "OPENAI_API_KEY is missing or invalid")
     if not prompt or not prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+    try:
+        client = get_client()
+    except Exception as e:
+        logger.exception(e)
+        raise openai_config_error("OpenAI client is not configured")
     prompt_text = build_prompt(prompt, liked_game_ids)
     try:
         timeout = float(os.getenv("OPENAI_TIMEOUT_SECONDS") or "8")
+    except ValueError as e:
+        raise openai_config_error("OPENAI_TIMEOUT_SECONDS must be a number") from e
+    try:
         response = client.responses.create(
             model="gpt-4.1-mini",
             input=prompt_text,
@@ -151,10 +159,16 @@ def get_recommendation(prompt: str, liked_game_ids: list[int]) -> dict:
         return validated.model_dump()
     except RateLimitError:
         return fallback_or_raise(prompt, "OpenAI rate limit reached")
-    except APIConnectionError:
+    except (APIConnectionError, APITimeoutError):
         return fallback_or_raise(prompt, "OpenAI connection failed")
+    except (AuthenticationError, PermissionDeniedError) as e:
+        logger.exception(e)
+        raise HTTPException(status_code=503, detail="OpenAI authentication or permission failed")
+    except APIStatusError as e:
+        logger.exception(e)
+        raise HTTPException(status_code=502, detail=f"OpenAI API error: {e.status_code}")
     except (ValueError, KeyError):
         return fallback_or_raise(prompt, "OpenAI response was invalid")
     except Exception as e:
         logger.exception(e)
-        return fallback_or_raise(prompt, "OpenAI recommendations failed")
+        raise HTTPException(status_code=500, detail="OpenAI recommendations failed")
