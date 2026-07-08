@@ -1,8 +1,10 @@
 import asyncio
+import os
 import uuid
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
@@ -10,22 +12,39 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.openai_client import get_recommendation
 from app.cache import build_cache_key, get_json_cached
-from app.integrations.rawg import fetch_rawg_games, RAWGError
+from app.integrations.rawg import fetch_rawg_game_detail, fetch_rawg_games, RAWGError
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.database import get_db, User, Base, engine, wait_for_db
+from app.database import get_db, User, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, \
-    RecommendationResponse, GameSearchResponse
+    RecommendationResponse, GameCatalogDetail, GameSearchResponse
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
+
+
+def get_allowed_origins() -> list[str]:
+    origins = {"http://localhost:3000"}
+    for env_name in ("FRONTEND_ORIGIN", "FRONTEND_ORIGINS"):
+        raw = os.getenv(env_name, "")
+        for origin in raw.split(","):
+            origin = origin.strip().rstrip("/")
+            if origin:
+                origins.add(origin)
+    return sorted(origins)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     wait_for_db(engine)
-    Base.metadata.create_all(bind=engine)
     yield
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_allowed_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 CACHE_TTL = 3600
@@ -114,6 +133,21 @@ async def search(request: Request, q: str, page: int = 1):
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e))
+
+
+@app.get("/catalog/games/{rawg_id}", response_model=GameCatalogDetail)
+async def catalog_game_detail(rawg_id: int):
+    if rawg_id < 1:
+        raise HTTPException(status_code=400, detail="rawg_id must be >= 1")
+    key = build_cache_key("catalog_game", rawg_id=rawg_id)
+
+    async def fetch():
+        return await fetch_rawg_game_detail(rawg_id)
+
+    try:
+        return await get_json_cached(key, CACHE_TTL, fetch)
+    except RAWGError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
 @app.post("/recommendations",response_model=RecommendationResponse)
