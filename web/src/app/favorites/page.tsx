@@ -1,0 +1,168 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import {
+  ApiError,
+  SavedGame,
+  deleteSavedGame,
+  isAuthenticated,
+  listSavedGames,
+  updateSavedGame,
+} from "@/lib/api";
+
+export default function FavoritesPage() {
+  const router = useRouter();
+  const [games, setGames] = useState<SavedGame[]>([]);
+  const [expandedId, setExpandedId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      router.push("/login?message=Log in to open your saved games.");
+      return;
+    }
+
+    let active = true;
+    listSavedGames()
+      .then((data) => {
+        if (active) {
+          setGames(data);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setError(err instanceof ApiError ? err.message : "Could not load your saved games.");
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  async function removeGame(id: string) {
+    setSavingId(id);
+    setError("");
+    setMessage("");
+    try {
+      await deleteSavedGame(id);
+      setGames((current) => current.filter((game) => game.id !== id));
+      setMessage("Removed from your library.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not remove this game.");
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function saveEdit(event: FormEvent<HTMLFormElement>, game: SavedGame) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const notes = String(formData.get("notes") ?? "").trim();
+
+    setSavingId(game.id);
+    setError("");
+    setMessage("");
+    try {
+      const updated = await updateSavedGame(game.id, notes);
+      setGames((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setMessage("Saved changes.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not save changes.");
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  function toggleExpanded(id: string) {
+    setExpandedId((current) => (current === id ? "" : id));
+  }
+
+  return (
+    <section className="stack">
+      <div className="section-header">
+        <p className="eyebrow">Your library</p>
+        <h1>Saved games</h1>
+        <p>Keep the games you want to revisit, compare, or play later.</p>
+      </div>
+
+      {message && <p className="alert success">{message}</p>}
+      {error && <p className="alert error">{error}</p>}
+      {loading && <p className="alert">Loading your library...</p>}
+      {!loading && games.length === 0 && (
+        <div className="empty-state">
+          <p>Your library is empty for now.</p>
+          <Link className="button secondary fit" href="/">
+            Find games
+          </Link>
+        </div>
+      )}
+
+      <div className="favorites-list">
+        {games.map((game) => (
+          <form
+            className={`favorite-item ${expandedId === game.id ? "expanded" : ""}`}
+            key={game.id}
+            onSubmit={(event) => saveEdit(event, game)}
+          >
+            <button
+              className="favorite-title"
+              type="button"
+              aria-expanded={expandedId === game.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleExpanded(game.id);
+              }}
+            >
+              <span>Title</span>
+              <strong>{game.title}</strong>
+            </button>
+            <label onClick={(event) => event.stopPropagation()}>
+              Notes
+              <input
+                name="notes"
+                defaultValue={game.notes ?? ""}
+                maxLength={255}
+                placeholder="Write your own note..."
+              />
+            </label>
+            <div className="favorite-actions" onClick={(event) => event.stopPropagation()}>
+              <button type="submit" disabled={savingId === game.id}>
+                Save
+              </button>
+              <button
+                className="danger"
+                type="button"
+                disabled={savingId === game.id}
+                onClick={() => removeGame(game.id)}
+              >
+                Delete
+              </button>
+            </div>
+            {expandedId === game.id && (
+              <div className="favorite-expanded">
+                <div>
+                  <p className="eyebrow">Game info</p>
+                  <p>{game.info || "No game info saved yet."}</p>
+                </div>
+                <div className="meta-row">
+                  <span>Saved {new Date(game.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            )}
+          </form>
+        ))}
+      </div>
+    </section>
+  );
+}

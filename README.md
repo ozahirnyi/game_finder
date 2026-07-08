@@ -115,13 +115,72 @@ cp .env.example .env
 ## Running with Docker
 
 ```bash
-docker compose up --build
+docker compose up -d db redis
+docker compose run --rm app alembic upgrade head
+docker compose up --build app
 ```
 This starts:
 
 - FastAPI app
 - PostgreSQL
 - Redis
+
+---
+
+## Running API + Web
+
+Start the database/cache, run migrations, then start the API:
+
+```bash
+docker compose up -d db redis
+docker compose run --rm app alembic upgrade head
+docker compose up --build app
+```
+
+In a second terminal, start the Next.js frontend:
+
+```bash
+cd web
+npm.cmd install
+npm.cmd run dev
+```
+
+The web app runs at `http://localhost:3000` and calls the API URL from `web/.env.local`:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+For a deployed frontend, point it at the Railway backend after the latest API deploy:
+
+```bash
+NEXT_PUBLIC_API_URL=https://game-finder.up.railway.app
+```
+
+For the API, keep these values in `.env`:
+
+```bash
+FRONTEND_ORIGIN=http://localhost:3000
+FRONTEND_ORIGINS=http://localhost:3000,https://your-frontend-domain.example
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/gamefinder
+REDIS_URL=redis://redis:6379/0
+RAWG_API_KEY=your-rawg-key
+RAWG_TIMEOUT_SECONDS=12
+OPENAI_API_KEY=your-openai-key
+OPENAI_TIMEOUT_SECONDS=8
+AI_FALLBACK_ENABLED=true
+SECRET_KEY=your-secret-key
+```
+
+On Railway, set `FRONTEND_ORIGINS` to the comma-separated list of frontend URLs that should be allowed by CORS. For example:
+
+```bash
+FRONTEND_ORIGINS=http://localhost:3000,https://your-gamefinder-frontend.railway.app
+```
+
+Set `AI_FALLBACK_ENABLED=false` in production if you want `/recommendations` to fail visibly with `503` when OpenAI is unavailable instead of returning local fallback recommendations.
+
+Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy. If you prefer pnpm later, enable it with Corepack and run the equivalent install/dev commands inside `web/`.
 
 ---
 

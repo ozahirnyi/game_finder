@@ -1,6 +1,3 @@
-version: "3.9"
-
-
 services:
   app:
     build: .
@@ -12,8 +9,12 @@ services:
       REDIS_URL: ${REDIS_URL}
       SECRET_KEY: ${SECRET_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-8}
+      AI_FALLBACK_ENABLED: ${AI_FALLBACK_ENABLED:-true}
       RAWG_API_KEY: ${RAWG_API_KEY}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
+      RAWG_TIMEOUT_SECONDS: ${RAWG_TIMEOUT_SECONDS:-12}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000}
     depends_on:
       - db
       - redis

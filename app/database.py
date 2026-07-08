@@ -30,11 +30,12 @@ class Game(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(255))
     notes: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    info: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
     owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("users.id"),nullable=False)
 
     def __repr__(self) -> str:
-        return f"Game(id={self.id!r}, title={self.title!r}, notes={self.notes!r}, created_at={self.created_at!r})"
+        return f"Game(id={self.id!r}, title={self.title!r}, notes={self.notes!r}, info={self.info!r}, created_at={self.created_at!r})"
 
 
 class User(Base):
