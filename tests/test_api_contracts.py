@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 import uuid
+import pytest
 
 from fastapi.testclient import TestClient
 
@@ -647,6 +648,15 @@ def test_profile_me_normalizes_nickname_and_returns_visibility_defaults(monkeypa
         "current_game_visibility": "everyone",
         "recent_games_visibility": "everyone",
     }
+
+
+def test_social_request_schemas_validate_public_inputs():
+    from app.schemas import FriendshipRequestCreate, PsnContactCreate
+
+    assert FriendshipRequestCreate(nickname="  Player One ").nickname == "Player One"
+    assert PsnContactCreate(online_id="  PlayEr_One-42 ").online_id == "PlayEr_One-42"
+    with pytest.raises(ValueError):
+        PsnContactCreate(online_id="not a psn id")
 
 
 def test_profile_me_accepts_a_trimmed_32_character_nickname(monkeypatch):

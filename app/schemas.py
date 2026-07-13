@@ -1,6 +1,7 @@
 from enum import Enum
+import re
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from datetime import datetime
 from typing import Optional
 import uuid
@@ -31,6 +32,61 @@ class PublicProfileRead(BaseModel):
     platforms: list[str] = Field(default_factory=list)
     current_game: str | None = None
     recent_games: list[str] = Field(default_factory=list)
+
+
+class FriendshipRequestCreate(BaseModel):
+    nickname: str = Field(min_length=3, max_length=32)
+
+    @field_validator("nickname")
+    @classmethod
+    def strip_nickname(cls, value: str) -> str:
+        return value.strip()
+
+
+class PsnContactCreate(BaseModel):
+    online_id: str = Field(min_length=3, max_length=16)
+
+    @field_validator("online_id")
+    @classmethod
+    def strip_online_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{2,15}", normalized):
+            raise ValueError("PSN Online ID must be 3-16 letters, numbers, underscores, or hyphens")
+        return normalized
+
+
+class FriendshipRequestRespond(BaseModel):
+    action: str = Field(pattern="^(accepted|declined)$")
+
+
+class FriendshipRequestRead(BaseModel):
+    id: uuid.UUID
+    requester_nickname: str
+    recipient_nickname: str
+    status: str
+    created_at: datetime
+
+
+class FriendshipRead(BaseModel):
+    user_id: uuid.UUID
+    nickname: str
+    created_at: datetime
+
+
+class InviteRead(BaseModel):
+    token: str
+    url: str
+
+
+class InviteResolveRead(BaseModel):
+    owner_nickname: str
+
+
+class PsnContactRead(BaseModel):
+    id: uuid.UUID
+    online_id: str
+    profile_url: str
+    created_at: datetime
 
 
 class GameCreate(BaseModel):

@@ -3,10 +3,13 @@ import os
 import uuid
 import contextlib
 import re
+import hashlib
+import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -27,7 +30,7 @@ from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
 from app.steam_store import fetch_steam_store_deals
 from app.auth import hash_password, verify_password, create_access_token, get_current_user, decode_access_token, get_user_by_id
-from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, engine, wait_for_db
+from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, FriendshipRequest, Friendship, FriendshipInvite, PsnContact, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
@@ -42,7 +45,7 @@ from app.steam import (
     verify_steam_openid,
 )
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
-from app.schemas import ProfileSettingsRead, ProfileSettingsUpdate, PublicProfileRead, Visibility
+from app.schemas import ProfileSettingsRead, ProfileSettingsUpdate, PublicProfileRead, Visibility, FriendshipRequestCreate, FriendshipRequestRespond, FriendshipRequestRead, FriendshipRead, InviteRead, InviteResolveRead, PsnContactCreate, PsnContactRead
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -165,9 +168,25 @@ def profile_social_data(db: Session, user: User) -> dict[str, object]:
     return {"platforms": platforms, "current_game": None, "recent_games": [game.title for game in recent_games]}
 
 
-def users_are_friends(_db: Session, _owner_id: uuid.UUID, _viewer_id: uuid.UUID) -> bool:
-    """Friendship storage is introduced in the next social task."""
-    return False
+def canonical_friend_pair(first: uuid.UUID, second: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
+    return tuple(sorted((first, second), key=lambda value: value.hex))
+
+
+def users_are_friends(db: Session, owner_id: uuid.UUID, viewer_id: uuid.UUID) -> bool:
+    if owner_id == viewer_id:
+        return False
+    low_id, high_id = canonical_friend_pair(owner_id, viewer_id)
+    return db.query(Friendship).filter(
+        Friendship.user_low_id == low_id, Friendship.user_high_id == high_id
+    ).first() is not None
+
+
+def invite_digest(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def psn_profile_url(online_id: str) -> str:
+    return f"https://psnprofiles.com/{online_id}"
 
 
 def can_view_profile_field(db: Session, owner: User, viewer: User | None, visibility: Visibility | str) -> bool:
@@ -451,6 +470,208 @@ def update_profile_settings(
             setattr(current_user, field, updates[field].value)
     db.commit()
     return profile_settings_response(current_user)
+
+
+def friendship_request_response(db: Session, request: FriendshipRequest) -> FriendshipRequestRead:
+    requester = db.query(User).filter(User.id == request.requester_id).first()
+    recipient = db.query(User).filter(User.id == request.recipient_id).first()
+    return FriendshipRequestRead(
+        id=request.id,
+        requester_nickname=requester.public_nickname or "",
+        recipient_nickname=recipient.public_nickname or "",
+        status=request.status,
+        created_at=request.created_at,
+    )
+
+
+@app.post("/friends/requests", status_code=201, response_model=FriendshipRequestRead)
+def create_friendship_request(
+    data: FriendshipRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    recipient = get_user_by_public_nickname(db, normalize_public_nickname(data.nickname))
+    if not recipient:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if recipient.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot add yourself")
+    existing = db.query(FriendshipRequest).filter(
+        or_(
+            (FriendshipRequest.requester_id == current_user.id) & (FriendshipRequest.recipient_id == recipient.id),
+            (FriendshipRequest.requester_id == recipient.id) & (FriendshipRequest.recipient_id == current_user.id),
+        )
+    ).first()
+    if existing or users_are_friends(db, current_user.id, recipient.id):
+        raise HTTPException(status_code=409, detail="A friendship request or friendship already exists")
+    request = FriendshipRequest(requester_id=current_user.id, recipient_id=recipient.id, status="pending")
+    db.add(request)
+    db.commit()
+    return friendship_request_response(db, request)
+
+
+@app.get("/friends/requests", response_model=list[FriendshipRequestRead])
+def list_friendship_requests(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    requests = db.query(FriendshipRequest).filter(
+        FriendshipRequest.status == "pending",
+        or_(FriendshipRequest.requester_id == current_user.id, FriendshipRequest.recipient_id == current_user.id),
+    ).order_by(FriendshipRequest.created_at.desc()).all()
+    return [friendship_request_response(db, request) for request in requests]
+
+
+@app.post("/friends/requests/{request_id}/respond", response_model=FriendshipRequestRead)
+def respond_to_friendship_request(
+    request_id: uuid.UUID,
+    data: FriendshipRequestRespond,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    request = db.query(FriendshipRequest).filter(FriendshipRequest.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Friendship request not found")
+    if request.recipient_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the recipient can respond")
+    if request.status != "pending":
+        raise HTTPException(status_code=409, detail="Friendship request is no longer pending")
+    request.status = data.action
+    if data.action == "accepted":
+        low_id, high_id = canonical_friend_pair(request.requester_id, request.recipient_id)
+        if not db.query(Friendship).filter(Friendship.user_low_id == low_id, Friendship.user_high_id == high_id).first():
+            db.add(Friendship(user_low_id=low_id, user_high_id=high_id))
+    db.commit()
+    return friendship_request_response(db, request)
+
+
+@app.post("/friends/requests/{request_id}/cancel", response_model=FriendshipRequestRead)
+def cancel_friendship_request(request_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    request = db.query(FriendshipRequest).filter(FriendshipRequest.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Friendship request not found")
+    if request.requester_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the requester can cancel")
+    if request.status != "pending":
+        raise HTTPException(status_code=409, detail="Friendship request is no longer pending")
+    request.status = "cancelled"
+    db.commit()
+    return friendship_request_response(db, request)
+
+
+@app.get("/friends", response_model=list[FriendshipRead])
+def list_friends(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    pairs = db.query(Friendship).filter(or_(Friendship.user_low_id == current_user.id, Friendship.user_high_id == current_user.id)).all()
+    result = []
+    for friendship in pairs:
+        friend_id = friendship.user_high_id if friendship.user_low_id == current_user.id else friendship.user_low_id
+        friend = db.query(User).filter(User.id == friend_id).first()
+        result.append(FriendshipRead(user_id=friend_id, nickname=friend.public_nickname or "", created_at=friendship.created_at))
+    return result
+
+
+@app.delete("/friends/{friend_id}", status_code=204)
+def delete_friendship(friend_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    low_id, high_id = canonical_friend_pair(current_user.id, friend_id)
+    friendship = db.query(Friendship).filter(Friendship.user_low_id == low_id, Friendship.user_high_id == high_id).first()
+    if not friendship:
+        raise HTTPException(status_code=404, detail="Friendship not found")
+    db.delete(friendship)
+    db.commit()
+
+
+@app.post("/friends/invites", response_model=InviteRead)
+def rotate_friendship_invite(request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    token = secrets.token_urlsafe(32)
+    digest = invite_digest(token)
+    invite = db.query(FriendshipInvite).filter(FriendshipInvite.owner_id == current_user.id).first()
+    now = datetime.now(timezone.utc)
+    if invite:
+        invite.token_digest = digest
+        invite.rotated_at = now
+    else:
+        db.add(FriendshipInvite(owner_id=current_user.id, token_digest=digest, created_at=now, rotated_at=now))
+    db.commit()
+    return InviteRead(token=token, url=f"{get_frontend_url()}/friends/invite/{token}")
+
+
+def resolve_invite(db: Session, token: str) -> FriendshipInvite:
+    invite = db.query(FriendshipInvite).filter(FriendshipInvite.token_digest == invite_digest(token)).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    return invite
+
+
+@app.get("/friends/invites/{token}", response_model=InviteResolveRead)
+def resolve_friendship_invite(token: str, db: Session = Depends(get_db)):
+    invite = resolve_invite(db, token)
+    owner = db.query(User).filter(User.id == invite.owner_id).first()
+    return InviteResolveRead(owner_nickname=owner.public_nickname or "")
+
+
+@app.post("/friends/invites/{token}/accept", response_model=FriendshipRead)
+def accept_friendship_invite(token: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    invite = resolve_invite(db, token)
+    if invite.owner_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot accept your own invite")
+    if users_are_friends(db, invite.owner_id, current_user.id):
+        raise HTTPException(status_code=409, detail="Friendship already exists")
+    low_id, high_id = canonical_friend_pair(invite.owner_id, current_user.id)
+    friendship = Friendship(user_low_id=low_id, user_high_id=high_id)
+    db.add(friendship)
+    db.commit()
+    owner = db.query(User).filter(User.id == invite.owner_id).first()
+    return FriendshipRead(user_id=owner.id, nickname=owner.public_nickname or "", created_at=friendship.created_at)
+
+
+def psn_contact_response(contact: PsnContact) -> PsnContactRead:
+    return PsnContactRead(id=contact.id, online_id=contact.online_id, profile_url=psn_profile_url(contact.online_id), created_at=contact.created_at)
+
+
+@app.post("/friends/psn-contacts", status_code=201, response_model=PsnContactRead)
+def create_psn_contact(data: PsnContactCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    normalized = data.online_id.casefold()
+    if db.query(PsnContact).filter(PsnContact.owner_id == current_user.id, PsnContact.normalized_online_id == normalized).first():
+        raise HTTPException(status_code=409, detail="PSN contact already exists")
+    contact = PsnContact(owner_id=current_user.id, online_id=data.online_id, normalized_online_id=normalized)
+    db.add(contact)
+    db.commit()
+    return psn_contact_response(contact)
+
+
+@app.get("/friends/psn-contacts", response_model=list[PsnContactRead])
+def list_psn_contacts(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    contacts = db.query(PsnContact).filter(PsnContact.owner_id == current_user.id).order_by(PsnContact.created_at.desc()).all()
+    return [psn_contact_response(contact) for contact in contacts]
+
+
+@app.patch("/friends/psn-contacts/{contact_id}", response_model=PsnContactRead)
+def update_psn_contact(
+    contact_id: uuid.UUID,
+    data: PsnContactCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    contact = db.query(PsnContact).filter(PsnContact.id == contact_id, PsnContact.owner_id == current_user.id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="PSN contact not found")
+    normalized = data.online_id.casefold()
+    duplicate = db.query(PsnContact).filter(
+        PsnContact.owner_id == current_user.id,
+        PsnContact.normalized_online_id == normalized,
+        PsnContact.id != contact.id,
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=409, detail="PSN contact already exists")
+    contact.online_id = data.online_id
+    contact.normalized_online_id = normalized
+    db.commit()
+    return psn_contact_response(contact)
+
+
+@app.delete("/friends/psn-contacts/{contact_id}", status_code=204)
+def delete_psn_contact(contact_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    contact = db.query(PsnContact).filter(PsnContact.id == contact_id, PsnContact.owner_id == current_user.id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="PSN contact not found")
+    db.delete(contact)
+    db.commit()
 
 
 @app.get("/profiles/{nickname}", response_model=PublicProfileRead)
