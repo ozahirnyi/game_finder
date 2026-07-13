@@ -125,6 +125,13 @@ This starts:
 - PostgreSQL
 - Redis
 
+To refresh cached Steam contacts locally, run the dedicated worker in another terminal. It is intentionally
+separate from the API process:
+
+```bash
+docker compose up --build steam-social-refresh-worker
+```
+
 ---
 
 ## Running API + Web
@@ -177,6 +184,9 @@ PRICE_ALERT_WATCHER_ENABLED=false
 PRICE_ALERT_INTERVAL_SECONDS=86400
 PRICE_ALERT_INITIAL_DELAY_SECONDS=60
 PRICE_ALERT_MIN_CUT=1
+STEAM_SOCIAL_REFRESH_STALE_MINUTES=60
+STEAM_SOCIAL_REFRESH_BATCH_SIZE=25
+STEAM_SOCIAL_REFRESH_INTERVAL_SECONDS=300
 OPENAI_API_KEY=your-openai-key
 OPENAI_TIMEOUT_SECONDS=8
 AI_FALLBACK_ENABLED=true
@@ -193,6 +203,20 @@ BACKEND_PUBLIC_URL=https://your-gamefinder-api.railway.app
 ```
 
 Set `AI_FALLBACK_ENABLED=false` in production if you want `/recommendations` to fail visibly with `503` when OpenAI is unavailable instead of returning local fallback recommendations.
+
+### Steam social refresh worker
+
+Deploy Steam contact refresh as a second Railway service from the same repository and Dockerfile. Set its
+start command to:
+
+```bash
+sh -c 'while true; do python -m scripts.run_steam_social_refresh; sleep "${STEAM_SOCIAL_REFRESH_INTERVAL_SECONDS:-300}"; done'
+```
+
+Configure exactly one replica for this worker, give it the same `DATABASE_URL` and `STEAM_API_KEY` as the API,
+and set `STEAM_SOCIAL_REFRESH_STALE_MINUTES`, `STEAM_SOCIAL_REFRESH_BATCH_SIZE`, and
+`STEAM_SOCIAL_REFRESH_INTERVAL_SECONDS`. Do not add this command to the API service: the API serves requests
+only, while the worker polls stale or missing snapshots independently.
 
 Steam linking uses Steam OpenID for account linking and `STEAM_API_KEY` for library import. A linked Steam account only exposes owned games when the user's Steam game details are public.
 
@@ -255,6 +279,9 @@ Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy.
 | PRICE_ALERT_INTERVAL_SECONDS | Seconds between watcher runs, defaults to `86400` |
 | PRICE_ALERT_INITIAL_DELAY_SECONDS | Delay before the first watcher run after backend startup |
 | PRICE_ALERT_MIN_CUT | Minimum discount percentage required before sending a Telegram alert |
+| STEAM_SOCIAL_REFRESH_STALE_MINUTES | Age in minutes after which a Steam contact snapshot is refreshed |
+| STEAM_SOCIAL_REFRESH_BATCH_SIZE | Maximum stale or missing Steam snapshots refreshed per worker pass |
+| STEAM_SOCIAL_REFRESH_INTERVAL_SECONDS | Seconds the dedicated worker waits between refresh passes |
 | OPENAI_API_KEY | AI provider key |
 | SECRET_KEY | JWT signing key |
 | ACCESS_TOKEN_EXPIRE_MINUTES | JWT lifetime in minutes, defaults to 10080 (7 days) |

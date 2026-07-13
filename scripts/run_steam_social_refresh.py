@@ -3,6 +3,8 @@ import asyncio
 import os
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import or_
+
 from app.database import SessionLocal, SteamSocialSnapshot, User
 from app.steam import fetch_steam_social_contacts
 
@@ -14,7 +16,21 @@ async def refresh_stale_snapshots() -> int:
     db = SessionLocal()
     refreshed = 0
     try:
-        users = db.query(User).filter(User.steam_id.isnot(None)).limit(batch_size).all()
+        users = (
+            db.query(User)
+            .outerjoin(SteamSocialSnapshot, SteamSocialSnapshot.owner_id == User.id)
+            .filter(User.steam_id.isnot(None))
+            .filter(
+                or_(
+                    SteamSocialSnapshot.owner_id.is_(None),
+                    SteamSocialSnapshot.refreshed_at.is_(None),
+                    SteamSocialSnapshot.refreshed_at < cutoff,
+                )
+            )
+            .order_by(User.id)
+            .limit(batch_size)
+            .all()
+        )
         for user in users:
             snapshot = db.query(SteamSocialSnapshot).filter(SteamSocialSnapshot.owner_id == user.id).first()
             if snapshot and snapshot.refreshed_at and snapshot.refreshed_at >= cutoff:
