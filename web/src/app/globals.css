@@ -1623,6 +1623,29 @@ p {
   gap: 10px;
 }
 
+.friends-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.inline-form,
+.friend-request {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.inline-form input { min-width: 0; flex: 1; }
+.friend-request { justify-content: space-between; padding-block: 0.5rem; border-top: 1px solid var(--border); }
+.friend-request:first-of-type { border-top: 0; }
+.avatar-placeholder { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--surface-raised); font-weight: 700; }
+
+@media (max-width: 720px) {
+  .friends-grid { grid-template-columns: 1fr; }
+  .inline-form, .friend-request { align-items: stretch; flex-direction: column; }
+}
+
 .friend-card {
   display: grid;
   gap: 12px;

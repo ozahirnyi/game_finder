@@ -186,6 +186,24 @@ export type TelegramLink = {
   message: string | null;
 };
 
+export type Visibility = "everyone" | "friends" | "nobody";
+export type ProfileSettings = {
+  nickname: string | null;
+  platforms_visibility: Visibility;
+  current_game_visibility: Visibility;
+  recent_games_visibility: Visibility;
+};
+export type PublicProfile = { nickname: string; platforms: string[]; current_game: string | null; recent_games: string[] };
+export type FriendshipRequest = { id: string; requester_nickname: string; recipient_nickname: string; status: string; created_at: string };
+export type Friendship = { user_id: string; nickname: string; created_at: string };
+export type FriendInvite = { token: string; url: string };
+export type InviteResolution = { owner_nickname: string };
+export type PsnContact = { id: string; online_id: string; profile_url: string; created_at: string };
+export type ManualActivity = { current_game: string | null; recent_games: string[] };
+export type FriendCard = { id: string; source: "site" | "psn" | "steam"; nickname: string | null; profile_url: string | null; steam_id: string | null; avatar: string | null; current_game: string | null; recent_games: string[] };
+export type ContactSourceStatus = { available: boolean; error: string | null };
+export type FriendsContacts = { contacts: FriendCard[]; sources: Record<string, ContactSourceStatus> };
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://game-finder.up.railway.app";
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
@@ -498,3 +516,24 @@ export function sendTelegramTestAlert() {
     auth: true,
   });
 }
+
+export function getProfileSettings() { return request<ProfileSettings>("/profile/me", { auth: true }); }
+export function updateProfileSettings(settings: Partial<ProfileSettings>) { return request<ProfileSettings>("/profile/me", { method: "PATCH", auth: true, body: settings }); }
+export function getPublicProfile(nickname: string) { return request<PublicProfile>(`/profiles/${encodeURIComponent(nickname)}`); }
+export function createFriendRequest(nickname: string) { return request<FriendshipRequest>("/friends/requests", { method: "POST", auth: true, body: { nickname } }); }
+export function listFriendRequests() { return request<FriendshipRequest[]>("/friends/requests", { auth: true }); }
+export function respondToFriendRequest(id: string, action: "accepted" | "declined") { return request<FriendshipRequest>(`/friends/requests/${encodeURIComponent(id)}/respond`, { method: "POST", auth: true, body: { action } }); }
+export function cancelFriendRequest(id: string) { return request<FriendshipRequest>(`/friends/requests/${encodeURIComponent(id)}/cancel`, { method: "POST", auth: true }); }
+export function listFriends() { return request<Friendship[]>("/friends", { auth: true }); }
+export function deleteFriend(id: string) { return request<void>(`/friends/${encodeURIComponent(id)}`, { method: "DELETE", auth: true }); }
+export function rotateFriendInvite() { return request<FriendInvite>("/friends/invites", { method: "POST", auth: true }); }
+export function resolveFriendInvite(token: string) { return request<InviteResolution>(`/friends/invites/${encodeURIComponent(token)}`); }
+export function acceptFriendInvite(token: string) { return request<Friendship>(`/friends/invites/${encodeURIComponent(token)}/accept`, { method: "POST", auth: true }); }
+export function listPsnContacts() { return request<PsnContact[]>("/friends/psn-contacts", { auth: true }); }
+export function createPsnContact(onlineId: string) { return request<PsnContact>("/friends/psn-contacts", { method: "POST", auth: true, body: { online_id: onlineId } }); }
+export function updatePsnContact(id: string, onlineId: string) { return request<PsnContact>(`/friends/psn-contacts/${encodeURIComponent(id)}`, { method: "PATCH", auth: true, body: { online_id: onlineId } }); }
+export function deletePsnContact(id: string) { return request<void>(`/friends/psn-contacts/${encodeURIComponent(id)}`, { method: "DELETE", auth: true }); }
+export function getFriendsContacts() { return request<FriendsContacts>("/friends/contacts", { auth: true }); }
+export function syncSteamContacts() { return request<FriendsContacts>("/friends/steam/sync", { method: "POST", auth: true }); }
+export function updateManualActivity(activity: ManualActivity) { return request<ManualActivity>("/activity/manual", { method: "PATCH", auth: true, body: activity }); }
+export function deleteManualActivity() { return request<void>("/activity/manual", { method: "DELETE", auth: true }); }

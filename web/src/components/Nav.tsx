@@ -29,6 +29,12 @@ export function Nav() {
           <span>Deals</span>
         </Link>
         {authed && (
+          <Link className="nav-link" href="/friends" aria-current={isCurrent("/friends") ? "page" : undefined}>
+            <Icon name="user-plus" />
+            <span>Friends</span>
+          </Link>
+        )}
+        {authed && (
           <Link className="nav-link" href="/steam" aria-current={isCurrent("/steam") ? "page" : undefined}>
             <Icon name="gamepad" />
             <span>Steam</span>

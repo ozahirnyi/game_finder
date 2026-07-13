@@ -7,14 +7,14 @@ import { useEffect, useState } from "react";
 import {
   ApiError,
   PsnImportPreview,
+  ProfileSettings,
   SavedGame,
   SearchGame,
   SteamAccount,
   TelegramAccount,
-  UserRead,
   clearToken,
   confirmPsnImport,
-  getCurrentUser,
+  getProfileSettings,
   getSteamAccount,
   getTelegramAccount,
   getTelegramLinkUrl,
@@ -23,6 +23,7 @@ import {
   previewPsnImport,
   searchGames,
   sendTelegramTestAlert,
+  updateProfileSettings,
   unlinkTelegramAccount,
 } from "@/lib/api";
 
@@ -42,9 +43,10 @@ async function loadSavedGameImages(savedGames: SavedGame[], limit: number) {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<UserRead | null>(null);
   const [telegram, setTelegram] = useState<TelegramAccount | null>(null);
   const [steam, setSteam] = useState<SteamAccount | null>(null);
+  const [settings, setSettings] = useState<ProfileSettings | null>(null);
+  const [settingsBusy, setSettingsBusy] = useState(false);
   const [savedGames, setSavedGames] = useState<SavedGame[]>([]);
   const [imageMap, setImageMap] = useState<Record<string, SearchGame | null>>({});
   const [loading, setLoading] = useState(true);
@@ -67,16 +69,16 @@ export default function ProfilePage() {
       setLoading(true);
       setError("");
       try {
-        const [userData, telegramData, savedData, steamData] = await Promise.all([
-          getCurrentUser(),
+        const [telegramData, savedData, steamData, settingsData] = await Promise.all([
           getTelegramAccount().catch(() => null),
           listSavedGames().catch(() => []),
           getSteamAccount().catch(() => null),
+          getProfileSettings().catch(() => null),
         ]);
         if (active) {
-          setUser(userData);
           setTelegram(telegramData);
           setSteam(steamData);
+          setSettings(settingsData);
           setSavedGames(savedData);
           loadSavedGameImages(savedData, 6).then((images) => {
             if (active) {
@@ -195,6 +197,15 @@ export default function ProfilePage() {
     }
   }
 
+  async function saveSocialSettings(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!settings) return;
+    setSettingsBusy(true); setError(""); setMessage("");
+    try { setSettings(await updateProfileSettings(settings)); setMessage("Social profile settings saved."); }
+    catch (err) { setError(err instanceof ApiError ? err.message : "Could not save social profile settings."); }
+    finally { setSettingsBusy(false); }
+  }
+
   if (loading) {
     return <p className="alert">Loading your profile...</p>;
   }
@@ -211,7 +222,7 @@ export default function ProfilePage() {
           <div className="profile-status-row">
             <span className="profile-account-status">
               <span>Account</span>
-              {user?.email ?? "Signed in"}
+              Signed in
             </span>
             <Link className="profile-steam-status" href="/steam">
               Steam · {steam?.linked ? "Connected" : "Not connected"} <span aria-hidden="true">→</span>
@@ -227,6 +238,17 @@ export default function ProfilePage() {
       {message && <p className="alert success">{message}</p>}
 
       <section className="profile-dashboard">
+        <section className="results-panel profile-section">
+          <div className="results-heading"><div><p className="eyebrow">Social profile</p><h2>Share on your terms</h2></div>{settings?.nickname && <Link className="muted-link" href={`/u/${encodeURIComponent(settings.nickname)}`}>View public profile</Link>}</div>
+          <form className="stack" onSubmit={saveSocialSettings}>
+            <label>Public nickname<input value={settings?.nickname ?? ""} minLength={3} maxLength={32} onChange={(event) => setSettings((current) => current ? { ...current, nickname: event.target.value || null } : current)} placeholder="Choose a unique nickname" /></label>
+            <p className="muted">Your email is never shown on your public profile.</p>
+            <label>Platforms visibility<select value={settings?.platforms_visibility ?? "everyone"} onChange={(event) => setSettings((current) => current ? { ...current, platforms_visibility: event.target.value as ProfileSettings["platforms_visibility"] } : current)}><option value="everyone">Everyone</option><option value="friends">Friends only</option><option value="nobody">Nobody</option></select></label>
+            <label>Current game visibility<select value={settings?.current_game_visibility ?? "everyone"} onChange={(event) => setSettings((current) => current ? { ...current, current_game_visibility: event.target.value as ProfileSettings["current_game_visibility"] } : current)}><option value="everyone">Everyone</option><option value="friends">Friends only</option><option value="nobody">Nobody</option></select></label>
+            <label>Recent games visibility<select value={settings?.recent_games_visibility ?? "everyone"} onChange={(event) => setSettings((current) => current ? { ...current, recent_games_visibility: event.target.value as ProfileSettings["recent_games_visibility"] } : current)}><option value="everyone">Everyone</option><option value="friends">Friends only</option><option value="nobody">Nobody</option></select></label>
+            <button className="fit" type="submit" disabled={!settings || settingsBusy}>{settingsBusy ? "Saving..." : "Save social settings"}</button>
+          </form>
+        </section>
         <div className="results-panel profile-section">
           <div className="results-heading">
             <div>
