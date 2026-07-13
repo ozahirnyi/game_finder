@@ -288,14 +288,73 @@ Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy.
 
 ---
 
-## Deployment
+## Railway deployment
 
-The backend is deployed and accessible at:
+This repository is prepared for Railway but is not deployed by this repository or these instructions.
 
-https://game-finder.up.railway.app
+Create two public services (Backend and Frontend) and one private worker service, plus Railway PostgreSQL and Redis.
 
-### API Docs:
-https://game-finder.up.railway.app/docs
+### 1. Backend service
+
+Create a service from the repository root using the root `Dockerfile`.
+In **Settings → Deploy**, set **Pre-Deploy Command** to exactly:
+
+```bash
+python -m alembic upgrade head
+```
+
+Set **Healthcheck Path** to `/health`. Keep the Dockerfile start command unchanged; it listens on Railway's `PORT`.
+The pre-deploy command belongs **only** to Backend. Do not copy it to Frontend or the worker.
+
+Give Backend the secrets and configuration from `.env.example`, with Railway service connection values for
+`DATABASE_URL` and `REDIS_URL`. Set these production URLs after generating domains:
+
+```bash
+FRONTEND_ORIGIN=https://your-gamefinder-frontend.up.railway.app
+FRONTEND_ORIGINS=https://your-gamefinder-frontend.up.railway.app
+FRONTEND_PUBLIC_URL=https://your-gamefinder-frontend.up.railway.app
+BACKEND_PUBLIC_URL=https://your-gamefinder-backend.up.railway.app
+GOOGLE_REDIRECT_URI=https://your-gamefinder-backend.up.railway.app/auth/google/callback
+AI_FALLBACK_ENABLED=false
+```
+
+`RAILWAY_PUBLIC_DOMAIN` is injected by Railway; do not set it manually. Keep secrets private service variables.
+
+### 2. Frontend service
+
+Create another service from the same repository. Set `RAILWAY_DOCKERFILE_PATH=web/Dockerfile` and:
+
+```bash
+NEXT_PUBLIC_API_URL=https://your-gamefinder-backend.up.railway.app
+```
+
+The frontend Dockerfile declares this value with `ARG` before `npm run build`, so Next.js embeds the backend URL.
+Redeploy Frontend whenever the API URL changes. Set its healthcheck path to `/`; configure no pre-deploy command.
+
+### 3. Steam social refresh worker
+
+Create a third service from the repository root using the root `Dockerfile`. Set its **Start Command** to exactly:
+
+```bash
+sh -c 'while true; do python -m scripts.run_steam_social_refresh; sleep "${STEAM_SOCIAL_REFRESH_INTERVAL_SECONDS:-300}"; done'
+```
+
+Set this worker to **one replica**. It needs `DATABASE_URL`, `STEAM_API_KEY`,
+`STEAM_SOCIAL_REFRESH_STALE_MINUTES`, `STEAM_SOCIAL_REFRESH_BATCH_SIZE`, and
+`STEAM_SOCIAL_REFRESH_INTERVAL_SECONDS`. It needs no public domain or healthcheck. Do not configure a pre-deploy
+command on the worker.
+
+### Release verification
+
+After the Backend deployment reports a successful pre-deploy phase, verify the migration revision:
+
+```bash
+railway run --service Backend python -m alembic current
+railway run --service Backend python -m alembic heads
+```
+
+The current revision must match the sole head revision. Then confirm `/health` returns HTTP 200, the frontend loads
+the Friends hub, and worker logs show refresh passes from exactly one replica.
 
 ---
 
