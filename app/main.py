@@ -235,11 +235,13 @@ def build_contacts_response(db: Session, current_user: User) -> FriendsContactsR
         if steam and friend.steam_id:
             matched_steam_ids.add(str(friend.steam_id))
         manual = activities.get(friend.id)
+        platforms_visible = can_view_profile_field(db, friend, current_user, friend.platforms_visibility)
         current_game = manual.current_game if manual else (steam or {}).get("current_game")
         recent_games = manual.recent_games if manual else (steam or {}).get("recent_games", [])
         cards.append(FriendCard(
             id=f"site:{friend.id}", source="site", nickname=friend.public_nickname,
-            steam_id=friend.steam_id, avatar=(steam or {}).get("avatar") or friend.steam_avatar,
+            steam_id=friend.steam_id if platforms_visible else None,
+            avatar=((steam or {}).get("avatar") or friend.steam_avatar) if platforms_visible else None,
             current_game=current_game if can_view_profile_field(db, friend, current_user, friend.current_game_visibility) else None,
             recent_games=recent_games if can_view_profile_field(db, friend, current_user, friend.recent_games_visibility) else [],
         ))

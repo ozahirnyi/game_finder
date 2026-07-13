@@ -339,7 +339,8 @@ Create a third service from the repository root using the root `Dockerfile`. Set
 sh -c 'while true; do python -m scripts.run_steam_social_refresh; sleep "${STEAM_SOCIAL_REFRESH_INTERVAL_SECONDS:-300}"; done'
 ```
 
-Set this worker to **one replica**. It needs `DATABASE_URL`, `STEAM_API_KEY`,
+Set this worker to **one replica**. It needs the same SECRET_KEY as the Backend because the
+Steam integration imports the JWT configuration, plus `DATABASE_URL`, `STEAM_API_KEY`,
 `STEAM_SOCIAL_REFRESH_STALE_MINUTES`, `STEAM_SOCIAL_REFRESH_BATCH_SIZE`, and
 `STEAM_SOCIAL_REFRESH_INTERVAL_SECONDS`. It needs no public domain or healthcheck. Do not configure a pre-deploy
 command on the worker.

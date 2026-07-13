@@ -142,6 +142,33 @@ def test_contacts_merge_confirmed_site_friends_psn_and_steam_without_creating_fr
     assert db.query(Friendship).count() == 1
 
 
+@pytest.mark.parametrize(
+    ("platforms_visibility", "expected_steam_id", "expected_avatar"),
+    [
+        ("nobody", None, None),
+        ("friends", "steam-bob", "https://example.com/bob.jpg"),
+    ],
+)
+def test_contacts_apply_platform_visibility_to_confirmed_site_friend_steam_fields(
+    social_api, platforms_visibility, expected_steam_id, expected_avatar
+):
+    api, db, users, _actor = social_api
+    low_id, high_id = main.canonical_friend_pair(users["alice"].id, users["bob"].id)
+    db.add(Friendship(user_low_id=low_id, user_high_id=high_id))
+    users["bob"].steam_id = "steam-bob"
+    users["bob"].steam_avatar = "https://example.com/bob.jpg"
+    users["bob"].platforms_visibility = platforms_visibility
+    db.commit()
+
+    response = api.get("/friends/contacts")
+
+    assert response.status_code == 200
+    site = next(card for card in response.json()["contacts"] if card["id"] == f"site:{users['bob'].id}")
+    assert site["steam_id"] == expected_steam_id
+    assert site["avatar"] == expected_avatar
+    assert site["profile_url"] is None
+
+
 def test_contacts_degrade_when_steam_snapshot_reports_private_or_error(social_api):
     api, db, users, _actor = social_api
     psn = PsnContact(owner_id=users["alice"].id, online_id="ConsolePal", normalized_online_id="consolepal")

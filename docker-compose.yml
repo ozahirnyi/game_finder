@@ -38,6 +38,7 @@ services:
       - while true; do python -m scripts.run_steam_social_refresh; sleep "$${STEAM_SOCIAL_REFRESH_INTERVAL_SECONDS:-300}"; done
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
       STEAM_API_KEY: ${STEAM_API_KEY}
       STEAM_SOCIAL_REFRESH_STALE_MINUTES: ${STEAM_SOCIAL_REFRESH_STALE_MINUTES:-60}
       STEAM_SOCIAL_REFRESH_BATCH_SIZE: ${STEAM_SOCIAL_REFRESH_BATCH_SIZE:-25}
