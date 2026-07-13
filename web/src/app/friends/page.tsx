@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { ApiError, FriendCard, FriendInvite, FriendshipRequest, FriendsContacts, PsnContact, cancelFriendRequest, createFriendRequest, createPsnContact, deleteFriend, deletePsnContact, getFriendsContacts, getProfileSettings, isAuthenticated, listFriendRequests, listPsnContacts, rotateFriendInvite, respondToFriendRequest, syncSteamContacts, updateManualActivity, updatePsnContact } from "@/lib/api";
+import { ApiError, FriendCard, FriendInvite, FriendshipRequest, FriendsContacts, PsnContact, cancelFriendRequest, createFriendRequest, createPsnContact, deleteFriend, deletePsnContact, getFriendsContacts, getManualActivity, getProfileSettings, isAuthenticated, listFriendRequests, listPsnContacts, rotateFriendInvite, respondToFriendRequest, syncSteamContacts, updateManualActivity, updatePsnContact } from "@/lib/api";
 
 function errorMessage(error: unknown, fallback: string) { return error instanceof ApiError ? error.message : fallback; }
 
@@ -24,19 +24,23 @@ export default function FriendsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (hydrateActivity = false) => {
     const [contactsData, requestData, psnData, settings] = await Promise.all([getFriendsContacts(), listFriendRequests(), listPsnContacts(), getProfileSettings()]);
     setContacts(contactsData); setRequests(requestData); setPsnContacts(psnData); setOwnNickname(settings.nickname);
+    if (hydrateActivity) {
+      const activity = await getManualActivity();
+      setCurrentGame(activity.current_game ?? ""); setRecentGames(activity.recent_games.join(", "));
+    }
   }, []);
   useEffect(() => {
     if (!isAuthenticated()) { router.push("/login?message=Log in to manage friends."); return; }
-    const timer = window.setTimeout(() => { void load().catch((err) => setError(errorMessage(err, "Could not load friends."))).finally(() => setLoading(false)); }, 0);
+    const timer = window.setTimeout(() => { void load(true).catch((err) => setError(errorMessage(err, "Could not load friends."))).finally(() => setLoading(false)); }, 0);
     return () => window.clearTimeout(timer);
   }, [load, router]);
   async function run(action: () => Promise<void>, success: string) { setBusy(true); setError(""); setMessage(""); try { await action(); setMessage(success); } catch (err) { setError(errorMessage(err, "Could not update friends.")); } finally { setBusy(false); } }
   function submitRequest(event: FormEvent) { event.preventDefault(); run(async () => { await createFriendRequest(nickname); setNickname(""); await load(); }, "Friend request sent."); }
   function submitPsn(event: FormEvent) { event.preventDefault(); run(async () => { await createPsnContact(onlineId); setOnlineId(""); await load(); }, "PSN contact added."); }
-  function submitActivity(event: FormEvent) { event.preventDefault(); run(async () => { await updateManualActivity({ current_game: currentGame.trim() || null, recent_games: recentGames.split(",").map((game) => game.trim()).filter(Boolean) }); await load(); }, "Current game updated."); }
+  function submitActivity(event: FormEvent) { event.preventDefault(); run(async () => { const activity = await updateManualActivity({ current_game: currentGame.trim() || null, recent_games: recentGames.split(",").map((game) => game.trim()).filter(Boolean) }); setCurrentGame(activity.current_game ?? ""); setRecentGames(activity.recent_games.join(", ")); await load(); }, "Current game updated."); }
   async function copyInvite() { if (!invite) return; try { await navigator.clipboard.writeText(invite.url); setMessage("Invite link copied."); } catch { setError("Could not copy the invite link. Select and copy it manually."); } }
   if (loading) return <p className="alert">Loading friends...</p>;
   return <section className="stack friends-page">

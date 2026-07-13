@@ -519,7 +519,7 @@ export function sendTelegramTestAlert() {
 
 export function getProfileSettings() { return request<ProfileSettings>("/profile/me", { auth: true }); }
 export function updateProfileSettings(settings: Partial<ProfileSettings>) { return request<ProfileSettings>("/profile/me", { method: "PATCH", auth: true, body: settings }); }
-export function getPublicProfile(nickname: string) { return request<PublicProfile>(`/profiles/${encodeURIComponent(nickname)}`); }
+export function getPublicProfile(nickname: string) { return request<PublicProfile>(`/profiles/${encodeURIComponent(nickname)}`, { auth: Boolean(getToken()) }); }
 export function createFriendRequest(nickname: string) { return request<FriendshipRequest>("/friends/requests", { method: "POST", auth: true, body: { nickname } }); }
 export function listFriendRequests() { return request<FriendshipRequest[]>("/friends/requests", { auth: true }); }
 export function respondToFriendRequest(id: string, action: "accepted" | "declined") { return request<FriendshipRequest>(`/friends/requests/${encodeURIComponent(id)}/respond`, { method: "POST", auth: true, body: { action } }); }
@@ -527,7 +527,7 @@ export function cancelFriendRequest(id: string) { return request<FriendshipReque
 export function listFriends() { return request<Friendship[]>("/friends", { auth: true }); }
 export function deleteFriend(id: string) { return request<void>(`/friends/${encodeURIComponent(id)}`, { method: "DELETE", auth: true }); }
 export function rotateFriendInvite() { return request<FriendInvite>("/friends/invites", { method: "POST", auth: true }); }
-export function resolveFriendInvite(token: string) { return request<InviteResolution>(`/friends/invites/${encodeURIComponent(token)}`); }
+export function resolveFriendInvite(token: string) { return request<InviteResolution>(`/friends/invites/${encodeURIComponent(token)}`, { auth: true }); }
 export function acceptFriendInvite(token: string) { return request<Friendship>(`/friends/invites/${encodeURIComponent(token)}/accept`, { method: "POST", auth: true }); }
 export function listPsnContacts() { return request<PsnContact[]>("/friends/psn-contacts", { auth: true }); }
 export function createPsnContact(onlineId: string) { return request<PsnContact>("/friends/psn-contacts", { method: "POST", auth: true, body: { online_id: onlineId } }); }
@@ -535,5 +535,6 @@ export function updatePsnContact(id: string, onlineId: string) { return request<
 export function deletePsnContact(id: string) { return request<void>(`/friends/psn-contacts/${encodeURIComponent(id)}`, { method: "DELETE", auth: true }); }
 export function getFriendsContacts() { return request<FriendsContacts>("/friends/contacts", { auth: true }); }
 export function syncSteamContacts() { return request<FriendsContacts>("/friends/steam/sync", { method: "POST", auth: true }); }
+export function getManualActivity() { return request<ManualActivity>("/activity/manual", { auth: true }); }
 export function updateManualActivity(activity: ManualActivity) { return request<ManualActivity>("/activity/manual", { method: "PATCH", auth: true, body: activity }); }
 export function deleteManualActivity() { return request<void>("/activity/manual", { method: "DELETE", auth: true }); }

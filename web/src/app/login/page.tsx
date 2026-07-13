@@ -17,6 +17,7 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [googleConfiguration, setGoogleConfiguration] = useState<GoogleConfiguration>("unknown");
   const notice = searchParams.get("message") ?? "";
+  const nextPath = searchParams.get("next");
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,7 +26,7 @@ function LoginForm() {
     try {
       const data = await loginUser(email, password);
       setToken(data.access_token);
-      router.push("/");
+      router.push(nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Login failed. Please try again.");
     } finally {

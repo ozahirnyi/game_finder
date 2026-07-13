@@ -656,7 +656,7 @@ def resolve_invite(db: Session, token: str) -> FriendshipInvite:
 
 
 @app.get("/friends/invites/{token}", response_model=InviteResolveRead)
-def resolve_friendship_invite(token: str, db: Session = Depends(get_db)):
+def resolve_friendship_invite(token: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     invite = resolve_invite(db, token)
     owner = db.query(User).filter(User.id == invite.owner_id).first()
     return InviteResolveRead(owner_nickname=owner.public_nickname or "")
@@ -733,6 +733,14 @@ def delete_psn_contact(contact_id: uuid.UUID, db: Session = Depends(get_db), cur
         raise HTTPException(status_code=404, detail="PSN contact not found")
     db.delete(contact)
     db.commit()
+
+
+@app.get("/activity/manual", response_model=ManualActivityUpdate)
+def get_manual_activity(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    activity = db.query(ManualActivity).filter(ManualActivity.owner_id == current_user.id).first()
+    if not activity:
+        return ManualActivityUpdate()
+    return ManualActivityUpdate(current_game=activity.current_game, recent_games=activity.recent_games)
 
 
 @app.patch("/activity/manual", response_model=ManualActivityUpdate)
