@@ -60,7 +60,7 @@ def build_prompt(prompt: str, liked_game_ids: list[int]) -> str:
       ]
     }}
     CONSTRAINTS:
-    - Exactly 3 recommendations
+    - Exactly 8 recommendations
     - Use liked games as preference signal
     - If no liked games, rely only on request
     LIKED GAMES:
@@ -103,6 +103,56 @@ def fallback_recommendations(prompt: str) -> dict:
             "reason": "A tense tactical strategy game with squad decisions and high-stakes missions.",
             "tags": ["strategy", "tactics", "sci-fi"],
         },
+        {
+            "title": "Prey",
+            "reason": "A smart immersive sim with first-person exploration, flexible problem solving, and sci-fi tension.",
+            "tags": ["immersive sim", "sci-fi", "fps"],
+        },
+        {
+            "title": "The Talos Principle 2",
+            "reason": "A thoughtful puzzle game for players who like Portal-style spatial logic and mystery.",
+            "tags": ["puzzle", "philosophy", "sci-fi"],
+        },
+        {
+            "title": "BioShock",
+            "reason": "A story-heavy first-person classic with atmosphere, powers, and memorable world design.",
+            "tags": ["fps", "story", "atmosphere"],
+        },
+        {
+            "title": "Slay the Spire",
+            "reason": "A replayable strategy game with compact runs, hard choices, and build experimentation.",
+            "tags": ["strategy", "cards", "roguelike"],
+        },
+        {
+            "title": "Baldur's Gate 3",
+            "reason": "A deep party RPG for players who spend a lot of time with choice-driven adventures.",
+            "tags": ["rpg", "choices", "party"],
+        },
+        {
+            "title": "Portal 2",
+            "reason": "A polished puzzle adventure with clever test chambers, comedy, and co-op-friendly design.",
+            "tags": ["puzzle", "co-op", "first-person"],
+        },
+        {
+            "title": "Control",
+            "reason": "A stylish supernatural action game with exploration, strange atmosphere, and punchy powers.",
+            "tags": ["action", "supernatural", "story"],
+        },
+        {
+            "title": "Rainbow Six Siege",
+            "reason": "A tactical multiplayer shooter built around map knowledge, teamwork, and tense rounds.",
+            "tags": ["tactical", "shooter", "multiplayer"],
+        },
+        {
+            "title": "Stellaris",
+            "reason": "A large-scale strategy sandbox about building, shaping, and surviving a space empire.",
+            "tags": ["strategy", "space", "grand strategy"],
+        },
+        {
+            "title": "The Witcher 3: Wild Hunt",
+            "reason": "A story-rich open-world RPG with quests, exploration, and long-form character progression.",
+            "tags": ["rpg", "open world", "story"],
+        },
     ]
     keywords = {
         "cozy": ["Stardew Valley", "Outer Wilds", "Hades"],
@@ -114,6 +164,16 @@ def fallback_recommendations(prompt: str) -> dict:
         "mystery": ["Outer Wilds", "Disco Elysium", "Cyberpunk 2077"],
         "space": ["Outer Wilds", "XCOM 2", "Cyberpunk 2077"],
         "action": ["Hades", "Cyberpunk 2077", "XCOM 2"],
+        "portal": ["The Talos Principle 2", "Outer Wilds", "Prey"],
+        "puzzle": ["The Talos Principle 2", "Portal 2", "Outer Wilds"],
+        "half-life": ["Prey", "BioShock", "Control"],
+        "fps": ["Prey", "BioShock", "Cyberpunk 2077"],
+        "shooter": ["Prey", "BioShock", "Cyberpunk 2077"],
+        "counter-strike": ["Rainbow Six Siege", "Prey", "XCOM 2"],
+        "dota": ["Slay the Spire", "Hades", "XCOM 2"],
+        "civilization": ["XCOM 2", "Slay the Spire", "Stellaris"],
+        "skyrim": ["Baldur's Gate 3", "Cyberpunk 2077", "The Witcher 3: Wild Hunt"],
+        "witcher": ["Baldur's Gate 3", "Cyberpunk 2077", "Disco Elysium"],
     }
     selected_titles: list[str] = []
     for keyword, titles in keywords.items():
@@ -130,7 +190,14 @@ def fallback_recommendations(prompt: str) -> dict:
         match = next(item for item in catalog if item["title"] == title)
         selected.append(match)
         seen.add(title)
-        if len(selected) == 3:
+        if len(selected) == 8:
+            break
+    for item in catalog:
+        if item["title"] in seen:
+            continue
+        selected.append(item)
+        seen.add(item["title"])
+        if len(selected) == 8:
             break
     return {"recommendations": selected}
 

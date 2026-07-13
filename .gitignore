@@ -27,3 +27,4 @@ Thumbs.db
 # Logs / local
 *.log
 heatmap.png
+.superpowers/

@@ -1,6 +1,7 @@
 import os
 import asyncio
 import httpx
+from datetime import date, timedelta
 from typing import Any
 
 
@@ -47,6 +48,82 @@ async def fetch_rawg_games(query: str, page: int = 1) -> dict[str, Any]:
             raise RAWGError("RAWG connection error",status_code=502) from e
         except httpx.HTTPStatusError as e:
             raise RAWGError(f"RAWG HTTP error: {e.response.status_code}",status_code=502) from e
+    data = response.json()
+    return {
+        "results": [
+            {
+                "id": game.get("id"),
+                "name": game.get("name"),
+                "released": game.get("released"),
+                "background_image": game.get("background_image"),
+            }
+            for game in data.get("results", [])
+        ]
+    }
+
+
+async def fetch_rawg_upcoming_games(page: int = 1, page_size: int = 8) -> dict[str, Any]:
+    if not RAWG_API_KEY:
+        raise RAWGError("RAWG_API_KEY is missing")
+    today = date.today()
+    future = today + timedelta(days=365)
+    url = f"{RAWG_BASE_URL}/games"
+    params = {
+        "key": RAWG_API_KEY,
+        "dates": f"{today.isoformat()},{future.isoformat()}",
+        "ordering": "-added",
+        "page": page,
+        "page_size": min(max(page_size, 1), 20),
+    }
+    timeout = httpx.Timeout(RAWG_TIMEOUT_SECONDS)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        try:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+        except httpx.TimeoutException as e:
+            raise RAWGError("RAWG request timeout", status_code=504) from e
+        except httpx.RequestError as e:
+            raise RAWGError("RAWG connection error", status_code=502) from e
+        except httpx.HTTPStatusError as e:
+            raise RAWGError(f"RAWG HTTP error: {e.response.status_code}", status_code=502) from e
+    data = response.json()
+    return {
+        "results": [
+            {
+                "id": game.get("id"),
+                "name": game.get("name"),
+                "released": game.get("released"),
+                "background_image": game.get("background_image"),
+            }
+            for game in data.get("results", [])
+        ]
+    }
+
+
+async def fetch_rawg_trending_games(page: int = 1, page_size: int = 8) -> dict[str, Any]:
+    if not RAWG_API_KEY:
+        raise RAWGError("RAWG_API_KEY is missing")
+    today = date.today()
+    week_start = today - timedelta(days=7)
+    url = f"{RAWG_BASE_URL}/games"
+    params = {
+        "key": RAWG_API_KEY,
+        "dates": f"{week_start.isoformat()},{today.isoformat()}",
+        "ordering": "-added",
+        "page": page,
+        "page_size": min(max(page_size, 1), 20),
+    }
+    timeout = httpx.Timeout(RAWG_TIMEOUT_SECONDS)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        try:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+        except httpx.TimeoutException as e:
+            raise RAWGError("RAWG request timeout", status_code=504) from e
+        except httpx.RequestError as e:
+            raise RAWGError("RAWG connection error", status_code=502) from e
+        except httpx.HTTPStatusError as e:
+            raise RAWGError(f"RAWG HTTP error: {e.response.status_code}", status_code=502) from e
     data = response.json()
     return {
         "results": [

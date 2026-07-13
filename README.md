@@ -162,23 +162,63 @@ For the API, keep these values in `.env`:
 ```bash
 FRONTEND_ORIGIN=http://localhost:3000
 FRONTEND_ORIGINS=http://localhost:3000,https://your-frontend-domain.example
+FRONTEND_PUBLIC_URL=http://localhost:3000
+BACKEND_PUBLIC_URL=http://localhost:8000
 DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/gamefinder
 REDIS_URL=redis://redis:6379/0
 RAWG_API_KEY=your-rawg-key
 RAWG_TIMEOUT_SECONDS=12
+STEAM_API_KEY=your-steam-web-api-key
+ITAD_API_KEY=your-isthereanydeal-api-key
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+TELEGRAM_BOT_USERNAME=your_bot_username
+TELEGRAM_WEBHOOK_SECRET=random-webhook-secret
+PRICE_ALERT_WATCHER_ENABLED=false
+PRICE_ALERT_INTERVAL_SECONDS=86400
+PRICE_ALERT_INITIAL_DELAY_SECONDS=60
+PRICE_ALERT_MIN_CUT=1
 OPENAI_API_KEY=your-openai-key
 OPENAI_TIMEOUT_SECONDS=8
 AI_FALLBACK_ENABLED=true
 SECRET_KEY=your-secret-key
+ACCESS_TOKEN_EXPIRE_MINUTES=10080
 ```
 
 On Railway, set `FRONTEND_ORIGINS` to the comma-separated list of frontend URLs that should be allowed by CORS. For example:
 
 ```bash
 FRONTEND_ORIGINS=http://localhost:3000,https://your-gamefinder-frontend.railway.app
+FRONTEND_PUBLIC_URL=https://your-gamefinder-frontend.railway.app
+BACKEND_PUBLIC_URL=https://your-gamefinder-api.railway.app
 ```
 
 Set `AI_FALLBACK_ENABLED=false` in production if you want `/recommendations` to fail visibly with `503` when OpenAI is unavailable instead of returning local fallback recommendations.
+
+Steam linking uses Steam OpenID for account linking and `STEAM_API_KEY` for library import. A linked Steam account only exposes owned games when the user's Steam game details are public.
+
+Price history uses the IsThereAnyDeal API. Create an app at `https://isthereanydeal.com/dev/app/` and set `ITAD_API_KEY` on the backend service.
+
+Telegram alerts MVP uses a Telegram bot. Create a bot with BotFather, set `TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_BOT_USERNAME`, and `TELEGRAM_WEBHOOK_SECRET`, then point Telegram at:
+
+```bash
+https://your-gamefinder-api.railway.app/telegram/webhook/your-webhook-secret
+```
+
+The profile page can then open `https://t.me/<bot>?start=<link-token>`. After the user presses Start,
+the backend stores the Telegram chat and can send test alerts plus saved-game confirmation messages.
+
+Daily price alerts use the saved games table, Telegram, and IsThereAnyDeal. Set
+`PRICE_ALERT_WATCHER_ENABLED=true` on the backend service to run the watcher inside the API process.
+It checks linked Telegram users every `PRICE_ALERT_INTERVAL_SECONDS` seconds, uses the user's Steam
+country code when available, and sends a Telegram message only when the current discount is different
+from the last alert stored for that saved game.
+
+You can also run one manual pass:
+
+```bash
+python -m scripts.run_price_alerts
+```
 
 Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy. If you prefer pnpm later, enable it with Corepack and run the equivalent install/dev commands inside `web/`.
 
@@ -200,9 +240,24 @@ Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy.
 |----------|-------------|
 | DATABASE_URL | PostgreSQL connection string |
 | REDIS_URL | Redis connection |
+| FRONTEND_PUBLIC_URL | Public frontend URL used after Steam OpenID callback |
+| BACKEND_PUBLIC_URL | Public API URL used to build Steam OpenID callback URLs |
+| GOOGLE_CLIENT_ID | Google OAuth web-client ID |
+| GOOGLE_CLIENT_SECRET | Google OAuth web-client secret |
+| GOOGLE_REDIRECT_URI | Exact Google OAuth callback URL, usually `<BACKEND_PUBLIC_URL>/auth/google/callback` |
 | RAWG_API_KEY | Game API key |
+| STEAM_API_KEY | Steam Web API key for owned-game library import |
+| ITAD_API_KEY | IsThereAnyDeal API key for current prices and historical lows |
+| TELEGRAM_BOT_TOKEN | Telegram bot token from BotFather |
+| TELEGRAM_BOT_USERNAME | Telegram bot username without `@` |
+| TELEGRAM_WEBHOOK_SECRET | Secret path segment used by the Telegram webhook URL |
+| PRICE_ALERT_WATCHER_ENABLED | Enables the daily Telegram price watcher when `true` |
+| PRICE_ALERT_INTERVAL_SECONDS | Seconds between watcher runs, defaults to `86400` |
+| PRICE_ALERT_INITIAL_DELAY_SECONDS | Delay before the first watcher run after backend startup |
+| PRICE_ALERT_MIN_CUT | Minimum discount percentage required before sending a Telegram alert |
 | OPENAI_API_KEY | AI provider key |
 | SECRET_KEY | JWT signing key |
+| ACCESS_TOKEN_EXPIRE_MINUTES | JWT lifetime in minutes, defaults to 10080 (7 days) |
 
 ---
 
@@ -222,6 +277,7 @@ https://game-finder.up.railway.app/docs
 - GET `/health`
 - GET `/docs`
 - GET `/search/games?q=witcher`
+- GET `/catalog/upcoming-games`
 - POST `/recommendations`
 
 ---

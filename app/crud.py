@@ -3,12 +3,16 @@ from app.database import Game, User
 
 
 def list_games(db, current_user):
-    games = db.query(Game).filter(Game.owner_id == current_user)
-    return games.all()
+    return (
+        db.query(Game)
+        .filter(Game.owner_id == current_user)
+        .order_by(Game.source.asc(), Game.created_at.desc(), Game.playtime_forever.desc().nullslast())
+        .all()
+    )
 
 
 def create_game(db, data, current_user):
-    game = Game(**data, owner_id=current_user)
+    game = Game(**data, source="manual", owner_id=current_user)
     db.add(game)
     db.commit()
     db.refresh(game)
@@ -43,11 +47,11 @@ def delete_game(db, game_id: uuid.UUID, current_user):
 
 
 def get_user_by_email(db, email: str):
-    return db.query(User).filter(User.email == email).first()
+    return db.query(User).filter(User.email == email.strip().lower()).first()
 
 
 def create_user(db, email: str, password_hash: str):
-    user = User(email=email, password_hash=password_hash)
+    user = User(email=email.strip().lower(), password_hash=password_hash)
     db.add(user)
     db.commit()
     db.refresh(user)

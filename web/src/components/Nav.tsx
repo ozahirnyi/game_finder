@@ -1,19 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
-import { clearToken, getAuthSnapshot, subscribeToAuthChanges } from "@/lib/api";
+import { Icon } from "@/components/Icon";
+import { getAuthSnapshot, subscribeToAuthChanges } from "@/lib/api";
 
 export function Nav() {
   const pathname = usePathname();
-  const router = useRouter();
   const authed = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
-
-  function logout() {
-    clearToken();
-    router.push("/login");
-  }
+  const isCurrent = (href: string) => href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <header className="site-header">
@@ -24,31 +20,40 @@ export function Nav() {
         Game Finder
       </Link>
       <nav className="nav-links" aria-label="Main navigation">
-        <Link href="/" aria-current={pathname === "/" ? "page" : undefined}>
-          Search
+        <Link className="nav-link" href="/" aria-current={isCurrent("/") ? "page" : undefined}>
+          <Icon name="search" />
+          <span>Search</span>
+        </Link>
+        <Link className="nav-link" href="/deals" aria-current={isCurrent("/deals") ? "page" : undefined}>
+          <Icon name="tag" />
+          <span>Deals</span>
         </Link>
         {authed && (
-          <Link href="/favorites" aria-current={pathname === "/favorites" ? "page" : undefined}>
-            Favorites
+          <Link className="nav-link" href="/steam" aria-current={isCurrent("/steam") ? "page" : undefined}>
+            <Icon name="gamepad" />
+            <span>Steam</span>
           </Link>
         )}
       </nav>
-      <div className="auth-actions">
+      <div className="auth-actions" aria-label="Account actions">
         {authed ? (
-          <button className="nav-button ghost" type="button" onClick={logout}>
-            Log out
-          </button>
+          <Link className="nav-button ghost" href="/profile" aria-current={isCurrent("/profile") ? "page" : undefined}>
+            <Icon name="user" />
+            <span>Profile</span>
+          </Link>
         ) : (
           <>
-            <Link className="nav-button ghost" href="/login" aria-current={pathname === "/login" ? "page" : undefined}>
-              Login
+            <Link className="nav-button ghost" href="/login" aria-current={isCurrent("/login") ? "page" : undefined}>
+              <Icon name="log-in" />
+              <span>Login</span>
             </Link>
             <Link
               className="nav-button primary"
               href="/register"
-              aria-current={pathname === "/register" ? "page" : undefined}
+              aria-current={isCurrent("/register") ? "page" : undefined}
             >
-              Register
+              <Icon name="user-plus" />
+              <span>Register</span>
             </Link>
           </>
         )}
