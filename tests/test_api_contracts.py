@@ -616,3 +616,88 @@ def test_steam_library_sync_removes_legacy_imports_without_saving_steam_games(mo
     assert db.committed is True
     assert db.added == []
     assert db.deleted == [legacy_import]
+
+
+def test_profile_me_normalizes_nickname_and_returns_visibility_defaults(monkeypatch):
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        email="owner@example.com",
+        public_nickname=None,
+        platforms_visibility="everyone",
+        current_game_visibility="everyone",
+        recent_games_visibility="everyone",
+    )
+
+    class Db:
+        def commit(self):
+            pass
+
+    monkeypatch.setattr(main, "get_user_by_public_nickname", lambda _db, _nickname: None, raising=False)
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: Db()
+    try:
+        response = client.patch("/profile/me", json={"nickname": "  Player One  "})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "nickname": "player one",
+        "platforms_visibility": "everyone",
+        "current_game_visibility": "everyone",
+        "recent_games_visibility": "everyone",
+    }
+
+
+def test_profile_me_rejects_casefolded_duplicate_nickname(monkeypatch):
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        public_nickname=None,
+        platforms_visibility="everyone",
+        current_game_visibility="everyone",
+        recent_games_visibility="everyone",
+    )
+    duplicate = SimpleNamespace(id=uuid.uuid4(), public_nickname="player one")
+    monkeypatch.setattr(main, "get_user_by_public_nickname", lambda _db, _nickname: duplicate, raising=False)
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: object()
+    try:
+        response = client.patch("/profile/me", json={"nickname": "PLAYER ONE"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Nickname is already in use"
+
+
+def test_public_profile_enforces_visibility_and_never_leaks_email(monkeypatch):
+    profile = SimpleNamespace(
+        id=uuid.uuid4(),
+        email="private@example.com",
+        public_nickname="player-one",
+        platforms_visibility="everyone",
+        current_game_visibility="friends",
+        recent_games_visibility="nobody",
+    )
+    monkeypatch.setattr(main, "get_user_by_public_nickname", lambda _db, _nickname: profile, raising=False)
+    monkeypatch.setattr(
+        main,
+        "profile_social_data",
+        lambda _db, _user: {"platforms": ["steam"], "current_game": "Hades", "recent_games": ["Celeste"]},
+        raising=False,
+    )
+    main.app.dependency_overrides[main.get_db] = lambda: object()
+    try:
+        response = client.get("/profiles/player-one")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "nickname": "player-one",
+        "platforms": ["steam"],
+        "current_game": None,
+        "recent_games": [],
+    }
+    assert "email" not in response.json()

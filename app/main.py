@@ -2,11 +2,12 @@ import asyncio
 import os
 import uuid
 import contextlib
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from sqlalchemy.orm import Session
-from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -25,7 +26,7 @@ from app.integrations.rawg import (
 from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
 from app.steam_store import fetch_steam_store_deals
-from app.auth import hash_password, verify_password, create_access_token, get_current_user
+from app.auth import hash_password, verify_password, create_access_token, get_current_user, decode_access_token, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
@@ -41,6 +42,7 @@ from app.steam import (
     verify_steam_openid,
 )
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
+from app.schemas import ProfileSettingsRead, ProfileSettingsUpdate, PublicProfileRead, Visibility
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -138,6 +140,57 @@ def user_response(user: User, google_linked: bool | None = None, db: Session | N
     if google_linked is None:
         google_linked = bool(db and db.query(OAuthIdentity).filter(OAuthIdentity.user_id == user.id, OAuthIdentity.provider == "google").first())
     return UserRead(id=user.id, email=user.email, created_at=user.created_at, google_linked=google_linked)
+
+
+def normalize_public_nickname(nickname: str) -> str:
+    normalized = " ".join(nickname.strip().casefold().split())
+    if not 3 <= len(normalized) <= 32 or not re.fullmatch(r"[a-z0-9][a-z0-9 _-]*", normalized):
+        raise HTTPException(status_code=422, detail="Nickname must be 3-32 characters using letters, numbers, spaces, underscores, or hyphens")
+    return normalized
+
+
+def get_user_by_public_nickname(db: Session, nickname: str) -> User | None:
+    return db.query(User).filter(User.public_nickname == nickname).first()
+
+
+def profile_social_data(db: Session, user: User) -> dict[str, object]:
+    platforms = ["steam"] if user.steam_id else []
+    recent_games = (
+        db.query(Game)
+        .filter(Game.owner_id == user.id)
+        .order_by(Game.created_at.desc())
+        .limit(5)
+        .all()
+    )
+    return {"platforms": platforms, "current_game": None, "recent_games": [game.title for game in recent_games]}
+
+
+def users_are_friends(_db: Session, _owner_id: uuid.UUID, _viewer_id: uuid.UUID) -> bool:
+    """Friendship storage is introduced in the next social task."""
+    return False
+
+
+def can_view_profile_field(db: Session, owner: User, viewer: User | None, visibility: Visibility | str) -> bool:
+    if viewer and viewer.id == owner.id:
+        return True
+    if visibility == Visibility.everyone or visibility == Visibility.everyone.value:
+        return True
+    if visibility == Visibility.friends or visibility == Visibility.friends.value:
+        return bool(viewer and users_are_friends(db, owner.id, viewer.id))
+    return False
+
+
+def get_optional_current_user(
+    authorization: str | None = Header(default=None), db: Session = Depends(get_db)
+) -> User | None:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    try:
+        payload = decode_access_token(authorization.split(" ", 1)[1])
+        user_id = uuid.UUID(payload["sub"])
+    except (HTTPException, KeyError, ValueError):
+        return None
+    return get_user_by_id(db, user_id)
 
 
 def google_frontend_redirect(**params: str) -> RedirectResponse:
@@ -364,6 +417,58 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 @app.get("/auth/me", response_model=UserRead)
 def current_user_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return user_response(current_user, db=db)
+
+
+def profile_settings_response(user: User) -> ProfileSettingsRead:
+    return ProfileSettingsRead(
+        nickname=user.public_nickname,
+        platforms_visibility=user.platforms_visibility,
+        current_game_visibility=user.current_game_visibility,
+        recent_games_visibility=user.recent_games_visibility,
+    )
+
+
+@app.get("/profile/me", response_model=ProfileSettingsRead)
+def get_profile_settings(current_user: User = Depends(get_current_user)):
+    return profile_settings_response(current_user)
+
+
+@app.patch("/profile/me", response_model=ProfileSettingsRead)
+def update_profile_settings(
+    settings: ProfileSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    updates = settings.model_dump(exclude_unset=True)
+    if "nickname" in updates:
+        nickname = normalize_public_nickname(updates["nickname"] or "")
+        existing = get_user_by_public_nickname(db, nickname)
+        if existing and existing.id != current_user.id:
+            raise HTTPException(status_code=409, detail="Nickname is already in use")
+        current_user.public_nickname = nickname
+    for field in ("platforms_visibility", "current_game_visibility", "recent_games_visibility"):
+        if field in updates:
+            setattr(current_user, field, updates[field].value)
+    db.commit()
+    return profile_settings_response(current_user)
+
+
+@app.get("/profiles/{nickname}", response_model=PublicProfileRead)
+def get_public_profile(
+    nickname: str,
+    db: Session = Depends(get_db),
+    viewer: User | None = Depends(get_optional_current_user),
+):
+    profile = get_user_by_public_nickname(db, normalize_public_nickname(nickname))
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    data = profile_social_data(db, profile)
+    return PublicProfileRead(
+        nickname=profile.public_nickname,
+        platforms=data["platforms"] if can_view_profile_field(db, profile, viewer, profile.platforms_visibility) else [],
+        current_game=data["current_game"] if can_view_profile_field(db, profile, viewer, profile.current_game_visibility) else None,
+        recent_games=data["recent_games"] if can_view_profile_field(db, profile, viewer, profile.recent_games_visibility) else [],
+    )
 
 
 def create_google_transaction(db: Session, mode: str, user_id: uuid.UUID | None = None) -> OAuthLoginUrl:

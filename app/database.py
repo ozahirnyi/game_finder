@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import create_engine, String, DateTime, ForeignKey, Float, Integer, Index, text, UniqueConstraint
+from sqlalchemy import create_engine, String, DateTime, ForeignKey, Float, Integer, Index, text, UniqueConstraint, func, column
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.exc import OperationalError
 
@@ -63,6 +63,14 @@ class Game(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index(
+            "uq_users_public_nickname_casefold",
+            func.lower(column("public_nickname")),
+            unique=True,
+            postgresql_where=text("public_nickname IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255),nullable=False, unique=True)
@@ -76,6 +84,10 @@ class User(Base):
     telegram_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     telegram_link_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True)
     telegram_linked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    public_nickname: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    platforms_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="everyone", server_default="everyone")
+    current_game_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="everyone", server_default="everyone")
+    recent_games_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="everyone", server_default="everyone")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
 
 

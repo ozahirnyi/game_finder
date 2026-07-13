@@ -1,7 +1,36 @@
+from enum import Enum
+
 from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Optional
 import uuid
+
+
+class Visibility(str, Enum):
+    everyone = "everyone"
+    friends = "friends"
+    nobody = "nobody"
+
+
+class ProfileSettingsRead(BaseModel):
+    nickname: str | None = None
+    platforms_visibility: Visibility = Visibility.everyone
+    current_game_visibility: Visibility = Visibility.everyone
+    recent_games_visibility: Visibility = Visibility.everyone
+
+
+class ProfileSettingsUpdate(BaseModel):
+    nickname: str | None = Field(default=None, max_length=32)
+    platforms_visibility: Visibility | None = None
+    current_game_visibility: Visibility | None = None
+    recent_games_visibility: Visibility | None = None
+
+
+class PublicProfileRead(BaseModel):
+    nickname: str
+    platforms: list[str] = Field(default_factory=list)
+    current_game: str | None = None
+    recent_games: list[str] = Field(default_factory=list)
 
 
 class GameCreate(BaseModel):
