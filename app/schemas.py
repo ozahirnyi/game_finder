@@ -20,7 +20,7 @@ class ProfileSettingsRead(BaseModel):
 
 
 class ProfileSettingsUpdate(BaseModel):
-    nickname: str | None = Field(default=None, max_length=32)
+    nickname: str | None = None
     platforms_visibility: Visibility | None = None
     current_game_visibility: Visibility | None = None
     recent_games_visibility: Visibility | None = None

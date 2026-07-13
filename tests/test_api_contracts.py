@@ -649,6 +649,32 @@ def test_profile_me_normalizes_nickname_and_returns_visibility_defaults(monkeypa
     }
 
 
+def test_profile_me_accepts_a_trimmed_32_character_nickname(monkeypatch):
+    nickname = "a" * 32
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        public_nickname=None,
+        platforms_visibility="everyone",
+        current_game_visibility="everyone",
+        recent_games_visibility="everyone",
+    )
+    monkeypatch.setattr(main, "get_user_by_public_nickname", lambda _db, _nickname: None, raising=False)
+
+    class Db:
+        def commit(self):
+            pass
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: Db()
+    try:
+        response = client.patch("/profile/me", json={"nickname": f"  {nickname}  "})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["nickname"] == nickname
+
+
 def test_profile_me_rejects_casefolded_duplicate_nickname(monkeypatch):
     user = SimpleNamespace(
         id=uuid.uuid4(),
