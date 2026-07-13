@@ -17,7 +17,20 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY is not set in environment variables")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+
+def get_access_token_expire_minutes() -> int:
+    raw = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "").strip()
+    if not raw:
+        return 60 * 24 * 7
+    try:
+        value = int(raw)
+    except ValueError:
+        return 60 * 24 * 7
+    return max(value, 1)
+
+
+ACCESS_TOKEN_EXPIRE_MINUTES = get_access_token_expire_minutes()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")

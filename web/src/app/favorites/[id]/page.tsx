@@ -1,14 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError, SavedGame, deleteSavedGame, getSavedGame, isAuthenticated } from "@/lib/api";
+import { ApiError, SavedGame, SearchGame, deleteSavedGame, getSavedGame, isAuthenticated, searchGames } from "@/lib/api";
 
 export default function SavedGamePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [game, setGame] = useState<SavedGame | null>(null);
+  const [matchedGame, setMatchedGame] = useState<SearchGame | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -24,10 +26,25 @@ export default function SavedGamePage() {
       .then((data) => {
         if (active) {
           setGame(data);
+          searchGames(data.title)
+            .then((result) => {
+              if (active) {
+                setMatchedGame(result.results[0] ?? null);
+              }
+            })
+            .catch(() => {
+              if (active) {
+                setMatchedGame(null);
+              }
+            });
         }
       })
       .catch((err) => {
         if (active) {
+          if (err instanceof ApiError && err.status === 401) {
+            router.push("/login?message=Your session expired. Please log in again.");
+            return;
+          }
           setError(err instanceof ApiError ? err.message : "Could not load this saved game.");
         }
       })
@@ -52,6 +69,10 @@ export default function SavedGamePage() {
       await deleteSavedGame(game.id);
       router.push("/favorites");
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login?message=Your session expired. Please log in again.");
+        return;
+      }
       setError(err instanceof ApiError ? err.message : "Could not remove this game.");
       setDeleting(false);
     }
@@ -78,6 +99,14 @@ export default function SavedGamePage() {
 
   return (
     <section className="saved-detail stack">
+      <div className="saved-hero-image">
+        {matchedGame?.background_image ? (
+          <Image src={matchedGame.background_image} alt="" fill sizes="(max-width: 760px) 100vw, 720px" />
+        ) : (
+          <span>{game.title.slice(0, 2).toUpperCase()}</span>
+        )}
+      </div>
+
       <div className="section-header">
         <p className="eyebrow">Saved game</p>
         <h1>{game.title}</h1>

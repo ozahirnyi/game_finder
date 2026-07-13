@@ -8,13 +8,19 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+REDIS_URL = os.getenv("REDIS_URL")
+if REDIS_URL is None:
+    REDIS_URL = "redis://redis:6379/0"
+REDIS_URL = REDIS_URL.strip()
+REDIS_DISABLED_VALUES = {"", "0", "false", "off", "disabled", "none", "null"}
 
 
-try:
-    redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-except Exception:
-    redis_client = None
+redis_client = None
+if REDIS_URL.lower() not in REDIS_DISABLED_VALUES:
+    try:
+        redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+    except Exception:
+        redis_client = None
 
 
 async def cache_get(key: str):
@@ -32,9 +38,8 @@ async def cache_get(key: str):
 
 async def cache_set(key: str, value, ttl: int):
     if not redis_client:
-        logger.warning("Redis is not initialized")
         return
     try:
-        await redis_client.setex(key,ttl,json.dumps(value))
+        await redis_client.setex(key, ttl, json.dumps(value))
     except Exception as e:
         logger.warning(f"Redis write failed: {e}")

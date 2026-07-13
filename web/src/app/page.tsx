@@ -3,13 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   ApiError,
   RecommendationItem,
   SearchGame,
   createSavedGame,
   getRecommendations,
+  getTrendingGames,
+  getUpcomingGames,
   isAuthenticated,
   searchGames,
 } from "@/lib/api";
@@ -26,11 +28,60 @@ export default function Home() {
   const [recommendationDetails, setRecommendationDetails] = useState<RecommendationDetails>({});
   const [loading, setLoading] = useState(false);
   const [savingRecommendation, setSavingRecommendation] = useState("");
+  const [trendingGames, setTrendingGames] = useState<SearchGame[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+  const [trendingError, setTrendingError] = useState("");
+  const [upcomingGames, setUpcomingGames] = useState<SearchGame[]>([]);
+  const [upcomingLoading, setUpcomingLoading] = useState(true);
+  const [savingWatch, setSavingWatch] = useState("");
+  const [upcomingError, setUpcomingError] = useState("");
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
   const isAiMode = mode === "ai";
+
+  useEffect(() => {
+    let active = true;
+
+    getTrendingGames(8)
+      .then((data) => {
+        if (active) {
+          setTrendingGames(data.results.filter((game) => game.id && game.name).slice(0, 8));
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setTrendingError(err instanceof ApiError ? err.message : "Could not load trending games.");
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setTrendingLoading(false);
+        }
+      });
+
+    getUpcomingGames(8)
+      .then((data) => {
+        if (active) {
+          setUpcomingGames(data.results.filter((game) => game.id && game.name).slice(0, 8));
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setUpcomingError(err instanceof ApiError ? err.message : "Could not load upcoming games.");
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setUpcomingLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,9 +181,49 @@ export default function Home() {
       await createSavedGame(title, info);
       setMessage(`${title} saved to your library.`);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login?message=Your session expired. Please log in again.");
+        return;
+      }
       setError(err instanceof ApiError ? err.message : "Could not save this recommendation.");
     } finally {
       setSavingRecommendation("");
+    }
+  }
+
+  async function saveWatchGame(game: SearchGame, kind: "popular" | "upcoming") {
+    const title = game.name?.trim();
+    if (!title) {
+      return;
+    }
+    if (!isAuthenticated()) {
+      router.push("/login?message=Log in to save game alerts.");
+      return;
+    }
+
+    const info = [
+      kind === "upcoming" ? "Release alert" : "Popular now",
+      game.released ? `${kind === "upcoming" ? "Expected release" : "Released"}: ${game.released}` : null,
+      game.id ? `RAWG ID: ${game.id}` : null,
+    ]
+      .filter(Boolean)
+      .join(" | ")
+      .slice(0, 500);
+
+    setSavingWatch(`${kind}-${game.id ?? title}`);
+    setError("");
+    setMessage("");
+    try {
+      await createSavedGame(title, info);
+      setMessage(`${title} saved to your alerts.`);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login?message=Your session expired. Please log in again.");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "Could not save this game.");
+    } finally {
+      setSavingWatch("");
     }
   }
 
@@ -142,8 +233,8 @@ export default function Home() {
         <div className="neon-frame" aria-hidden="true" />
         <div className="section-header hero-copy">
           <p className="eyebrow">Game discovery, without the noise</p>
-          <h1>Find a game that fits your mood.</h1>
-          <p>Search by title when you know the name, or ask AI when you only know the vibe.</p>
+          <h1>Find your next game.</h1>
+          <p>Search by title, describe a mood, or browse a few current picks.</p>
         </div>
 
         <div className="search-mode-toggle" aria-label="Search mode">
@@ -184,7 +275,7 @@ export default function Home() {
           </button>
         </form>
 
-        <div className="prompt-chips" aria-label="Search suggestions">
+        <div className={`prompt-chips ${isAiMode ? "prompt-chips-ai" : ""}`} aria-label="Search suggestions">
           {(isAiMode
             ? [
                 "I want a dark RPG with meaningful choices",
@@ -298,6 +389,112 @@ export default function Home() {
             })}
           </div>
         </section>
+      )}
+
+      {!searched && (
+        <div className="home-discovery home-two-column">
+          <section className="results-panel home-section-panel" id="popular">
+            <div className="results-heading">
+              <div>
+                <p className="eyebrow">Popular now</p>
+                <h2>Current picks</h2>
+              </div>
+              <p>{trendingLoading ? "Loading" : `${trendingGames.length} games`}</p>
+            </div>
+
+            {trendingError && <p className="alert error">{trendingError}</p>}
+            {!trendingError && trendingLoading && <p className="alert">Loading popular games...</p>}
+            {!trendingError && !trendingLoading && trendingGames.length === 0 && (
+              <p className="alert">No popular games loaded yet.</p>
+            )}
+
+            {trendingGames.length > 0 && (
+              <div className="compact-game-list">
+                {trendingGames.slice(0, 6).map((game) => {
+                  const key = String(game.id ?? game.name);
+                  const isSaving = savingWatch === `popular-${game.id ?? game.name}`;
+
+                  return (
+                    <article className="compact-game-row" key={key}>
+                      <div className="compact-game-image">
+                        {game.background_image ? (
+                          <Image src={game.background_image} alt="" fill sizes="96px" />
+                        ) : (
+                          <span>No image</span>
+                        )}
+                      </div>
+                      <div>
+                        <h3>{game.name}</h3>
+                        <p>{game.released ? `Released ${game.released}` : "Release date unknown"}</p>
+                      </div>
+                      <div className="compact-actions">
+                        {game.id ? (
+                          <Link className="button secondary" href={`/games/${game.id}`}>
+                            Details
+                          </Link>
+                        ) : null}
+                        <button type="button" onClick={() => saveWatchGame(game, "popular")} disabled={isSaving}>
+                          {isSaving ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="results-panel home-section-panel">
+            <div className="results-heading">
+              <div>
+                <p className="eyebrow">Upcoming releases</p>
+                <h2>Worth watching</h2>
+              </div>
+              <p>{upcomingLoading ? "Loading" : `${upcomingGames.length} games`}</p>
+            </div>
+
+            {upcomingError && <p className="alert error">{upcomingError}</p>}
+            {!upcomingError && upcomingLoading && <p className="alert">Loading upcoming releases...</p>}
+            {!upcomingError && !upcomingLoading && upcomingGames.length === 0 && (
+              <p className="alert">No upcoming games loaded yet.</p>
+            )}
+
+            {upcomingGames.length > 0 && (
+              <div className="compact-game-list">
+                {upcomingGames.slice(0, 6).map((game) => {
+                  const key = String(game.id ?? game.name);
+                  const isSaving = savingWatch === `upcoming-${game.id ?? game.name}`;
+
+                  return (
+                    <article className="compact-game-row" key={key}>
+                      <div className="compact-game-image">
+                        {game.background_image ? (
+                          <Image src={game.background_image} alt="" fill sizes="96px" />
+                        ) : (
+                          <span>No image</span>
+                        )}
+                      </div>
+                      <div>
+                        <h3>{game.name}</h3>
+                        <p>{game.released ? `Expected ${game.released}` : "Release date unknown"}</p>
+                      </div>
+                      <div className="compact-actions">
+                        {game.id ? (
+                          <Link className="button secondary" href={`/games/${game.id}`}>
+                            Details
+                          </Link>
+                        ) : null}
+                        <button type="button" onClick={() => saveWatchGame(game, "upcoming")} disabled={isSaving}>
+                          {isSaving ? "Saving..." : "Notify me"}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
       )}
     </section>
   );
