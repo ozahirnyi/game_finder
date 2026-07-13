@@ -4,11 +4,143 @@ import uuid
 import pytest
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 import app.main as main
+from app.database import Base, Friendship, FriendshipInvite, FriendshipRequest, PsnContact, User
 
 
 client = TestClient(main.app)
+
+
+@pytest.fixture
+def social_api():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    db = session_factory()
+    users = {}
+    for nickname in ("alice", "bob", "carol", "dave"):
+        user = User(email=f"{nickname}@example.com", password_hash="hash", public_nickname=nickname)
+        db.add(user)
+        users[nickname] = user
+    db.commit()
+    actor = {"user": users["alice"]}
+
+    def get_test_db():
+        yield db
+
+    main.app.dependency_overrides[main.get_db] = get_test_db
+    main.app.dependency_overrides[main.get_current_user] = lambda: actor["user"]
+    try:
+        yield client, db, users, actor
+    finally:
+        main.app.dependency_overrides.clear()
+        db.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+def test_friendship_request_rejects_self_duplicate_and_reverse(social_api):
+    api, _db, _users, actor = social_api
+
+    assert api.post("/friends/requests", json={"nickname": "alice"}).status_code == 400
+    assert api.post("/friends/requests", json={"nickname": "bob"}).status_code == 201
+    assert api.post("/friends/requests", json={"nickname": "bob"}).status_code == 409
+    actor["user"] = _users["bob"]
+    assert api.post("/friends/requests", json={"nickname": "alice"}).status_code == 409
+
+
+def test_friendship_request_actions_are_authorized_and_create_canonical_pair(social_api):
+    api, db, users, actor = social_api
+    created = api.post("/friends/requests", json={"nickname": "bob"})
+    request_id = created.json()["id"]
+
+    assert api.post(f"/friends/requests/{request_id}/respond", json={"action": "accepted"}).status_code == 403
+    actor["user"] = users["carol"]
+    assert api.post(f"/friends/requests/{request_id}/cancel").status_code == 403
+    actor["user"] = users["bob"]
+    assert api.post(f"/friends/requests/{request_id}/respond", json={"action": "accepted"}).status_code == 200
+    friendship = db.query(Friendship).one()
+    assert (friendship.user_low_id, friendship.user_high_id) == main.canonical_friend_pair(users["alice"].id, users["bob"].id)
+    actor["user"] = users["carol"]
+    assert api.delete(f"/friends/{users['bob'].id}").status_code == 404
+    actor["user"] = users["alice"]
+    assert api.delete(f"/friends/{users['bob'].id}").status_code == 204
+
+    declined = api.post("/friends/requests", json={"nickname": "carol"})
+    actor["user"] = users["carol"]
+    assert api.post(f"/friends/requests/{declined.json()['id']}/respond", json={"action": "declined"}).status_code == 200
+    actor["user"] = users["alice"]
+    cancelled = api.post("/friends/requests", json={"nickname": "dave"})
+    assert api.post(f"/friends/requests/{cancelled.json()['id']}/cancel").status_code == 200
+
+
+def test_invite_rotation_hashes_token_rejects_self_and_replay(social_api):
+    api, db, users, actor = social_api
+    first = api.post("/friends/invites").json()
+    stored = db.query(FriendshipInvite).one()
+    assert stored.token_digest == main.invite_digest(first["token"])
+    assert stored.token_digest != first["token"]
+    assert api.post(f"/friends/invites/{first['token']}/accept").status_code == 400
+
+    second = api.post("/friends/invites").json()
+    assert second["token"] != first["token"]
+    assert api.get(f"/friends/invites/{first['token']}").status_code == 404
+    actor["user"] = users["bob"]
+    assert api.post(f"/friends/invites/{second['token']}/accept").status_code == 200
+    assert api.post(f"/friends/invites/{second['token']}/accept").status_code == 409
+
+
+def test_psn_contacts_crud_is_owner_scoped_and_uses_fixed_profile_url(social_api):
+    api, _db, users, actor = social_api
+    created = api.post("/friends/psn-contacts", json={"online_id": "PlayEr_One-42"})
+    assert created.status_code == 201
+    contact = created.json()
+    assert contact["profile_url"] == "https://psnprofiles.com/PlayEr_One-42"
+    assert api.post("/friends/psn-contacts", json={"online_id": "player_one-42"}).status_code == 409
+    actor["user"] = users["bob"]
+    assert api.get("/friends/psn-contacts").json() == []
+    assert api.patch(f"/friends/psn-contacts/{contact['id']}", json={"online_id": "Other"}).status_code == 404
+    actor["user"] = users["alice"]
+    assert api.patch(f"/friends/psn-contacts/{contact['id']}", json={"online_id": "Other"}).json()["online_id"] == "Other"
+    assert api.delete(f"/friends/psn-contacts/{contact['id']}").status_code == 204
+
+
+@pytest.mark.parametrize("endpoint", ["request", "invite"])
+def test_duplicate_insert_races_rollback_and_return_conflict(social_api, monkeypatch, endpoint):
+    api, db, users, actor = social_api
+    original_commit = db.commit
+    rollback_called = {"value": False}
+
+    def race_commit():
+        db.rollback()
+        raise IntegrityError("insert", {}, Exception("unique constraint"))
+
+    def track_rollback():
+        rollback_called["value"] = True
+        original_rollback()
+
+    original_rollback = db.rollback
+    monkeypatch.setattr(db, "commit", race_commit)
+    monkeypatch.setattr(db, "rollback", track_rollback)
+    if endpoint == "request":
+        response = api.post("/friends/requests", json={"nickname": "bob"})
+    else:
+        db.add(FriendshipInvite(owner_id=users["bob"].id, token_digest=main.invite_digest("race-token")))
+        original_commit()
+        actor["user"] = users["alice"]
+        response = api.post("/friends/invites/race-token/accept")
+
+    assert response.status_code == 409
+    assert rollback_called["value"] is True
 
 
 def test_catalog_game_detail_returns_normalized_rawg_data(monkeypatch):

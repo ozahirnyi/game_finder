@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -505,7 +506,11 @@ def create_friendship_request(
         raise HTTPException(status_code=409, detail="A friendship request or friendship already exists")
     request = FriendshipRequest(requester_id=current_user.id, recipient_id=recipient.id, status="pending")
     db.add(request)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A friendship request or friendship already exists")
     return friendship_request_response(db, request)
 
 
@@ -615,7 +620,11 @@ def accept_friendship_invite(token: str, db: Session = Depends(get_db), current_
     low_id, high_id = canonical_friend_pair(invite.owner_id, current_user.id)
     friendship = Friendship(user_low_id=low_id, user_high_id=high_id)
     db.add(friendship)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Friendship already exists")
     owner = db.query(User).filter(User.id == invite.owner_id).first()
     return FriendshipRead(user_id=owner.id, nickname=owner.public_nickname or "", created_at=friendship.created_at)
 
