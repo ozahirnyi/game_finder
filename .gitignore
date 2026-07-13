@@ -28,3 +28,4 @@ Thumbs.db
 *.log
 heatmap.png
 .superpowers/
+.worktrees/
