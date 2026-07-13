@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.main as main
-from app.database import Base, Friendship, FriendshipInvite, FriendshipRequest, PsnContact, User
+from app.database import Base, Friendship, FriendshipInvite, FriendshipRequest, ManualActivity, PsnContact, SteamSocialSnapshot, User
 
 
 client = TestClient(main.app)
@@ -112,6 +112,67 @@ def test_psn_contacts_crud_is_owner_scoped_and_uses_fixed_profile_url(social_api
     actor["user"] = users["alice"]
     assert api.patch(f"/friends/psn-contacts/{contact['id']}", json={"online_id": "Other"}).json()["online_id"] == "Other"
     assert api.delete(f"/friends/psn-contacts/{contact['id']}").status_code == 204
+
+
+def test_contacts_merge_confirmed_site_friends_psn_and_steam_without_creating_friendships(social_api, monkeypatch):
+    api, db, users, _actor = social_api
+    low_id, high_id = main.canonical_friend_pair(users["alice"].id, users["bob"].id)
+    db.add(Friendship(user_low_id=low_id, user_high_id=high_id))
+    psn = PsnContact(owner_id=users["alice"].id, online_id="ConsolePal", normalized_online_id="consolepal")
+    snapshot = SteamSocialSnapshot(
+        owner_id=users["alice"].id,
+        contacts=[{"steam_id": "steam-bob", "persona_name": "Bob on Steam", "current_game": "Hades", "recent_games": ["Celeste"]}],
+        refreshed_at=datetime.now(timezone.utc),
+    )
+    users["bob"].steam_id = "steam-bob"
+    users["bob"].current_game_visibility = "everyone"
+    users["bob"].recent_games_visibility = "everyone"
+    db.add_all([psn, snapshot, ManualActivity(owner_id=users["bob"].id, current_game="Balatro", recent_games=["Slay the Spire"])])
+    db.commit()
+
+    response = api.get("/friends/contacts")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert {card["id"] for card in payload["contacts"]} == {f"site:{users['bob'].id}", f"psn:{psn.id}"}
+    site = next(card for card in payload["contacts"] if card["id"] == f"site:{users['bob'].id}")
+    assert site["steam_id"] == "steam-bob"
+    assert site["current_game"] == "Balatro"
+    assert site["recent_games"] == ["Slay the Spire"]
+    assert db.query(Friendship).count() == 1
+
+
+def test_contacts_degrade_when_steam_snapshot_reports_private_or_error(social_api):
+    api, db, users, _actor = social_api
+    psn = PsnContact(owner_id=users["alice"].id, online_id="ConsolePal", normalized_online_id="consolepal")
+    db.add_all([psn, SteamSocialSnapshot(owner_id=users["alice"].id, contacts=[], last_error="Steam friends list is private")])
+    db.commit()
+
+    response = api.get("/friends/contacts")
+
+    assert response.status_code == 200
+    assert response.json()["contacts"][0]["id"] == f"psn:{psn.id}"
+    assert response.json()["sources"]["steam"]["available"] is False
+    assert response.json()["sources"]["steam"]["error"] == "Steam friends list is private"
+
+
+def test_manual_activity_honors_visibility_in_contacts_and_is_owner_scoped(social_api):
+    api, db, users, actor = social_api
+    low_id, high_id = main.canonical_friend_pair(users["alice"].id, users["bob"].id)
+    db.add(Friendship(user_low_id=low_id, user_high_id=high_id))
+    users["bob"].current_game_visibility = "nobody"
+    users["bob"].recent_games_visibility = "friends"
+    db.commit()
+
+    actor["user"] = users["bob"]
+    assert api.patch("/activity/manual", json={"current_game": "Hidden", "recent_games": ["Visible"]}).status_code == 200
+    actor["user"] = users["alice"]
+    response = api.get("/friends/contacts")
+    site = next(card for card in response.json()["contacts"] if card["id"] == f"site:{users['bob'].id}")
+    assert site["current_game"] is None
+    assert site["recent_games"] == ["Visible"]
+    actor["user"] = users["bob"]
+    assert api.delete("/activity/manual").status_code == 204
 
 
 @pytest.mark.parametrize("endpoint", ["request", "invite"])

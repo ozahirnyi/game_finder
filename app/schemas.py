@@ -89,6 +89,37 @@ class PsnContactRead(BaseModel):
     created_at: datetime
 
 
+class ManualActivityUpdate(BaseModel):
+    current_game: str | None = Field(default=None, max_length=255)
+    recent_games: list[str] = Field(default_factory=list, max_length=10)
+
+    @field_validator("recent_games")
+    @classmethod
+    def validate_recent_games(cls, value: list[str]) -> list[str]:
+        return [game.strip() for game in value if game.strip()][:10]
+
+
+class FriendCard(BaseModel):
+    id: str
+    source: str
+    nickname: str | None = None
+    profile_url: str | None = None
+    steam_id: str | None = None
+    avatar: str | None = None
+    current_game: str | None = None
+    recent_games: list[str] = Field(default_factory=list)
+
+
+class ContactSourceStatus(BaseModel):
+    available: bool = True
+    error: str | None = None
+
+
+class FriendsContactsRead(BaseModel):
+    contacts: list[FriendCard] = Field(default_factory=list)
+    sources: dict[str, ContactSourceStatus] = Field(default_factory=dict)
+
+
 class GameCreate(BaseModel):
     title: str = Field(max_length=255)
     notes: Optional[str] = Field(default=None, max_length=255)

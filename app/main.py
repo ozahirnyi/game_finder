@@ -31,7 +31,7 @@ from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
 from app.steam_store import fetch_steam_store_deals
 from app.auth import hash_password, verify_password, create_access_token, get_current_user, decode_access_token, get_user_by_id
-from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, FriendshipRequest, Friendship, FriendshipInvite, PsnContact, engine, wait_for_db
+from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, FriendshipRequest, Friendship, FriendshipInvite, PsnContact, ManualActivity, SteamSocialSnapshot, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
@@ -41,12 +41,13 @@ from app.steam import (
     create_steam_state,
     decode_steam_state,
     fetch_steam_friends,
+    fetch_steam_social_contacts,
     fetch_owned_games,
     fetch_steam_profile,
     verify_steam_openid,
 )
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
-from app.schemas import ProfileSettingsRead, ProfileSettingsUpdate, PublicProfileRead, Visibility, FriendshipRequestCreate, FriendshipRequestRespond, FriendshipRequestRead, FriendshipRead, InviteRead, InviteResolveRead, PsnContactCreate, PsnContactRead
+from app.schemas import ProfileSettingsRead, ProfileSettingsUpdate, PublicProfileRead, Visibility, FriendshipRequestCreate, FriendshipRequestRespond, FriendshipRequestRead, FriendshipRead, InviteRead, InviteResolveRead, PsnContactCreate, PsnContactRead, ManualActivityUpdate, FriendCard, FriendsContactsRead, ContactSourceStatus
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -198,6 +199,57 @@ def can_view_profile_field(db: Session, owner: User, viewer: User | None, visibi
     if visibility == Visibility.friends or visibility == Visibility.friends.value:
         return bool(viewer and users_are_friends(db, owner.id, viewer.id))
     return False
+
+
+def refresh_steam_snapshot(db: Session, user: User, contacts: list[dict] | None, error: str | None = None) -> SteamSocialSnapshot:
+    snapshot = db.query(SteamSocialSnapshot).filter(SteamSocialSnapshot.owner_id == user.id).first()
+    if not snapshot:
+        snapshot = SteamSocialSnapshot(owner_id=user.id, contacts=[])
+        db.add(snapshot)
+    if contacts is not None:
+        snapshot.contacts = contacts
+        snapshot.refreshed_at = datetime.now(timezone.utc)
+        snapshot.last_error = None
+    else:
+        snapshot.last_error = (error or "Steam is unavailable")[:255]
+    db.commit()
+    return snapshot
+
+
+def build_contacts_response(db: Session, current_user: User) -> FriendsContactsRead:
+    friendships = db.query(Friendship).filter(
+        or_(Friendship.user_low_id == current_user.id, Friendship.user_high_id == current_user.id)
+    ).all()
+    friend_ids = [friendship.user_high_id if friendship.user_low_id == current_user.id else friendship.user_low_id for friendship in friendships]
+    site_friends = db.query(User).filter(User.id.in_(friend_ids)).all() if friend_ids else []
+    activities = {
+        activity.owner_id: activity
+        for activity in db.query(ManualActivity).filter(ManualActivity.owner_id.in_(friend_ids)).all()
+    } if friend_ids else {}
+    snapshot = db.query(SteamSocialSnapshot).filter(SteamSocialSnapshot.owner_id == current_user.id).first()
+    steam_by_id = {str(item.get("steam_id")): item for item in (snapshot.contacts if snapshot else []) if item.get("steam_id")}
+    cards: list[FriendCard] = []
+    matched_steam_ids: set[str] = set()
+    for friend in site_friends:
+        steam = steam_by_id.get(str(friend.steam_id)) if friend.steam_id else None
+        if steam and friend.steam_id:
+            matched_steam_ids.add(str(friend.steam_id))
+        manual = activities.get(friend.id)
+        current_game = manual.current_game if manual else (steam or {}).get("current_game")
+        recent_games = manual.recent_games if manual else (steam or {}).get("recent_games", [])
+        cards.append(FriendCard(
+            id=f"site:{friend.id}", source="site", nickname=friend.public_nickname,
+            steam_id=friend.steam_id, avatar=(steam or {}).get("avatar") or friend.steam_avatar,
+            current_game=current_game if can_view_profile_field(db, friend, current_user, friend.current_game_visibility) else None,
+            recent_games=recent_games if can_view_profile_field(db, friend, current_user, friend.recent_games_visibility) else [],
+        ))
+    for contact in db.query(PsnContact).filter(PsnContact.owner_id == current_user.id).order_by(PsnContact.created_at.desc()).all():
+        cards.append(FriendCard(id=f"psn:{contact.id}", source="psn", nickname=contact.online_id, profile_url=psn_profile_url(contact.online_id)))
+    for steam_id, steam in steam_by_id.items():
+        if steam_id not in matched_steam_ids:
+            cards.append(FriendCard(id=f"steam:{steam_id}", source="steam", nickname=steam.get("persona_name"), steam_id=steam_id, avatar=steam.get("avatar"), current_game=steam.get("current_game"), recent_games=steam.get("recent_games") or []))
+    steam_status = ContactSourceStatus(available=not bool(snapshot and snapshot.last_error), error=snapshot.last_error if snapshot else None)
+    return FriendsContactsRead(contacts=cards, sources={"site": ContactSourceStatus(), "psn": ContactSourceStatus(), "steam": steam_status})
 
 
 def get_optional_current_user(
@@ -681,6 +733,50 @@ def delete_psn_contact(contact_id: uuid.UUID, db: Session = Depends(get_db), cur
         raise HTTPException(status_code=404, detail="PSN contact not found")
     db.delete(contact)
     db.commit()
+
+
+@app.patch("/activity/manual", response_model=ManualActivityUpdate)
+def update_manual_activity(
+    data: ManualActivityUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    activity = db.query(ManualActivity).filter(ManualActivity.owner_id == current_user.id).first()
+    if not activity:
+        activity = ManualActivity(owner_id=current_user.id, current_game=data.current_game, recent_games=data.recent_games)
+        db.add(activity)
+    else:
+        activity.current_game = data.current_game
+        activity.recent_games = data.recent_games
+    db.commit()
+    return ManualActivityUpdate(current_game=activity.current_game, recent_games=activity.recent_games)
+
+
+@app.delete("/activity/manual", status_code=204)
+def delete_manual_activity(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    activity = db.query(ManualActivity).filter(ManualActivity.owner_id == current_user.id).first()
+    if activity:
+        db.delete(activity)
+        db.commit()
+
+
+@app.get("/friends/contacts", response_model=FriendsContactsRead)
+def get_friends_contacts(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return build_contacts_response(db, current_user)
+
+
+@app.post("/friends/steam/sync", response_model=FriendsContactsRead)
+async def sync_steam_contacts(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.steam_id:
+        raise HTTPException(status_code=409, detail="Connect Steam first")
+    try:
+        contacts = await fetch_steam_social_contacts(current_user.steam_id)
+        refresh_steam_snapshot(db, current_user, contacts)
+    except HTTPException as exc:
+        refresh_steam_snapshot(db, current_user, None, str(exc.detail))
+    except Exception:
+        refresh_steam_snapshot(db, current_user, None, "Steam refresh failed")
+    return build_contacts_response(db, current_user)
 
 
 @app.get("/profiles/{nickname}", response_model=PublicProfileRead)

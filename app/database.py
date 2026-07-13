@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import create_engine, String, DateTime, ForeignKey, Float, Integer, Index, text, UniqueConstraint, CheckConstraint, func, column
+from sqlalchemy import create_engine, String, DateTime, ForeignKey, Float, Integer, Index, text, UniqueConstraint, CheckConstraint, func, column, JSON
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.exc import OperationalError
 
@@ -137,6 +137,24 @@ class PsnContact(Base):
     online_id: Mapped[str] = mapped_column(String(16), nullable=False)
     normalized_online_id: Mapped[str] = mapped_column(String(16), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class ManualActivity(Base):
+    __tablename__ = "manual_activities"
+
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    current_game: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    recent_games: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class SteamSocialSnapshot(Base):
+    __tablename__ = "steam_social_snapshots"
+
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    contacts: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
+    last_error: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    refreshed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OAuthIdentity(Base):

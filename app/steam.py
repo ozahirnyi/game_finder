@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -134,6 +135,7 @@ async def fetch_steam_profiles(steam_ids: list[str]) -> dict[str, dict[str, str 
                             "persona_name": player.get("personaname"),
                             "avatar": player.get("avatarfull") or player.get("avatarmedium") or player.get("avatar"),
                             "country_code": normalize_country_code(player.get("loccountrycode")),
+                            "current_game": player.get("gameextrainfo"),
                         }
     except httpx.HTTPError:
         return profiles
@@ -172,6 +174,7 @@ async def fetch_steam_friends(steam_id: str, limit: int = 24) -> list[dict[str, 
             "steam_id": str(friend.get("steamid")),
             "persona_name": profile_map.get(str(friend.get("steamid")), {}).get("persona_name"),
             "avatar": profile_map.get(str(friend.get("steamid")), {}).get("avatar"),
+            "current_game": profile_map.get(str(friend.get("steamid")), {}).get("current_game"),
             "friend_since": friend.get("friend_since"),
         }
         for friend in selected
@@ -224,3 +227,28 @@ async def fetch_owned_games(steam_id: str) -> list[dict[str, Any]]:
         if game.get("appid") is not None
     ]
     return sorted(normalized, key=lambda item: item["playtime_forever"], reverse=True)
+
+
+async def fetch_steam_social_contacts(steam_id: str, limit: int = 24) -> list[dict[str, Any]]:
+    """Fetch a small, display-only Steam contact snapshot; never changes site friendships."""
+    friends = await fetch_steam_friends(steam_id, limit=max(1, min(limit, 50)))
+    semaphore = asyncio.Semaphore(5)
+
+    async def enrich(friend: dict[str, Any]) -> dict[str, Any]:
+        async with semaphore:
+            recent_games: list[str] = []
+            try:
+                api_key = get_steam_api_key()
+                if api_key:
+                    async with httpx.AsyncClient(timeout=8.0) as client:
+                        response = await client.get(
+                            "https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/",
+                            params={"key": api_key, "steamid": friend["steam_id"], "format": "json"},
+                        )
+                        response.raise_for_status()
+                        recent_games = [str(game.get("name")) for game in response.json().get("response", {}).get("games", [])[:5] if game.get("name")]
+            except httpx.HTTPError:
+                pass
+            return {**friend, "recent_games": recent_games}
+
+    return await asyncio.gather(*(enrich(friend) for friend in friends))
