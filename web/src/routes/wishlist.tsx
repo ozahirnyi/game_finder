@@ -39,7 +39,11 @@ function Sparkline() {
 
 export function WishlistPage() {
   const signedIn = isAuthenticated();
-  const { data: savedGames = [], isError } = useQuery({
+  const {
+    data: savedGames = [],
+    isError,
+    isPending,
+  } = useQuery({
     queryKey: lovableQueryKeys.savedGames,
     queryFn: listSavedGames,
     enabled: signedIn,
@@ -49,11 +53,18 @@ export function WishlistPage() {
     .filter((game) =>
       /wishlist/i.test(`${game.notes ?? ""}\n${game.info ?? ""}`),
     );
+  const hint = !signedIn
+    ? "Sign in to view your wishlist"
+    : isPending
+      ? "Loading wishlist..."
+      : isError
+        ? "Data unavailable"
+        : `${wl.length} wishlist items marked in your saved-game notes or info`;
   return (
     <AppShell>
       <SectionHeader
         title="Wishlist"
-        hint={`${wl.length} wishlist items marked in your saved-game notes or info`}
+        hint={hint}
         action={
           <button className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold hover:bg-white/5">
             <Bell className="size-3.5" /> Alerts via Telegram

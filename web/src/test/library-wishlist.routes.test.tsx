@@ -61,8 +61,34 @@ describe("Lovable library and wishlist routes", () => {
   it("uses the library container for signed-out state without requesting protected data", () => {
     vi.mocked(isAuthenticated).mockReturnValue(false);
     renderScreen(<LibraryPage />);
-    expect(screen.getByText("Sign in to view your library")).toBeVisible();
+    expect(
+      screen.getByText("Sign in to view your library", {
+        selector: "p.rounded-xl",
+      }),
+    ).toBeVisible();
     expect(listSavedGames).not.toHaveBeenCalled();
+  });
+
+  it("keeps the library count unknown while saved games are loading", () => {
+    vi.mocked(listSavedGames).mockReturnValue(new Promise(() => {}));
+
+    renderScreen(<LibraryPage />);
+
+    expect(screen.getByText(/loading library/i)).toBeVisible();
+    expect(screen.queryByText(/0 games synced/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the library count unavailable when saved games fail to load", async () => {
+    vi.mocked(listSavedGames).mockRejectedValue(new Error("Offline"));
+
+    renderScreen(<LibraryPage />);
+
+    expect(
+      await screen.findByText("Data unavailable", {
+        selector: "p.mt-1.text-sm.text-muted-foreground",
+      }),
+    ).toBeVisible();
+    expect(screen.queryByText(/0 games synced/i)).not.toBeInTheDocument();
   });
 
   it("renders only saved games explicitly marked as wishlist items", async () => {
@@ -89,8 +115,34 @@ describe("Lovable library and wishlist routes", () => {
     vi.mocked(isAuthenticated).mockReturnValue(false);
     renderScreen(<WishlistPage />);
     await waitFor(() =>
-      expect(screen.getByText("Sign in to view your wishlist")).toBeVisible(),
+      expect(
+        screen.getByText("Sign in to view your wishlist", {
+          selector: "div.rounded-2xl",
+        }),
+      ).toBeVisible(),
     );
     expect(listSavedGames).not.toHaveBeenCalled();
+  });
+
+  it("keeps the wishlist count unknown while saved games are loading", () => {
+    vi.mocked(listSavedGames).mockReturnValue(new Promise(() => {}));
+
+    renderScreen(<WishlistPage />);
+
+    expect(screen.getByText(/loading wishlist/i)).toBeVisible();
+    expect(screen.queryByText(/0 wishlist items/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the wishlist count unavailable when saved games fail to load", async () => {
+    vi.mocked(listSavedGames).mockRejectedValue(new Error("Offline"));
+
+    renderScreen(<WishlistPage />);
+
+    expect(
+      await screen.findByText("Data unavailable", {
+        selector: "p.mt-1.text-sm.text-muted-foreground",
+      }),
+    ).toBeVisible();
+    expect(screen.queryByText(/0 wishlist items/i)).not.toBeInTheDocument();
   });
 });

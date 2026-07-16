@@ -31,20 +31,28 @@ const tabs = [
 
 export function LibraryPage() {
   const signedIn = isAuthenticated();
-  const { data: savedGames = [], isError } = useQuery({
+  const {
+    data: savedGames = [],
+    isError,
+    isPending,
+  } = useQuery({
     queryKey: lovableQueryKeys.savedGames,
     queryFn: listSavedGames,
     enabled: signedIn,
   });
   const owned = savedGames.map(toSavedGameCard);
+  const hint = !signedIn
+    ? "Sign in to view your library"
+    : isPending
+      ? "Loading library..."
+      : isError
+        ? "Data unavailable"
+        : `${owned.length} games synced - Data unavailable shared with friends`;
   return (
     <AppShell>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <SectionHeader
-            title="Library"
-            hint={`${owned.length} games synced - Data unavailable shared with friends`}
-          />
+          <SectionHeader title="Library" hint={hint} />
         </div>
         <div className="flex items-center gap-6 font-mono">
           {[
