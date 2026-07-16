@@ -11,7 +11,7 @@ export const Route = createFileRoute("/deals")({
   head: () => ({
     meta: [
       { title: "Deals — GameFinder" },
-      { name: "description", content: "Live discounts across storefronts, prioritized by your wishlist and friend overlap." },
+      { name: "description", content: "Public game deals and discounts across storefronts." },
     ],
   }),
   component: DealsPage,
