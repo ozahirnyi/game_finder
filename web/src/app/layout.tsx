@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
-import { Nav } from "@/components/Nav";
+import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -22,8 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={manrope.variable}>
       <body>
-        <Nav />
-        <main className="page-shell">{children}</main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

@@ -1,0 +1,164 @@
+.shell {
+  min-height: 100vh;
+}
+
+.content {
+  width: min(1160px, calc(100% - 48px));
+  min-width: 0;
+  margin: 0 auto;
+  padding: 36px 0 56px;
+}
+
+.rail {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(10, 10, 11, 0.88);
+  padding: 10px 24px;
+  backdrop-filter: blur(18px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--foreground);
+  font-size: 1rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brandMark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-size: 0.72rem;
+}
+
+.menuButton {
+  display: none;
+  min-height: 38px;
+  margin-left: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--foreground);
+  padding: 0 12px;
+  font-weight: 700;
+}
+
+.navigation {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.link,
+.accountLink {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  padding: 0 10px;
+  font-size: 0.9rem;
+  font-weight: 720;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.link:hover,
+.link[aria-current="page"],
+.accountLink:hover,
+.accountLink[aria-current="page"] {
+  background: var(--surface-raised);
+  color: var(--foreground);
+}
+
+.link[aria-current="page"] {
+  box-shadow: inset 0 -2px 0 var(--primary-strong);
+}
+
+.account {
+  display: flex;
+  margin-left: auto;
+  gap: 6px;
+}
+
+.accountStatus {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  color: var(--muted);
+  padding: 0 10px;
+  font-size: 0.9rem;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.signUp {
+  border: 1px solid var(--primary-strong);
+  background: var(--primary-strong);
+  color: #111113;
+}
+
+.signUp:hover {
+  background: var(--primary);
+  color: #111113;
+}
+
+@media (max-width: 760px) {
+  .rail {
+    position: relative;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .menuButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .navigation,
+  .account {
+    display: none;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .navigationOpen,
+  .accountOpen {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .accountOpen {
+    margin-left: 0;
+  }
+
+  .link,
+  .accountLink,
+  .accountStatus {
+    justify-content: center;
+  }
+
+  .content {
+    width: min(100% - 24px, 1160px);
+    padding-top: 24px;
+  }
+}
