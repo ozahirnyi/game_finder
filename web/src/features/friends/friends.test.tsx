@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FriendsScreen } from "./FriendsScreen";
-import { ApiError, getSteamSocial } from "@/lib/api";
+import { ApiError, getSteamSocial, isAuthenticated } from "@/lib/api";
 
 const api = vi.hoisted(() => {
   class MockApiError extends Error {
@@ -14,7 +14,7 @@ const api = vi.hoisted(() => {
     }
   }
 
-  return { ApiError: MockApiError, getSteamSocial: vi.fn() };
+  return { ApiError: MockApiError, getSteamSocial: vi.fn(), isAuthenticated: vi.fn() };
 });
 
 vi.mock("@/lib/api", () => api);
@@ -44,6 +44,7 @@ const friend = {
 describe("FriendsScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(isAuthenticated).mockReturnValue(true);
   });
 
   it("renders Steam friend results from the social endpoint", async () => {
@@ -58,14 +59,23 @@ describe("FriendsScreen", () => {
     expect(screen.getByRole("img", { name: "Alex's Steam avatar" })).toHaveAttribute("src", friend.avatar);
   });
 
-  it("does not invent prototype friends when Steam is not linked", async () => {
-    vi.mocked(getSteamSocial).mockRejectedValue(new ApiError("Steam account is not linked", 400));
+  it("shows the Steam connect state for the backend's unlinked-account response", async () => {
+    vi.mocked(getSteamSocial).mockRejectedValue(new ApiError("Connect Steam first", 409));
 
     render(<FriendsScreen />);
 
     expect(await screen.findByText("Connect Steam to see friends")).toBeVisible();
     expect(screen.getByRole("link", { name: "Connect Steam" })).toHaveAttribute("href", "/steam");
     expect(screen.queryByText("Sasha K.")).not.toBeInTheDocument();
+  });
+
+  it("does not request Steam social data when signed out", () => {
+    vi.mocked(isAuthenticated).mockReturnValue(false);
+
+    render(<FriendsScreen />);
+
+    expect(getSteamSocial).not.toHaveBeenCalled();
+    expect(screen.getByText("Sign in to see friends")).toBeVisible();
   });
 
   it("offers a retry when Steam social data is unavailable", async () => {

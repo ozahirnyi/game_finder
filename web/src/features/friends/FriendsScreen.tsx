@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Panel, Section, StatePanel } from "@/components/ui";
-import { ApiError, SteamSocial, getSteamSocial } from "@/lib/api";
+import { ApiError, SteamSocial, getSteamSocial, isAuthenticated } from "@/lib/api";
 
 type LoadError = { message: string; steamNotLinked: boolean };
 
@@ -11,7 +11,7 @@ function messageForError(reason: unknown): LoadError {
   if (reason instanceof ApiError) {
     return {
       message: reason.message,
-      steamNotLinked: reason.status === 400 && /not linked/i.test(reason.message),
+      steamNotLinked: reason.status === 409,
     };
   }
 
@@ -19,12 +19,15 @@ function messageForError(reason: unknown): LoadError {
 }
 
 export function FriendsScreen() {
+  const authenticated = isAuthenticated();
   const [social, setSocial] = useState<SteamSocial | null>(null);
   const [error, setError] = useState<LoadError | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(authenticated);
   const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
+    if (!authenticated) return;
+
     let active = true;
 
     getSteamSocial()
@@ -40,7 +43,11 @@ export function FriendsScreen() {
     return () => {
       active = false;
     };
-  }, [loadAttempt]);
+  }, [authenticated, loadAttempt]);
+
+  if (!authenticated) {
+    return <StatePanel kind="unauthenticated" title="Sign in to see friends" detail="Sign in before viewing Steam friend data." />;
+  }
 
   if (loading) {
     return <main className="stack"><h1>Friends</h1><StatePanel kind="loading" title="Loading Steam friends" /></main>;
