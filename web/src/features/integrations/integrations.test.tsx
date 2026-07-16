@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfileScreen } from "./ProfileScreen";
 import { PsnScreen } from "./PsnScreen";
 import { SteamScreen } from "./SteamScreen";
+import PsnPage from "@/app/psn/page";
 
 const api = vi.hoisted(() => ({
   confirmPsnImport: vi.fn(),
@@ -66,6 +67,13 @@ describe("integration screens", () => {
     await waitFor(() => expect(api.confirmPsnImport).toHaveBeenCalledWith(["Bloodborne"]));
     expect(screen.queryByText("Bloodborne")).not.toBeInTheDocument();
     expect(screen.getByText("PlayStation import complete: 1 added, 0 updated, 0 already in your library.")).toBeVisible();
+  });
+
+  it("mounts the PSN screen at the PSN route instead of the available-soon placeholder", () => {
+    mockAuth(false);
+    render(<PsnPage />);
+    expect(screen.getByText("Sign in to import PlayStation games")).toBeVisible();
+    expect(screen.queryByText("PlayStation Network imports will be available here soon.")).not.toBeInTheDocument();
   });
 
   it("renders returned Steam games and recommendations", async () => {
