@@ -156,7 +156,7 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
                   </div>
                 )}
               </div>
-              <Sparkline />
+              {priceHistory.length ? <Sparkline /> : <div className="h-[60px] text-sm text-muted-foreground">Data unavailable</div>}
               <div className="mt-3 flex justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 {priceHistory.map((p) => (
                   <span key={p.date}>{p.date}</span>

@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Tonight with friends: shared games, LFG opportunities, AI picks, and wishlist deals in one dark, focused view.",
+          "Browse games from the public game catalog.",
       },
     ],
   }),
@@ -60,7 +60,7 @@ export function Dashboard() {
               ))}
             </div>
             <Link
-              to="/friends"
+              to="/steam"
               className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:opacity-90"
             >
               Connect Steam
