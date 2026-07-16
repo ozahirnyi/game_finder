@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
@@ -16,9 +16,10 @@ export const Route = createFileRoute("/profile")({
   component: ProfilePage,
 });
 
-function ProfilePage() {
+export function ProfilePage() {
   const [user, setUser] = useState<UserRead | null>(null);
   const [profileError, setProfileError] = useState("");
+  const [profileUnauthorized, setProfileUnauthorized] = useState(false);
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
   const [telegram, setTelegram] = useState<TelegramAccount | null>(null);
   const [googleError, setGoogleError] = useState("");
@@ -30,7 +31,7 @@ function ProfilePage() {
   function message(reason: unknown) {
     return reason instanceof Error ? reason.message : "Data unavailable";
   }
-  async function loadProfile() { try { setProfileError(""); setUser(await getCurrentUser()); } catch (reason) { setUser(null); setProfileError(message(reason)); } }
+  async function loadProfile() { try { setProfileError(""); setProfileUnauthorized(false); setUser(await getCurrentUser()); } catch (reason) { setUser(null); setProfileError(message(reason)); setProfileUnauthorized(typeof reason === "object" && reason !== null && "status" in reason && reason.status === 401); } }
   async function loadGoogle() { try { setGoogleError(""); setGoogleRetry(""); setGoogle(await getGoogleStatus()); } catch (reason) { setGoogleError(message(reason)); setGoogleRetry("status"); } }
   async function loadTelegram() { try { setTelegramError(""); setTelegramRetry(""); setTelegram(await getTelegramAccount()); } catch (reason) { setTelegramError(message(reason)); setTelegramRetry("status"); } }
   useEffect(() => { void loadProfile(); void loadGoogle(); void loadTelegram(); }, []);
@@ -75,7 +76,7 @@ function ProfilePage() {
               @{currentUser.handle}
             </p>
             <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              {profileError || currentUser.bio}
+              {profileUnauthorized ? <><span>{profileError} </span><Link to="/login" className="font-semibold text-primary hover:underline">Sign in</Link>.</> : profileError || currentUser.bio}
             </p>
           </div>
           <button onClick={profileError ? loadProfile : undefined} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold hover:bg-white/5">
