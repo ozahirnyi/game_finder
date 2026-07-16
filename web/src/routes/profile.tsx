@@ -18,26 +18,29 @@ export const Route = createFileRoute("/profile")({
 
 function ProfilePage() {
   const [user, setUser] = useState<UserRead | null>(null);
+  const [profileError, setProfileError] = useState("");
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
   const [telegram, setTelegram] = useState<TelegramAccount | null>(null);
   const [googleError, setGoogleError] = useState("");
+  const [googleRetry, setGoogleRetry] = useState<"status" | "link" | "">("");
   const [telegramError, setTelegramError] = useState("");
+  const [telegramRetry, setTelegramRetry] = useState<"status" | "link" | "">("");
   const [busy, setBusy] = useState("");
 
   function message(reason: unknown) {
     return reason instanceof Error ? reason.message : "Data unavailable";
   }
-  async function loadProfile() { try { setUser(await getCurrentUser()); } catch { setUser(null); } }
-  async function loadGoogle() { try { setGoogleError(""); setGoogle(await getGoogleStatus()); } catch (reason) { setGoogleError(message(reason)); } }
-  async function loadTelegram() { try { setTelegramError(""); setTelegram(await getTelegramAccount()); } catch (reason) { setTelegramError(message(reason)); } }
+  async function loadProfile() { try { setProfileError(""); setUser(await getCurrentUser()); } catch (reason) { setUser(null); setProfileError(message(reason)); } }
+  async function loadGoogle() { try { setGoogleError(""); setGoogleRetry(""); setGoogle(await getGoogleStatus()); } catch (reason) { setGoogleError(message(reason)); setGoogleRetry("status"); } }
+  async function loadTelegram() { try { setTelegramError(""); setTelegramRetry(""); setTelegram(await getTelegramAccount()); } catch (reason) { setTelegramError(message(reason)); setTelegramRetry("status"); } }
   useEffect(() => { void loadProfile(); void loadGoogle(); void loadTelegram(); }, []);
   async function connectGoogle() {
     setBusy("google"); setGoogleError("");
-    try { const result = await getGoogleLinkUrl(); window.location.assign(result.url); } catch (reason) { setGoogleError(message(reason)); } finally { setBusy(""); }
+    try { const result = await getGoogleLinkUrl(); window.location.assign(result.url); } catch (reason) { setGoogleError(message(reason)); setGoogleRetry("link"); } finally { setBusy(""); }
   }
   async function connectTelegram() {
     setBusy("telegram"); setTelegramError("");
-    try { const result = await getTelegramLinkUrl(); if (!result.configured || !result.url) throw new Error(result.message ?? "Telegram is not configured."); window.open(result.url, "_blank", "noopener,noreferrer"); } catch (reason) { setTelegramError(message(reason)); } finally { setBusy(""); }
+    try { const result = await getTelegramLinkUrl(); if (!result.configured || !result.url) throw new Error(result.message ?? "Telegram is not configured."); window.open(result.url, "_blank", "noopener,noreferrer"); } catch (reason) { setTelegramError(message(reason)); setTelegramRetry("link"); } finally { setBusy(""); }
   }
   async function telegramAction(action: "test" | "unlink") {
     setBusy("telegram"); setTelegramError("");
@@ -72,11 +75,11 @@ function ProfilePage() {
               @{currentUser.handle}
             </p>
             <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              {currentUser.bio}
+              {profileError || currentUser.bio}
             </p>
           </div>
-          <button className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold hover:bg-white/5">
-            <Edit3 className="size-3.5" /> Edit profile
+          <button onClick={profileError ? loadProfile : undefined} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold hover:bg-white/5">
+            <Edit3 className="size-3.5" /> {profileError ? "Retry profile" : "Edit profile"}
           </button>
         </div>
       </div>
@@ -187,8 +190,8 @@ function ProfilePage() {
           <div className="rounded-2xl border border-border bg-surface p-6">
             <SectionHeader title="Integrations" />
             {[
-              { name: "Steam", connected: currentUser.integrations.steam, note: "342 games synced" },
-              { name: "PlayStation Network", connected: currentUser.integrations.psn, note: "128 games · 47 platinums" },
+              { name: "Steam", connected: currentUser.integrations.steam, note: "Data unavailable" },
+              { name: "PlayStation Network", connected: currentUser.integrations.psn, note: "Data unavailable" },
               { name: "Telegram", connected: currentUser.integrations.telegram, note: "Price-drop alerts" },
               { name: "Google", connected: currentUser.integrations.google, note: "Sign-in" },
             ].map((i) => (
@@ -206,7 +209,7 @@ function ProfilePage() {
                     <Check className="mr-1 size-3" /> Connected
                   </Chip>
                 ) : (
-                  <button disabled={busy === "google" || busy === "telegram"} onClick={i.name === "Google" ? (googleError ? loadGoogle : connectGoogle) : i.name === "Telegram" ? (telegramError ? loadTelegram : connectTelegram) : undefined} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
+                  <button disabled={busy === "google" || busy === "telegram"} onClick={i.name === "Google" ? (googleRetry === "link" ? connectGoogle : googleError ? loadGoogle : connectGoogle) : i.name === "Telegram" ? (telegramRetry === "link" ? connectTelegram : telegramError ? loadTelegram : connectTelegram) : undefined} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
                     {i.name === "Google" && googleError ? "Retry Google" : i.name === "Telegram" && telegramError ? "Retry Telegram" : "Connect"}
                   </button>
                 )}
