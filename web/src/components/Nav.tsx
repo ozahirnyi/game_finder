@@ -2,59 +2,65 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSyncExternalStore } from "react";
-import { Icon } from "@/components/Icon";
-import { getAuthSnapshot, subscribeToAuthChanges } from "@/lib/api";
+import { useState } from "react";
+import { useAuthState } from "@/hooks/useAuthState";
+import styles from "./app-shell.module.css";
+
+const publicDestinations = [
+  ["Home", "/"],
+  ["Search", "/search"],
+  ["Deals", "/deals"],
+] as const;
+
+const protectedDestinations = [
+  ["Library", "/favorites"],
+  ["Wishlist", "/wishlist"],
+  ["Friends", "/friends"],
+  ["Steam", "/steam"],
+  ["PSN", "/psn"],
+  ["Profile", "/profile"],
+] as const;
 
 export function Nav() {
   const pathname = usePathname();
-  const authed = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
+  const authed = useAuthState();
+  const [menuOpen, setMenuOpen] = useState(false);
   const isCurrent = (href: string) => href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  const destinations = authed ? [...publicDestinations, ...protectedDestinations] : publicDestinations;
+  const linkClass = (isOpen: boolean) => `${styles.navigation} ${isOpen ? styles.navigationOpen : ""}`;
+  const accountClass = (isOpen: boolean) => `${styles.account} ${isOpen ? styles.accountOpen : ""}`;
 
   return (
-    <header className="site-header">
-      <Link className="brand" href="/">
-        <span className="brand-mark" aria-hidden="true">
+    <header className={styles.rail}>
+      <Link className={styles.brand} href="/">
+        <span className={styles.brandMark} aria-hidden="true">
           GF
         </span>
         Game Finder
       </Link>
-      <nav className="nav-links" aria-label="Main navigation">
-        <Link className="nav-link" href="/" aria-current={isCurrent("/") ? "page" : undefined}>
-          <Icon name="search" />
-          <span>Search</span>
-        </Link>
-        <Link className="nav-link" href="/deals" aria-current={isCurrent("/deals") ? "page" : undefined}>
-          <Icon name="tag" />
-          <span>Deals</span>
-        </Link>
-        {authed && (
-          <Link className="nav-link" href="/steam" aria-current={isCurrent("/steam") ? "page" : undefined}>
-            <Icon name="gamepad" />
-            <span>Steam</span>
+      <button
+        aria-controls="mobile-navigation"
+        aria-expanded={menuOpen}
+        className={styles.menuButton}
+        onClick={() => setMenuOpen((open) => !open)}
+        type="button"
+      >
+        Menu
+      </button>
+      <nav className={linkClass(menuOpen)} id="mobile-navigation" aria-label="Main navigation">
+        {destinations.map(([label, href]) => (
+          <Link className={styles.link} href={href} key={href} aria-current={isCurrent(href) ? "page" : undefined}>
+            {label}
           </Link>
-        )}
+        ))}
       </nav>
-      <div className="auth-actions" aria-label="Account actions">
+      <div className={accountClass(menuOpen)} aria-label="Account actions">
         {authed ? (
-          <Link className="nav-button ghost" href="/profile" aria-current={isCurrent("/profile") ? "page" : undefined}>
-            <Icon name="user" />
-            <span>Profile</span>
-          </Link>
+          <span className={styles.accountStatus}>Signed in</span>
         ) : (
           <>
-            <Link className="nav-button ghost" href="/login" aria-current={isCurrent("/login") ? "page" : undefined}>
-              <Icon name="log-in" />
-              <span>Login</span>
-            </Link>
-            <Link
-              className="nav-button primary"
-              href="/register"
-              aria-current={isCurrent("/register") ? "page" : undefined}
-            >
-              <Icon name="user-plus" />
-              <span>Register</span>
-            </Link>
+            <Link className={styles.accountLink} href="/login" aria-current={isCurrent("/login") ? "page" : undefined}>Sign in</Link>
+            <Link className={`${styles.accountLink} ${styles.signUp}`} href="/register" aria-current={isCurrent("/register") ? "page" : undefined}>Create account</Link>
           </>
         )}
       </div>
