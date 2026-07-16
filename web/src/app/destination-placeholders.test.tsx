@@ -1,16 +1,20 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import FriendsPage from "./friends/page";
 import PsnPage from "./psn/page";
 import SearchPage from "./search/page";
 import WishlistPage from "./wishlist/page";
 
-describe("navigation destination placeholders", () => {
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+describe("navigation destinations", () => {
   it.each([
     ["Search", SearchPage],
     ["Wishlist", WishlistPage],
-    ["Friends", FriendsPage],
-    ["PSN", PsnPage],
+    ["Sign in to see friends", FriendsPage],
+    ["Sign in to import PlayStation games", PsnPage],
   ])("renders a non-404 page for %s", (title, Page) => {
     render(<Page />);
 
