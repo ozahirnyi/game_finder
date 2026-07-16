@@ -11,6 +11,18 @@
   --danger: #f87171;
   --success: #86efac;
   --shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  --accent-strong: #d9f5ff;
+  --accent-muted: rgba(145, 222, 255, 0.14);
+  --success-muted: rgba(134, 239, 172, 0.12);
+  --surface-raised: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --radius-sm: 8px;
+  --radius-lg: 14px;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --ease-out: 160ms ease;
 }
 
 html {

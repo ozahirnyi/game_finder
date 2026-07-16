@@ -11,7 +11,7 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "Game Finder",
-  description: "Search games and save favorites with the Game Finder API.",
+  description: "Find your next favorite game, track its price, and save it for later.",
 };
 
 export default function RootLayout({
