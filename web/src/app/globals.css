@@ -1004,6 +1004,32 @@ p {
   padding: 26px;
 }
 
+.auth-panel--elevated {
+  gap: 20px;
+  border-color: rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(145deg, rgba(32, 32, 35, 0.96), rgba(18, 18, 20, 0.94)),
+    var(--panel);
+}
+
+.auth-panel--elevated .form-stack {
+  gap: 14px;
+}
+
+.auth-panel--elevated input {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.auth-switch a {
+  color: var(--foreground);
+  font-weight: 720;
+}
+
+.auth-callback {
+  align-content: center;
+  min-height: 240px;
+}
+
 .auth-panel .section-header {
   max-width: none;
   gap: 10px;

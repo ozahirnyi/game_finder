@@ -26,7 +26,7 @@ function OAuthCallback() {
 
   const providerName = provider === "steam" ? "Steam" : "Google";
   const displayMessage = invalid ? "Sign-in was cancelled or expired." : message;
-  return <section className="auth-page"><div className="auth-panel"><h1>{providerName} sign-in</h1><p>{displayMessage}</p>{!displayMessage.startsWith("Completing") && <Link href="/login">Back to login</Link>}</div></section>;
+  return <section className="auth-page"><div className="auth-panel auth-panel--elevated auth-callback"><p className="eyebrow">Secure handoff</p><h1>{providerName} sign-in</h1><p role="status">{displayMessage}</p>{!displayMessage.startsWith("Completing") && <Link className="button secondary" href="/login">Back to sign in</Link>}</div></section>;
 }
 
 export default function OAuthCallbackPage() {
