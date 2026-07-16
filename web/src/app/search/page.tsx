@@ -1,8 +1,14 @@
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { SearchScreen } from "@/features/discovery/SearchScreen";
 
+function SearchRoute() {
+  const query = useSearchParams().get("q") ?? "";
+  return <SearchScreen key={query} initialQuery={query} />;
+}
+
 export default function SearchPage() {
-  const initialQuery = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("q") ?? "";
-  return <SearchScreen initialQuery={initialQuery} />;
+  return <Suspense fallback={<SearchScreen initialQuery="" />}><SearchRoute /></Suspense>;
 }

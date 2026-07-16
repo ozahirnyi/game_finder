@@ -5,6 +5,13 @@ import { DealsScreen } from "./DealsScreen";
 import { DiscoveryScreen } from "./DiscoveryScreen";
 import { GameDetailScreen } from "./GameDetailScreen";
 import { SearchScreen } from "./SearchScreen";
+import SearchPage from "@/app/search/page";
+
+const navigationState = vi.hoisted(() => ({ params: new URLSearchParams() }));
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => navigationState.params,
+}));
 
 vi.mock("@/lib/api", () => ({
   getCatalogGame: vi.fn(),
@@ -49,6 +56,20 @@ describe("discovery API regions", () => {
     expect(await screen.findByRole("heading", { name: "Upcoming game" })).toBeVisible();
   });
 
+  it("retries only the failed discovery region", async () => {
+    vi.mocked(getTrendingGames).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ results: [] });
+    vi.mocked(getUpcomingGames).mockResolvedValue({ results: [{ id: 2, name: "Stable upcoming", released: null, background_image: null }] });
+    const user = render(<DiscoveryScreen />);
+    expect(await screen.findByRole("heading", { name: "Stable upcoming" })).toBeVisible();
+    const trendingCalls = vi.mocked(getTrendingGames).mock.calls.length;
+    const upcomingCalls = vi.mocked(getUpcomingGames).mock.calls.length;
+    fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    await screen.findByText("No trending games yet");
+    expect(getTrendingGames).toHaveBeenCalledTimes(trendingCalls + 1);
+    expect(getUpcomingGames).toHaveBeenCalledTimes(upcomingCalls);
+    user.unmount();
+  });
+
   it("renders game details and price history", async () => {
     vi.mocked(getCatalogGame).mockResolvedValue({
       id: 1, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [],
@@ -56,5 +77,30 @@ describe("discovery API regions", () => {
     render(<GameDetailScreen gameId="1" />);
     expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
     expect(await screen.findByText("Current price")).toBeVisible();
+  });
+
+  it("keeps successful price history visible when the catalog request fails", async () => {
+    vi.mocked(getCatalogGame).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ id: 1, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] });
+    vi.mocked(getGamePriceHistory).mockResolvedValue({ itad_id: "1", title: "Hades II", url: null, current: { shop: "Store", price: { amount: 19, currency: "USD" }, regular: null, cut: null, url: null, timestamp: null }, history_low_all: null, history_low_1y: null, history_low_3m: null, deals: [] });
+    render(<GameDetailScreen gameId="1" />);
+    expect(await screen.findByText("19 USD")).toBeVisible();
+    const catalogCalls = vi.mocked(getCatalogGame).mock.calls.length;
+    const priceCalls = vi.mocked(getGamePriceHistory).mock.calls.length;
+    fireEvent.click(await screen.findByRole("button", { name: "Retry game details" }));
+    expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
+    expect(getCatalogGame).toHaveBeenCalledTimes(catalogCalls + 1);
+    expect(getGamePriceHistory).toHaveBeenCalledTimes(priceCalls);
+  });
+
+  it("updates search results when App Router query params change", async () => {
+    navigationState.params = new URLSearchParams("q=hades");
+    vi.mocked(searchGames).mockResolvedValue({ results: [{ id: 1, name: "Hades II", released: null, background_image: null }] });
+    const view = render(<SearchPage />);
+    expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
+    navigationState.params = new URLSearchParams("q=celeste");
+    vi.mocked(searchGames).mockResolvedValue({ results: [{ id: 2, name: "Celeste", released: null, background_image: null }] });
+    view.rerender(<SearchPage />);
+    expect(await screen.findByRole("heading", { name: "Celeste" })).toBeVisible();
+    expect(searchGames).toHaveBeenLastCalledWith("celeste");
   });
 });
