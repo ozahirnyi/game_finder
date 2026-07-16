@@ -46,6 +46,8 @@ describe("Lovable home and game-detail routes", () => {
 
     expect((await screen.findAllByText("Hades")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Connect Steam").length).toBeGreaterThan(0);
+    expect(document.querySelector("section.animate-reveal.mb-12")).toBeInTheDocument();
+    expect(document.querySelector(".lg\\:col-span-4")).toBeInTheDocument();
     expect(getTrendingGames).toHaveBeenCalledWith(3);
   });
 
@@ -75,6 +77,8 @@ describe("Lovable home and game-detail routes", () => {
 
     expect(await screen.findByText("Fight out of hell.")).toBeInTheDocument();
     expect(screen.getAllByText("Action").length).toBeGreaterThan(0);
+    expect(document.querySelector("section.relative.mb-10.overflow-hidden.rounded-3xl")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Unavailable" }).every((button) => button.hasAttribute("disabled"))).toBe(true);
     expect(getCatalogGame).toHaveBeenCalledWith("7");
   });
 });
