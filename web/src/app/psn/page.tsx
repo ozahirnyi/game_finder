@@ -1,5 +1,3 @@
-import { StatePanel } from "@/components/ui";
+import { PsnScreen } from "@/features/integrations/PsnScreen";
 
-export default function PsnPage() {
-  return <StatePanel kind="empty" title="PSN" detail="PlayStation Network imports will be available here soon." />;
-}
+export default function PsnPage() { return <PsnScreen />; }
