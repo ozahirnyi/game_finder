@@ -18,3 +18,9 @@ The Vite/TanStack application had no `/login` or `/register` routes. The existin
 - `npm test -- --run src/test/auth-recovery.routes.test.tsx` — passed: 4 tests.
 - `npm run build` — passed.
 - `npm test` — remains blocked by pre-existing frontend-suite failures: several legacy modules resolve `next/link`/`next/navigation`, the PostCSS config references missing `@tailwindcss/postcss`, and `AppShell.test.tsx` renders TanStack navigation outside a RouterProvider. The auth-recovery focused test passes independently.
+
+## Review follow-up
+
+- Replaced the undefined legacy auth classes in the new TanStack auth routes with existing Vite/Lovable Tailwind utilities for the screen shell, surface card, fields, action, alert, and route links.
+- Added a regression assertion that the login route uses the Vite utility classes and does not reintroduce `auth-page` or `form-stack`.
+- Re-ran focused tests (5 passed) and the production build (passed).

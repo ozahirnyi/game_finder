@@ -82,6 +82,17 @@ describe("auth recovery routes", () => {
     expect(screen.getByLabelText("Password")).toHaveValue("password123");
   });
 
+  it("uses Vite Lovable utility classes instead of legacy auth classes", () => {
+    const { container } = render(<LoginPage />);
+    const section = container.querySelector("section");
+    const form = container.querySelector("form");
+
+    expect(section).toHaveClass("min-h-screen", "bg-background");
+    expect(section).not.toHaveClass("auth-page");
+    expect(form).toHaveClass("space-y-4");
+    expect(form).not.toHaveClass("form-stack");
+  });
+
   it("offers a sign-in link when the profile request is unauthorized", async () => {
     api.getCurrentUser.mockRejectedValue(new api.ApiError("Your session expired. Please log in again.", 401));
     render(<ProfilePage />);
