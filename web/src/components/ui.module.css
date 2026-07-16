@@ -1,0 +1,128 @@
+.button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.625rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background var(--ease-out), border-color var(--ease-out), color var(--ease-out), transform var(--ease-out);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.primary {
+  border-color: color-mix(in srgb, var(--accent) 72%, transparent);
+  background: var(--accent);
+  color: #09111f;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.secondary {
+  border-color: var(--line);
+  background: var(--surface-raised);
+  color: var(--foreground);
+}
+
+.secondary:hover:not(:disabled),
+.quiet:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+}
+
+.quiet {
+  background: transparent;
+  color: var(--muted);
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: var(--space-5);
+}
+
+.statePanel {
+  display: grid;
+  min-height: 172px;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.statePanel svg {
+  width: 2rem;
+  height: 2rem;
+  color: var(--accent);
+}
+
+.statePanel h2,
+.section h2 {
+  font-size: 1.125rem;
+}
+
+.statePanel p,
+.section p {
+  margin-top: 0.375rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.loadingIcon {
+  animation: spin 900ms linear infinite;
+}
+
+.badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.badgedefault { background: var(--surface-raised); color: var(--muted); }
+.badgeaccent { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-muted); color: var(--accent); }
+.badgesuccess { border-color: color-mix(in srgb, var(--success) 45%, transparent); background: var(--success-muted); color: var(--success); }
+
+.section {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sectionAction { flex: 0 0 auto; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loadingIcon { animation: none; }
+}
