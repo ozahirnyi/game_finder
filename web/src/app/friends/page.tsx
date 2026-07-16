@@ -1,5 +1,5 @@
-import { StatePanel } from "@/components/ui";
+import { FriendsScreen } from "@/features/friends/FriendsScreen";
 
 export default function FriendsPage() {
-  return <StatePanel kind="empty" title="Friends" detail="Your friends activity will be available here soon." />;
+  return <FriendsScreen />;
 }
