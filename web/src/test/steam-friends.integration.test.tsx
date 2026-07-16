@@ -57,6 +57,13 @@ describe("Steam and Friends routes", () => {
     expect(await screen.findByRole("link", { name: /connect steam/i })).toHaveAttribute("href", "/steam");
   });
 
+  test("shows an explicit signed-out Steam state", async () => {
+    api.getSteamAccount.mockRejectedValue({ status: 401 });
+    renderRoute((SteamRoute as { component: React.ComponentType }).component);
+
+    expect(await screen.findByText(/session is signed out/i)).toBeInTheDocument();
+  });
+
   test("renders Steam friend and shared-game records without fabricated activity", async () => {
     renderRoute((FriendsRoute as { component: React.ComponentType }).component);
 
@@ -64,5 +71,12 @@ describe("Steam and Friends routes", () => {
     expect(screen.getAllByText("Portal 2").length).toBeGreaterThan(0);
     expect(screen.queryByText(/Helldivers 2 launched/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add friend" })).toBeDisabled();
+  });
+
+  test("shows a Steam connect CTA when friends are unavailable because Steam is unlinked", async () => {
+    api.getSteamSocial.mockRejectedValue({ status: 409 });
+    renderRoute((FriendsRoute as { component: React.ComponentType }).component);
+
+    expect(await screen.findByRole("link", { name: /connect steam/i })).toHaveAttribute("href", "/steam");
   });
 });
