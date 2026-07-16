@@ -2,12 +2,12 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 
 COPY . .
 RUN npm run build
 
 ENV NODE_ENV=production
 
-CMD ["sh", "-c", "npm run start -- -p ${PORT:-3000}"]
+CMD ["sh", "-c", "npm run start -- --port ${PORT:-3000}"]
