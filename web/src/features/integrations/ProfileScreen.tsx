@@ -41,15 +41,15 @@ export function ProfileScreen() {
     void getTelegramAccount().then(setTelegram).catch((reason: unknown) => setTelegramError(failureMessage(reason, "Could not load Telegram alerts.")));
   }, [authenticated]);
   async function connectTelegram() {
-    setBusy(true); setError("");
+    setBusy(true); setTelegramError("");
     try { const link = await getTelegramLinkUrl(); if (!link.configured || !link.url) throw new Error(link.message ?? "Telegram is not configured."); window.open(link.url, "_blank", "noopener,noreferrer"); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Could not connect Telegram."); }
+    catch (reason) { setTelegramError(failureMessage(reason, "Could not connect Telegram.")); }
     finally { setBusy(false); }
   }
   async function telegramAction(action: "test" | "unlink") {
-    setBusy(true); setError("");
+    setBusy(true); setTelegramError("");
     try { if (action === "test") { await sendTelegramTestAlert(); setMessage("Test alert sent to Telegram."); } else { setTelegram(await unlinkTelegramAccount()); setMessage("Telegram disconnected."); } }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Telegram action failed."); }
+    catch (reason) { setTelegramError(failureMessage(reason, "Telegram action failed.")); }
     finally { setBusy(false); }
   }
   if (!authenticated) return <StatePanel kind="unauthenticated" title="Sign in to see your profile" />;
