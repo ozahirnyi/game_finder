@@ -1,5 +1,5 @@
-import { StatePanel } from "@/components/ui";
+import { WishlistScreen } from "@/features/library/WishlistScreen";
 
 export default function WishlistPage() {
-  return <StatePanel kind="empty" title="Wishlist" detail="Your wishlist will be available here soon." />;
+  return <WishlistScreen />;
 }
