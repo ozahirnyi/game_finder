@@ -10,4 +10,4 @@ RUN npm run build
 
 ENV NODE_ENV=production
 
-CMD ["sh", "-c", "npm run start -- --port ${PORT:-3000}"]
+CMD ["node", ".output/server/index.mjs"]
