@@ -7,6 +7,9 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  preview: {
+    allowedHosts: ["web-production-1d5b1.up.railway.app"],
+  },
   nitro: {
     preset: "node-server",
   },
