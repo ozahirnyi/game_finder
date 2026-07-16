@@ -18,6 +18,16 @@ export function SteamScreen() {
   const [loading, setLoading] = useState(authenticated);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [socialError, setSocialError] = useState("");
+
+  async function loadSocial() {
+    setSocialError("");
+    try {
+      setSocial(await getSteamSocial());
+    } catch (reason) {
+      setSocialError(failureMessage(reason, "Could not load friends' games."));
+    }
+  }
 
   useEffect(() => {
     if (!authenticated) return;
@@ -27,8 +37,12 @@ export function SteamScreen() {
         if (!active) return;
         setAccount(steam);
         if (steam.linked) {
-          const [library, socialData] = await Promise.all([getSteamLibrary(), getSteamSocial()]);
-          if (active) { setGames(library.games); setSocial(socialData); }
+          const [libraryResult, socialResult] = await Promise.allSettled([getSteamLibrary(), getSteamSocial()]);
+          if (!active) return;
+          if (libraryResult.status === "fulfilled") setGames(libraryResult.value.games);
+          else setError(failureMessage(libraryResult.reason, "Could not load Steam library."));
+          if (socialResult.status === "fulfilled") setSocial(socialResult.value);
+          else setSocialError(failureMessage(socialResult.reason, "Could not load friends' games."));
         }
       })
       .catch((reason: unknown) => active && setError(failureMessage(reason, "Could not load Steam.")))
@@ -64,7 +78,7 @@ export function SteamScreen() {
       {games.length ? games.map((game) => <Panel as="article" key={game.appid}><h3>{game.name}</h3><p>{Math.round(game.playtime_forever / 60)} hours played</p></Panel>) : <StatePanel kind="empty" title="No Steam games available" detail="Steam may be unable to read this library." />}
     </div></Section>
     <Section title="Friends' games" detail={social ? `${social.public_libraries} public friend librar${social.public_libraries === 1 ? "y" : "ies"} available.` : "Steam did not return friend-library data."}>
-      {social?.top_friend_games.length ? <div className="favorites-list">{social.top_friend_games.map((game) => <Panel as="article" key={game.appid}><h3>{game.name}</h3><p>{game.friends} friends own this game.</p></Panel>)}</div> : <p>No shared friend-library games returned.</p>}
+      {socialError ? <StatePanel kind="error" title="Friends' games are unavailable" detail={socialError} action={{ label: "Retry friends' games", onClick: loadSocial }} /> : social?.top_friend_games.length ? <div className="favorites-list">{social.top_friend_games.map((game) => <Panel as="article" key={game.appid}><h3>{game.name}</h3><p>{game.friends} friends own this game.</p></Panel>)}</div> : <p>No shared friend-library games returned.</p>}
     </Section>
     <Section title="Recommendations" detail="Based on your connected library." action={<Button disabled={busy} onClick={loadRecommendations}>{busy ? "Loading..." : "Get recommendations"}</Button>}>
       {recommendations.length ? <div className="favorites-list">{recommendations.map((item) => <Panel as="article" key={`${item.title}-${item.reason}`}><h3>{item.title}</h3><p>{item.reason}</p>{item.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</Panel>)}</div> : <p>No recommendations loaded yet.</p>}
