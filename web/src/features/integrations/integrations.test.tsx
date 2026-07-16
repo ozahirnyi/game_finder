@@ -108,6 +108,24 @@ describe("integration screens", () => {
     expect(screen.getByText("Half-Life")).toBeVisible();
   });
 
+  it("keeps Steam library and social data visible when recommendations fail and retries recommendations", async () => {
+    api.getSteamAccount.mockResolvedValue({ linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null });
+    api.getSteamLibrary.mockResolvedValue({ steam: { linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null }, games: [{ appid: 10, name: "Half-Life", playtime_forever: 120, playtime_2weeks: 0, img_icon_url: null }] });
+    api.getSteamSocial.mockResolvedValue({ steam: { linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null }, friends: [], top_friend_games: [{ appid: 20, name: "Deep Rock Galactic", friends: 3, total_playtime_forever: 600, img_icon_url: null }], public_libraries: 3, private_libraries: 0 });
+    api.getSteamRecommendations.mockRejectedValueOnce(new Error("Recommendations unavailable")).mockResolvedValueOnce({ recommendations: [{ title: "Portal", reason: "Puzzle favorite", tags: ["Puzzle"] }] });
+
+    render(<SteamScreen />);
+
+    expect(await screen.findByText("Half-Life")).toBeVisible();
+    expect(screen.getByText("Deep Rock Galactic")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Get recommendations" }));
+    expect(await screen.findByText("Recommendations are unavailable")).toBeVisible();
+    expect(screen.getByText("Half-Life")).toBeVisible();
+    expect(screen.getByText("Deep Rock Galactic")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Retry recommendations" }));
+    expect(await screen.findByText("Portal")).toBeVisible();
+  });
+
   it("keeps the core profile visible when optional integration regions fail and retries each region", async () => {
     api.getGoogleStatus.mockRejectedValueOnce(new Error("Google unavailable")).mockResolvedValueOnce({ configured: true });
     api.getTelegramAccount.mockRejectedValueOnce(new Error("Telegram unavailable")).mockResolvedValueOnce({ linked: false, configured: true, username: null, linked_at: null });
