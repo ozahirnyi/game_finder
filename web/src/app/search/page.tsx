@@ -1,5 +1,8 @@
-import { StatePanel } from "@/components/ui";
+"use client";
+
+import { SearchScreen } from "@/features/discovery/SearchScreen";
 
 export default function SearchPage() {
-  return <StatePanel kind="empty" title="Search" detail="Game search will be available here soon." />;
+  const initialQuery = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("q") ?? "";
+  return <SearchScreen initialQuery={initialQuery} />;
 }
