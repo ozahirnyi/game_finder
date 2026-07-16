@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Chip, SectionHeader } from "@/components/ui-bits";
+import { confirmPsnImport, previewPsnImport, type PsnImportPreview } from "@/lib/api";
 import { Check, RefreshCw, Shield, Lock, Users, Trophy, Award } from "lucide-react";
 
 export const Route = createFileRoute("/psn")({
@@ -18,6 +20,21 @@ export const Route = createFileRoute("/psn")({
 });
 
 function PsnPage() {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<PsnImportPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  async function selectFile(file?: File) {
+    if (!file) return;
+    setBusy(true); setError(""); setMessage(""); setPreview(null);
+    try { setPreview(await previewPsnImport(file)); } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not read the PlayStation export."); } finally { setBusy(false); }
+  }
+  async function sync() {
+    if (!preview) { fileInput.current?.click(); return; }
+    setBusy(true); setError("");
+    try { const result = await confirmPsnImport(preview.games); setPreview(null); if (fileInput.current) fileInput.current.value = ""; setMessage(`PlayStation import complete: ${result.created} added, ${result.updated} updated, ${result.skipped} already in your library.`); } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not import PlayStation games."); } finally { setBusy(false); }
+  }
   return (
     <AppShell>
       <SectionHeader
@@ -72,11 +89,14 @@ function PsnPage() {
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
               <button
+                disabled={busy}
+                onClick={sync}
                 className="rounded-lg px-4 py-2 text-sm font-bold text-white"
                 style={{ background: "#0070d1" }}
               >
                 <RefreshCw className="mr-1.5 inline size-3.5" /> Sync now
               </button>
+              <input ref={fileInput} aria-label="Choose PSN export" hidden type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => selectFile(event.target.files?.[0])} />
               <button className="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-bold">
                 Disconnect
               </button>
@@ -84,6 +104,9 @@ function PsnPage() {
                 Manage PS Plus
               </button>
             </div>
+            {preview ? <div className="mt-4 text-sm text-muted-foreground">{preview.games.map((game) => <p key={game}>{game}</p>)}</div> : null}
+            {error ? <div className="mt-4 text-sm text-muted-foreground"><p>{error}</p><button onClick={sync} className="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-bold">Retry import</button></div> : null}
+            {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
           </div>
         </div>
 
