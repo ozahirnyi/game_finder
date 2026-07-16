@@ -19,6 +19,7 @@ export function SteamScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [socialError, setSocialError] = useState("");
+  const [recommendationsError, setRecommendationsError] = useState("");
 
   async function loadSocial() {
     setSocialError("");
@@ -61,9 +62,9 @@ export function SteamScreen() {
   }
 
   async function loadRecommendations() {
-    setBusy(true); setError("");
+    setBusy(true); setRecommendationsError("");
     try { setRecommendations((await getSteamRecommendations()).recommendations); }
-    catch (reason) { setError(failureMessage(reason, "Could not load recommendations.")); }
+    catch (reason) { setRecommendationsError(failureMessage(reason, "Could not load recommendations.")); }
     finally { setBusy(false); }
   }
 
@@ -81,7 +82,7 @@ export function SteamScreen() {
       {socialError ? <StatePanel kind="error" title="Friends' games are unavailable" detail={socialError} action={{ label: "Retry friends' games", onClick: loadSocial }} /> : social?.top_friend_games.length ? <div className="favorites-list">{social.top_friend_games.map((game) => <Panel as="article" key={game.appid}><h3>{game.name}</h3><p>{game.friends} friends own this game.</p></Panel>)}</div> : <p>No shared friend-library games returned.</p>}
     </Section>
     <Section title="Recommendations" detail="Based on your connected library." action={<Button disabled={busy} onClick={loadRecommendations}>{busy ? "Loading..." : "Get recommendations"}</Button>}>
-      {recommendations.length ? <div className="favorites-list">{recommendations.map((item) => <Panel as="article" key={`${item.title}-${item.reason}`}><h3>{item.title}</h3><p>{item.reason}</p>{item.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</Panel>)}</div> : <p>No recommendations loaded yet.</p>}
+      {recommendationsError ? <StatePanel kind="error" title="Recommendations are unavailable" detail={recommendationsError} action={{ label: "Retry recommendations", onClick: loadRecommendations }} /> : recommendations.length ? <div className="favorites-list">{recommendations.map((item) => <Panel as="article" key={`${item.title}-${item.reason}`}><h3>{item.title}</h3><p>{item.reason}</p>{item.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</Panel>)}</div> : <p>No recommendations loaded yet.</p>}
     </Section>
   </div>;
 }
