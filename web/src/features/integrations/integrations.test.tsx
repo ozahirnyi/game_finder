@@ -93,4 +93,36 @@ describe("integration screens", () => {
     expect(await screen.findByText("Deep Rock Galactic")).toBeVisible();
     expect(screen.getByText("3 public friend libraries available.")).toBeVisible();
   });
+
+  it("keeps the linked Steam library visible when social data fails and retries only social data", async () => {
+    api.getSteamAccount.mockResolvedValue({ linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null });
+    api.getSteamLibrary.mockResolvedValue({ steam: { linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null }, games: [{ appid: 10, name: "Half-Life", playtime_forever: 120, playtime_2weeks: 0, img_icon_url: null }] });
+    api.getSteamSocial.mockRejectedValueOnce(new Error("Friends service unavailable")).mockResolvedValueOnce({ steam: { linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null }, friends: [], top_friend_games: [{ appid: 20, name: "Deep Rock Galactic", friends: 3, total_playtime_forever: 600, img_icon_url: null }], public_libraries: 3, private_libraries: 0 });
+
+    render(<SteamScreen />);
+
+    expect(await screen.findByText("Half-Life")).toBeVisible();
+    expect(screen.getByText("Friends' games are unavailable")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Retry friends' games" }));
+    expect(await screen.findByText("Deep Rock Galactic")).toBeVisible();
+    expect(screen.getByText("Half-Life")).toBeVisible();
+  });
+
+  it("keeps the core profile visible when optional integration regions fail and retries each region", async () => {
+    api.getGoogleStatus.mockRejectedValueOnce(new Error("Google unavailable")).mockResolvedValueOnce({ configured: true });
+    api.getTelegramAccount.mockRejectedValueOnce(new Error("Telegram unavailable")).mockResolvedValueOnce({ linked: false, configured: true, username: null, linked_at: null });
+
+    render(<ProfileScreen />);
+
+    expect(await screen.findByRole("heading", { name: "player@example.com" })).toBeVisible();
+    expect(screen.getByText("Google is unavailable")).toBeVisible();
+    expect(screen.getByText("Telegram alerts are unavailable")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Retry Google" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry Telegram" }));
+    await waitFor(() => expect(api.getGoogleStatus).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(api.getTelegramAccount).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText("Google is unavailable")).not.toBeInTheDocument();
+    expect(screen.queryByText("Telegram alerts are unavailable")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "player@example.com" })).toBeVisible();
+  });
 });
