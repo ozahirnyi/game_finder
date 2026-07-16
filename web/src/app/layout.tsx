@@ -1,18 +1,6 @@
-import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/lovable/AppShell";
+import { ThemeProvider } from "@/lib/theme";
 import "./globals.css";
-
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-export const metadata: Metadata = {
-  title: "Game Finder",
-  description: "Find your next favorite game, track its price, and save it for later.",
-};
 
 export default function RootLayout({
   children,
@@ -20,9 +8,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={manrope.variable}>
+    <html lang="en" className="dark">
       <body>
-        <AppShell>{children}</AppShell>
+        <ThemeProvider><AppShell>{children}</AppShell></ThemeProvider>
       </body>
     </html>
   );
