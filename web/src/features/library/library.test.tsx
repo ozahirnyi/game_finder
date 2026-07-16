@@ -33,6 +33,7 @@ function mockAuth(value: boolean) {
 
 describe("LibraryScreen", () => {
   beforeEach(() => {
+    vi.resetAllMocks();
     mockAuth(true);
   });
 
@@ -43,6 +44,24 @@ describe("LibraryScreen", () => {
 
     expect(listSavedGames).not.toHaveBeenCalled();
     expect(screen.getByText("Sign in to view your library")).toBeVisible();
+  });
+
+  it("shows an empty state after a successful empty library load", async () => {
+    vi.mocked(listSavedGames).mockResolvedValue([]);
+
+    render(<LibraryScreen />);
+
+    expect(await screen.findByRole("heading", { name: "Your library is empty" })).toBeVisible();
+  });
+
+  it("shows a retryable error panel when the initial library load fails", async () => {
+    vi.mocked(listSavedGames).mockRejectedValueOnce(new Error("Network unavailable")).mockResolvedValueOnce([]);
+
+    render(<LibraryScreen />);
+
+    expect(await screen.findByRole("heading", { name: "Could not load your library" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("heading", { name: "Your library is empty" })).toBeVisible();
   });
 
   it("removes the deleted game after the API confirms deletion", async () => {

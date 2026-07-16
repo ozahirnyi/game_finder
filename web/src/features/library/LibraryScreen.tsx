@@ -13,22 +13,35 @@ export function LibraryScreen() {
   const authenticated = isAuthenticated();
   const [games, setGames] = useState<SavedGame[]>([]);
   const [loading, setLoading] = useState(authenticated);
+  const [initialLoadError, setInitialLoadError] = useState("");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [removingId, setRemovingId] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     if (!authenticated) return;
 
     let active = true;
     listSavedGames()
-      .then((savedGames) => active && setGames(savedGames))
-      .catch((reason) => active && setError(errorMessage(reason, "Could not load your library.")))
+      .then((savedGames) => {
+        if (active) {
+          setGames(savedGames);
+          setInitialLoadError("");
+        }
+      })
+      .catch((reason) => active && setInitialLoadError(errorMessage(reason, "Could not load your library.")))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [authenticated]);
+  }, [authenticated, loadAttempt]);
+
+  function retryLoad() {
+    setInitialLoadError("");
+    setLoading(true);
+    setLoadAttempt((attempt) => attempt + 1);
+  }
 
   async function addGame(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -70,6 +83,10 @@ export function LibraryScreen() {
 
   if (loading) {
     return <StatePanel kind="loading" title="Loading your library" />;
+  }
+
+  if (initialLoadError) {
+    return <StatePanel kind="error" title="Could not load your library" detail={initialLoadError} action={{ label: "Retry", onClick: retryLoad }} />;
   }
 
   return (
