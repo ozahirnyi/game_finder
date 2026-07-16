@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   getGoogleStatus: vi.fn(),
   getTelegramAccount: vi.fn(),
   getTelegramLinkUrl: vi.fn(),
+  getTelegramLinkUrl: vi.fn(),
   previewPsnImport: vi.fn(),
   sendTelegramTestAlert: vi.fn(),
   unlinkTelegramAccount: vi.fn(),
