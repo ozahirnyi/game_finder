@@ -186,7 +186,7 @@ export type TelegramLink = {
   message: string | null;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://game-finder.up.railway.app";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://game-finder.up.railway.app";
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
 
@@ -295,13 +295,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json") ? await response.json() : null;
 
   if (!response.ok) {
+    const payload = contentType.includes("application/json") ? await response.json() : null;
+    const responseText = payload === null ? await response.text() : "";
     const detail = payload?.detail;
     let message = Array.isArray(detail)
       ? detail.map((item) => item.msg ?? JSON.stringify(item)).join(", ")
-      : detail ?? `Request failed with status ${response.status}`;
+      : detail ?? (responseText || `Request failed with status ${response.status}`);
     if (options.auth && response.status === 401) {
       removeStoredToken();
       message = "Your session expired. Please log in again.";
@@ -309,7 +310,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw new ApiError(message, response.status);
   }
 
-  return payload as T;
+  return (contentType.includes("application/json") ? await response.json() : null) as T;
 }
 
 export function registerUser(email: string, password: string) {
