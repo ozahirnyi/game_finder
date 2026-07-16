@@ -42,7 +42,7 @@ export function SearchPage() {
     <AppShell>
       <SectionHeader
         title="Search"
-        hint="42,184 games indexed across 8 storefronts."
+        hint="Search the public game catalog."
       />
 
       <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
