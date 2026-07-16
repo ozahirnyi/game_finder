@@ -143,4 +143,45 @@ describe("integration screens", () => {
     expect(screen.queryByText("Telegram alerts are unavailable")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "player@example.com" })).toBeVisible();
   });
+
+  it("keeps profile and Google visible when connecting Telegram fails", async () => {
+    api.getTelegramLinkUrl.mockRejectedValue(new Error("Telegram link unavailable"));
+
+    render(<ProfileScreen />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Connect Telegram" }));
+    expect(await screen.findByText("Telegram alerts are unavailable")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "player@example.com" })).toBeVisible();
+    expect(screen.getByText("Google sign-in is available.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Retry Telegram" }));
+    expect(await screen.findByRole("button", { name: "Connect Telegram" })).toBeVisible();
+  });
+
+  it("keeps profile and Google visible when a Telegram test alert fails", async () => {
+    api.getTelegramAccount.mockResolvedValue({ linked: true, configured: true, username: "player", linked_at: null });
+    api.sendTelegramTestAlert.mockRejectedValue(new Error("Telegram unavailable"));
+
+    render(<ProfileScreen />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Send test" }));
+    expect(await screen.findByText("Telegram alerts are unavailable")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "player@example.com" })).toBeVisible();
+    expect(screen.getByText("Google sign-in is available.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Retry Telegram" }));
+    expect(await screen.findByRole("button", { name: "Send test" })).toBeVisible();
+  });
+
+  it("keeps profile and Google visible when unlinking Telegram fails", async () => {
+    api.getTelegramAccount.mockResolvedValue({ linked: true, configured: true, username: "player", linked_at: null });
+    api.unlinkTelegramAccount.mockRejectedValue(new Error("Telegram unavailable"));
+
+    render(<ProfileScreen />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    expect(await screen.findByText("Telegram alerts are unavailable")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "player@example.com" })).toBeVisible();
+    expect(screen.getByText("Google sign-in is available.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Retry Telegram" }));
+    expect(await screen.findByRole("button", { name: "Disconnect" })).toBeVisible();
+  });
 });
