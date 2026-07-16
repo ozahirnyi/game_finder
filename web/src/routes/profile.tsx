@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { currentUser, games } from "@/lib/mockData";
+import { getCurrentUser, getGoogleLinkUrl, getGoogleStatus, getTelegramAccount, getTelegramLinkUrl, sendTelegramTestAlert, unlinkTelegramAccount, type GoogleStatus, type TelegramAccount, type UserRead } from "@/lib/api";
 import { Check, Edit3 } from "lucide-react";
 
 export const Route = createFileRoute("/profile")({
@@ -16,10 +17,35 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
-  const favs = games.filter((g) =>
-    ["hades2", "eldenring", "bg3", "drg"].includes(g.id),
-  );
-  const wl = games.filter((g) => g.status === "Want to Play" || g.discount).slice(0, 3);
+  const [user, setUser] = useState<UserRead | null>(null);
+  const [google, setGoogle] = useState<GoogleStatus | null>(null);
+  const [telegram, setTelegram] = useState<TelegramAccount | null>(null);
+  const [googleError, setGoogleError] = useState("");
+  const [telegramError, setTelegramError] = useState("");
+  const [busy, setBusy] = useState("");
+
+  function message(reason: unknown) {
+    return reason instanceof Error ? reason.message : "Data unavailable";
+  }
+  async function loadProfile() { try { setUser(await getCurrentUser()); } catch { setUser(null); } }
+  async function loadGoogle() { try { setGoogleError(""); setGoogle(await getGoogleStatus()); } catch (reason) { setGoogleError(message(reason)); } }
+  async function loadTelegram() { try { setTelegramError(""); setTelegram(await getTelegramAccount()); } catch (reason) { setTelegramError(message(reason)); } }
+  useEffect(() => { void loadProfile(); void loadGoogle(); void loadTelegram(); }, []);
+  async function connectGoogle() {
+    setBusy("google"); setGoogleError("");
+    try { const result = await getGoogleLinkUrl(); window.location.assign(result.url); } catch (reason) { setGoogleError(message(reason)); } finally { setBusy(""); }
+  }
+  async function connectTelegram() {
+    setBusy("telegram"); setTelegramError("");
+    try { const result = await getTelegramLinkUrl(); if (!result.configured || !result.url) throw new Error(result.message ?? "Telegram is not configured."); window.open(result.url, "_blank", "noopener,noreferrer"); } catch (reason) { setTelegramError(message(reason)); } finally { setBusy(""); }
+  }
+  async function telegramAction(action: "test" | "unlink") {
+    setBusy("telegram"); setTelegramError("");
+    try { if (action === "test") await sendTelegramTestAlert(); else setTelegram(await unlinkTelegramAccount()); } catch (reason) { setTelegramError(message(reason)); } finally { setBusy(""); }
+  }
+  const currentUser = { avatarFrom: "#22c55e", avatarTo: "#0f766e", name: user?.email ?? "Data unavailable", handle: user?.id ?? "unavailable", bio: "Data unavailable", favoriteGenres: ["Data unavailable"], platforms: ["Data unavailable"], integrations: { steam: false, psn: false, telegram: telegram?.linked ?? false, google: user?.google_linked ?? false } };
+  const favs: never[] = [];
+  const wl: never[] = [];
 
   return (
     <AppShell>
@@ -57,10 +83,10 @@ function ProfilePage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { l: "Library", v: currentUser.stats.library },
-          { l: "Friends", v: currentUser.stats.friends },
-          { l: "Shared games", v: currentUser.stats.shared },
-          { l: "Playtime", v: `${currentUser.stats.playtime}h` },
+          { l: "Library", v: "Data unavailable" },
+          { l: "Friends", v: "Data unavailable" },
+          { l: "Shared games", v: "Data unavailable" },
+          { l: "Playtime", v: "Data unavailable" },
         ].map((s) => (
           <div
             key={s.l}
@@ -105,7 +131,7 @@ function ProfilePage() {
           <div>
             <SectionHeader title="Favorite games" />
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {favs.map((g) => (
+              {(favs.length ? favs : [{ id: "unavailable", title: "Data unavailable", coverFrom: "#27272a", coverTo: "#18181b", playtime: null }]).map((g) => (
                 <div
                   key={g.id}
                   className="overflow-hidden rounded-xl border border-border bg-surface"
@@ -130,7 +156,7 @@ function ProfilePage() {
           <div>
             <SectionHeader title="Active wishlist" />
             <div className="space-y-3">
-              {wl.map((g) => (
+              {(wl.length ? wl : [{ id: "unavailable", title: "Data unavailable", coverFrom: "#27272a", coverTo: "#18181b", genres: ["Data unavailable"], price: "—" }]).map((g) => (
                 <div
                   key={g.id}
                   className="flex items-center gap-4 rounded-xl border border-border bg-surface p-3"
@@ -173,15 +199,15 @@ function ProfilePage() {
               >
                 <div>
                   <p className="text-sm font-bold">{i.name}</p>
-                  <p className="text-xs text-muted-foreground">{i.note}</p>
+                  <p className="text-xs text-muted-foreground">{i.name === "Steam" || i.name === "PlayStation Network" ? "Data unavailable" : i.name === "Google" ? googleError || (google?.configured ? i.note : "Google is not configured") : telegramError || i.note}</p>
                 </div>
                 {i.connected ? (
                   <Chip tone="primary">
                     <Check className="mr-1 size-3" /> Connected
                   </Chip>
                 ) : (
-                  <button className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
-                    Connect
+                  <button disabled={busy === "google" || busy === "telegram"} onClick={i.name === "Google" ? (googleError ? loadGoogle : connectGoogle) : i.name === "Telegram" ? (telegramError ? loadTelegram : connectTelegram) : undefined} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
+                    {i.name === "Google" && googleError ? "Retry Google" : i.name === "Telegram" && telegramError ? "Retry Telegram" : "Connect"}
                   </button>
                 )}
               </div>
