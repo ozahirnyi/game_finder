@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Home,
   Search,
@@ -12,9 +12,8 @@ import {
   User,
   Bell,
 } from "lucide-react";
-import { Avatar } from "./GameCover";
 import { ThemeSelector } from "./ThemeSelector";
-import { currentUser } from "@/lib/mockData";
+import { isAuthenticated, subscribeToAuthChanges } from "@/lib/api";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -28,9 +27,14 @@ const nav = [
   { to: "/profile", label: "Profile", icon: User },
 ] as const;
 
-
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [authenticated, setAuthenticated] = useState(isAuthenticated);
+
+  useEffect(
+    () => subscribeToAuthChanges(() => setAuthenticated(isAuthenticated())),
+    [],
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
@@ -48,9 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="space-y-1">
           {nav.map((item) => {
             const active =
-              item.to === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.to);
+              item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
             return (
               <Link
@@ -71,33 +73,36 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="mt-auto space-y-4 pt-6">
           <ThemeSelector />
-          <div className="relative overflow-hidden rounded-xl border border-border bg-surface-2 p-4">
-            <div className="absolute -right-6 -bottom-6 size-24 rounded-full bg-primary/10 blur-3xl" />
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-primary">
-              Steam · Synced
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {currentUser.stats.library} games · updated 4m ago
-            </p>
-          </div>
-
-          <Link
-            to="/profile"
-            className="flex items-center gap-3 rounded-lg border border-transparent p-2 hover:border-border"
-          >
-            <Avatar
-              from={currentUser.avatarFrom}
-              to={currentUser.avatarTo}
-              name={currentUser.name}
-              className="size-10 shrink-0 rounded-full"
-            />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{currentUser.name}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                @{currentUser.handle}
+          {!authenticated ? (
+            <div className="relative overflow-hidden rounded-xl border border-border bg-surface-2 p-4">
+              <div className="absolute -right-6 -bottom-6 size-24 rounded-full bg-primary/10 blur-3xl" />
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-primary">
+                Your account
               </p>
+              <div className="relative flex gap-2 text-sm">
+                <Link
+                  to="/login"
+                  className="font-semibold text-primary hover:underline"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  to="/register"
+                  className="font-semibold text-primary hover:underline"
+                >
+                  Create account
+                </Link>
+              </div>
             </div>
-          </Link>
+          ) : (
+            <Link
+              to="/profile"
+              className="flex items-center gap-3 rounded-lg border border-transparent p-2 hover:border-border"
+            >
+              <User className="size-10 shrink-0 rounded-full border border-border p-2 text-muted-foreground" />
+              <span className="truncate text-sm font-semibold">Signed in</span>
+            </Link>
+          )}
         </div>
       </aside>
 
