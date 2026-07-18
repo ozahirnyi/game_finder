@@ -20,12 +20,12 @@ provider states are explicit and do not leave stale client authentication.
 
 ## Mobile navigation
 
-At mobile widths the fixed bottom navigation is replaced by a compact top bar
-with a menu control. It opens the same labelled navigation drawer pattern as
-the site navigation, exposing every destination without consuming vertical
-screen space. Selecting a destination, clicking the scrim, pressing Escape,
-or using the close control closes the drawer. Focus handling, keyboard use,
-and safe-area spacing remain accessible.
+At mobile widths the fixed bottom navigation is replaced by a menu button in
+the screen's upper corner. It opens the same labelled navigation drawer
+pattern as the site navigation, exposing every destination without consuming
+vertical screen space. Selecting a destination, clicking the scrim, pressing
+Escape, or using the close control closes the drawer. Focus handling,
+keyboard use, and safe-area spacing remain accessible.
 
 ## Friends
 
