@@ -1,142 +1,43 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { isAuthenticated, listSavedGames } from "@/lib/api";
-import { lovableQueryKeys, toSavedGameCard } from "@/lib/lovable-data";
+import { getProfileSummary, searchGames, type SavedGame } from "@/lib/api";
+import { lovableQueryKeys, toSavedGameCard, type LovableSavedGameCard } from "@/lib/lovable-data";
 
-export const Route = createFileRoute("/library")({
-  head: () => ({
-    meta: [
-      { title: "Library — GameFinder" },
-      {
-        name: "description",
-        content:
-          "Your synced library across storefronts, with statuses and shared-with-friends visibility.",
-      },
-    ],
-  }),
-  component: LibraryPage,
-});
+export const Route = createFileRoute("/library")({ component: LibraryPage });
 
-const tabs = [
-  "All",
-  "Playing with Friends",
-  "Playing",
-  "Want to Play",
-  "Completed",
-  "Paused",
-] as const;
+function SavedGameCover({ game }: { game: LovableSavedGameCard }) {
+  const catalogCover = useQuery({
+    queryKey: ["library-cover", game.title],
+    queryFn: () => searchGames(game.title),
+    enabled: !game.imageUrl,
+    staleTime: 1000 * 60 * 60,
+  });
+  const cover = game.imageUrl ?? catalogCover.data?.results[0]?.background_image ?? "#14b8a6";
+  return <GameCover from={cover} to="#0f172a" title={game.title} compact className="size-16 shrink-0 rounded-lg" />;
+}
+
+function LibraryGameRow({ game }: { game: SavedGame }) {
+  const card = toSavedGameCard(game);
+  const hours = game.playtime_forever ? `${Math.round(game.playtime_forever / 60)}h played` : null;
+  return <Link to="/games/$gameId" params={{ gameId: game.id }} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 transition hover:border-primary/50">
+    <SavedGameCover game={card} />
+    <div className="min-w-0"><h4 className="truncate font-bold">{game.title}</h4><p className="truncate text-xs text-muted-foreground">{game.notes || hours || "Saved in your library"}</p></div>
+    <Chip tone="primary">{game.source}</Chip>
+  </Link>;
+}
 
 export function LibraryPage() {
-  const signedIn = isAuthenticated();
-  const {
-    data: savedGames = [],
-    isError,
-    isPending,
-  } = useQuery({
-    queryKey: lovableQueryKeys.savedGames,
-    queryFn: listSavedGames,
-    enabled: signedIn,
-  });
-  const owned = savedGames.map(toSavedGameCard);
-  const hint = !signedIn
-    ? "Sign in to view your library"
-    : isPending
-      ? "Loading library..."
-      : isError
-        ? "Data unavailable"
-        : `${owned.length} games synced - Data unavailable shared with friends`;
-  return (
-    <AppShell>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <SectionHeader title="Library" hint={hint} />
-        </div>
-        <div className="flex items-center gap-6 font-mono">
-          {[
-            { l: "Playing", v: "Data unavailable" },
-            { l: "Completed", v: "Data unavailable" },
-            { l: "Backlog", v: "Data unavailable" },
-            { l: "Hours", v: "Data unavailable" },
-          ].map((s) => (
-            <div key={s.l}>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                {s.l}
-              </p>
-              <p className="text-xl font-bold">{s.v}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+  const query = useQuery({ queryKey: lovableQueryKeys.profileSummary, queryFn: getProfileSummary });
+  const block = query.data?.library;
+  const stats = block?.data;
+  const games = stats?.games ?? [];
+  const unauthorized = (query.error as { status?: number } | null)?.status === 401;
+  const hint = unauthorized ? "Sign in to view your library." : query.isPending ? "Loading library…" : block?.status === "ready" ? `${stats?.total_games ?? games.length} games synced` : block?.message || "Your library is empty.";
 
-      <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4">
-        {tabs.map((t, i) => (
-          <button
-            key={t}
-            className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${i === 0 ? "bg-white/5 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-3">
-        {!signedIn ? (
-          <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-            Sign in to view your library
-          </p>
-        ) : isError ? (
-          <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-            Data unavailable
-          </p>
-        ) : (
-          owned.map((g) => (
-            <Link
-              key={g.id}
-              to="/games/$gameId"
-              params={{ gameId: g.id }}
-              className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 transition hover:border-white/20 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
-            >
-              <GameCover
-                from="#14b8a6"
-                to="#0f172a"
-                title={g.title}
-                compact
-                className="size-16 shrink-0 rounded-lg"
-              />
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="truncate font-bold">{g.title}</h4>
-                  {g.notes?.toLowerCase().includes("playing with friends") && (
-                    <Chip tone="primary">Data unavailable</Chip>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Data unavailable
-                </p>
-              </div>
-              <div className="hidden text-right sm:block">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Status
-                </p>
-                <p className="text-sm font-bold">Data unavailable</p>
-              </div>
-              <div className="text-right">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Playtime
-                </p>
-                <p className="font-mono text-sm font-bold">
-                  {g.playtimeForever === null
-                    ? "Data unavailable"
-                    : `${Math.round(g.playtimeForever / 60)}h`}
-                </p>
-              </div>
-            </Link>
-          ))
-        )}
-      </div>
-    </AppShell>
-  );
+  return <AppShell><div className="mb-8 flex flex-wrap items-end justify-between gap-4"><SectionHeader title="Library" hint={hint}/><div className="flex items-center gap-6 font-mono">{[["Games", stats?.total_games], ["Hours", stats?.total_playtime_hours === undefined ? undefined : `${stats.total_playtime_hours}h`], ["Manual", stats?.manual_games], ["PSN", stats?.psn_games]].map(([label, value]) => <div key={String(label)}><p className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p><p className="text-xl font-bold">{value ?? "—"}</p></div>)}</div></div>
+    {unauthorized ? <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted-foreground"><p>{hint}</p><Link to="/login" className="mt-4 inline-block rounded-lg bg-primary px-3 py-2 font-bold text-primary-foreground">Sign in</Link></div> : games.length ? <div className="space-y-3">{games.map(game => <LibraryGameRow key={game.id} game={game} />)}</div> : <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted-foreground"><p>{hint}</p><Link to="/search" className="mt-4 inline-block rounded-lg bg-primary px-3 py-2 font-bold text-primary-foreground">Add a game</Link></div>}
+  </AppShell>;
 }
