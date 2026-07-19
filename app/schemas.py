@@ -1,6 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from datetime import datetime
-from typing import Optional
+from typing import Any, Literal, Optional
 import uuid
 
 
@@ -39,8 +39,48 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     email: str
+    display_name: str
     created_at: datetime
     google_linked: bool = False
+
+
+class UserProfileRead(UserRead):
+    bio: str | None = None
+    platforms: list[str] = Field(default_factory=list)
+    favorite_genres: list[str] = Field(default_factory=list)
+
+
+class UserProfileUpdate(BaseModel):
+    display_name: str | None = Field(default=None, min_length=3, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+    bio: str | None = Field(default=None, max_length=1000)
+    platforms: list[str] | None = Field(default=None, max_length=20)
+    favorite_genres: list[str] | None = Field(default=None, max_length=20)
+
+
+class DataBlock(BaseModel):
+    status: Literal["ready", "empty", "not_connected", "error"]
+    data: Any = None
+    message: str | None = None
+
+
+class DashboardRead(BaseModel):
+    user: DataBlock
+    library: DataBlock
+    recommendations: DataBlock
+    deals: DataBlock
+    steam: DataBlock
+    social: DataBlock
+    activity: DataBlock
+
+
+class ProfileSummaryRead(BaseModel):
+    account: DataBlock
+    profile: DataBlock
+    services: DataBlock
+    library: DataBlock
+    favorites: DataBlock
+    wishlist: DataBlock
+    recently_played: DataBlock
 
 
 class UserLogin(BaseModel):
@@ -230,3 +270,144 @@ class HomeDealItem(BaseModel):
 
 class HomeDealResponse(BaseModel):
     results: list[HomeDealItem] = Field(default_factory=list)
+
+
+class PublicUserRead(BaseModel):
+    id: uuid.UUID
+    display_name: str
+    bio: str | None = None
+    avatar: str | None = None
+
+
+class FriendRequestCreate(BaseModel):
+    recipient_id: uuid.UUID
+    message: str | None = Field(default=None, max_length=280)
+
+
+class FriendRequestRead(BaseModel):
+    id: uuid.UUID
+    sender: PublicUserRead
+    recipient: PublicUserRead
+    message: str | None = None
+    created_at: datetime
+
+
+class FriendshipRead(BaseModel):
+    user: PublicUserRead
+    created_at: datetime
+
+
+class ConversationCreate(BaseModel):
+    recipient_id: uuid.UUID
+
+
+class ConversationRead(BaseModel):
+    id: uuid.UUID
+    participant: PublicUserRead
+    updated_at: datetime
+    unread_count: int = 0
+    last_message: str | None = None
+
+
+class MessageCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class MessageRead(BaseModel):
+    id: uuid.UUID
+    conversation_id: uuid.UUID
+    sender_id: uuid.UUID
+    body: str
+    created_at: datetime
+    read_at: datetime | None = None
+
+
+class GameInviteCreate(BaseModel):
+    recipient_id: uuid.UUID
+    game_name: str = Field(min_length=1, max_length=255)
+    game_id: int | None = None
+    note: str | None = Field(default=None, max_length=280)
+
+
+class GameInviteRead(BaseModel):
+    id: uuid.UUID
+    sender: PublicUserRead
+    recipient: PublicUserRead
+    game_name: str
+    game_id: int | None = None
+    note: str | None = None
+    status: str
+    created_at: datetime
+    responded_at: datetime | None = None
+
+
+class InviteResponseUpdate(BaseModel):
+    status: Literal["accepted", "declined"]
+
+
+class NotificationRead(BaseModel):
+    id: uuid.UUID
+    type: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    read_at: datetime | None = None
+    created_at: datetime
+
+
+class InviteLinkRead(BaseModel):
+    url: str
+
+
+class CatalogCollectionCreate(BaseModel):
+    catalog_game_id: int = Field(ge=1)
+    title: str = Field(min_length=1, max_length=255)
+    cover_url: str | None = Field(default=None, max_length=1000)
+
+
+class CatalogCollectionUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    cover_url: str | None = Field(default=None, max_length=1000)
+
+
+class CatalogCollectionRead(BaseModel):
+    id: uuid.UUID
+    catalog_game_id: int
+    title: str
+    cover_url: str | None = None
+    created_at: datetime
+    updated_at: datetime | None = None
+
+
+class PriceAlertCreate(BaseModel):
+    wishlist_catalog_game_id: int = Field(ge=1)
+    target_price: float | None = Field(default=None, gt=0)
+    target_discount: int | None = Field(default=None, ge=1, le=100)
+    delivery_channels: list[Literal["in_app", "telegram"]] = Field(default_factory=lambda: ["in_app"], min_length=1, max_length=2)
+
+    @model_validator(mode="after")
+    def require_target(self):
+        if self.target_price is None and self.target_discount is None:
+            raise ValueError("Set a target price or discount")
+        return self
+
+
+class PriceAlertUpdate(BaseModel):
+    target_price: float | None = Field(default=None, gt=0)
+    target_discount: int | None = Field(default=None, ge=1, le=100)
+    delivery_channels: list[Literal["in_app", "telegram"]] | None = Field(default=None, min_length=1, max_length=2)
+
+    @model_validator(mode="after")
+    def require_target_when_replacing(self):
+        if self.target_price is None and self.target_discount is None and self.delivery_channels is None:
+            raise ValueError("Provide at least one alert setting")
+        return self
+
+
+class PriceAlertRead(BaseModel):
+    id: uuid.UUID
+    wishlist_catalog_game_id: int
+    target_price: float | None = None
+    target_discount: int | None = None
+    delivery_channels: list[str] = Field(default_factory=list)
+    last_delivered_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime

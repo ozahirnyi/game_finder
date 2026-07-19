@@ -38,6 +38,8 @@ export const lovableQueryKeys = {
   trendingGames: (pageSize: number) => ["catalog", "trending", pageSize] as const,
   steamLibrary: ["steam", "library"] as const,
   steamSocial: (friendsLimit: number) => ["steam", "social", friendsLimit] as const,
+  dashboard: ["dashboard"] as const,
+  profileSummary: ["profile", "summary"] as const,
 } as const;
 
 export function getProtectedState(error: unknown): "sign-in" | "connect-steam" | "error" {
@@ -68,6 +70,8 @@ export function toSavedGameCard(game: SavedGame): LovableSavedGameCard {
     info: game.info,
     playtimeForever: game.playtime_forever,
     playtimeTwoWeeks: game.playtime_2weeks,
-    imageUrl: game.img_icon_url,
+    imageUrl: game.img_icon_url && game.external_id
+      ? `https://media.steampowered.com/steamcommunity/public/images/apps/${game.external_id}/${game.img_icon_url}.jpg`
+      : game.img_icon_url,
   };
 }

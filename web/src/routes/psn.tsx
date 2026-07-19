@@ -1,178 +1,26 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { Upload, Check, Trophy } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { Chip, SectionHeader } from "@/components/ui-bits";
-import { confirmPsnImport, previewPsnImport, type PsnImportPreview } from "@/lib/api";
-import { Check, RefreshCw, Shield, Lock, Users, Trophy, Award } from "lucide-react";
+import { SectionHeader } from "@/components/ui-bits";
+import { confirmPsnImport, getProfileSummary, previewPsnImport, type PsnImportPreview } from "@/lib/api";
 
-export const Route = createFileRoute("/psn")({
-  head: () => ({
-    meta: [
-      { title: "PlayStation Network — GameFinder" },
-      {
-        name: "description",
-        content:
-          "Connect PlayStation Network to sync your PS5 library, trophies, and co-op sessions with friends.",
-      },
-    ],
-  }),
-  component: PsnPage,
-});
+export const Route = createFileRoute("/psn")({ component: PsnPage });
 
-function PsnPage() {
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+export function PsnPage() {
+  const input = useRef<HTMLInputElement>(null);
+  const summary = useQuery({ queryKey: ["profile", "summary"], queryFn: getProfileSummary });
   const [preview, setPreview] = useState<PsnImportPreview | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  async function selectFile(file?: File) {
-    if (!file) return;
-    setSelectedFile(file); setBusy(true); setError(""); setMessage(""); setPreview(null);
-    try { setPreview(await previewPsnImport(file)); } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not read the PlayStation export."); } finally { setBusy(false); }
-  }
-  async function sync() {
-    if (!preview) { fileInput.current?.click(); return; }
-    setBusy(true); setError("");
-    try { const result = await confirmPsnImport(preview.games); setPreview(null); if (fileInput.current) fileInput.current.value = ""; setMessage(`PlayStation import complete: ${result.created} added, ${result.updated} updated, ${result.skipped} already in your library.`); } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not import PlayStation games."); } finally { setBusy(false); }
-  }
-  return (
-    <AppShell>
-      <SectionHeader
-        title="PlayStation Network"
-        hint="Sync your PSN library so we can match trophies, party sessions, and shared PS5 titles."
-      />
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div
-          className="relative overflow-hidden rounded-3xl border p-8 lg:col-span-2"
-          style={{
-            borderColor: "rgba(0, 112, 209, 0.35)",
-            background:
-              "linear-gradient(135deg, rgba(0,112,209,0.18) 0%, transparent 65%)",
-          }}
-        >
-          <div
-            className="absolute -right-10 -top-10 size-56 rounded-full blur-3xl"
-            style={{ background: "rgba(0,112,209,0.25)" }}
-          />
-          <div className="relative">
-            <div className="mb-4 flex items-center gap-2">
-              <Check className="size-4" style={{ color: "#4aa3ff" }} />
-              <span
-                className="font-mono text-[11px] uppercase tracking-[0.25em]"
-                style={{ color: "#4aa3ff" }}
-              >
-                Data unavailable
-              </span>
-            </div>
-            <h3 className="text-3xl font-extrabold tracking-tight">
-              Data unavailable
-            </h3>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              We match your PSN library with friends' PS accounts, surface Play Together
-              opportunities, and cross-reference PS Plus catalog with your wishlist.
-            </p>
-            <div className="mt-8 grid grid-cols-3 gap-6 border-t border-border pt-6 font-mono">
-              {[
-                { l: "PS games", v: "Data unavailable", i: Trophy },
-                { l: "Platinums", v: "Data unavailable", i: Award },
-                { l: "PS friends", v: "Data unavailable", i: Users },
-              ].map((s) => (
-                <div key={s.l}>
-                  <s.i className="mb-2 size-4" style={{ color: "#4aa3ff" }} />
-                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {s.l}
-                  </p>
-                  <p className="text-xl font-black">{s.v}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <button
-                disabled={busy}
-                onClick={sync}
-                className="rounded-lg px-4 py-2 text-sm font-bold text-white"
-                style={{ background: "#0070d1" }}
-              >
-                <RefreshCw className="mr-1.5 inline size-3.5" /> Sync now
-              </button>
-              <input ref={fileInput} aria-label="Choose PSN export" hidden type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => selectFile(event.target.files?.[0])} />
-              <button className="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-bold">
-                Disconnect
-              </button>
-              <button className="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-bold">
-                Manage PS Plus
-              </button>
-            </div>
-            {preview ? <div className="mt-4 text-sm text-muted-foreground">{preview.games.map((game) => <p key={game}>{game}</p>)}</div> : null}
-            {error ? <div className="mt-4 text-sm text-muted-foreground"><p>{error}</p><button onClick={preview ? sync : () => selectFile(selectedFile ?? undefined)} className="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-bold">Retry import</button></div> : null}
-            {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-border bg-surface p-6">
-          <Shield className="mb-4 size-5" style={{ color: "#4aa3ff" }} />
-          <h4 className="mb-2 font-bold">What we read</h4>
-          <ul className="space-y-3 text-sm text-muted-foreground">
-            <li className="flex gap-2">
-              <Check className="mt-0.5 size-4 shrink-0" style={{ color: "#4aa3ff" }} />
-              Owned games, trophy list, and playtime (read-only).
-            </li>
-            <li className="flex gap-2">
-              <Check className="mt-0.5 size-4 shrink-0" style={{ color: "#4aa3ff" }} />
-              Online presence and friends list for LFG matching.
-            </li>
-            <li className="flex gap-2">
-              <Check className="mt-0.5 size-4 shrink-0" style={{ color: "#4aa3ff" }} />
-              PS Plus tier so we surface catalog freebies you already have access to.
-            </li>
-            <li className="flex gap-2">
-              <Lock className="mt-0.5 size-4 shrink-0" style={{ color: "#4aa3ff" }} />
-              We never send party invites or messages on your behalf.
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div>
-          <SectionHeader title="Recent PSN activity" />
-          <div className="space-y-2 font-mono text-xs">
-            {[
-              { t: "Data unavailable", m: "Data unavailable" },
-            ].map((r) => (
-              <div
-                key={r.t}
-                className="flex items-center gap-4 rounded-lg border border-border bg-surface px-4 py-2.5"
-              >
-                <Chip tone="primary">{r.t}</Chip>
-                <span className="text-muted-foreground">{r.m}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <SectionHeader title="Cross-play matches" hint="Friends on PS5 that share PC titles with you." />
-          <div className="space-y-2">
-            {[
-              { name: "Data unavailable", g: "Data unavailable", cross: "Data unavailable" },
-            ].map((r) => (
-              <div
-                key={r.name}
-                className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3 text-sm"
-              >
-                <div>
-                  <p className="font-bold">{r.name}</p>
-                  <p className="text-xs text-muted-foreground">{r.g}</p>
-                </div>
-                <Chip tone="outline">{r.cross}</Chip>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </AppShell>
-  );
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState("");
+  const choose = async (file?: File) => { if (!file) return; setBusy(true); setError(""); setResult(""); try { setPreview(await previewPsnImport(file)); } catch (e) { setError(e instanceof Error ? e.message : "Could not read this PlayStation export."); } finally { setBusy(false); } };
+  const importGames = async () => { if (!preview) return; setBusy(true); setError(""); try { const value = await confirmPsnImport(preview.games); setPreview(null); setResult(`${value.created} added, ${value.updated} updated, ${value.skipped} already present.`); await summary.refetch(); } catch (e) { setError(e instanceof Error ? e.message : "Could not import these games."); } finally { setBusy(false); } };
+  const count = summary.data?.library.data?.psn_games;
+  const unauthenticated = summary.isError && (summary.error as { status?: number })?.status === 401;
+  return <AppShell>
+    <SectionHeader title="PlayStation library" hint="PlayStation does not provide the API this app needs, so you stay in control: download your account export and upload the .xlsx file here." />
+    {unauthenticated ? <div className="rounded-2xl border border-border bg-surface p-6"><p>Sign in to import your own PlayStation data.</p><Link to="/login" className="mt-4 inline-block rounded-lg bg-primary px-4 py-2 font-bold text-primary-foreground">Sign in</Link></div> : <div className="grid gap-6 lg:grid-cols-3"><section className="rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/15 to-transparent p-8 lg:col-span-2"><Trophy className="mb-4 size-6 text-primary" /><p className="font-mono text-[11px] uppercase tracking-widest text-primary">Your imported games</p><h1 className="mt-2 text-4xl font-extrabold">{count === undefined ? "Loading…" : `${count} PSN games`}</h1><p className="mt-3 max-w-xl text-sm text-muted-foreground">We only import the game titles you select from your export. Trophy progress, friends, PS Plus and activity are not claimed because the export/API does not reliably provide them.</p><input ref={input} hidden type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e => choose(e.target.files?.[0])} /><div className="mt-6 flex gap-3"><button onClick={() => input.current?.click()} disabled={busy} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"><Upload className="mr-2 inline size-4" />Choose export</button>{preview ? <button onClick={importGames} disabled={busy} className="rounded-lg border border-border px-4 py-2 text-sm font-bold">Import {preview.total} games</button> : null}</div>{preview ? <div className="mt-5 rounded-xl border border-border bg-background/40 p-4 text-sm"><p className="font-bold">Ready to import {preview.total} games</p><p className="mt-1 text-muted-foreground">{preview.games.slice(0, 8).join(" · ")}{preview.total > 8 ? " …" : ""}</p></div> : null}{result ? <p className="mt-4 text-sm text-primary"><Check className="mr-1 inline size-4" />{result}</p> : null}{error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}</section><aside className="rounded-3xl border border-border bg-surface p-6"><h2 className="font-bold">How to import</h2><ol className="mt-4 space-y-3 text-sm text-muted-foreground"><li>1. Open the <a className="text-primary underline" href="https://www.playstation.com/uk-ua/support/account/data-request/" target="_blank" rel="noreferrer">official PlayStation data-request guide</a> and sign in to Account Management.</li><li>2. In <strong>Privacy Settings</strong>, choose <strong>Data Access Requests → Request Data</strong>.</li><li>3. Wait for PlayStation’s second email (it can take up to 7 days), then use its link to download the Excel file. The download link expires after 7 days.</li><li>4. Return here, choose that unmodified <strong>.xlsx</strong> export, review detected titles and confirm the import.</li></ol></aside></div>}
+  </AppShell>;
 }

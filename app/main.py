@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from sqlalchemy.orm import Session
-from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -26,11 +26,13 @@ from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
 from app.steam_store import fetch_steam_store_deals
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, engine, wait_for_db
+from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest
+    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
+    PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
+    CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -40,7 +42,7 @@ from app.steam import (
     fetch_steam_profile,
     verify_steam_openid,
 )
-from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
+from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user, build_display_name
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -137,7 +139,164 @@ def steam_account_response(user: User) -> SteamAccountRead:
 def user_response(user: User, google_linked: bool | None = None, db: Session | None = None) -> UserRead:
     if google_linked is None:
         google_linked = bool(db and db.query(OAuthIdentity).filter(OAuthIdentity.user_id == user.id, OAuthIdentity.provider == "google").first())
-    return UserRead(id=user.id, email=user.email, created_at=user.created_at, google_linked=google_linked)
+    display_name = getattr(user, "display_name", None) or user.email.split("@", 1)[0]
+    return UserRead(id=user.id, email=user.email, display_name=display_name, created_at=user.created_at, google_linked=google_linked)
+
+
+def user_profile_response(user: User, google_linked: bool | None = None, db: Session | None = None) -> UserProfileRead:
+    base = user_response(user, google_linked=google_linked, db=db)
+    platforms = list(getattr(user, "platforms", None) or [])
+    if getattr(user, "steam_id", None) and "Steam" not in platforms:
+        platforms.append("Steam")
+    return UserProfileRead(
+        **base.model_dump(),
+        bio=getattr(user, "bio", None),
+        platforms=platforms,
+        favorite_genres=list(getattr(user, "favorite_genres", None) or []),
+    )
+
+
+def public_user_response(user: User) -> PublicUserRead:
+    return PublicUserRead(
+        id=user.id,
+        display_name=getattr(user, "display_name", None) or user.email.split("@", 1)[0],
+        bio=getattr(user, "bio", None),
+        avatar=getattr(user, "steam_avatar", None),
+    )
+
+
+def user_pair(first_id: uuid.UUID, second_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
+    return (first_id, second_id) if str(first_id) < str(second_id) else (second_id, first_id)
+
+
+def are_friends(db: Session, first_id: uuid.UUID, second_id: uuid.UUID) -> bool:
+    low_id, high_id = user_pair(first_id, second_id)
+    return bool(db.query(Friendship.id).filter(Friendship.user_low_id == low_id, Friendship.user_high_id == high_id).first())
+
+
+def create_notification(db: Session, user_id: uuid.UUID, notification_type: str, payload: dict) -> Notification:
+    notification = Notification(user_id=user_id, type=notification_type, payload=payload)
+    db.add(notification)
+    return notification
+
+
+def friend_request_response(db: Session, request: FriendRequest) -> FriendRequestRead:
+    sender = db.query(User).filter(User.id == request.sender_id).first()
+    recipient = db.query(User).filter(User.id == request.recipient_id).first()
+    return FriendRequestRead(
+        id=request.id,
+        sender=public_user_response(sender),
+        recipient=public_user_response(recipient),
+        message=request.message,
+        created_at=request.created_at,
+    )
+
+
+def game_invite_response(db: Session, invite: GameInvite) -> GameInviteRead:
+    sender = db.query(User).filter(User.id == invite.sender_id).first()
+    recipient = db.query(User).filter(User.id == invite.recipient_id).first()
+    return GameInviteRead(
+        id=invite.id,
+        sender=public_user_response(sender),
+        recipient=public_user_response(recipient),
+        game_name=invite.game_name,
+        game_id=invite.game_id,
+        note=invite.note,
+        status=invite.status,
+        created_at=invite.created_at,
+        responded_at=invite.responded_at,
+    )
+
+
+def collection_response(item: Favorite | WishlistItem) -> CatalogCollectionRead:
+    return CatalogCollectionRead(
+        id=item.id,
+        catalog_game_id=item.catalog_game_id,
+        title=item.title,
+        cover_url=item.cover_url,
+        created_at=item.created_at,
+        updated_at=getattr(item, "updated_at", None),
+    )
+
+
+def price_alert_response(alert: PriceAlert, item: WishlistItem) -> PriceAlertRead:
+    return PriceAlertRead(
+        id=alert.id,
+        wishlist_catalog_game_id=item.catalog_game_id,
+        target_price=alert.target_price,
+        target_discount=alert.target_discount,
+        delivery_channels=list(alert.delivery_channels or []),
+        last_delivered_at=alert.last_delivered_at,
+        created_at=alert.created_at,
+        updated_at=alert.updated_at,
+    )
+
+
+def favorites_block(db: Session, user_id: uuid.UUID) -> DataBlock:
+    favorites = db.query(Favorite).filter(Favorite.user_id == user_id).order_by(Favorite.created_at.desc()).all()
+    data = {"items": [collection_response(item).model_dump(mode="json") for item in favorites], "total": len(favorites)}
+    return DataBlock(status="ready" if favorites else "empty", data=data, message=None if favorites else "No favorites have been saved yet.")
+
+
+def wishlist_block(db: Session, user_id: uuid.UUID) -> DataBlock:
+    items = db.query(WishlistItem).filter(WishlistItem.user_id == user_id).order_by(WishlistItem.created_at.desc()).all()
+    alerts = db.query(PriceAlert).filter(PriceAlert.user_id == user_id).all()
+    alert_by_item = {alert.wishlist_item_id: alert for alert in alerts}
+    data = {
+        "items": [
+            {**collection_response(item).model_dump(mode="json"), "alert": price_alert_response(alert_by_item[item.id], item).model_dump(mode="json") if item.id in alert_by_item else None}
+            for item in items
+        ],
+        "total": len(items),
+        "active_alerts": len(alerts),
+    }
+    return DataBlock(status="ready" if items else "empty", data=data, message=None if items else "No wishlist games have been saved yet.")
+
+
+def social_block(db: Session, user_id: uuid.UUID) -> DataBlock:
+    try:
+        friend_count = db.query(Friendship).filter((Friendship.user_low_id == user_id) | (Friendship.user_high_id == user_id)).count()
+        unread_notifications = db.query(Notification).filter(Notification.user_id == user_id, Notification.read_at.is_(None)).count()
+        incoming_requests = db.query(FriendRequest).filter(FriendRequest.recipient_id == user_id).count()
+    except AttributeError:
+        # Lightweight dependency stubs used by API contract consumers may only expose list operations.
+        return DataBlock(status="not_connected", data=[])
+    data = {"friend_count": friend_count, "unread_notifications": unread_notifications, "incoming_requests": incoming_requests}
+    return DataBlock(status="ready" if friend_count or unread_notifications or incoming_requests else "empty", data=data)
+
+
+def library_block(db: Session, user_id: uuid.UUID) -> DataBlock:
+    games = list_games(db, user_id)
+    if not games:
+        return DataBlock(
+            status="empty",
+            data={
+                "games": [],
+                "total": 0,
+                "total_games": 0,
+                "total_playtime_minutes": 0,
+                "total_playtime_hours": 0,
+                "manual_games": 0,
+                "psn_games": 0,
+            },
+        )
+    total_playtime = sum(int(game.playtime_forever or 0) for game in games)
+    return DataBlock(
+        status="ready",
+        data={
+            "games": [GameRead.model_validate(game).model_dump(mode="json") for game in games],
+            "total": len(games),
+            "total_games": len(games),
+            "total_playtime_minutes": total_playtime,
+            "total_playtime_hours": round(total_playtime / 60, 1),
+            "manual_games": sum(game.source == "manual" for game in games),
+            "psn_games": sum(game.source == "psn" for game in games),
+        },
+    )
+
+
+def empty_block(message: str | None = None) -> DataBlock:
+    return DataBlock(status="empty", data=[], message=message)
 
 
 def google_frontend_redirect(**params: str) -> RedirectResponse:
@@ -366,6 +525,608 @@ def current_user_profile(current_user: User = Depends(get_current_user), db: Ses
     return user_response(current_user, db=db)
 
 
+@app.get("/profile", response_model=UserProfileRead)
+def get_user_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return user_profile_response(current_user, db=db)
+
+
+@app.patch("/profile", response_model=UserProfileRead)
+def update_user_profile(
+    data: UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    updates = data.model_dump(exclude_unset=True)
+    display_name = updates.get("display_name")
+    if display_name and display_name != current_user.display_name:
+        if db.query(User.id).filter(User.display_name == display_name).first():
+            raise HTTPException(status_code=409, detail="Display name is already taken")
+    for field, value in updates.items():
+        setattr(current_user, field, value)
+    db.commit()
+    db.refresh(current_user)
+    return user_profile_response(current_user, db=db)
+
+
+@app.get("/users/search", response_model=list[PublicUserRead])
+def search_users(
+    q: str = Query(min_length=2, max_length=64),
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    users = (
+        db.query(User)
+        .filter(User.id != current_user.id, User.display_name.ilike(f"%{q.strip()}%"))
+        .order_by(User.display_name.asc())
+        .limit(limit)
+        .all()
+    )
+    return [public_user_response(user) for user in users]
+
+
+@app.get("/friends/requests", response_model=list[FriendRequestRead])
+def list_outgoing_friend_requests(
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    requests = (
+        db.query(FriendRequest)
+        .filter(FriendRequest.sender_id == current_user.id)
+        .order_by(FriendRequest.created_at.desc())
+        .offset(offset).limit(limit).all()
+    )
+    return [friend_request_response(db, request) for request in requests]
+
+
+@app.get("/friends/requests/incoming", response_model=list[FriendRequestRead])
+def list_incoming_friend_requests(
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    requests = (
+        db.query(FriendRequest)
+        .filter(FriendRequest.recipient_id == current_user.id)
+        .order_by(FriendRequest.created_at.desc())
+        .offset(offset).limit(limit).all()
+    )
+    return [friend_request_response(db, request) for request in requests]
+
+
+@app.post("/friends/requests", status_code=201, response_model=FriendRequestRead)
+def create_friend_request(
+    data: FriendRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if data.recipient_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot add yourself as a friend")
+    recipient = db.query(User).filter(User.id == data.recipient_id).first()
+    if not recipient:
+        raise HTTPException(status_code=404, detail="User not found")
+    if are_friends(db, current_user.id, recipient.id):
+        raise HTTPException(status_code=409, detail="You are already friends")
+    reverse = db.query(FriendRequest).filter(FriendRequest.sender_id == recipient.id, FriendRequest.recipient_id == current_user.id).first()
+    if reverse:
+        raise HTTPException(status_code=409, detail="This user already sent you a friend request")
+    existing = db.query(FriendRequest).filter(FriendRequest.sender_id == current_user.id, FriendRequest.recipient_id == recipient.id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Friend request already sent")
+    request = FriendRequest(sender_id=current_user.id, recipient_id=recipient.id, message=data.message)
+    db.add(request)
+    db.flush()
+    create_notification(db, recipient.id, "friend_request", {"request_id": str(request.id), "from": current_user.display_name})
+    db.commit()
+    db.refresh(request)
+    return friend_request_response(db, request)
+
+
+@app.post("/friends/requests/{request_id}/accept", response_model=FriendshipRead)
+def accept_friend_request(
+    request_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    request = db.query(FriendRequest).filter(FriendRequest.id == request_id, FriendRequest.recipient_id == current_user.id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Friend request not found")
+    low_id, high_id = user_pair(request.sender_id, request.recipient_id)
+    friendship = Friendship(user_low_id=low_id, user_high_id=high_id)
+    db.add(friendship)
+    sender = db.query(User).filter(User.id == request.sender_id).first()
+    create_notification(db, sender.id, "friend_request_accepted", {"by": current_user.display_name})
+    db.delete(request)
+    db.commit()
+    db.refresh(friendship)
+    return FriendshipRead(user=public_user_response(sender), created_at=friendship.created_at)
+
+
+@app.delete("/friends/requests/{request_id}", status_code=204)
+def delete_friend_request(
+    request_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    request = db.query(FriendRequest).filter(
+        FriendRequest.id == request_id,
+        (FriendRequest.sender_id == current_user.id) | (FriendRequest.recipient_id == current_user.id),
+    ).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Friend request not found")
+    db.delete(request)
+    db.commit()
+
+
+@app.get("/friends", response_model=list[FriendshipRead])
+def list_friends(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friendships = (
+        db.query(Friendship)
+        .filter((Friendship.user_low_id == current_user.id) | (Friendship.user_high_id == current_user.id))
+        .order_by(Friendship.created_at.desc()).offset(offset).limit(limit).all()
+    )
+    result = []
+    for friendship in friendships:
+        friend_id = friendship.user_high_id if friendship.user_low_id == current_user.id else friendship.user_low_id
+        friend = db.query(User).filter(User.id == friend_id).first()
+        result.append(FriendshipRead(user=public_user_response(friend), created_at=friendship.created_at))
+    return result
+
+
+@app.delete("/friends/{user_id}", status_code=204)
+def delete_friend(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    low_id, high_id = user_pair(current_user.id, user_id)
+    friendship = db.query(Friendship).filter(Friendship.user_low_id == low_id, Friendship.user_high_id == high_id).first()
+    if not friendship:
+        raise HTTPException(status_code=404, detail="Friendship not found")
+    db.delete(friendship)
+    db.commit()
+
+
+@app.get("/conversations", response_model=list[ConversationRead])
+def list_conversations(
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversations = (
+        db.query(Conversation)
+        .filter((Conversation.user_low_id == current_user.id) | (Conversation.user_high_id == current_user.id))
+        .order_by(Conversation.updated_at.desc()).offset(offset).limit(limit).all()
+    )
+    result = []
+    for conversation in conversations:
+        participant_id = conversation.user_high_id if conversation.user_low_id == current_user.id else conversation.user_low_id
+        participant = db.query(User).filter(User.id == participant_id).first()
+        last_message = db.query(Message).filter(Message.conversation_id == conversation.id).order_by(Message.created_at.desc()).first()
+        unread_count = db.query(Message).filter(Message.conversation_id == conversation.id, Message.sender_id != current_user.id, Message.read_at.is_(None)).count()
+        result.append(ConversationRead(id=conversation.id, participant=public_user_response(participant), updated_at=conversation.updated_at, unread_count=unread_count, last_message=last_message.body if last_message else None))
+    return result
+
+
+@app.post("/conversations", status_code=201, response_model=ConversationRead)
+def create_conversation(
+    data: ConversationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if data.recipient_id == current_user.id or not are_friends(db, current_user.id, data.recipient_id):
+        raise HTTPException(status_code=403, detail="You can only message GameFinder friends")
+    low_id, high_id = user_pair(current_user.id, data.recipient_id)
+    conversation = db.query(Conversation).filter(Conversation.user_low_id == low_id, Conversation.user_high_id == high_id).first()
+    if conversation:
+        return ConversationRead(id=conversation.id, participant=public_user_response(db.query(User).filter(User.id == data.recipient_id).first()), updated_at=conversation.updated_at)
+    conversation = Conversation(user_low_id=low_id, user_high_id=high_id)
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+    return ConversationRead(id=conversation.id, participant=public_user_response(db.query(User).filter(User.id == data.recipient_id).first()), updated_at=conversation.updated_at)
+
+
+def get_conversation_for_user(db: Session, conversation_id: uuid.UUID, user_id: uuid.UUID) -> Conversation:
+    conversation = db.query(Conversation).filter(
+        Conversation.id == conversation_id,
+        (Conversation.user_low_id == user_id) | (Conversation.user_high_id == user_id),
+    ).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conversation
+
+
+@app.get("/conversations/{conversation_id}/messages", response_model=list[MessageRead])
+def list_messages(
+    conversation_id: uuid.UUID,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_conversation_for_user(db, conversation_id, current_user.id)
+    messages = db.query(Message).filter(Message.conversation_id == conversation_id).order_by(Message.created_at.desc()).offset(offset).limit(limit).all()
+    now = datetime.now(timezone.utc)
+    for message in messages:
+        if message.sender_id != current_user.id and message.read_at is None:
+            message.read_at = now
+    db.commit()
+    return [MessageRead(id=message.id, conversation_id=message.conversation_id, sender_id=message.sender_id, body=message.body, created_at=message.created_at, read_at=message.read_at) for message in reversed(messages)]
+
+
+@app.post("/conversations/{conversation_id}/messages", status_code=201, response_model=MessageRead)
+def create_message(
+    conversation_id: uuid.UUID,
+    data: MessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversation = get_conversation_for_user(db, conversation_id, current_user.id)
+    message = Message(conversation_id=conversation.id, sender_id=current_user.id, body=data.body.strip())
+    conversation.updated_at = datetime.now(timezone.utc)
+    recipient_id = conversation.user_high_id if conversation.user_low_id == current_user.id else conversation.user_low_id
+    db.add(message)
+    create_notification(db, recipient_id, "message", {"conversation_id": str(conversation.id), "from": current_user.display_name, "preview": message.body[:120]})
+    db.commit()
+    db.refresh(message)
+    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender_id=message.sender_id, body=message.body, created_at=message.created_at, read_at=message.read_at)
+
+
+@app.get("/game-invites", response_model=list[GameInviteRead])
+def list_game_invites(
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    invites = db.query(GameInvite).filter(
+        (GameInvite.sender_id == current_user.id) | (GameInvite.recipient_id == current_user.id)
+    ).order_by(GameInvite.created_at.desc()).offset(offset).limit(limit).all()
+    return [game_invite_response(db, invite) for invite in invites]
+
+
+@app.post("/game-invites", status_code=201, response_model=GameInviteRead)
+def create_game_invite(
+    data: GameInviteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if data.recipient_id == current_user.id or not are_friends(db, current_user.id, data.recipient_id):
+        raise HTTPException(status_code=403, detail="You can only invite GameFinder friends")
+    recipient = db.query(User).filter(User.id == data.recipient_id).first()
+    invite = GameInvite(sender_id=current_user.id, recipient_id=recipient.id, game_id=data.game_id, game_name=data.game_name.strip(), note=data.note)
+    db.add(invite)
+    db.flush()
+    create_notification(db, recipient.id, "game_invite", {"invite_id": str(invite.id), "from": current_user.display_name, "game_name": invite.game_name})
+    db.commit()
+    db.refresh(invite)
+    return game_invite_response(db, invite)
+
+
+@app.post("/game-invites/{invite_id}/response", response_model=GameInviteRead)
+def respond_to_game_invite(
+    invite_id: uuid.UUID,
+    data: InviteResponseUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    invite = db.query(GameInvite).filter(GameInvite.id == invite_id, GameInvite.recipient_id == current_user.id).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Game invite not found")
+    if invite.status != "pending":
+        raise HTTPException(status_code=409, detail="Game invite has already been answered")
+    invite.status = data.status
+    invite.responded_at = datetime.now(timezone.utc)
+    create_notification(db, invite.sender_id, "game_invite_response", {"invite_id": str(invite.id), "by": current_user.display_name, "status": data.status})
+    db.commit()
+    db.refresh(invite)
+    return game_invite_response(db, invite)
+
+
+@app.get("/notifications", response_model=list[NotificationRead])
+def list_notifications(
+    unread_only: bool = False,
+    limit: int = Query(default=30, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = db.query(Notification).filter(Notification.user_id == current_user.id)
+    if unread_only:
+        query = query.filter(Notification.read_at.is_(None))
+    notifications = query.order_by(Notification.created_at.desc()).offset(offset).limit(limit).all()
+    return [NotificationRead(id=item.id, type=item.type, payload=item.payload or {}, read_at=item.read_at, created_at=item.created_at) for item in notifications]
+
+
+@app.post("/notifications/{notification_id}/read", response_model=NotificationRead)
+def mark_notification_read(
+    notification_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    notification = db.query(Notification).filter(Notification.id == notification_id, Notification.user_id == current_user.id).first()
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if notification.read_at is None:
+        notification.read_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(notification)
+    return NotificationRead(id=notification.id, type=notification.type, payload=notification.payload or {}, read_at=notification.read_at, created_at=notification.created_at)
+
+
+@app.post("/notifications/read-all", status_code=204)
+def mark_all_notifications_read(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db.query(Notification).filter(Notification.user_id == current_user.id, Notification.read_at.is_(None)).update({Notification.read_at: datetime.now(timezone.utc)}, synchronize_session=False)
+    db.commit()
+
+
+@app.get("/social/invite-link", response_model=InviteLinkRead)
+def get_social_invite_link(request: Request, current_user: User = Depends(get_current_user)):
+    return InviteLinkRead(url=f"{get_frontend_url()}/friends?add={current_user.display_name}")
+
+
+@app.get("/favorites", response_model=list[CatalogCollectionRead])
+def list_favorites(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    items = db.query(Favorite).filter(Favorite.user_id == current_user.id).order_by(Favorite.created_at.desc()).offset(offset).limit(limit).all()
+    return [collection_response(item) for item in items]
+
+
+@app.post("/favorites", status_code=201, response_model=CatalogCollectionRead)
+def add_favorite(
+    data: CatalogCollectionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    existing = db.query(Favorite).filter(Favorite.user_id == current_user.id, Favorite.catalog_game_id == data.catalog_game_id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Game is already in favorites")
+    item = Favorite(user_id=current_user.id, **data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return collection_response(item)
+
+
+@app.delete("/favorites/{catalog_game_id}", status_code=204)
+def remove_favorite(
+    catalog_game_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = db.query(Favorite).filter(Favorite.user_id == current_user.id, Favorite.catalog_game_id == catalog_game_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Favorite not found")
+    db.delete(item)
+    db.commit()
+
+
+@app.get("/wishlist", response_model=list[CatalogCollectionRead])
+def list_wishlist(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    items = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id).order_by(WishlistItem.created_at.desc()).offset(offset).limit(limit).all()
+    return [collection_response(item) for item in items]
+
+
+@app.post("/wishlist", status_code=201, response_model=CatalogCollectionRead)
+def add_wishlist_item(
+    data: CatalogCollectionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    existing = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id, WishlistItem.catalog_game_id == data.catalog_game_id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Game is already in wishlist")
+    item = WishlistItem(user_id=current_user.id, **data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return collection_response(item)
+
+
+def get_owned_wishlist_item(db: Session, user_id: uuid.UUID, catalog_game_id: int) -> WishlistItem:
+    item = db.query(WishlistItem).filter(WishlistItem.user_id == user_id, WishlistItem.catalog_game_id == catalog_game_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Wishlist item not found")
+    return item
+
+
+@app.patch("/wishlist/{catalog_game_id}", response_model=CatalogCollectionRead)
+def update_wishlist_item(
+    catalog_game_id: int,
+    data: CatalogCollectionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = get_owned_wishlist_item(db, current_user.id, catalog_game_id)
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(item, field, value)
+    db.commit()
+    db.refresh(item)
+    return collection_response(item)
+
+
+@app.delete("/wishlist/{catalog_game_id}", status_code=204)
+def remove_wishlist_item(
+    catalog_game_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = get_owned_wishlist_item(db, current_user.id, catalog_game_id)
+    db.delete(item)
+    db.commit()
+
+
+@app.get("/price-alerts", response_model=list[PriceAlertRead])
+def list_price_alerts(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    alerts = db.query(PriceAlert).filter(PriceAlert.user_id == current_user.id).order_by(PriceAlert.created_at.desc()).offset(offset).limit(limit).all()
+    items = {item.id: item for item in db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id).all()}
+    return [price_alert_response(alert, items[alert.wishlist_item_id]) for alert in alerts if alert.wishlist_item_id in items]
+
+
+@app.post("/price-alerts", status_code=201, response_model=PriceAlertRead)
+def create_price_alert(
+    data: PriceAlertCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = get_owned_wishlist_item(db, current_user.id, data.wishlist_catalog_game_id)
+    existing = db.query(PriceAlert).filter(PriceAlert.wishlist_item_id == item.id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="This wishlist game already has a price alert")
+    if "telegram" in data.delivery_channels and not current_user.telegram_chat_id:
+        raise HTTPException(status_code=400, detail="Connect Telegram before enabling Telegram delivery")
+    alert = PriceAlert(
+        wishlist_item_id=item.id,
+        user_id=current_user.id,
+        target_price=data.target_price,
+        target_discount=data.target_discount,
+        delivery_channels=list(data.delivery_channels),
+    )
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return price_alert_response(alert, item)
+
+
+@app.patch("/price-alerts/{alert_id}", response_model=PriceAlertRead)
+def update_price_alert(
+    alert_id: uuid.UUID,
+    data: PriceAlertUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    alert = db.query(PriceAlert).filter(PriceAlert.id == alert_id, PriceAlert.user_id == current_user.id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Price alert not found")
+    updates = data.model_dump(exclude_unset=True)
+    channels = updates.get("delivery_channels", alert.delivery_channels)
+    if "telegram" in channels and not current_user.telegram_chat_id:
+        raise HTTPException(status_code=400, detail="Connect Telegram before enabling Telegram delivery")
+    for field, value in updates.items():
+        setattr(alert, field, value)
+    if alert.target_price is None and alert.target_discount is None:
+        raise HTTPException(status_code=422, detail="Set a target price or discount")
+    item = db.query(WishlistItem).filter(WishlistItem.id == alert.wishlist_item_id, WishlistItem.user_id == current_user.id).first()
+    db.commit()
+    db.refresh(alert)
+    return price_alert_response(alert, item)
+
+
+@app.delete("/price-alerts/{alert_id}", status_code=204)
+def delete_price_alert(
+    alert_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    alert = db.query(PriceAlert).filter(PriceAlert.id == alert_id, PriceAlert.user_id == current_user.id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Price alert not found")
+    db.delete(alert)
+    db.commit()
+
+
+@app.get("/profile/summary", response_model=ProfileSummaryRead)
+async def profile_summary(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    profile = user_profile_response(current_user, db=db)
+    profile_complete = bool(profile.bio or profile.platforms or profile.favorite_genres)
+    google_linked = bool(
+        db.query(OAuthIdentity)
+        .filter(OAuthIdentity.user_id == current_user.id, OAuthIdentity.provider == "google")
+        .first()
+    )
+    services = {
+        "steam": steam_account_response(current_user).model_dump(mode="json"),
+        "google": {"linked": google_linked},
+        "telegram": telegram_account_response(current_user).model_dump(mode="json"),
+    }
+    library = library_block(db, current_user.id)
+    if current_user.steam_id:
+        try:
+            steam_games = await fetch_owned_games(current_user.steam_id)
+            if steam_games:
+                library_data = dict(library.data)
+                steam_minutes = sum(int(game.get("playtime_forever") or 0) for game in steam_games)
+                library_data["total_games"] += len(steam_games)
+                library_data["total_playtime_minutes"] += steam_minutes
+                library_data["total_playtime_hours"] = round(library_data["total_playtime_minutes"] / 60, 1)
+                library = DataBlock(status="ready", data=library_data)
+        except Exception:
+            pass
+    return ProfileSummaryRead(
+        account=DataBlock(status="ready", data=profile.model_dump(mode="json")),
+        profile=DataBlock(status="ready" if profile_complete else "empty", data=profile.model_dump(mode="json")),
+        services=DataBlock(status="ready", data=services),
+        library=library,
+        favorites=favorites_block(db, current_user.id),
+        wishlist=wishlist_block(db, current_user.id),
+        recently_played=empty_block("No recently played games are available yet."),
+    )
+
+
+@app.get("/dashboard", response_model=DashboardRead)
+async def dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        deals = await fetch_steam_store_deals(country=current_user.steam_country_code or "US", page_size=6)
+        deals_block = DataBlock(status="ready" if deals else "empty", data={"results": deals})
+    except Exception:
+        deals_block = DataBlock(status="error", data=[], message="Deals are temporarily unavailable.")
+
+    steam = steam_account_response(current_user)
+    steam_data = {"steam": steam.model_dump(mode="json"), "games": []}
+    if not steam.linked:
+        steam_block = DataBlock(status="not_connected", data=steam_data)
+    else:
+        try:
+            steam_games = await fetch_owned_games(current_user.steam_id)
+            steam_block = DataBlock(status="ready" if steam_games else "empty", data={"steam": steam.model_dump(mode="json"), "games": steam_games})
+        except Exception:
+            steam_block = DataBlock(status="error", data=steam_data, message="Steam library is temporarily unavailable.")
+    library = library_block(db, current_user.id)
+    if steam_block.status == "ready" and steam_games:
+        library_data = dict(library.data)
+        steam_minutes = sum(int(game.get("playtime_forever") or 0) for game in steam_games)
+        library_data["total_games"] += len(steam_games)
+        library_data["total_playtime_minutes"] += steam_minutes
+        library_data["total_playtime_hours"] = round(library_data["total_playtime_minutes"] / 60, 1)
+        library = DataBlock(status="ready", data=library_data)
+    return DashboardRead(
+        user=DataBlock(status="ready", data=user_profile_response(current_user, db=db).model_dump(mode="json")),
+        library=library,
+        recommendations=empty_block("Add games or connect Steam to get recommendations."),
+        deals=deals_block,
+        steam=steam_block,
+        social=social_block(db, current_user.id),
+        activity=empty_block("No recent activity yet."),
+    )
+
+
 def create_google_transaction(db: Session, mode: str, user_id: uuid.UUID | None = None) -> OAuthLoginUrl:
     if not google_configured():
         raise HTTPException(status_code=503, detail="Google sign-in is not configured")
@@ -431,7 +1192,7 @@ async def google_callback(code: str | None = None, state: str | None = None, err
         else:
             user = get_user_by_email(db, email)
             if not user:
-                user = User(email=email, password_hash=None)
+                user = User(email=email, password_hash=None, display_name=build_display_name(db, email))
                 db.add(user)
                 db.flush()
             db.add(OAuthIdentity(user_id=user.id, provider="google", provider_subject=subject, email=email))
@@ -490,7 +1251,7 @@ async def steam_sign_in_callback(request: Request, state: str | None = None, db:
         if not user:
             profile = await fetch_steam_profile(steam_id)
             user = User(
-                email=steam_sign_in_email(steam_id), password_hash=None, steam_id=steam_id,
+                email=steam_sign_in_email(steam_id), password_hash=None, display_name=build_display_name(db, steam_sign_in_email(steam_id)), steam_id=steam_id,
                 steam_persona_name=profile["persona_name"], steam_avatar=profile["avatar"],
                 steam_country_code=profile["country_code"], steam_linked_at=datetime.now(timezone.utc),
             )

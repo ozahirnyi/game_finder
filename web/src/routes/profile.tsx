@@ -1,248 +1,30 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { Check, Edit3, Gamepad2, MessageCircle, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { Avatar, GameCover } from "@/components/GameCover";
+import { Avatar } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { getCurrentUser, getGoogleLinkUrl, getGoogleStatus, getTelegramAccount, getTelegramLinkUrl, sendTelegramTestAlert, unlinkTelegramAccount, type GoogleStatus, type TelegramAccount, type UserRead } from "@/lib/api";
-import { Check, Edit3 } from "lucide-react";
+import { getProfileSummary, updateProfile } from "@/lib/api";
+import { lovableQueryKeys } from "@/lib/lovable-data";
 
-export const Route = createFileRoute("/profile")({
-  head: () => ({
-    meta: [
-      { title: "Profile — GameFinder" },
-      { name: "description", content: "Your GameFinder profile: stats, favorite games, integrations, and privacy controls." },
-    ],
-  }),
-  component: ProfilePage,
-});
+export const Route = createFileRoute("/profile")({ component: ProfilePage });
+const PLATFORM_OPTIONS = ["Steam", "PC", "PlayStation", "Xbox", "Nintendo Switch", "Mobile"];
+const GENRE_OPTIONS = ["Action", "Adventure", "RPG", "Roguelike", "Strategy", "Puzzle", "Shooter", "Simulation", "Sports", "Indie"];
+const toggle = (values: string[], value: string) => values.includes(value) ? values.filter(item => item !== value) : [...values, value];
 
 export function ProfilePage() {
-  const [user, setUser] = useState<UserRead | null>(null);
-  const [profileError, setProfileError] = useState("");
-  const [profileUnauthorized, setProfileUnauthorized] = useState(false);
-  const [google, setGoogle] = useState<GoogleStatus | null>(null);
-  const [telegram, setTelegram] = useState<TelegramAccount | null>(null);
-  const [googleError, setGoogleError] = useState("");
-  const [googleRetry, setGoogleRetry] = useState<"status" | "link" | "">("");
-  const [telegramError, setTelegramError] = useState("");
-  const [telegramRetry, setTelegramRetry] = useState<"status" | "link" | "">("");
-  const [busy, setBusy] = useState("");
-
-  function message(reason: unknown) {
-    return reason instanceof Error ? reason.message : "Data unavailable";
-  }
-  async function loadProfile() { try { setProfileError(""); setProfileUnauthorized(false); setUser(await getCurrentUser()); } catch (reason) { setUser(null); setProfileError(message(reason)); setProfileUnauthorized(typeof reason === "object" && reason !== null && "status" in reason && reason.status === 401); } }
-  async function loadGoogle() { try { setGoogleError(""); setGoogleRetry(""); setGoogle(await getGoogleStatus()); } catch (reason) { setGoogleError(message(reason)); setGoogleRetry("status"); } }
-  async function loadTelegram() { try { setTelegramError(""); setTelegramRetry(""); setTelegram(await getTelegramAccount()); } catch (reason) { setTelegramError(message(reason)); setTelegramRetry("status"); } }
-  useEffect(() => { void loadProfile(); void loadGoogle(); void loadTelegram(); }, []);
-  async function connectGoogle() {
-    setBusy("google"); setGoogleError("");
-    try { const result = await getGoogleLinkUrl(); window.location.assign(result.url); } catch (reason) { setGoogleError(message(reason)); setGoogleRetry("link"); } finally { setBusy(""); }
-  }
-  async function connectTelegram() {
-    setBusy("telegram"); setTelegramError("");
-    try { const result = await getTelegramLinkUrl(); if (!result.configured || !result.url) throw new Error(result.message ?? "Telegram is not configured."); window.open(result.url, "_blank", "noopener,noreferrer"); } catch (reason) { setTelegramError(message(reason)); setTelegramRetry("link"); } finally { setBusy(""); }
-  }
-  async function telegramAction(action: "test" | "unlink") {
-    setBusy("telegram"); setTelegramError("");
-    try { if (action === "test") await sendTelegramTestAlert(); else setTelegram(await unlinkTelegramAccount()); } catch (reason) { setTelegramError(message(reason)); } finally { setBusy(""); }
-  }
-  const currentUser = { avatarFrom: "#22c55e", avatarTo: "#0f766e", name: user?.email ?? "Data unavailable", handle: user?.id ?? "unavailable", bio: "Data unavailable", favoriteGenres: ["Data unavailable"], platforms: ["Data unavailable"], integrations: { steam: false, psn: false, telegram: telegram?.linked ?? false, google: user?.google_linked ?? false } };
-  const favs: never[] = [];
-  const wl: never[] = [];
-
-  return (
-    <AppShell>
-      {/* Cover / header */}
-      <div className="relative mb-10 overflow-hidden rounded-3xl border border-border">
-        <div
-          className="h-40"
-          style={{
-            background: `radial-gradient(60% 100% at 30% 0%, ${currentUser.avatarFrom}55 0%, transparent 60%), linear-gradient(135deg, ${currentUser.avatarTo} 0%, hsl(240 10% 3.5%) 100%)`,
-          }}
-        />
-        <div className="flex flex-col items-start gap-4 px-6 pb-6 sm:flex-row sm:items-end sm:gap-6">
-          <Avatar
-            from={currentUser.avatarFrom}
-            to={currentUser.avatarTo}
-            name={currentUser.name}
-            className="-mt-12 size-24 shrink-0 rounded-2xl ring-4 ring-background"
-          />
-          <div className="min-w-0 flex-1 pt-2">
-            <h1 className="text-3xl font-extrabold tracking-tight">
-              {currentUser.name}
-            </h1>
-            <p className="font-mono text-xs text-muted-foreground">
-              @{currentUser.handle}
-            </p>
-            <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              {profileUnauthorized ? <><span>{profileError} </span><Link to="/login" className="font-semibold text-primary hover:underline">Sign in</Link>.</> : profileError || currentUser.bio}
-            </p>
-          </div>
-          <button onClick={profileError ? loadProfile : undefined} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold hover:bg-white/5">
-            <Edit3 className="size-3.5" /> {profileError ? "Retry profile" : "Edit profile"}
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          { l: "Library", v: "Data unavailable" },
-          { l: "Friends", v: "Data unavailable" },
-          { l: "Shared games", v: "Data unavailable" },
-          { l: "Playtime", v: "Data unavailable" },
-        ].map((s) => (
-          <div
-            key={s.l}
-            className="rounded-2xl border border-border bg-surface p-5"
-          >
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              {s.l}
-            </p>
-            <p className="mt-1 text-3xl font-black">{s.v}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12">
-        <div className="space-y-10 lg:col-span-8">
-          <div>
-            <SectionHeader title="Preferences" />
-            <div className="rounded-2xl border border-border bg-surface p-6">
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                Favorite genres
-              </p>
-              <div className="mb-6 flex flex-wrap gap-2">
-                {currentUser.favoriteGenres.map((g) => (
-                  <Chip key={g} tone="primary">
-                    {g}
-                  </Chip>
-                ))}
-              </div>
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                Platforms
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {currentUser.platforms.map((p) => (
-                  <Chip key={p} tone="outline">
-                    {p}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <SectionHeader title="Favorite games" />
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {(favs.length ? favs : [{ id: "unavailable", title: "Data unavailable", coverFrom: "#27272a", coverTo: "#18181b", playtime: null }]).map((g) => (
-                <div
-                  key={g.id}
-                  className="overflow-hidden rounded-xl border border-border bg-surface"
-                >
-                  <GameCover
-                    from={g.coverFrom}
-                    to={g.coverTo}
-                    title={g.title}
-                    className="aspect-[3/4] w-full"
-                  />
-                  <div className="p-3">
-                    <p className="truncate text-sm font-bold">{g.title}</p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {g.playtime ?? "—"}h played
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <SectionHeader title="Active wishlist" />
-            <div className="space-y-3">
-              {(wl.length ? wl : [{ id: "unavailable", title: "Data unavailable", coverFrom: "#27272a", coverTo: "#18181b", genres: ["Data unavailable"], price: "—" }]).map((g) => (
-                <div
-                  key={g.id}
-                  className="flex items-center gap-4 rounded-xl border border-border bg-surface p-3"
-                >
-                  <GameCover
-                    from={g.coverFrom}
-                    to={g.coverTo}
-                    title={g.title}
-                    compact
-                    className="size-14 rounded-md"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">{g.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {g.genres.join(" · ")}
-                    </p>
-                  </div>
-                  <p className="font-mono text-sm font-bold text-primary">
-                    ${g.price}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-8 lg:col-span-4">
-          <div className="rounded-2xl border border-border bg-surface p-6">
-            <SectionHeader title="Integrations" />
-            {[
-              { name: "Steam", connected: currentUser.integrations.steam, note: "Data unavailable" },
-              { name: "PlayStation Network", connected: currentUser.integrations.psn, note: "Data unavailable" },
-              { name: "Telegram", connected: currentUser.integrations.telegram, note: "Price-drop alerts" },
-              { name: "Google", connected: currentUser.integrations.google, note: "Sign-in" },
-            ].map((i) => (
-
-              <div
-                key={i.name}
-                className="flex items-center justify-between border-t border-border py-3 first:border-t-0"
-              >
-                <div>
-                  <p className="text-sm font-bold">{i.name}</p>
-                  <p className="text-xs text-muted-foreground">{i.name === "Steam" || i.name === "PlayStation Network" ? "Data unavailable" : i.name === "Google" ? googleError || (google?.configured ? i.note : "Google is not configured") : telegramError || i.note}</p>
-                </div>
-                {i.connected ? (
-                  <Chip tone="primary">
-                    <Check className="mr-1 size-3" /> Connected
-                  </Chip>
-                ) : (
-                  <button disabled={busy === "google" || busy === "telegram"} onClick={i.name === "Google" ? (googleRetry === "link" ? connectGoogle : googleError ? loadGoogle : connectGoogle) : i.name === "Telegram" ? (telegramRetry === "link" ? connectTelegram : telegramError ? loadTelegram : connectTelegram) : undefined} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
-                    {i.name === "Google" && googleError ? "Retry Google" : i.name === "Telegram" && telegramError ? "Retry Telegram" : "Connect"}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-2xl border border-border bg-surface p-6">
-            <SectionHeader title="Privacy" />
-            {[
-              { l: "Library visible to friends", v: true },
-              { l: "Wishlist visible to friends", v: true },
-              { l: "Activity feed", v: true },
-              { l: "Allow friend requests", v: false },
-            ].map((p) => (
-              <label
-                key={p.l}
-                className="flex cursor-pointer items-center justify-between border-t border-border py-3 first:border-t-0"
-              >
-                <span className="text-sm">{p.l}</span>
-                <span
-                  className={`grid h-6 w-11 place-items-start rounded-full p-0.5 transition ${
-                    p.v ? "bg-primary" : "bg-muted"
-                  } ${p.v ? "justify-items-end" : "justify-items-start"}`}
-                >
-                  <span className="size-5 rounded-full bg-background" />
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
-    </AppShell>
-  );
+  const client = useQueryClient(); const query = useQuery({ queryKey: lovableQueryKeys.profileSummary, queryFn: getProfileSummary }); const s = query.data;
+  const user = s?.account.data?.user; const profile = s?.profile.data; const stats = s?.library.data; const services = s?.services.data; const favorites = s?.favorites.data ?? []; const wishlist = s?.wishlist.data ?? [];
+  const [editing, setEditing] = useState(false); const [bio, setBio] = useState(""); const [platforms, setPlatforms] = useState<string[]>([]); const [genres, setGenres] = useState<string[]>([]);
+  const save = useMutation({ mutationFn: updateProfile, onSuccess: () => { setEditing(false); client.invalidateQueries({ queryKey: lovableQueryKeys.profileSummary }); } });
+  const open = () => { setBio(profile?.bio ?? ""); setPlatforms(profile?.platforms ?? []); setGenres(profile?.favorite_genres ?? []); setEditing(true); };
+  if (query.isError) return <AppShell><SectionHeader title="Profile" hint="Sign in to view your profile."/><Link to="/login">Sign in</Link></AppShell>;
+  const rows = [{n:"Steam",d:services?.steam.linked ? (services.steam.persona_name ?? "Steam library connected") : "Connect your library and playtime",i:Gamepad2,ok:services?.steam.linked,to:"/steam"},{n:"PlayStation export",d:`${stats?.psn_games ?? 0} imported games`,i:ShieldCheck,ok:Boolean(stats?.psn_games),to:"/psn"},{n:"Telegram",d:services?.telegram.linked ? "Price alerts connected" : "Price alerts are optional",i:MessageCircle,ok:services?.telegram.linked},{n:"Google",d:services?.google.linked ? "Connected" : "Sign-in not connected",i:ShieldCheck,ok:services?.google.linked}];
+  return <AppShell>
+    <section className="relative mb-10 overflow-hidden rounded-3xl border border-border"><div className="h-40 bg-gradient-to-br from-primary/45 via-primary/10 to-background"/><div className="flex flex-col items-start gap-4 px-6 pb-6 sm:flex-row sm:items-end"><Avatar from="#22c55e" to="#0f766e" name={user?.email ?? "Player"} className="-mt-12 size-24 rounded-2xl ring-4 ring-background"/><div className="flex-1"><h1 className="text-3xl font-extrabold">{user?.email ?? "Your profile"}</h1><p className="mt-2 text-sm text-muted-foreground">{profile?.bio || "Set a short bio and preferences to improve recommendations."}</p></div><button onClick={open} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold"><Edit3 className="size-3.5"/>Edit profile</button></div></section>
+    {editing && <form onSubmit={e => { e.preventDefault(); save.mutate({bio,platforms,favorite_genres:genres}); }} className="mb-8 rounded-2xl border border-border bg-surface p-6"><label>Bio<textarea aria-label="Bio" value={bio} onChange={e=>setBio(e.target.value)} className="mt-2 w-full rounded border border-border bg-background p-2"/></label><div className="mt-4 grid gap-4 md:grid-cols-2"><fieldset><legend className="text-sm font-bold">Platforms</legend><div className="mt-2 flex flex-wrap gap-2">{PLATFORM_OPTIONS.map(value => <button type="button" key={value} onClick={() => setPlatforms(current => toggle(current, value))} className={`rounded-md border px-3 py-1.5 text-xs font-bold ${platforms.includes(value) ? "border-primary bg-primary/15 text-primary" : "border-border"}`}>{value}</button>)}</div></fieldset><fieldset><legend className="text-sm font-bold">Favorite genres</legend><div className="mt-2 flex flex-wrap gap-2">{GENRE_OPTIONS.map(value => <button type="button" key={value} onClick={() => setGenres(current => toggle(current, value))} className={`rounded-md border px-3 py-1.5 text-xs font-bold ${genres.includes(value) ? "border-primary bg-primary/15 text-primary" : "border-border"}`}>{value}</button>)}</div></fieldset></div><button className="mt-4 rounded bg-primary px-4 py-2 font-bold text-primary-foreground">Save profile</button></form>}
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[["Library",stats?.total_games],["Hours played",stats?.total_playtime_hours === undefined ? undefined : `${stats.total_playtime_hours}h`],["Manual games",stats?.manual_games],["PSN games",stats?.psn_games]].map(([l,v])=><div key={String(l)} className="rounded-2xl border border-border bg-surface p-5"><p className="text-xs text-muted-foreground">{l}</p><p className="text-3xl font-black">{v ?? "—"}</p></div>)}</div>
+    <div className="mt-10 grid gap-8 lg:grid-cols-12"><section className="space-y-8 lg:col-span-8"><div><SectionHeader title="Preferences"/><div className="rounded-2xl border border-border bg-surface p-6"><p className="text-xs text-muted-foreground">Favorite genres</p><div className="mt-2 flex flex-wrap gap-2">{profile?.favorite_genres?.length ? profile.favorite_genres.map(x=><Chip key={x} tone="primary">{x}</Chip>) : "Not set yet"}</div><p className="mt-5 text-xs text-muted-foreground">Platforms</p><div className="mt-2 flex flex-wrap gap-2">{profile?.platforms?.length ? profile.platforms.map(x=><Chip key={x} tone="outline">{x}</Chip>) : "Not set yet"}</div></div></div><div className="grid gap-6 md:grid-cols-2"><div><SectionHeader title="Favorite games"/>{favorites.length ? favorites.map(g=><p key={g.id} className="rounded-lg border border-border bg-surface p-3 font-bold">{g.title}</p>) : <p>No favorite games yet.</p>}</div><div><SectionHeader title="Active wishlist"/>{wishlist.length ? wishlist.map(g=><p key={g.id}>{g.title}</p>) : <p>{s?.wishlist.message ?? "No wishlist games yet."}</p>}</div></div></section><aside className="rounded-2xl border border-border bg-surface p-6 lg:col-span-4"><SectionHeader title="Integrations"/>{rows.map(r=><div key={r.n} className="flex items-center gap-3 border-t border-border py-4 first:border-t-0"><r.i className="size-5 text-primary"/><div className="flex-1"><p className="font-bold">{r.n}</p><p className="text-xs text-muted-foreground">{r.d}</p></div>{r.ok ? <Chip tone="primary"><Check className="mr-1 size-3"/>Connected</Chip> : r.to ? <Link to={r.to} className="rounded border border-border px-2 py-1 text-xs">Connect</Link> : <span className="text-xs text-muted-foreground">Not connected</span>}</div>)}</aside></div>
+  </AppShell>;
 }

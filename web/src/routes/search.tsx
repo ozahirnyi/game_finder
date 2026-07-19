@@ -1,162 +1,48 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Search, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { searchGames } from "@/lib/api";
+import { getRecommendations, searchGames, type RecommendationItem } from "@/lib/api";
 import { lovableQueryKeys, toGameCard } from "@/lib/lovable-data";
-import { useQuery } from "@tanstack/react-query";
-import { Search, SlidersHorizontal, Plus, Heart, Users } from "lucide-react";
-import { useState } from "react";
 
+export const Route = createFileRoute("/search")({ component: SearchPage });
 
-export const Route = createFileRoute("/search")({
-  head: () => ({
-    meta: [
-      { title: "Search — GameFinder" },
-      { name: "description", content: "Search games by title, genre, platform, mood, and active deals." },
-    ],
-  }),
-  component: SearchPage,
-});
+function normalized(value: string | null) {
+  return value?.trim().toLocaleLowerCase() ?? "";
+}
 
-const filters = [
-  { label: "All", active: true },
-  { label: "Co-op" },
-  { label: "PC" },
-  { label: "PS5" },
-  { label: "Under $30" },
-  { label: "On sale" },
-  { label: "Roguelike" },
-  { label: "RPG" },
-  { label: "Multiplayer" },
-];
+function AiRecommendationCard({ item }: { item: RecommendationItem }) {
+  const matchQuery = useQuery({
+    queryKey: ["ai-search-catalog-match", item.title],
+    queryFn: () => searchGames(item.title),
+  });
+  const match = matchQuery.data?.results.find((game) => normalized(game.name) === normalized(item.title)) ?? matchQuery.data?.results[0];
+
+  return <article className="rounded-xl border border-border bg-surface p-5">
+    <Sparkles className="mb-3 size-4 text-primary" />
+    <h3 className="font-bold">{item.title}</h3>
+    <p className="mt-2 text-sm text-muted-foreground">{item.reason}</p>
+    {item.tags.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{item.tags.map((tag) => <Chip key={tag}>{tag}</Chip>)}</div>}
+    {match?.id ? <Link to="/games/$gameId" params={{ gameId: String(match.id) }} aria-label={`View game details for ${item.title}`} className="mt-4 inline-block text-sm font-bold text-primary hover:underline">View game details</Link> : matchQuery.isSuccess ? <p className="mt-4 text-xs text-muted-foreground">A catalog match is not available yet.</p> : <p className="mt-4 text-xs text-muted-foreground">Finding the catalog entry…</p>}
+  </article>;
+}
 
 export function SearchPage() {
-  const [query, setQuery] = useState("co-op roguelike");
-  const search = useQuery({
-    queryKey: lovableQueryKeys.search(query),
-    queryFn: () => searchGames(query),
-  });
-  const games = search.data?.results.map(toGameCard) ?? [];
-  return (
-    <AppShell>
-      <SectionHeader
-        title="Search"
-        hint="Search the public game catalog."
-      />
+  const [mode, setMode] = useState<"catalog" | "ai">("catalog");
+  const [query, setQuery] = useState("");
+  const [submitted, setSubmitted] = useState("");
+  const catalog = useQuery({ queryKey: lovableQueryKeys.search(query), queryFn: () => searchGames(query), enabled: mode === "catalog" && query.trim().length > 1 });
+  const ai = useQuery({ queryKey: ["ai-search", submitted], queryFn: () => getRecommendations(submitted), enabled: mode === "ai" && Boolean(submitted) });
+  const games = catalog.data?.results.map(toGameCard) ?? [];
+  const ask = () => setSubmitted(query.trim());
 
-      <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-        <Search className="size-4 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          placeholder="Search by title, genre, mood…"
-        />
-        <button className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground">
-          <SlidersHorizontal className="size-3.5" /> Filters
-        </button>
-      </div>
-
-      <div className="mb-8 flex flex-wrap gap-2">
-        {filters.map((f) => (
-          <button
-            key={f.label}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-              f.active
-                ? "border-primary bg-primary/15 text-primary"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-4 flex items-center justify-between">
-        <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          {games.length} results · sorted by relevance
-        </p>
-        <select className="rounded-md border border-border bg-surface px-2 py-1 text-xs">
-          <option>Relevance</option>
-          <option>Price ↑</option>
-          <option>Discount</option>
-          <option>Rating</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
-        {search.isError && (
-          <div className="col-span-full rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-            <p>Failed to load search results.</p>
-            <button className="mt-3 rounded-md border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground" onClick={() => search.refetch()}>
-              Retry
-            </button>
-          </div>
-        )}
-        {games.map((g) => (
-          <article
-            key={g.id}
-            className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition hover:border-white/20"
-          >
-            <Link
-              to="/games/$gameId"
-              params={{ gameId: g.id ?? "data-unavailable" }}
-              className="relative block"
-            >
-              <GameCover
-                from={g.imageUrl ?? "Data unavailable"}
-                to={g.imageUrl ?? "Data unavailable"}
-                title={g.title ?? "Data unavailable"}
-                className="aspect-[3/4] w-full"
-              />
-              <span className="absolute left-3 top-3 rounded bg-primary px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-primary-foreground">
-                Data unavailable
-              </span>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex translate-y-2 items-center gap-1.5 bg-gradient-to-t from-background/95 to-transparent p-3 opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
-                <span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
-                  <Plus className="size-4" />
-                </span>
-                <span className="grid size-8 place-items-center rounded-md border border-border bg-background/80 backdrop-blur">
-                  <Heart className="size-4" />
-                </span>
-                <span className="grid size-8 place-items-center rounded-md border border-border bg-background/80 backdrop-blur">
-                  <Users className="size-4" />
-                </span>
-              </div>
-            </Link>
-            <Link
-              to="/games/$gameId"
-              params={{ gameId: g.id ?? "data-unavailable" }}
-              className="flex flex-1 flex-col p-4"
-            >
-              <h5 className="font-bold leading-tight group-hover:text-primary">
-                {g.title ?? "Data unavailable"}
-              </h5>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {g.released ?? "Data unavailable"}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                <Chip>Data unavailable</Chip>
-              </div>
-              <div className="mt-auto flex items-end justify-between pt-4">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    Data unavailable
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-mono text-[10px] text-muted-foreground line-through">
-                    Data unavailable
-                  </p>
-                  <p className="font-mono text-sm font-bold">Data unavailable</p>
-                </div>
-              </div>
-            </Link>
-          </article>
-        ))}
-
-      </div>
-    </AppShell>
-  );
+  return <AppShell>
+    <SectionHeader title="Search" hint={mode === "ai" ? "Describe a game, mood, budget, or who you want to play with." : "Search the public game catalog by title."} />
+    <div className="mb-6 flex gap-2"><button onClick={() => setMode("catalog")} className={`rounded-lg px-4 py-2 text-sm font-bold ${mode === "catalog" ? "bg-primary text-primary-foreground" : "border border-border"}`}>Title search</button><button onClick={() => setMode("ai")} className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold ${mode === "ai" ? "bg-primary text-primary-foreground" : "border border-border"}`}><Sparkles className="size-4" />AI Search</button></div>
+    <div className="mb-8 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3"><Search className="size-4 text-muted-foreground" /><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && mode === "ai") ask(); }} className="flex-1 bg-transparent text-sm outline-none" placeholder={mode === "ai" ? "Describe what you want to play…" : "Search by title…"} />{mode === "ai" && <button onClick={ask} disabled={!query.trim()} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50">Ask AI</button>}</div>
+    {mode === "ai" ? <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{!submitted && <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">Tell AI what you want to play to get recommendations.</p>}{ai.isLoading && <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">Finding recommendations…</p>}{ai.isError && <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">AI search is not available right now. Please try again.</p>}{ai.data?.recommendations.length === 0 && <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">No recommendations matched that description. Try mentioning a genre, platform, or mood.</p>}{ai.data?.recommendations.map((item) => <AiRecommendationCard key={item.title} item={item} />)}</div> : <div className="grid grid-cols-2 gap-5 md:grid-cols-4">{query.trim().length < 2 && <p className="col-span-full rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">Enter at least two characters to search the catalog.</p>}{catalog.isLoading && <p className="col-span-full rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">Searching the catalog…</p>}{catalog.isError && <p className="col-span-full rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">Catalog search is not available right now. Try again shortly.</p>}{catalog.isSuccess && games.length === 0 && <p className="col-span-full rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">No catalog games matched “{query}”.</p>}{games.map((game) => game.id ? <Link key={game.id} to="/games/$gameId" params={{ gameId: game.id }} className="overflow-hidden rounded-xl border border-border bg-surface"><GameCover from={game.imageUrl ?? "#1f2937"} to="#111827" title={game.title ?? "Untitled game"} className="aspect-[3/4] w-full" /><p className="p-3 font-bold">{game.title}</p></Link> : <article key={game.title} className="overflow-hidden rounded-xl border border-border bg-surface"><GameCover from={game.imageUrl ?? "#1f2937"} to="#111827" title={game.title ?? "Untitled game"} className="aspect-[3/4] w-full" /><p className="p-3 font-bold">{game.title}</p></article>)}</div>}
+  </AppShell>;
 }

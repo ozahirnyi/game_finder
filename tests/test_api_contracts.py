@@ -554,6 +554,270 @@ def test_steam_recommendations_use_most_played_games(monkeypatch):
     assert response.json()["recommendations"][0]["title"] == "Prey"
 
 
+def test_dashboard_requires_authentication():
+    response = client.get("/dashboard")
+
+    assert response.status_code == 401
+
+
+def test_dashboard_returns_explicit_empty_and_not_connected_blocks():
+    owner_id = uuid.uuid4()
+    user = SimpleNamespace(
+        id=owner_id,
+        email="player@example.com",
+        created_at=datetime.now(timezone.utc),
+        steam_id=None,
+        steam_persona_name=None,
+        steam_avatar=None,
+        steam_country_code=None,
+        steam_linked_at=None,
+        telegram_chat_id=None,
+        telegram_username=None,
+        telegram_linked_at=None,
+        bio=None,
+        platforms=[],
+        favorite_genres=[],
+    )
+
+    class Query:
+        def filter(self, *_args):
+            return self
+
+        def order_by(self, *_args):
+            return self
+
+        def all(self):
+            return []
+
+        def first(self):
+            return None
+
+    db = SimpleNamespace(query=lambda _model: Query())
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: db
+
+    try:
+        response = client.get("/dashboard")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["library"]["status"] == "empty"
+    assert payload["steam"]["status"] == "not_connected"
+    assert payload["recommendations"]["status"] == "empty"
+    assert payload["social"]["status"] == "not_connected"
+
+
+def test_user_profile_patch_persists_profile_fields():
+    owner_id = uuid.uuid4()
+    user = SimpleNamespace(
+        id=owner_id,
+        email="player@example.com",
+        created_at=datetime.now(timezone.utc),
+        bio=None,
+        platforms=[],
+        favorite_genres=[],
+    )
+    db = SimpleNamespace(query=lambda _model: SimpleNamespace(filter=lambda *_args: SimpleNamespace(first=lambda: None)), commit=lambda: None, refresh=lambda _user: None)
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: db
+
+    try:
+        response = client.patch(
+            "/profile",
+            json={"bio": "Indie fan", "platforms": ["PC", "PS5"], "favorite_genres": ["RPG"]},
+        )
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["bio"] == "Indie fan"
+    assert response.json()["platforms"] == ["PC", "PS5"]
+
+
+def test_profile_summary_marks_unconfigured_profile_and_empty_collections():
+    owner_id = uuid.uuid4()
+    user = SimpleNamespace(
+        id=owner_id,
+        email="player@example.com",
+        created_at=datetime.now(timezone.utc),
+        steam_id=None,
+        steam_persona_name=None,
+        steam_avatar=None,
+        steam_country_code=None,
+        steam_linked_at=None,
+        telegram_chat_id=None,
+        telegram_username=None,
+        telegram_linked_at=None,
+        bio=None,
+        platforms=[],
+        favorite_genres=[],
+    )
+
+    class Query:
+        def filter(self, *_args):
+            return self
+
+        def order_by(self, *_args):
+            return self
+
+        def all(self):
+            return []
+
+        def first(self):
+            return None
+
+    db = SimpleNamespace(query=lambda _model: Query())
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: db
+
+    try:
+        response = client.get("/profile/summary")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["profile"]["status"] == "empty"
+    assert payload["favorites"]["status"] == "empty"
+    assert payload["wishlist"]["status"] == "empty"
+
+
+def test_dashboard_reports_ready_and_error_deal_states(monkeypatch):
+    user = SimpleNamespace(
+        id=uuid.uuid4(), email="player@example.com", created_at=datetime.now(timezone.utc),
+        steam_id=None, steam_persona_name=None, steam_avatar=None, steam_country_code=None, steam_linked_at=None,
+        telegram_chat_id=None, telegram_username=None, telegram_linked_at=None,
+        bio=None, platforms=[], favorite_genres=[],
+    )
+
+    class Query:
+        def filter(self, *_args):
+            return self
+
+        def order_by(self, *_args):
+            return self
+
+        def all(self):
+            return []
+
+        def first(self):
+            return None
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: SimpleNamespace(query=lambda _model: Query())
+
+    async def available_deals(**_kwargs):
+        return [{"name": "Hades"}]
+
+    monkeypatch.setattr(main, "fetch_steam_store_deals", available_deals)
+    try:
+        ready = client.get("/dashboard")
+
+        async def unavailable_deals(**_kwargs):
+            raise RuntimeError("Steam is unavailable")
+
+        monkeypatch.setattr(main, "fetch_steam_store_deals", unavailable_deals)
+        failed = client.get("/dashboard")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert ready.status_code == 200
+    assert ready.json()["deals"]["status"] == "ready"
+    assert failed.status_code == 200
+    assert failed.json()["deals"]["status"] == "error"
+
+
+def test_dashboard_library_stats_and_linked_steam_library_contract(monkeypatch):
+    user = SimpleNamespace(
+        id=uuid.uuid4(), email="player@example.com", created_at=datetime.now(timezone.utc),
+        steam_id="76561198000000000", steam_persona_name="Steam Player", steam_avatar=None,
+        steam_country_code="UA", steam_linked_at=datetime.now(timezone.utc),
+        telegram_chat_id=None, telegram_username=None, telegram_linked_at=None,
+        bio=None, platforms=[], favorite_genres=[],
+    )
+    games = [
+        SimpleNamespace(id=uuid.uuid4(), title="Manual", notes=None, info=None, source="manual", external_id=None,
+                        playtime_forever=None, playtime_2weeks=None, img_icon_url=None, synced_at=None, created_at=datetime.now(timezone.utc)),
+        SimpleNamespace(id=uuid.uuid4(), title="PSN", notes=None, info=None, source="psn", external_id="psn:1",
+                        playtime_forever=90, playtime_2weeks=None, img_icon_url=None, synced_at=None, created_at=datetime.now(timezone.utc)),
+    ]
+
+    class Query:
+        def filter(self, *_args):
+            return self
+
+        def order_by(self, *_args):
+            return self
+
+        def all(self):
+            return games
+
+        def first(self):
+            return None
+
+    async def steam_games(_steam_id):
+        return [{"appid": 10, "name": "Portal", "playtime_forever": 120, "playtime_2weeks": 30, "img_icon_url": None}]
+
+    async def deals(**_kwargs):
+        return []
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: SimpleNamespace(query=lambda _model: Query())
+    monkeypatch.setattr(main, "fetch_owned_games", steam_games)
+    monkeypatch.setattr(main, "fetch_steam_store_deals", deals)
+
+    try:
+        response = client.get("/dashboard")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["library"]["data"]["total_games"] == 3
+    assert payload["library"]["data"]["total_playtime_hours"] == 3.5
+    assert payload["library"]["data"]["manual_games"] == 1
+    assert payload["library"]["data"]["psn_games"] == 1
+    assert payload["steam"]["status"] == "ready"
+    assert payload["steam"]["data"]["steam"]["linked"] is True
+    assert payload["steam"]["data"]["games"][0]["name"] == "Portal"
+
+
+def test_dashboard_keeps_steam_external_failure_as_error(monkeypatch):
+    user = SimpleNamespace(
+        id=uuid.uuid4(), email="player@example.com", created_at=datetime.now(timezone.utc),
+        steam_id="76561198000000000", steam_persona_name="Steam Player", steam_avatar=None,
+        steam_country_code="UA", steam_linked_at=datetime.now(timezone.utc),
+        telegram_chat_id=None, telegram_username=None, telegram_linked_at=None,
+        bio=None, platforms=[], favorite_genres=[],
+    )
+
+    class Query:
+        def filter(self, *_args): return self
+        def order_by(self, *_args): return self
+        def all(self): return []
+        def first(self): return None
+
+    async def unavailable_library(_steam_id):
+        raise RuntimeError("Steam is unavailable")
+
+    async def deals(**_kwargs):
+        return []
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: SimpleNamespace(query=lambda _model: Query())
+    monkeypatch.setattr(main, "fetch_owned_games", unavailable_library)
+    monkeypatch.setattr(main, "fetch_steam_store_deals", deals)
+    try:
+        response = client.get("/dashboard")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["steam"]["status"] == "error"
+
+
 def test_steam_library_sync_removes_legacy_imports_without_saving_steam_games(monkeypatch):
     owner_id = uuid.uuid4()
     linked_at = datetime.now(timezone.utc)
