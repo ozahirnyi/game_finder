@@ -64,6 +64,7 @@ from app.social_auth import (
     consume_exchange_result,
     create_exchange_result,
     resolve_google_user,
+    resolve_steam_user,
 )
 
 
@@ -469,23 +470,8 @@ async def steam_sign_in_callback(request: Request, state: str | None = None, db:
     db.commit()
     try:
         steam_id = await verify_steam_openid(dict(request.query_params))
-        user = db.query(User).filter(User.steam_id == steam_id).first()
-        if not user:
-            profile = await fetch_steam_profile(steam_id)
-            user = User(
-                email=steam_sign_in_email(steam_id), password_hash=None, steam_id=steam_id,
-                steam_persona_name=profile["persona_name"], steam_avatar=profile["avatar"],
-                steam_country_code=profile["country_code"], steam_linked_at=datetime.now(timezone.utc),
-            )
-            db.add(user)
-            db.flush()
-        exchange_code = random_token()
-        db.add(OAuthAuthorizationTransaction(
-            state=random_token(), code_verifier="consumed", nonce="consumed", mode="result",
-            exchange_code=exchange_code, result_user_id=user.id, expires_at=utcnow() + timedelta(seconds=60),
-        ))
-        db.commit()
-        return oauth_frontend_redirect(provider="steam", exchange_code=exchange_code)
+        user = resolve_steam_user(db, steam_id, await fetch_steam_profile(steam_id))
+        return oauth_frontend_redirect(provider="steam", exchange_code=create_exchange_result(db, user.id))
     except Exception:
         db.rollback()
         return oauth_frontend_redirect(provider="steam", error="authentication_failed")
