@@ -13,6 +13,11 @@ vi.mock("@/lib/api", () => ({
   updateSavedGame: vi.fn(),
 }));
 
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+  useNavigate: () => vi.fn(),
+}));
+
 const hades = {
   id: "g1",
   title: "Hades II",

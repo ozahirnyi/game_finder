@@ -9,8 +9,9 @@ import SearchPage from "@/app/search/page";
 
 const navigationState = vi.hoisted(() => ({ params: new URLSearchParams() }));
 
-vi.mock("next/navigation", () => ({
-  useSearchParams: () => navigationState.params,
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+  useRouterState: ({ select }: { select: (state: { location: { searchStr: string } }) => unknown }) => select({ location: { searchStr: navigationState.params.toString() } }),
 }));
 
 vi.mock("@/lib/api", () => ({

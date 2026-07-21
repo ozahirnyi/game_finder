@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/lib/theme";
 import { AppShell } from "./AppShell";
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+  useRouterState: ({ select }: { select: (state: { location: { pathname: string } }) => unknown }) => select({ location: { pathname: "/" } }),
+}));
 
 describe("Lovable AppShell", () => {
   it("keeps the archive navigation labels", () => {
