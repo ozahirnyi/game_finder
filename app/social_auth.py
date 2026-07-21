@@ -1,4 +1,5 @@
 from datetime import timedelta
+from datetime import datetime, timezone
 import uuid
 
 from sqlalchemy.orm import Session
@@ -79,5 +80,25 @@ def resolve_google_user(db: Session, subject: str, email: str) -> User:
             email=normalized_email,
         )
     )
+    db.commit()
+    return user
+
+
+def resolve_steam_user(db: Session, steam_id: str, profile: dict[str, str | None]) -> User:
+    user = db.query(User).filter_by(steam_id=steam_id).first()
+    if user:
+        return user
+
+    user = User(
+        email=f"steam-{steam_id}@steam.invalid",
+        password_hash=None,
+        steam_id=steam_id,
+        steam_persona_name=profile.get("persona_name"),
+        steam_avatar=profile.get("avatar"),
+        steam_country_code=profile.get("country_code"),
+        steam_linked_at=datetime.now(timezone.utc),
+    )
+    db.add(user)
+    db.flush()
     db.commit()
     return user

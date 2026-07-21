@@ -8,6 +8,7 @@ from app.social_auth import (
     create_exchange_result,
     consume_exchange_result,
     resolve_google_user,
+    resolve_steam_user,
 )
 
 
@@ -88,3 +89,15 @@ def test_authorization_transaction_is_consumed_before_provider_call():
 
     assert consume_authorization_transaction(db, "state", "google_login") is transaction
     assert db.query(OAuthAuthorizationTransaction).filter_by(state="state").first() is None
+
+
+def test_steam_resolution_creates_and_reuses_a_steam_only_account():
+    db = Session()
+    profile = {"persona_name": "Player", "avatar": "https://example.test/avatar", "country_code": "UA"}
+
+    first = resolve_steam_user(db, "76561198000000000", profile)
+    second = resolve_steam_user(db, "76561198000000000", profile)
+
+    assert first is second
+    assert first.email == "steam-76561198000000000@steam.invalid"
+    assert first.steam_persona_name == "Player"
