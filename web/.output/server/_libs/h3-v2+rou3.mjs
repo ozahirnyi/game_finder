@@ -1,4 +1,4 @@
-import { a as FastResponse, o as FastURL } from "./h3+rou3+srvx.mjs";
+import { l as FastURL, s as NodeResponse } from "./h3+rou3+srvx.mjs";
 //#region node_modules/rou3/dist/index.mjs
 var NullProtoObj = /* @__PURE__ */ (() => {
 	const e = function() {};
@@ -177,7 +177,7 @@ var HTTPResponse = class {
 	}
 };
 function prepareResponse(val, event, config, nested) {
-	if (val === kHandled) return new FastResponse(null);
+	if (val === kHandled) return new NodeResponse(null);
 	if (val === kNotFound) val = new HTTPError({
 		status: 404,
 		message: `Cannot find any route matching [${event.req.method}] ${event.url}`
@@ -200,7 +200,7 @@ function prepareResponse(val, event, config, nested) {
 	if (!(val instanceof Response)) {
 		const res = prepareResponseBody(val, event, config);
 		const status = res.status || preparedRes?.status;
-		return new FastResponse(nullBody(event.req.method, status) ? null : res.body, {
+		return new NodeResponse(nullBody(event.req.method, status) ? null : res.body, {
 			status,
 			statusText: res.statusText || preparedRes?.statusText,
 			headers: res.headers && preparedHeaders ? mergeHeaders$1(res.headers, preparedHeaders) : res.headers || preparedHeaders
@@ -211,7 +211,7 @@ function prepareResponse(val, event, config, nested) {
 		mergeHeaders$1(val.headers, preparedHeaders, val.headers);
 		return val;
 	} catch {
-		return new FastResponse(nullBody(event.req.method, val.status) ? null : val.body, {
+		return new NodeResponse(nullBody(event.req.method, val.status) ? null : val.body, {
 			status: val.status,
 			statusText: val.statusText,
 			headers: mergeHeaders$1(val.headers, preparedHeaders)
@@ -278,7 +278,7 @@ function nullBody(method, status) {
 function errorResponse(error, debug, errHeaders) {
 	let headers = error.headers ? mergeHeaders$1(jsonHeaders, error.headers) : new Headers(jsonHeaders);
 	if (errHeaders) headers = mergeHeaders$1(headers, errHeaders);
-	return new FastResponse(JSON.stringify({
+	return new NodeResponse(JSON.stringify({
 		...error.toJSON(),
 		stack: debug && error.stack ? error.stack.split("\n").map((l) => l.trim()) : void 0
 	}, void 0, debug ? 2 : void 0), {

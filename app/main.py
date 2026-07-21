@@ -596,7 +596,6 @@ async def steam_callback(request: Request, state: str, db: Session = Depends(get
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-
         steam_id = await verify_steam_openid(dict(request.query_params))
         linked_user = db.query(User).filter(User.steam_id == steam_id, User.id != user.id).first()
         if linked_user:

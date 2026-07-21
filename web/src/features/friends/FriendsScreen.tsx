@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Panel, Section, StatePanel } from "@/components/ui";
 import { ApiError, SteamSocial, getSteamSocial, isAuthenticated } from "@/lib/api";
@@ -57,7 +57,7 @@ export function FriendsScreen() {
     return (
       <main className="stack">
         <StatePanel kind="empty" title="Connect Steam to see friends" detail="Steam friend data is available after you link your account." />
-        <Link href="/steam">Connect Steam</Link>
+        <Link to="/steam">Connect Steam</Link>
       </main>
     );
   }

@@ -1,7 +1,7 @@
-//#region node_modules/.nitro/vite/services/ssr/assets/_tanstack-start-manifest_v-DVSn5VzQ.js
+//#region node_modules/.nitro/vite/services/ssr/assets/_tanstack-start-manifest_v-DIQyyKWc.js
 var tsrStartManifest = () => ({ routes: {
 	__root__: {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/__root.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/__root.tsx",
 		children: [
 			"/",
 			"/deals",
@@ -22,7 +22,7 @@ var tsrStartManifest = () => ({ routes: {
 		} }]
 	},
 	"/": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/index.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/index.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/routes-CKvNcdeJ.js",
@@ -33,7 +33,7 @@ var tsrStartManifest = () => ({ routes: {
 		]
 	},
 	"/deals": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/deals.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/deals.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/deals-DSU8YBEj.js",
@@ -42,7 +42,7 @@ var tsrStartManifest = () => ({ routes: {
 		]
 	},
 	"/friends": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/friends.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/friends.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/friends-MQE_4hxX.js",
@@ -51,7 +51,7 @@ var tsrStartManifest = () => ({ routes: {
 		]
 	},
 	"/library": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/library.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/library.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/library-CuExuiTC.js",
@@ -60,7 +60,7 @@ var tsrStartManifest = () => ({ routes: {
 		]
 	},
 	"/profile": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/profile.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/profile.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/profile-DK5zA4bK.js",
@@ -70,7 +70,7 @@ var tsrStartManifest = () => ({ routes: {
 		]
 	},
 	"/psn": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/psn.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/psn.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/psn-BGgjthWq.js",
@@ -81,7 +81,7 @@ var tsrStartManifest = () => ({ routes: {
 		]
 	},
 	"/search": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/search.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/search.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/search-BDMJ5AGB.js",
@@ -91,7 +91,7 @@ var tsrStartManifest = () => ({ routes: {
 		]
 	},
 	"/steam": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/steam.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/steam.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/steam-Dr6oEP5t.js",
@@ -102,7 +102,7 @@ var tsrStartManifest = () => ({ routes: {
 		]
 	},
 	"/wishlist": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/wishlist.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/wishlist.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/wishlist-N0hQlRO9.js",
@@ -111,7 +111,7 @@ var tsrStartManifest = () => ({ routes: {
 		]
 	},
 	"/games/$gameId": {
-		filePath: "C:/Users/zagir/PycharmProjects/game_finder/.worktrees/lovable-literal-port/web/src/routes/games.$gameId.tsx",
+		filePath: "C:/Users/zagir/PycharmProjects/game_finder/web/src/routes/games.$gameId.tsx",
 		children: void 0,
 		preloads: [
 			"/assets/games._gameId-DiyjNaNQ.js",

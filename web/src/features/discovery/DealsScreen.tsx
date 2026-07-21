@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { GameCover } from "@/components/GameCover";
 import { StatePanel } from "@/components/ui";
@@ -13,5 +13,5 @@ export function DealsScreen() {
   if (state.status === "loading") return <StatePanel kind="loading" title="Loading deals" />;
   if (state.status === "error") return <StatePanel kind="error" title="Could not load deals" detail={state.message} action={{ label: "Retry", onClick: () => { setState({ status: "loading" }); setRetry((value) => value + 1); } }} />;
   if (!state.data.length) return <StatePanel kind="empty" title="No deals available" />;
-  return <section className="stack"><header className="section-header"><p className="eyebrow">Deals</p><h1>Worth a look</h1></header><div className="game-grid">{state.data.map((deal) => <article className="game-card" key={deal.id ?? deal.name}><GameCover title={deal.name} src={deal.background_image} /><h2>{deal.name}</h2><p>{money(deal.current)}</p>{deal.id ? <Link href={`/games/${deal.id}`}>View details</Link> : null}{deal.url ? <a href={deal.url} target="_blank" rel="noreferrer">Open store</a> : null}</article>)}</div></section>;
+  return <section className="stack"><header className="section-header"><p className="eyebrow">Deals</p><h1>Worth a look</h1></header><div className="game-grid">{state.data.map((deal) => <article className="game-card" key={deal.id ?? deal.name}><GameCover title={deal.name} src={deal.background_image} /><h2>{deal.name}</h2><p>{money(deal.current)}</p>{deal.id ? <Link to="/games/$gameId" params={{ gameId: String(deal.id) }}>View details</Link> : null}{deal.url ? <a href={deal.url} target="_blank" rel="noreferrer">Open store</a> : null}</article>)}</div></section>;
 }

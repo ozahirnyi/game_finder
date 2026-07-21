@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { Button, Panel, StatePanel } from "@/components/ui";
 import { SavedGame, createSavedGame, deleteSavedGame, isAuthenticated, listSavedGames } from "@/lib/api";
@@ -113,7 +112,7 @@ export function LibraryScreen() {
           {games.map((game) => (
             <Panel as="article" key={game.id} className="stack">
               <div className="section-header">
-                <h2><Link href={`/favorites/${game.id}`}>{game.title}</Link></h2>
+                <h2>{game.title}</h2>
                 {game.notes ? <p>{game.notes}</p> : null}
               </div>
               <Button variant="quiet" aria-label={`Remove ${game.title}`} disabled={removingId === game.id} onClick={() => removeGame(game)}>
