@@ -3,7 +3,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
-const nextRouterImport = /\b(?:from\s*|import\s*\()\s*["']next\/(?:link|navigation)["']/;
+const nextRouterImport = /\b(?:from\s*|import\s*(?:\(\s*)?)["']next\/(?:link|navigation)["']/;
 
 function runtimeSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -22,10 +22,10 @@ describe("Next router import boundary", () => {
     expect(prohibitedImports(path.join(process.cwd(), "src"))).toEqual([]);
   });
 
-  it("detects a prohibited router import", () => {
+  it("detects a prohibited side-effect router import", () => {
     const sourceRoot = mkdtempSync(path.join(tmpdir(), "no-next-imports-"));
     const prohibitedFile = path.join(sourceRoot, "blocked.ts");
-    writeFileSync(prohibitedFile, 'import Link from "next/link";');
+    writeFileSync(prohibitedFile, 'import "next/link";');
 
     try {
       expect(prohibitedImports(sourceRoot)).toEqual([prohibitedFile]);
