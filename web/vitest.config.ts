@@ -8,6 +8,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.join(rootDir, "src"),
+      "next/link": path.join(rootDir, "src/test/next-link.tsx"),
+      "next/navigation": path.join(rootDir, "src/test/next-navigation.ts"),
     },
   },
   test: {
