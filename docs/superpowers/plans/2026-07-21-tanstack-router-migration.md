@@ -42,3 +42,22 @@
 - [ ] Run `rtk rg -n "next/navigation|next/link" web/src -g "*.ts" -g "*.tsx" --max-count 80` and replace every remaining runtime import and test mock with a TanStack equivalent.
 - [ ] Run `rtk proxy npm.cmd --prefix web test`, `rtk proxy npm.cmd --prefix web run lint`, and `rtk proxy npm.cmd --prefix web run build`; each must exit successfully.
 - [ ] Commit the final source files as `refactor: remove Next router dependencies`.
+
+### Task 4: Register migrated destinations as TanStack routes
+
+**Files:** `web/src/routes/login.tsx`, `web/src/routes/register.tsx`, `web/src/routes/auth.callback.tsx`, `web/src/routes/favorites.$id.tsx`, `web/src/components/Nav.tsx`, `web/src/features/library/SavedGameDetailScreen.tsx`, `web/src/routeTree.gen.ts`, and route-focused tests.
+
+- [ ] Add a failing route registration test that requires `/login`, `/register`, `/auth/callback`, and `/favorites/$id` in the generated route tree.
+- [ ] Add a failing OAuth callback test for `provider=google&error=access_denied` that proves no code exchange occurs and the retry link is rendered.
+- [ ] Create TanStack file routes for the four paths; use `Route.useParams()` in the saved-game detail route and retain `/favorites/$id` as the public detail URL.
+- [ ] Point library navigation and the saved-game return action to the existing `/library` route.
+- [ ] Regenerate `web/src/routeTree.gen.ts`, then run the route and callback tests.
+- [ ] Run TypeScript with `rtk proxy npm.cmd --prefix web exec tsc -- --noEmit -p C:/Users/zagir/PycharmProjects/game_finder/.worktrees/tanstack-router-migration/web/tsconfig.json`; resolve all TanStack route destination errors.
+
+### Task 5: Restore the GameCover API contract
+
+**Files:** `web/src/components/GameCover.tsx`, `web/src/components/ui.test.tsx`, `web/src/features/discovery/discovery.test.tsx`.
+
+- [ ] Add a failing GameCover test for rendering an accessible image when a non-empty `src` is supplied, while retaining the gradient title fallback for absent artwork.
+- [ ] Extend `GameCover` to accept optional `src`, render the image when supplied, and require no image for the existing colour-gradient fallback.
+- [ ] Run the focused UI and discovery tests, then run the TypeScript command from Task 4 to confirm API-backed screens type-check.
