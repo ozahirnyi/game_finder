@@ -13,9 +13,7 @@ export function SectionHeader({
     <div className="mb-6 flex items-end justify-between gap-4">
       <div className="min-w-0">
         <h2 className="text-xl font-bold tracking-tight">{title}</h2>
-        {hint && (
-          <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
-        )}
+        {hint && <p className="mt-1 text-sm text-muted-foreground">{hint}</p>}
       </div>
       {action}
     </div>

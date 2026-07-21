@@ -5,23 +5,37 @@ import { Badge, Button, Panel, Section, StatePanel } from "./ui";
 
 describe("design primitives", () => {
   it("renders the title without an image element", () => {
-    const { container } = render(<GameCover title="Hades II" from="#845EC2" to="#2C73D2" />);
+    const { container } = render(
+      <GameCover title="Hades II" from="#845EC2" to="#2C73D2" />,
+    );
 
     expect(screen.getByText("Hades II")).toBeVisible();
-    expect(container.querySelector("div.relative.overflow-hidden img")).not.toBeInTheDocument();
+    expect(
+      container.querySelector("div.relative.overflow-hidden img"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders error state with an enabled retry action", () => {
     const retry = vi.fn();
 
-    render(<StatePanel kind="error" title="Could not load" action={{ label: "Retry", onClick: retry }} />);
+    render(
+      <StatePanel
+        kind="error"
+        title="Could not load"
+        action={{ label: "Retry", onClick: retry }}
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(retry).toHaveBeenCalledOnce();
   });
 
   it("keeps Button native semantics while forwarding button attributes", () => {
-    render(<Button type="submit" disabled>Save</Button>);
+    render(
+      <Button type="submit" disabled>
+        Save
+      </Button>,
+    );
 
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
@@ -32,11 +46,15 @@ describe("design primitives", () => {
         <Panel aria-label="Trending game list">
           <Badge>Popular</Badge>
         </Panel>
-      </Section>
+      </Section>,
     );
 
-    expect(screen.getByRole("region", { name: "Trending games" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Trending game list" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Trending games" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Trending game list" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Popular")).toBeInTheDocument();
   });
 });

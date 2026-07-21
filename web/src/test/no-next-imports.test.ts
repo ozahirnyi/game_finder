@@ -1,20 +1,33 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
-const nextRouterImport = /\b(?:from\s*|import\s*(?:\(\s*)?)["']next\/(?:link|navigation)["']/;
+const nextRouterImport =
+  /\b(?:from\s*|import\s*(?:\(\s*)?)["']next\/(?:link|navigation)["']/;
 
 function runtimeSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const file = path.join(directory, entry.name);
     if (entry.isDirectory()) return runtimeSourceFiles(file);
-    return entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name) && !/\.test\.(?:ts|tsx)$/.test(entry.name) ? [file] : [];
+    return entry.isFile() &&
+      /\.(?:ts|tsx)$/.test(entry.name) &&
+      !/\.test\.(?:ts|tsx)$/.test(entry.name)
+      ? [file]
+      : [];
   });
 }
 
 function prohibitedImports(sourceRoot: string) {
-  return runtimeSourceFiles(sourceRoot).filter((file) => nextRouterImport.test(readFileSync(file, "utf8")));
+  return runtimeSourceFiles(sourceRoot).filter((file) =>
+    nextRouterImport.test(readFileSync(file, "utf8")),
+  );
 }
 
 describe("Next router import boundary", () => {

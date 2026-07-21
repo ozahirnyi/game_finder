@@ -9,7 +9,11 @@ export const Route = createFileRoute("/wishlist")({
   head: () => ({
     meta: [
       { title: "Wishlist — GameFinder" },
-      { name: "description", content: "Track wishlist items with live price history and Telegram drop alerts." },
+      {
+        name: "description",
+        content:
+          "Track wishlist items with live price history and Telegram drop alerts.",
+      },
     ],
   }),
   component: WishlistPage,
@@ -29,7 +33,12 @@ function Sparkline() {
     .join(" ");
   return (
     <svg width={w} height={h} className="text-primary">
-      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth={1.5} />
+      <polyline
+        points={pts}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      />
     </svg>
   );
 }

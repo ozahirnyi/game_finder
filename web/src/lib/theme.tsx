@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 export type Mode = "dark" | "light";
 export type Accent = {
@@ -29,11 +35,41 @@ export const accents: Accent[] = [
     lightPrimary: "hsl(240 10% 4%)",
     lightPrimaryForeground: "hsl(0 0% 100%)",
   },
-  { id: "emerald", name: "Emerald", swatch: "#22c55e", primary: "hsl(142 76% 45%)", primaryForeground: "hsl(240 10% 4%)" },
-  { id: "cyan", name: "Cyan", swatch: "#06b6d4", primary: "hsl(189 94% 43%)", primaryForeground: "hsl(240 10% 4%)" },
-  { id: "violet", name: "Violet", swatch: "#8b5cf6", primary: "hsl(262 83% 62%)", primaryForeground: "hsl(0 0% 100%)" },
-  { id: "orange", name: "Orange", swatch: "#f97316", primary: "hsl(24 95% 55%)", primaryForeground: "hsl(240 10% 4%)" },
-  { id: "rose", name: "Rose", swatch: "#f43f5e", primary: "hsl(346 84% 58%)", primaryForeground: "hsl(0 0% 100%)" },
+  {
+    id: "emerald",
+    name: "Emerald",
+    swatch: "#22c55e",
+    primary: "hsl(142 76% 45%)",
+    primaryForeground: "hsl(240 10% 4%)",
+  },
+  {
+    id: "cyan",
+    name: "Cyan",
+    swatch: "#06b6d4",
+    primary: "hsl(189 94% 43%)",
+    primaryForeground: "hsl(240 10% 4%)",
+  },
+  {
+    id: "violet",
+    name: "Violet",
+    swatch: "#8b5cf6",
+    primary: "hsl(262 83% 62%)",
+    primaryForeground: "hsl(0 0% 100%)",
+  },
+  {
+    id: "orange",
+    name: "Orange",
+    swatch: "#f97316",
+    primary: "hsl(24 95% 55%)",
+    primaryForeground: "hsl(240 10% 4%)",
+  },
+  {
+    id: "rose",
+    name: "Rose",
+    swatch: "#f43f5e",
+    primary: "hsl(346 84% 58%)",
+    primaryForeground: "hsl(0 0% 100%)",
+  },
 ];
 
 type ThemeCtx = {
@@ -63,7 +99,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           if (a) setAccentState(a);
         }
       }
-    } catch {}
+    } catch {
+      // Stored theme preferences are optional; defaults remain active.
+    }
   }, []);
 
   // Apply to <html>
@@ -72,18 +110,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     html.classList.toggle("dark", mode === "dark");
     html.classList.toggle("light", mode === "light");
     const primary =
-      (mode === "dark" ? accent.darkPrimary : accent.lightPrimary) ?? accent.primary;
+      (mode === "dark" ? accent.darkPrimary : accent.lightPrimary) ??
+      accent.primary;
     const primaryForeground =
-      (mode === "dark" ? accent.darkPrimaryForeground : accent.lightPrimaryForeground) ??
-      accent.primaryForeground;
+      (mode === "dark"
+        ? accent.darkPrimaryForeground
+        : accent.lightPrimaryForeground) ?? accent.primaryForeground;
     html.style.setProperty("--primary", primary);
     html.style.setProperty("--ring", primary);
     html.style.setProperty("--primary-foreground", primaryForeground);
     try {
       localStorage.setItem(KEY, JSON.stringify({ mode, accentId: accent.id }));
-    } catch {}
+    } catch {
+      // Persistence can fail (for example, when browser storage is unavailable).
+    }
   }, [mode, accent]);
-
 
   return (
     <Ctx.Provider

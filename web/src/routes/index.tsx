@@ -42,13 +42,15 @@ function Dashboard() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.25em] text-primary">
-              Tonight · {new Date().toLocaleDateString("en", { weekday: "long" })}
+              Tonight ·{" "}
+              {new Date().toLocaleDateString("en", { weekday: "long" })}
             </p>
             <h1 className="text-4xl font-extrabold tracking-tight text-balance">
               Play with friends tonight
             </h1>
             <p className="mt-2 text-muted-foreground">
-              {online.length} friends online · {shared.length} games your squad already owns.
+              {online.length} friends online · {shared.length} games your squad
+              already owns.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -108,7 +110,6 @@ function Dashboard() {
             </div>
           </Link>
 
-
           <div className="flex flex-col gap-4">
             {shared
               .filter((g) => g.id !== "helldivers2")
@@ -147,7 +148,6 @@ function Dashboard() {
                   </span>
                 </Link>
               ))}
-
           </div>
         </div>
       </section>
@@ -156,7 +156,10 @@ function Dashboard() {
         {/* Left column */}
         <div className="space-y-12 lg:col-span-8">
           {/* AI recs */}
-          <section className="animate-reveal" style={{ animationDelay: "100ms" }}>
+          <section
+            className="animate-reveal"
+            style={{ animationDelay: "100ms" }}
+          >
             <SectionHeader
               title="AI picks for your group"
               hint="Cross-referenced against everyone's library and mood."
@@ -205,12 +208,14 @@ function Dashboard() {
                   </div>
                 </Link>
               ))}
-
             </div>
           </section>
 
           {/* Wishlist deals */}
-          <section className="animate-reveal" style={{ animationDelay: "150ms" }}>
+          <section
+            className="animate-reveal"
+            style={{ animationDelay: "150ms" }}
+          >
             <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 to-transparent p-6">
               <div className="mb-6 flex items-center gap-3">
                 <span className="size-2 animate-pulse-soft rounded-full bg-primary" />
@@ -257,7 +262,6 @@ function Dashboard() {
                     </div>
                   </Link>
                 ))}
-
               </div>
             </div>
           </section>
@@ -265,7 +269,10 @@ function Dashboard() {
 
         {/* Right column */}
         <div className="space-y-10 lg:col-span-4">
-          <section className="animate-reveal" style={{ animationDelay: "200ms" }}>
+          <section
+            className="animate-reveal"
+            style={{ animationDelay: "200ms" }}
+          >
             <SectionHeader title="Online now" />
             <div className="space-y-2">
               {online.map((f) => (
@@ -313,7 +320,8 @@ function Dashboard() {
                 {currentUser.stats.library} games imported
               </h3>
               <p className="mb-4 text-sm text-muted-foreground">
-                We refresh your library every 15 minutes to spot new shared titles.
+                We refresh your library every 15 minutes to spot new shared
+                titles.
               </p>
               <Link
                 to="/steam"
@@ -324,7 +332,10 @@ function Dashboard() {
             </div>
           </section>
 
-          <section className="animate-reveal" style={{ animationDelay: "250ms" }}>
+          <section
+            className="animate-reveal"
+            style={{ animationDelay: "250ms" }}
+          >
             <SectionHeader title="Activity" />
             <div className="space-y-4 font-mono text-[11px] leading-relaxed">
               {activity.map((a) => {
@@ -333,8 +344,7 @@ function Dashboard() {
                   <div key={a.id} className="flex gap-3">
                     <span className="mt-1 size-1.5 shrink-0 rounded-full bg-primary/60" />
                     <p className="text-muted-foreground">
-                      <span className="text-primary">{f.name}</span>{" "}
-                      {a.verb}{" "}
+                      <span className="text-primary">{f.name}</span> {a.verb}{" "}
                       <span className="text-foreground">{a.target}</span>{" "}
                       {a.tag}.{" "}
                       <span className="text-muted-foreground/60">{a.time}</span>

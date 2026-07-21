@@ -9,7 +9,11 @@ export const Route = createFileRoute("/deals")({
   head: () => ({
     meta: [
       { title: "Deals — GameFinder" },
-      { name: "description", content: "Live discounts across storefronts, prioritized by your wishlist and friend overlap." },
+      {
+        name: "description",
+        content:
+          "Live discounts across storefronts, prioritized by your wishlist and friend overlap.",
+      },
     ],
   }),
   component: DealsPage,
@@ -39,7 +43,8 @@ function DealsPage() {
               {hero.title}
             </h3>
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
-              Matches your wishlist and 3 friends already own it. Sale ends in 2 days.
+              Matches your wishlist and 3 friends already own it. Sale ends in 2
+              days.
             </p>
             <div className="mt-6 flex flex-wrap items-end gap-6">
               <div>
