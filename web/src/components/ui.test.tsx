@@ -4,6 +4,20 @@ import { GameCover } from "./GameCover";
 import { Badge, Button, Panel, Section, StatePanel } from "./ui";
 
 describe("design primitives", () => {
+  it("renders a supplied cover URL as an accessible image", () => {
+    render(
+      <GameCover
+        title="Hades II"
+        src="https://images.example.test/hades-ii.jpg"
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Hades II" })).toHaveAttribute(
+      "src",
+      "https://images.example.test/hades-ii.jpg",
+    );
+  });
+
   it("renders the title without an image element", () => {
     const { container } = render(
       <GameCover title="Hades II" from="#845EC2" to="#2C73D2" />,

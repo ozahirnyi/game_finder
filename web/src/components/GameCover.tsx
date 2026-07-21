@@ -1,15 +1,17 @@
 type Props = {
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
   title: string;
+  src?: string | null;
   className?: string;
   compact?: boolean;
 };
 
 export function GameCover({
-  from,
-  to,
+  from = "#845EC2",
+  to = "#2C73D2",
   title,
+  src,
   className = "",
   compact = false,
 }: Props) {
@@ -26,6 +28,13 @@ export function GameCover({
         background: `radial-gradient(120% 90% at 15% 10%, ${from}55 0%, transparent 55%), linear-gradient(135deg, ${to} 0%, ${from}22 100%), ${to}`,
       }}
     >
+      {src ? (
+        <img
+          src={src}
+          alt={title}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : null}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_90%,rgba(255,255,255,0.08),transparent_50%)]" />
       <div className="absolute inset-0 flex flex-col justify-between p-3">
         <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/50">
