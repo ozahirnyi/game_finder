@@ -60,6 +60,11 @@ from app.google_auth import (
     utcnow,
     verify_google_id_token,
 )
+from app.social_auth import (
+    consume_exchange_result,
+    create_exchange_result,
+    resolve_google_user,
+)
 
 
 def get_allowed_origins() -> list[str]:
@@ -140,7 +145,7 @@ def user_response(user: User, google_linked: bool | None = None, db: Session | N
     return UserRead(id=user.id, email=user.email, created_at=user.created_at, google_linked=google_linked)
 
 
-def google_frontend_redirect(**params: str) -> RedirectResponse:
+def oauth_frontend_redirect(**params: str) -> RedirectResponse:
     return RedirectResponse(f"{get_frontend_url()}/auth/callback?{urlencode(params)}", status_code=303)
 
 
@@ -389,79 +394,57 @@ def google_status():
 
 @app.get("/auth/google/login-url", response_model=OAuthLoginUrl)
 def google_login_url(db: Session = Depends(get_db)):
-    return create_google_transaction(db, "login")
+    return create_google_transaction(db, "google_login")
 
 
 @app.post("/auth/google/link-url", response_model=OAuthLoginUrl)
 def google_link_url(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return create_google_transaction(db, "link", current_user.id)
+    return create_google_transaction(db, "google_link", current_user.id)
 
 
 @app.get("/auth/google/callback", include_in_schema=False)
 async def google_callback(code: str | None = None, state: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
     if error or not code or not state:
-        return google_frontend_redirect(provider="google", error="authorization_failed")
+        return oauth_frontend_redirect(provider="google", error="authorization_failed")
     transaction = db.query(OAuthAuthorizationTransaction).filter(OAuthAuthorizationTransaction.state == state).first()
     if not transaction or transaction.expires_at <= utcnow() or transaction.result_user_id:
         if transaction:
             db.delete(transaction)
             db.commit()
-        return google_frontend_redirect(provider="google", error="invalid_state")
+        return oauth_frontend_redirect(provider="google", error="invalid_state")
     # Consume state before contacting Google so it cannot be replayed.
     mode, linked_user_id, verifier, nonce = transaction.mode, transaction.user_id, transaction.code_verifier, transaction.nonce
     db.delete(transaction)
     db.commit()
+    if mode not in {"google_login", "google_link"}:
+        return oauth_frontend_redirect(provider="google", error="invalid_state")
     try:
         token_data = await exchange_google_code(code, verifier)
         claims = await verify_google_id_token(token_data.get("id_token", ""), nonce)
         subject, email = claims["sub"], normalize_email(claims["email"])
-        identity = db.query(OAuthIdentity).filter(OAuthIdentity.provider == "google", OAuthIdentity.provider_subject == subject).first()
-        if mode == "link":
+        if mode == "google_link":
+            identity = db.query(OAuthIdentity).filter(OAuthIdentity.provider == "google", OAuthIdentity.provider_subject == subject).first()
             user = db.query(User).filter(User.id == linked_user_id).first()
             if not user:
                 raise ValueError("Account no longer exists")
             if identity and identity.user_id != user.id:
-                return google_frontend_redirect(provider="google", error="account_already_linked")
+                return oauth_frontend_redirect(provider="google", error="account_already_linked")
             if not identity:
                 db.add(OAuthIdentity(user_id=user.id, provider="google", provider_subject=subject, email=email))
-        elif identity:
-            user = db.query(User).filter(User.id == identity.user_id).first()
-            if not user:
-                raise ValueError("Account no longer exists")
         else:
-            user = get_user_by_email(db, email)
-            if not user:
-                user = User(email=email, password_hash=None)
-                db.add(user)
-                db.flush()
-            db.add(OAuthIdentity(user_id=user.id, provider="google", provider_subject=subject, email=email))
+            user = resolve_google_user(db, subject, email)
         db.commit()
-        exchange_code = random_token()
-        db.add(OAuthAuthorizationTransaction(
-            state=random_token(), code_verifier="consumed", nonce="consumed", mode="result",
-            exchange_code=exchange_code, result_user_id=user.id, expires_at=utcnow() + timedelta(seconds=60),
-        ))
-        db.commit()
-        return google_frontend_redirect(provider="google", exchange_code=exchange_code)
+        return oauth_frontend_redirect(provider="google", exchange_code=create_exchange_result(db, user.id))
     except Exception:
         db.rollback()
-        return google_frontend_redirect(provider="google", error="authentication_failed")
+        return oauth_frontend_redirect(provider="google", error="authentication_failed")
 
 
 @app.post("/auth/google/exchange")
 def google_exchange(data: OAuthExchangeRequest, db: Session = Depends(get_db)):
-    transaction = db.query(OAuthAuthorizationTransaction).filter(
-        OAuthAuthorizationTransaction.exchange_code == data.exchange_code,
-        OAuthAuthorizationTransaction.mode == "result",
-    ).first()
-    if not transaction or transaction.expires_at <= utcnow() or not transaction.result_user_id:
-        if transaction:
-            db.delete(transaction)
-            db.commit()
+    user_id = consume_exchange_result(db, data.exchange_code)
+    if not user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired Google sign-in result")
-    user_id = transaction.result_user_id
-    db.delete(transaction)
-    db.commit()
     return {"access_token": create_access_token(user_id), "token_type": "bearer"}
 
 
@@ -473,13 +456,13 @@ def steam_sign_in_url(request: Request, db: Session = Depends(get_db)):
 @app.get("/auth/steam/callback", include_in_schema=False)
 async def steam_sign_in_callback(request: Request, state: str | None = None, db: Session = Depends(get_db)):
     if not state:
-        return google_frontend_redirect(provider="steam", error="authorization_failed")
+        return oauth_frontend_redirect(provider="steam", error="authorization_failed")
     transaction = db.query(OAuthAuthorizationTransaction).filter(OAuthAuthorizationTransaction.state == state).first()
     if not transaction or transaction.mode != "steam_login" or transaction.expires_at <= utcnow():
         if transaction:
             db.delete(transaction)
             db.commit()
-        return google_frontend_redirect(provider="steam", error="invalid_state")
+        return oauth_frontend_redirect(provider="steam", error="invalid_state")
 
     # Consume the state before the remote verification call, preventing replay.
     db.delete(transaction)
@@ -502,10 +485,10 @@ async def steam_sign_in_callback(request: Request, state: str | None = None, db:
             exchange_code=exchange_code, result_user_id=user.id, expires_at=utcnow() + timedelta(seconds=60),
         ))
         db.commit()
-        return google_frontend_redirect(provider="steam", exchange_code=exchange_code)
+        return oauth_frontend_redirect(provider="steam", exchange_code=exchange_code)
     except Exception:
         db.rollback()
-        return google_frontend_redirect(provider="steam", error="authentication_failed")
+        return oauth_frontend_redirect(provider="steam", error="authentication_failed")
 
 
 @app.post("/auth/steam/exchange")
