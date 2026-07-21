@@ -1,14 +1,21 @@
 "use client";
 
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouterState } from "@tanstack/react-router";
 import { SearchScreen } from "@/features/discovery/SearchScreen";
 
 function SearchRoute() {
-  const query = useSearchParams().get("q") ?? "";
+  const query =
+    new URLSearchParams(
+      useRouterState({ select: (state) => state.location.searchStr }),
+    ).get("q") ?? "";
   return <SearchScreen key={query} initialQuery={query} />;
 }
 
 export default function SearchPage() {
-  return <Suspense fallback={<SearchScreen initialQuery="" />}><SearchRoute /></Suspense>;
+  return (
+    <Suspense fallback={<SearchScreen initialQuery="" />}>
+      <SearchRoute />
+    </Suspense>
+  );
 }

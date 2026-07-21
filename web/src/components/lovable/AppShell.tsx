@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import {
   Home,
@@ -31,15 +30,16 @@ const nav = [
   { to: "/profile", label: "Profile", icon: User },
 ] as const;
 
-
 export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname() ?? "/";
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
       {/* Desktop sidebar */}
       <aside className="fixed left-0 top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface p-6 lg:flex z-40">
-        <Link href="/" className="mb-10 flex items-center gap-3 px-2">
+        <Link to="/" className="mb-10 flex items-center gap-3 px-2">
           <div className="grid size-8 place-items-center rounded-lg bg-primary">
             <div className="size-4 rounded-sm bg-background" />
           </div>
@@ -51,14 +51,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="space-y-1">
           {nav.map((item) => {
             const active =
-              item.to === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.to);
+              item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
             return (
               <Link
                 key={item.to}
-                href={item.to}
+                to={item.to}
                 className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   active
                     ? "bg-white/5 text-foreground"
@@ -85,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
 
           <Link
-            href="/profile"
+            to="/profile"
             className="flex items-center gap-3 rounded-lg border border-transparent p-2 hover:border-border"
           >
             <Avatar
@@ -95,7 +93,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="size-10 shrink-0 rounded-full"
             />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{currentUser.name}</p>
+              <p className="truncate text-sm font-semibold">
+                {currentUser.name}
+              </p>
               <p className="truncate text-xs text-muted-foreground">
                 @{currentUser.handle}
               </p>
@@ -106,7 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Top bar (mobile) */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 px-4 py-3 backdrop-blur lg:hidden">
-        <Link href="/" className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2">
           <div className="grid size-7 place-items-center rounded-md bg-primary">
             <div className="size-3.5 rounded-sm bg-background" />
           </div>
@@ -132,7 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           return (
             <Link
               key={item.to}
-              href={item.to}
+              to={item.to}
               className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-2 py-1.5 ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}

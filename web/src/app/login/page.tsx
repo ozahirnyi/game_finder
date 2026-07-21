@@ -1,11 +1,13 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouterState } from "@tanstack/react-router";
 import { Suspense } from "react";
 import { AuthPanel } from "@/features/auth/AuthPanel";
 
 function LoginForm() {
-  const searchParams = useSearchParams();
+  const searchParams = new URLSearchParams(
+    useRouterState({ select: (state) => state.location.searchStr }),
+  );
   const notice = searchParams.get("message") ?? "";
   return <AuthPanel mode="login" notice={notice} />;
 }

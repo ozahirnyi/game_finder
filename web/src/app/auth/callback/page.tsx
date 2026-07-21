@@ -1,34 +1,59 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
 import { exchangeGoogleCode, exchangeSteamCode, setToken } from "@/lib/api";
 
-function OAuthCallback() {
-  const router = useRouter();
-  const params = useSearchParams();
+export function OAuthCallback() {
+  const navigate = useNavigate();
+  const params = new URLSearchParams(
+    useRouterState({ select: (state) => state.location.searchStr }),
+  );
   const provider = params.get("provider");
   const [message, setMessage] = useState("Completing sign-in...");
   const code = params.get("exchange_code");
-  const invalid = (provider !== "google" && provider !== "steam") || !code;
+  const error = params.get("error");
+  const invalid =
+    (provider !== "google" && provider !== "steam") || !code || Boolean(error);
 
   useEffect(() => {
     if (invalid || !code) return;
-    const exchange = provider === "steam" ? exchangeSteamCode : exchangeGoogleCode;
+    const exchange =
+      provider === "steam" ? exchangeSteamCode : exchangeGoogleCode;
     exchange(code)
       .then((data) => {
         setToken(data.access_token);
-        router.replace("/profile");
+        navigate({ to: "/profile", replace: true });
       })
       .catch(() => setMessage("Sign-in expired. Please try again."));
-  }, [code, invalid, provider, router]);
+  }, [code, invalid, navigate, provider]);
 
   const providerName = provider === "steam" ? "Steam" : "Google";
-  const displayMessage = invalid ? "Sign-in was cancelled or expired." : message;
-  return <section className="auth-page"><div className="auth-panel auth-panel--elevated auth-callback"><p className="eyebrow">Secure handoff</p><h1>{providerName} sign-in</h1><p role="status">{displayMessage}</p>{!displayMessage.startsWith("Completing") && <Link className="button secondary" href="/login">Back to sign in</Link>}</div></section>;
+  const displayMessage = error
+    ? "Sign-in was cancelled or could not be completed. Please try again."
+    : invalid
+      ? "Sign-in was cancelled or expired."
+      : message;
+  return (
+    <section className="auth-page">
+      <div className="auth-panel auth-panel--elevated auth-callback">
+        <p className="eyebrow">Secure handoff</p>
+        <h1>{providerName} sign-in</h1>
+        <p role="status">{displayMessage}</p>
+        {!displayMessage.startsWith("Completing") && (
+          <Link className="button secondary" to="/login">
+            Back to sign in
+          </Link>
+        )}
+      </div>
+    </section>
+  );
 }
 
 export default function OAuthCallbackPage() {
-  return <Suspense fallback={null}><OAuthCallback /></Suspense>;
+  return (
+    <Suspense fallback={null}>
+      <OAuthCallback />
+    </Suspense>
+  );
 }
