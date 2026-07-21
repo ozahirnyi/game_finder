@@ -41,12 +41,13 @@ describe("discovery API regions", () => {
     expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
   });
 
-  it("shows the fallback cover when a result has no background image", async () => {
+  it("renders the game title without an image when a deal has no background image", async () => {
     vi.mocked(getHomepageDeals).mockResolvedValue({
       results: [{ id: 1, name: "Hades II", released: null, background_image: null, url: null, current: null, history_low_all: null }],
     });
-    render(<DealsScreen />);
-    expect(await screen.findByLabelText("Hades II cover unavailable")).toBeVisible();
+    const { container } = render(<DealsScreen />);
+    expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
+    expect(container.querySelector("img")).not.toBeInTheDocument();
   });
 
   it("renders trending and upcoming games from their API regions", async () => {

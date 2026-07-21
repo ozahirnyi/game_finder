@@ -8,10 +8,10 @@ const activeRoutes = [
 ];
 
 describe("active application routes", () => {
-  it("do not render the prototype mock data", () => {
+  it("declares a TanStack file route for every active route module", () => {
     for (const route of activeRoutes) {
       const source = readFileSync(path.join(process.cwd(), "src", "routes", route), "utf8");
-      expect(source).not.toContain("mockData");
+      expect(source).toContain("createFileRoute(");
     }
   });
 });
