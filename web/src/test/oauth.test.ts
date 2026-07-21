@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { oauthErrorMessage } from "./oauth";
+import { oauthErrorMessage } from "@/features/auth/oauth";
 
 describe("oauthErrorMessage", () => {
   it("explains when a Google account belongs to a different profile", () => {
