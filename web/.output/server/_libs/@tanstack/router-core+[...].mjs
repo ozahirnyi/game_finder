@@ -1,7 +1,4 @@
 import { C as getStylesheetHref, M as createLRUCache, N as invariant, P as decodePath, b as createInlineCssPlaceholderAsset, k as rootRouteId, v as GLOBAL_TSR, x as createInlineCssStyleAsset, y as TSR_SCRIPT_BARRIER_ID } from "./react-router+[...].mjs";
-//#region node_modules/unenv/dist/runtime/polyfill/globalthis.mjs
-var globalthis_default = globalThis;
-//#endregion
 //#region node_modules/seroval/dist/esm/production/index.mjs
 var M$1 = ((i) => (i[i.AggregateError = 1] = "AggregateError", i[i.ArrowFunction = 2] = "ArrowFunction", i[i.ErrorPrototypeStack = 4] = "ErrorPrototypeStack", i[i.ObjectAssign = 8] = "ObjectAssign", i[i.BigIntTypedArray = 16] = "BigIntTypedArray", i[i.RegExp = 32] = "RegExp", i))(M$1 || {});
 var v$1 = Symbol.asyncIterator;
@@ -205,7 +202,7 @@ typeof globalThis != "undefined" ? Object.defineProperty(globalThis, L, {
 	configurable: !0,
 	writable: !1,
 	enumerable: !1
-}) : typeof globalthis_default != "undefined" && Object.defineProperty(globalthis_default, L, {
+}) : typeof global != "undefined" && Object.defineProperty(global, L, {
 	value: U,
 	configurable: !0,
 	writable: !1,

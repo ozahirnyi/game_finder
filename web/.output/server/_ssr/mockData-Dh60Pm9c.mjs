@@ -1,4 +1,4 @@
-import { n as __toESM } from "../_runtime.mjs";
+import { r as __toESM } from "../_runtime.mjs";
 import { n as require_jsx_runtime, r as require_react } from "../_libs/react+tanstack__react-query.mjs";
 //#region node_modules/.nitro/vite/services/ssr/assets/mockData-Dh60Pm9c.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
