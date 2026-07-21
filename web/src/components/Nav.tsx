@@ -12,7 +12,7 @@ const publicDestinations = [
 ] as const;
 
 const protectedDestinations = [
-  ["Library", "/favorites"],
+  ["Library", "/library"],
   ["Wishlist", "/wishlist"],
   ["Friends", "/friends"],
   ["Steam", "/steam"],

@@ -61,7 +61,7 @@ export function SavedGameDetailScreen({ id }: { id: string }) {
     setError("");
     try {
       await deleteSavedGame(game.id);
-      await navigate({ to: "/favorites" });
+      await navigate({ to: "/library" });
     } catch (reason) {
       setError(errorMessage(reason, "Could not remove this game."));
       setDeleting(false);
@@ -84,7 +84,7 @@ export function SavedGameDetailScreen({ id }: { id: string }) {
 
   return (
     <main className="stack">
-      <Link to="/favorites">Back to library</Link>
+      <Link to="/library">Back to library</Link>
       <header className="section-header">
         <p className="eyebrow">Saved game</p>
         <h1>{game.title}</h1>
