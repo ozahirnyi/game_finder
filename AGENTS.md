@@ -20,6 +20,6 @@ Apply these rules in every chat working in this project:
 
 Apply this workflow in every chat working in this project, including the current chat:
 
-- Create a separate `codex/<task-name>` branch before starting each implementation task; do not work directly on a shared phase branch.
-- Keep each task's commits limited to that task and preserve unrelated working-tree changes.
-- After a task is verified, push its branch and create a pull request for review before considering the task complete.
+- Create one separate `codex/<chat-name>` branch at the start of each new chat; do not work directly on a shared phase branch.
+- Keep the chat's commits focused on its requested work and preserve unrelated working-tree changes.
+- After the chat's requested work is verified, push its branch and create one pull request for review before considering the chat complete.
