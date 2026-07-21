@@ -12,13 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as SteamRouteImport } from './routes/steam'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PsnRouteImport } from './routes/psn'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as FriendsRouteImport } from './routes/friends'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as FavoritesIdRouteImport } from './routes/favorites.$id'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
 const WishlistRoute = WishlistRouteImport.update({
   id: '/wishlist',
@@ -35,6 +39,11 @@ const SearchRoute = SearchRouteImport.update({
   path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PsnRoute = PsnRouteImport.update({
   id: '/psn',
   path: '/psn',
@@ -43,6 +52,11 @@ const PsnRoute = PsnRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LibraryRoute = LibraryRouteImport.update({
@@ -70,17 +84,31 @@ const GamesGameIdRoute = GamesGameIdRouteImport.update({
   path: '/games/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FavoritesIdRoute = FavoritesIdRouteImport.update({
+  id: '/favorites/$id',
+  path: '/favorites/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/deals': typeof DealsRoute
   '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/psn': typeof PsnRoute
+  '/register': typeof RegisterRoute
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/favorites/$id': typeof FavoritesIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
 }
 export interface FileRoutesByTo {
@@ -88,11 +116,15 @@ export interface FileRoutesByTo {
   '/deals': typeof DealsRoute
   '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/psn': typeof PsnRoute
+  '/register': typeof RegisterRoute
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/favorites/$id': typeof FavoritesIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
 }
 export interface FileRoutesById {
@@ -101,11 +133,15 @@ export interface FileRoutesById {
   '/deals': typeof DealsRoute
   '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/psn': typeof PsnRoute
+  '/register': typeof RegisterRoute
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/favorites/$id': typeof FavoritesIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
 }
 export interface FileRouteTypes {
@@ -115,11 +151,15 @@ export interface FileRouteTypes {
     | '/deals'
     | '/friends'
     | '/library'
+    | '/login'
     | '/profile'
     | '/psn'
+    | '/register'
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/auth/callback'
+    | '/favorites/$id'
     | '/games/$gameId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -127,11 +167,15 @@ export interface FileRouteTypes {
     | '/deals'
     | '/friends'
     | '/library'
+    | '/login'
     | '/profile'
     | '/psn'
+    | '/register'
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/auth/callback'
+    | '/favorites/$id'
     | '/games/$gameId'
   id:
     | '__root__'
@@ -139,11 +183,15 @@ export interface FileRouteTypes {
     | '/deals'
     | '/friends'
     | '/library'
+    | '/login'
     | '/profile'
     | '/psn'
+    | '/register'
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/auth/callback'
+    | '/favorites/$id'
     | '/games/$gameId'
   fileRoutesById: FileRoutesById
 }
@@ -152,11 +200,15 @@ export interface RootRouteChildren {
   DealsRoute: typeof DealsRoute
   FriendsRoute: typeof FriendsRoute
   LibraryRoute: typeof LibraryRoute
+  LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   PsnRoute: typeof PsnRoute
+  RegisterRoute: typeof RegisterRoute
   SearchRoute: typeof SearchRoute
   SteamRoute: typeof SteamRoute
   WishlistRoute: typeof WishlistRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  FavoritesIdRoute: typeof FavoritesIdRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
 }
 
@@ -183,6 +235,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/psn': {
       id: '/psn'
       path: '/psn'
@@ -195,6 +254,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/library': {
@@ -232,6 +298,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/favorites/$id': {
+      id: '/favorites/$id'
+      path: '/favorites/$id'
+      fullPath: '/favorites/$id'
+      preLoaderRoute: typeof FavoritesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -240,11 +320,15 @@ const rootRouteChildren: RootRouteChildren = {
   DealsRoute: DealsRoute,
   FriendsRoute: FriendsRoute,
   LibraryRoute: LibraryRoute,
+  LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   PsnRoute: PsnRoute,
+  RegisterRoute: RegisterRoute,
   SearchRoute: SearchRoute,
   SteamRoute: SteamRoute,
   WishlistRoute: WishlistRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  FavoritesIdRoute: FavoritesIdRoute,
   GamesGameIdRoute: GamesGameIdRoute,
 }
 export const routeTree = rootRouteImport

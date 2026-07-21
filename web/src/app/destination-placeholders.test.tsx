@@ -5,8 +5,12 @@ import PsnPage from "./psn/page";
 import SearchPage from "./search/page";
 import WishlistPage from "./wishlist/page";
 
-vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+vi.mock("@tanstack/react-router", () => ({
+  useRouterState: ({
+    select,
+  }: {
+    select: (state: { location: { searchStr: string } }) => unknown;
+  }) => select({ location: { searchStr: "" } }),
 }));
 
 describe("navigation destinations", () => {

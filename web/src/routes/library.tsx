@@ -4,18 +4,28 @@ import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
 import { games } from "@/lib/mockData";
 
-
 export const Route = createFileRoute("/library")({
   head: () => ({
     meta: [
       { title: "Library — GameFinder" },
-      { name: "description", content: "Your synced library across storefronts, with statuses and shared-with-friends visibility." },
+      {
+        name: "description",
+        content:
+          "Your synced library across storefronts, with statuses and shared-with-friends visibility.",
+      },
     ],
   }),
   component: LibraryPage,
 });
 
-const tabs = ["All", "Playing with Friends", "Playing", "Want to Play", "Completed", "Paused"] as const;
+const tabs = [
+  "All",
+  "Playing with Friends",
+  "Playing",
+  "Want to Play",
+  "Completed",
+  "Paused",
+] as const;
 
 function LibraryPage() {
   const owned = games.filter((g) => g.status);
@@ -100,7 +110,6 @@ function LibraryPage() {
             </div>
           </Link>
         ))}
-
       </div>
     </AppShell>
   );

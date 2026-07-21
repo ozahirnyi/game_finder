@@ -1,9 +1,15 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useRouterState } from "@tanstack/react-router";
 import { SavedGameDetailScreen } from "@/features/library/SavedGameDetailScreen";
 
 export default function SavedGamePage() {
-  const params = useParams<{ id: string }>();
-  return <SavedGameDetailScreen id={params.id} />;
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  return (
+    <SavedGameDetailScreen
+      id={pathname.split("/").filter(Boolean).at(-1) ?? ""}
+    />
+  );
 }

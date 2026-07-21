@@ -30,13 +30,18 @@ export const Route = createFileRoute("/games/$gameId")({
             content: `${loaderData.game.title} · ${loaderData.game.genres.join(", ")} · ${loaderData.game.platforms.join(", ")}. Shared with your friends on GameFinder.`,
           },
         ]
-      : [{ title: "Game not found — GameFinder" }, { name: "robots", content: "noindex" }],
+      : [
+          { title: "Game not found — GameFinder" },
+          { name: "robots", content: "noindex" },
+        ],
   }),
   component: GameDetail,
   notFoundComponent: () => (
     <AppShell>
       <div className="mx-auto max-w-md py-24 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-primary">404</p>
+        <p className="font-mono text-xs uppercase tracking-widest text-primary">
+          404
+        </p>
         <h1 className="mt-3 text-2xl font-bold">Game not in catalog</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn't find that title. It may have been delisted.
@@ -65,8 +70,18 @@ function Sparkline() {
     })
     .join(" ");
   return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} className="text-primary">
-      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth={1.5} />
+    <svg
+      width="100%"
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      className="text-primary"
+    >
+      <polyline
+        points={pts}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      />
       {priceHistory.map((p, i) => {
         const x = (i / (priceHistory.length - 1)) * w;
         const y = h - ((p.price - min) / (max - min || 1)) * (h - 8) - 4;
@@ -80,7 +95,12 @@ function GameDetail() {
   const { game } = Route.useLoaderData();
 
   const owners = friends.slice(0, 4);
-  const similar = games.filter((g: Game) => g.id !== game.id && g.genres.some((x) => game.genres.includes(x))).slice(0, 4);
+  const similar = games
+    .filter(
+      (g: Game) =>
+        g.id !== game.id && g.genres.some((x) => game.genres.includes(x)),
+    )
+    .slice(0, 4);
 
   return (
     <AppShell>
@@ -111,7 +131,6 @@ function GameDetail() {
                 {g}
               </Chip>
             ))}
-
           </div>
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
             {game.title}
@@ -129,10 +148,11 @@ function GameDetail() {
           <section>
             <SectionHeader title="About" />
             <p className="text-sm leading-relaxed text-muted-foreground">
-              {game.title} is a {game.genres.join(" / ").toLowerCase()} experience built
-              for {game.platforms.join(" and ")}. GameFinder ranks it against your library
-              and your circle's shared titles to surface the best moments to play together
-              tonight. Cross-referenced with 12 professional reviews and 4,821 friends'
+              {game.title} is a {game.genres.join(" / ").toLowerCase()}{" "}
+              experience built for {game.platforms.join(" and ")}. GameFinder
+              ranks it against your library and your circle's shared titles to
+              surface the best moments to play together tonight.
+              Cross-referenced with 12 professional reviews and 4,821 friends'
               playtime.
             </p>
           </section>
@@ -293,7 +313,10 @@ function GameDetail() {
                   icon: Trophy,
                 },
               ].map((r) => (
-                <div key={r.l} className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0">
+                <div
+                  key={r.l}
+                  className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
+                >
                   <span className="text-muted-foreground">{r.l}</span>
                   <span className="text-right font-bold">{r.v}</span>
                 </div>
@@ -309,8 +332,8 @@ function GameDetail() {
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Marcus, Alex, and Sasha all own {game.title}. Their combined playtime is
-              234h — a great candidate for tonight's session.
+              Marcus, Alex, and Sasha all own {game.title}. Their combined
+              playtime is 234h — a great candidate for tonight's session.
             </p>
           </div>
         </div>

@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LibraryScreen } from "./LibraryScreen";
 import { SavedGameDetailScreen } from "./SavedGameDetailScreen";
 import { WishlistScreen } from "./WishlistScreen";
-import { deleteSavedGame, getSavedGame, isAuthenticated, listSavedGames, updateSavedGame } from "@/lib/api";
+import {
+  deleteSavedGame,
+  getSavedGame,
+  isAuthenticated,
+  listSavedGames,
+  updateSavedGame,
+} from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
   deleteSavedGame: vi.fn(),
@@ -11,6 +17,13 @@ vi.mock("@/lib/api", () => ({
   isAuthenticated: vi.fn(),
   listSavedGames: vi.fn(),
   updateSavedGame: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
+  useNavigate: () => vi.fn(),
 }));
 
 const hades = {
@@ -51,17 +64,27 @@ describe("LibraryScreen", () => {
 
     render(<LibraryScreen />);
 
-    expect(await screen.findByRole("heading", { name: "Your library is empty" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Your library is empty" }),
+    ).toBeVisible();
   });
 
   it("shows a retryable error panel when the initial library load fails", async () => {
-    vi.mocked(listSavedGames).mockRejectedValueOnce(new Error("Network unavailable")).mockResolvedValueOnce([]);
+    vi.mocked(listSavedGames)
+      .mockRejectedValueOnce(new Error("Network unavailable"))
+      .mockResolvedValueOnce([]);
 
     render(<LibraryScreen />);
 
-    expect(await screen.findByRole("heading", { name: "Could not load your library" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", {
+        name: "Could not load your library",
+      }),
+    ).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByRole("heading", { name: "Your library is empty" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Your library is empty" }),
+    ).toBeVisible();
   });
 
   it("removes the deleted game after the API confirms deletion", async () => {
@@ -70,18 +93,26 @@ describe("LibraryScreen", () => {
 
     render(<LibraryScreen />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Remove Hades II" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Remove Hades II" }),
+    );
 
-    await waitFor(() => expect(screen.queryByText("Hades II")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText("Hades II")).not.toBeInTheDocument(),
+    );
   });
 
   it("keeps a game visible and reports an inline error when deletion fails", async () => {
     vi.mocked(listSavedGames).mockResolvedValue([hades]);
-    vi.mocked(deleteSavedGame).mockRejectedValue(new Error("Network unavailable"));
+    vi.mocked(deleteSavedGame).mockRejectedValue(
+      new Error("Network unavailable"),
+    );
 
     render(<LibraryScreen />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Remove Hades II" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Remove Hades II" }),
+    );
 
     expect(await screen.findByText("Network unavailable")).toBeVisible();
     expect(screen.getByText("Hades II")).toBeVisible();
@@ -110,13 +141,20 @@ describe("WishlistScreen", () => {
     mockAuth(true);
     vi.mocked(listSavedGames).mockResolvedValue([
       hades,
-      { ...hades, id: "g2", title: "Silksong", notes: "Wishlist: play on release" },
+      {
+        ...hades,
+        id: "g2",
+        title: "Silksong",
+        notes: "Wishlist: play on release",
+      },
     ]);
 
     render(<WishlistScreen />);
 
     expect(await screen.findByText("Silksong")).toBeVisible();
     expect(screen.queryByText("Hades II")).not.toBeInTheDocument();
-    expect(screen.getByText(/saved games marked with a “wishlist” keyword/i)).toBeVisible();
+    expect(
+      screen.getByText(/saved games marked with a “wishlist” keyword/i),
+    ).toBeVisible();
   });
 });

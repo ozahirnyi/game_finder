@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { FormEvent, useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
 import {
@@ -51,17 +50,22 @@ const copy = {
 };
 
 export function AuthPanel({ mode, notice }: AuthPanelProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const content = copy[mode];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [googleConfiguration, setGoogleConfiguration] = useState<GoogleConfiguration>("unknown");
+  const [googleConfiguration, setGoogleConfiguration] =
+    useState<GoogleConfiguration>("unknown");
 
   useEffect(() => {
     getGoogleStatus()
-      .then((status) => setGoogleConfiguration(status.configured ? "configured" : "unconfigured"))
+      .then((status) =>
+        setGoogleConfiguration(
+          status.configured ? "configured" : "unconfigured",
+        ),
+      )
       .catch(() => setGoogleConfiguration("unknown"));
   }, []);
 
@@ -76,7 +80,7 @@ export function AuthPanel({ mode, notice }: AuthPanelProps) {
       }
       const data = await loginUser(email, password);
       setToken(data.access_token);
-      router.push("/");
+      await navigate({ to: "/" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : content.error);
     } finally {
@@ -89,7 +93,11 @@ export function AuthPanel({ mode, notice }: AuthPanelProps) {
     try {
       window.location.assign((await getGoogleLoginUrl()).url);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not start Google sign-in.");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not start Google sign-in.",
+      );
     }
   }
 
@@ -98,7 +106,11 @@ export function AuthPanel({ mode, notice }: AuthPanelProps) {
     try {
       window.location.assign((await getSteamSignInUrl()).url);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not start Steam sign-in.");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not start Steam sign-in.",
+      );
     }
   }
 
@@ -106,16 +118,31 @@ export function AuthPanel({ mode, notice }: AuthPanelProps) {
     <section className="auth-page">
       <div className="auth-panel auth-panel--elevated">
         <div className="section-header compact">
-          <p className="eyebrow auth-kicker"><Icon name={content.icon} /> {content.kicker}</p>
+          <p className="eyebrow auth-kicker">
+            <Icon name={content.icon} /> {content.kicker}
+          </p>
           <h1>{content.title}</h1>
           <p>{content.description}</p>
         </div>
-        {notice && <p className="alert" role="status">{notice}</p>}
-        {error && <p className="alert error" role="alert">{error}</p>}
+        {notice && (
+          <p className="alert" role="status">
+            {notice}
+          </p>
+        )}
+        {error && (
+          <p className="alert error" role="alert">
+            {error}
+          </p>
+        )}
         <form className="form-stack" onSubmit={onSubmit}>
           <label>
             <span>Email</span>
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
           </label>
           <label>
             <span>Password</span>
@@ -132,20 +159,35 @@ export function AuthPanel({ mode, notice }: AuthPanelProps) {
             {loading ? content.loading : content.submit}
           </button>
         </form>
-        <div className="auth-divider" aria-hidden="true"><span>{content.divider}</span></div>
+        <div className="auth-divider" aria-hidden="true">
+          <span>{content.divider}</span>
+        </div>
         <div className="auth-social-actions">
-          <button className="secondary" type="button" onClick={beginGoogleSignIn} disabled={googleConfiguration === "unconfigured"}>
+          <button
+            className="secondary"
+            type="button"
+            onClick={beginGoogleSignIn}
+            disabled={googleConfiguration === "unconfigured"}
+          >
             <Icon name="sparkles" />
             Continue with Google
           </button>
-          <button className="secondary" type="button" onClick={beginSteamSignIn}>
+          <button
+            className="secondary"
+            type="button"
+            onClick={beginSteamSignIn}
+          >
             <Icon name="gamepad" />
             Continue with Steam
           </button>
         </div>
-        {googleConfiguration === "unconfigured" && <p className="muted" role="status">Google sign-in is not configured right now.</p>}
+        {googleConfiguration === "unconfigured" && (
+          <p className="muted" role="status">
+            Google sign-in is not configured right now.
+          </p>
+        )}
         <p className="muted auth-switch">
-          {content.prompt} <Link href={content.href}>{content.linkLabel}</Link>.
+          {content.prompt} <Link to={content.href}>{content.linkLabel}</Link>.
         </p>
       </div>
     </section>
