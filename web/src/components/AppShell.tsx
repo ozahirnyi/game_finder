@@ -13,7 +13,14 @@ import {
   Bell,
 } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
-import { isAuthenticated, listNotifications, markAllNotificationsRead, markNotificationRead, subscribeToAuthChanges, type Notification } from "@/lib/api";
+import {
+  isAuthenticated,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  subscribeToAuthChanges,
+  type Notification,
+} from "@/lib/api";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -28,22 +35,94 @@ const nav = [
 ] as const;
 
 function notificationText(notification: Notification) {
-  if (notification.type === "friend_request") return `${notification.payload.from ?? "A player"} sent you a friend request.`;
-  if (notification.type === "friend_request_accepted") return `${notification.payload.by ?? "A player"} accepted your friend request.`;
-  if (notification.type === "message") return `${notification.payload.from ?? "A friend"} sent you a message.`;
-  if (notification.type === "game_invite") return `${notification.payload.from ?? "A friend"} invited you to play ${notification.payload.game_name ?? "a game"}.`;
+  if (notification.type === "friend_request")
+    return `${notification.payload.from ?? "A player"} sent you a friend request.`;
+  if (notification.type === "friend_request_accepted")
+    return `${notification.payload.by ?? "A player"} accepted your friend request.`;
+  if (notification.type === "message")
+    return `${notification.payload.from ?? "A friend"} sent you a message.`;
+  if (notification.type === "game_invite")
+    return `${notification.payload.from ?? "A friend"} invited you to play ${notification.payload.game_name ?? "a game"}.`;
   return "You have a new GameFinder notification.";
 }
 
-function NotificationMenu({ authenticated, mobile = false }: { authenticated: boolean; mobile?: boolean }) {
+function NotificationMenu({
+  authenticated,
+  mobile = false,
+}: {
+  authenticated: boolean;
+  mobile?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notification[]>([]);
   const unread = items.filter((item) => !item.read_at).length;
-  const refresh = () => authenticated && listNotifications().then(setItems).catch(() => setItems([]));
-  useEffect(() => { refresh(); }, [authenticated]);
-  const read = async (item: Notification) => { if (!item.read_at) await markNotificationRead(item.id); refresh(); };
-  const readAll = async () => { await markAllNotificationsRead(); refresh(); };
-  return <div className="relative"><button aria-label={mobile ? "Mobile notifications" : "Notifications"} onClick={() => setOpen((value) => !value)} className="relative grid size-9 place-items-center rounded-md border border-border"><Bell className="size-4" />{authenticated && unread > 0 ? <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">{unread > 9 ? "9+" : unread}</span> : null}</button>{open ? <div className={`absolute z-50 w-80 rounded-xl border border-border bg-surface p-3 shadow-xl ${mobile ? "right-0 mt-2" : "bottom-full left-0 mb-2"}`}><div className="mb-2 flex items-center justify-between"><p className="text-sm font-bold">Notifications</p>{unread ? <button onClick={readAll} className="text-xs text-primary">Mark all read</button> : null}</div>{!authenticated ? <p className="p-2 text-sm text-muted-foreground">Sign in to see notifications.</p> : items.length ? <div className="max-h-80 space-y-1 overflow-y-auto">{items.map((item) => <button key={item.id} onClick={() => read(item)} className={`w-full rounded-lg p-2 text-left text-sm ${item.read_at ? "text-muted-foreground" : "bg-primary/10"}`}>{notificationText(item)}</button>)}</div> : <p className="p-2 text-sm text-muted-foreground">You are all caught up.</p>}</div> : null}</div>;
+  const refresh = () =>
+    authenticated &&
+    listNotifications()
+      .then(setItems)
+      .catch(() => setItems([]));
+  useEffect(() => {
+    refresh();
+  }, [authenticated]);
+  const read = async (item: Notification) => {
+    if (!item.read_at) await markNotificationRead(item.id);
+    refresh();
+  };
+  const readAll = async () => {
+    await markAllNotificationsRead();
+    refresh();
+  };
+  return (
+    <div className="relative">
+      <button
+        aria-label={mobile ? "Mobile notifications" : "Notifications"}
+        onClick={() => setOpen((value) => !value)}
+        className="relative grid size-9 place-items-center rounded-md border border-border"
+      >
+        <Bell className="size-4" />
+        {authenticated && unread > 0 ? (
+          <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        ) : null}
+      </button>
+      {open ? (
+        <div
+          className={`absolute z-50 w-80 rounded-xl border border-border bg-surface p-3 shadow-xl ${mobile ? "right-0 mt-2" : "bottom-full left-0 mb-2"}`}
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-bold">Notifications</p>
+            {unread ? (
+              <button onClick={readAll} className="text-xs text-primary">
+                Mark all read
+              </button>
+            ) : null}
+          </div>
+          {!authenticated ? (
+            <p className="p-2 text-sm text-muted-foreground">
+              Sign in to see notifications.
+            </p>
+          ) : items.length ? (
+            <div className="max-h-80 space-y-1 overflow-y-auto">
+              {items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => read(item)}
+                  className={`w-full rounded-lg p-2 text-left text-sm ${item.read_at ? "text-muted-foreground" : "bg-primary/10"}`}
+                >
+                  {notificationText(item)}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="p-2 text-sm text-muted-foreground">
+              You are all caught up.
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function AppShell({ children }: { children: ReactNode }) {

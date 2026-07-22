@@ -23,7 +23,11 @@ export function RegisterPage() {
       setToken(data.access_token);
       await navigate({ to: "/profile" });
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Registration failed. Please try again.");
+      setError(
+        reason instanceof ApiError
+          ? reason.message
+          : "Registration failed. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -33,26 +37,65 @@ export function RegisterPage() {
     <section className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md rounded-3xl border border-border bg-surface p-6 shadow-2xl shadow-black/20 sm:p-8">
         <div className="mb-8">
-          <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-primary"><UserPlus className="size-4" /> Save your discoveries</p>
-          <h1 className="mt-3 text-3xl font-extrabold tracking-tight">Create your library</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Start a simple collection of games you want to remember.</p>
+          <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-primary">
+            <UserPlus className="size-4" /> Save your discoveries
+          </p>
+          <h1 className="mt-3 text-3xl font-extrabold tracking-tight">
+            Create your library
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Start a simple collection of games you want to remember.
+          </p>
         </div>
-        {error && <p className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{error}</p>}
+        {error && (
+          <p
+            className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
+            {error}
+          </p>
+        )}
         <form className="space-y-4" onSubmit={onSubmit}>
           <label className="grid gap-2 text-sm font-medium">
             <span>Email</span>
-            <input className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <input
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
           </label>
           <label className="grid gap-2 text-sm font-medium">
             <span>Password</span>
-            <input className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} />
+            <input
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              minLength={6}
+            />
           </label>
-          <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={loading}>
+          <button
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            type="submit"
+            disabled={loading}
+          >
             <UserPlus className="size-4" />
             {loading ? "Creating..." : "Create account"}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-muted-foreground">Already have an account? <Link to="/login" className="font-semibold text-primary hover:underline">Sign in</Link>.</p>
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          Already have an account?{" "}
+          <Link
+            to="/login"
+            className="font-semibold text-primary hover:underline"
+          >
+            Sign in
+          </Link>
+          .
+        </p>
       </div>
     </section>
   );

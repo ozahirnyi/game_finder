@@ -10,7 +10,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body>
-        <ThemeProvider><AppShell>{children}</AppShell></ThemeProvider>
+        <ThemeProvider>
+          <AppShell>{children}</AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );
