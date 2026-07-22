@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError, type SavedGame } from "./api";
-import { getProtectedState, lovableQueryKeys, toGameCard, toSavedGameCard } from "./lovable-data";
+import {
+  getProtectedState,
+  lovableQueryKeys,
+  toGameCard,
+  toSavedGameCard,
+} from "./lovable-data";
 
 describe("lovable data adapters", () => {
   it("keeps missing catalogue art explicit", () => {
@@ -50,8 +55,12 @@ describe("lovable data adapters", () => {
 
 describe("protected data state", () => {
   it("maps authentication and Steam connection API errors", () => {
-    expect(getProtectedState(new ApiError("Please log in", 401))).toBe("sign-in");
-    expect(getProtectedState(new ApiError("Connect Steam first", 409))).toBe("connect-steam");
+    expect(getProtectedState(new ApiError("Please log in", 401))).toBe(
+      "sign-in",
+    );
+    expect(getProtectedState(new ApiError("Connect Steam first", 409))).toBe(
+      "connect-steam",
+    );
   });
 
   it("maps unknown failures to the generic error state", () => {

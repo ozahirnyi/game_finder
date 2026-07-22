@@ -31,7 +31,6 @@ const nav = [
   { to: "/profile", label: "Profile", icon: User },
 ] as const;
 
-
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "/";
 
@@ -51,9 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="space-y-1">
           {nav.map((item) => {
             const active =
-              item.to === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.to);
+              item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
             return (
               <Link
@@ -95,7 +92,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="size-10 shrink-0 rounded-full"
             />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{currentUser.name}</p>
+              <p className="truncate text-sm font-semibold">
+                {currentUser.name}
+              </p>
               <p className="truncate text-xs text-muted-foreground">
                 @{currentUser.handle}
               </p>

@@ -10,5 +10,9 @@ function SearchRoute() {
 }
 
 export default function SearchPage() {
-  return <Suspense fallback={<SearchScreen initialQuery="" />}><SearchRoute /></Suspense>;
+  return (
+    <Suspense fallback={<SearchScreen initialQuery="" />}>
+      <SearchRoute />
+    </Suspense>
+  );
 }

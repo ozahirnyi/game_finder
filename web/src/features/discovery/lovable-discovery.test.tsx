@@ -17,7 +17,9 @@ vi.mock("@/components/AppShell", () => ({
 }));
 
 vi.mock("@/components/GameCover", () => ({
-  GameCover: ({ title }: { title: string }) => <div aria-label={`${title} artwork`} />,
+  GameCover: ({ title }: { title: string }) => (
+    <div aria-label={`${title} artwork`} />
+  ),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -26,14 +28,25 @@ vi.mock("@/lib/api", () => ({
 }));
 
 function renderRoute(ui: ReactNode) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
 }
 
 describe("Lovable discovery routes", () => {
   it("renders search results from the search API", async () => {
     vi.mocked(searchGames).mockResolvedValue({
-      results: [{ id: 1, name: "Hades", released: "2020-09-17", background_image: "https://example.test/hades.jpg" }],
+      results: [
+        {
+          id: 1,
+          name: "Hades",
+          released: "2020-09-17",
+          background_image: "https://example.test/hades.jpg",
+        },
+      ],
     });
 
     renderRoute(<SearchPage />);
@@ -48,23 +61,36 @@ describe("Lovable discovery routes", () => {
     vi.mocked(getHomepageDeals)
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce({
-        results: [{
-          id: 2,
-          name: "Celeste",
-          released: "2018-01-25",
-          background_image: "https://example.test/celeste.jpg",
-          url: "https://store.example.test/celeste",
-          current: { shop: "Example Store", price: { amount: 4.99, currency: "USD" }, regular: null, cut: 50, url: null, timestamp: null },
-          history_low_all: null,
-        }],
+        results: [
+          {
+            id: 2,
+            name: "Celeste",
+            released: "2018-01-25",
+            background_image: "https://example.test/celeste.jpg",
+            url: "https://store.example.test/celeste",
+            current: {
+              shop: "Example Store",
+              price: { amount: 4.99, currency: "USD" },
+              regular: null,
+              cut: 50,
+              url: null,
+              timestamp: null,
+            },
+            history_low_all: null,
+          },
+        ],
       });
 
     renderRoute(<DealsPage />);
 
-    expect(await screen.findByText("Failed to load deals.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Failed to load deals."),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
-    await waitFor(() => expect(screen.getByText("Celeste")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Celeste")).toBeInTheDocument(),
+    );
     expect(getHomepageDeals).toHaveBeenCalledTimes(2);
   });
 });

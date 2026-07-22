@@ -31,7 +31,16 @@ vi.mock("@/lib/api", () => ({
       notifyAuthChange = undefined;
     };
   },
-  listNotifications: () => Promise.resolve([{ id: "n1", type: "friend_request", payload: { from: "Alex" }, read_at: null, created_at: "2026-07-17T00:00:00Z" }]),
+  listNotifications: () =>
+    Promise.resolve([
+      {
+        id: "n1",
+        type: "friend_request",
+        payload: { from: "Alex" },
+        read_at: null,
+        created_at: "2026-07-17T00:00:00Z",
+      },
+    ]),
   markNotificationRead: () => Promise.resolve({}),
   markAllNotificationsRead: () => Promise.resolve(),
 }));
@@ -94,9 +103,17 @@ describe("AppShell", () => {
 
   it("opens the notification menu for authenticated users", async () => {
     authenticated = true;
-    render(<AppShell><main>Home</main></AppShell>);
+    render(
+      <AppShell>
+        <main>Home</main>
+      </AppShell>,
+    );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Notifications" }));
-    expect(await screen.findByText("Alex sent you a friend request.")).toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Notifications" }),
+    );
+    expect(
+      await screen.findByText("Alex sent you a friend request."),
+    ).toBeInTheDocument();
   });
 });

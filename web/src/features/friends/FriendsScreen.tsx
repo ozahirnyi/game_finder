@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Panel, Section, StatePanel } from "@/components/ui";
-import { ApiError, SteamSocial, getSteamSocial, isAuthenticated } from "@/lib/api";
+import {
+  ApiError,
+  SteamSocial,
+  getSteamSocial,
+  isAuthenticated,
+} from "@/lib/api";
 
 type LoadError = { message: string; steamNotLinked: boolean };
 
@@ -46,28 +51,62 @@ export function FriendsScreen() {
   }, [authenticated, loadAttempt]);
 
   if (!authenticated) {
-    return <StatePanel kind="unauthenticated" title="Sign in to see friends" detail="Sign in before viewing Steam friend data." />;
+    return (
+      <StatePanel
+        kind="unauthenticated"
+        title="Sign in to see friends"
+        detail="Sign in before viewing Steam friend data."
+      />
+    );
   }
 
   if (loading) {
-    return <main className="stack"><h1>Friends</h1><StatePanel kind="loading" title="Loading Steam friends" /></main>;
+    return (
+      <main className="stack">
+        <h1>Friends</h1>
+        <StatePanel kind="loading" title="Loading Steam friends" />
+      </main>
+    );
   }
 
   if (error?.steamNotLinked) {
     return (
       <main className="stack">
-        <StatePanel kind="empty" title="Connect Steam to see friends" detail="Steam friend data is available after you link your account." />
+        <StatePanel
+          kind="empty"
+          title="Connect Steam to see friends"
+          detail="Steam friend data is available after you link your account."
+        />
         <Link href="/steam">Connect Steam</Link>
       </main>
     );
   }
 
   if (error) {
-    return <StatePanel kind="error" title="Friends are unavailable" detail={error.message} action={{ label: "Retry", onClick: () => { setLoading(true); setLoadAttempt((attempt) => attempt + 1); } }} />;
+    return (
+      <StatePanel
+        kind="error"
+        title="Friends are unavailable"
+        detail={error.message}
+        action={{
+          label: "Retry",
+          onClick: () => {
+            setLoading(true);
+            setLoadAttempt((attempt) => attempt + 1);
+          },
+        }}
+      />
+    );
   }
 
   if (!social || social.friends.length === 0) {
-    return <StatePanel kind="empty" title="No Steam friends available" detail="Steam did not return any friends with visible libraries." />;
+    return (
+      <StatePanel
+        kind="empty"
+        title="No Steam friends available"
+        detail="Steam did not return any friends with visible libraries."
+      />
+    );
   }
 
   return (
@@ -83,23 +122,49 @@ export function FriendsScreen() {
             <div>
               {friend.avatar ? (
                 // Steam provides remote avatar URLs that are not configured for Next's image optimizer.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={friend.avatar} alt={`${friend.persona_name ?? "Steam friend"}'s Steam avatar`} width={48} height={48} />
+                <img
+                  src={friend.avatar}
+                  alt={`${friend.persona_name ?? "Steam friend"}'s Steam avatar`}
+                  width={48}
+                  height={48}
+                />
               ) : null}
               <h2>{friend.persona_name ?? "Steam friend"}</h2>
               <p>{friend.common_games_count} games in common</p>
               <p>{friend.taste_match_percent}% taste match</p>
             </div>
-            {friend.common_games.length ? <p>Shared games: {friend.common_games.map((game, index) => <span key={game.appid}>{index ? ", " : ""}{game.name}</span>)}</p> : <p>No shared games returned.</p>}
+            {friend.common_games.length ? (
+              <p>
+                Shared games:{" "}
+                {friend.common_games.map((game, index) => (
+                  <span key={game.appid}>
+                    {index ? ", " : ""}
+                    {game.name}
+                  </span>
+                ))}
+              </p>
+            ) : (
+              <p>No shared games returned.</p>
+            )}
           </Panel>
         ))}
       </div>
-      <Section title="Top shared games" detail="Games returned across your Steam friends' public libraries.">
+      <Section
+        title="Top shared games"
+        detail="Games returned across your Steam friends' public libraries."
+      >
         {social.top_friend_games.length ? (
           <div className="stack">
-            {social.top_friend_games.map((game) => <Panel as="article" key={game.appid}><h3>{game.name}</h3><p>{game.friends} friends own this game.</p></Panel>)}
+            {social.top_friend_games.map((game) => (
+              <Panel as="article" key={game.appid}>
+                <h3>{game.name}</h3>
+                <p>{game.friends} friends own this game.</p>
+              </Panel>
+            ))}
           </div>
-        ) : <p>No top shared games returned.</p>}
+        ) : (
+          <p>No top shared games returned.</p>
+        )}
       </Section>
     </main>
   );

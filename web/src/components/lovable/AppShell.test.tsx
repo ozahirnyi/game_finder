@@ -5,7 +5,13 @@ import { AppShell } from "./AppShell";
 
 describe("Lovable AppShell", () => {
   it("keeps the archive navigation labels", () => {
-    render(<ThemeProvider><AppShell><p>Content</p></AppShell></ThemeProvider>);
+    render(
+      <ThemeProvider>
+        <AppShell>
+          <p>Content</p>
+        </AppShell>
+      </ThemeProvider>,
+    );
 
     expect(screen.getAllByText("GameFinder").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Wishlist").length).toBeGreaterThan(0);

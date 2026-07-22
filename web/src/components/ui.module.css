@@ -11,7 +11,11 @@
   font-weight: 700;
   line-height: 1.2;
   cursor: pointer;
-  transition: background var(--ease-out), border-color var(--ease-out), color var(--ease-out), transform var(--ease-out);
+  transition:
+    background var(--ease-out),
+    border-color var(--ease-out),
+    color var(--ease-out),
+    transform var(--ease-out);
 }
 
 .button:disabled {
@@ -101,9 +105,20 @@
   line-height: 1.2;
 }
 
-.badgedefault { background: var(--surface-raised); color: var(--muted); }
-.badgeaccent { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-muted); color: var(--accent); }
-.badgesuccess { border-color: color-mix(in srgb, var(--success) 45%, transparent); background: var(--success-muted); color: var(--success); }
+.badgedefault {
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+.badgeaccent {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+.badgesuccess {
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  background: var(--success-muted);
+  color: var(--success);
+}
 
 .section {
   display: grid;
@@ -117,12 +132,18 @@
   gap: var(--space-3);
 }
 
-.sectionAction { flex: 0 0 auto; }
+.sectionAction {
+  flex: 0 0 auto;
+}
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loadingIcon { animation: none; }
+  .loadingIcon {
+    animation: none;
+  }
 }

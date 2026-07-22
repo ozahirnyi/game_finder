@@ -25,10 +25,17 @@ export function Nav() {
   const pathname = usePathname();
   const authed = useAuthState();
   const [menuOpen, setMenuOpen] = useState(false);
-  const isCurrent = (href: string) => href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-  const destinations = authed ? [...publicDestinations, ...protectedDestinations] : publicDestinations;
-  const linkClass = (isOpen: boolean) => `${styles.navigation} ${isOpen ? styles.navigationOpen : ""}`;
-  const accountClass = (isOpen: boolean) => `${styles.account} ${isOpen ? styles.accountOpen : ""}`;
+  const isCurrent = (href: string) =>
+    href === "/"
+      ? pathname === href
+      : pathname === href || pathname.startsWith(`${href}/`);
+  const destinations = authed
+    ? [...publicDestinations, ...protectedDestinations]
+    : publicDestinations;
+  const linkClass = (isOpen: boolean) =>
+    `${styles.navigation} ${isOpen ? styles.navigationOpen : ""}`;
+  const accountClass = (isOpen: boolean) =>
+    `${styles.account} ${isOpen ? styles.accountOpen : ""}`;
 
   return (
     <header className={styles.rail}>
@@ -47,9 +54,18 @@ export function Nav() {
       >
         Menu
       </button>
-      <nav className={linkClass(menuOpen)} id="mobile-navigation" aria-label="Main navigation">
+      <nav
+        className={linkClass(menuOpen)}
+        id="mobile-navigation"
+        aria-label="Main navigation"
+      >
         {destinations.map(([label, href]) => (
-          <Link className={styles.link} href={href} key={href} aria-current={isCurrent(href) ? "page" : undefined}>
+          <Link
+            className={styles.link}
+            href={href}
+            key={href}
+            aria-current={isCurrent(href) ? "page" : undefined}
+          >
             {label}
           </Link>
         ))}
@@ -59,8 +75,20 @@ export function Nav() {
           <span className={styles.accountStatus}>Signed in</span>
         ) : (
           <>
-            <Link className={styles.accountLink} href="/login" aria-current={isCurrent("/login") ? "page" : undefined}>Sign in</Link>
-            <Link className={`${styles.accountLink} ${styles.signUp}`} href="/register" aria-current={isCurrent("/register") ? "page" : undefined}>Create account</Link>
+            <Link
+              className={styles.accountLink}
+              href="/login"
+              aria-current={isCurrent("/login") ? "page" : undefined}
+            >
+              Sign in
+            </Link>
+            <Link
+              className={`${styles.accountLink} ${styles.signUp}`}
+              href="/register"
+              aria-current={isCurrent("/register") ? "page" : undefined}
+            >
+              Create account
+            </Link>
           </>
         )}
       </div>
