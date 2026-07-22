@@ -30,12 +30,30 @@ const navigate = vi.fn();
 vi.mock("@/lib/api", () => api);
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => () => ({}),
-  Link: ({ children, to, ...props }: React.ComponentProps<"a"> & { to: string }) => <a href={to} {...props}>{children}</a>,
+  Link: ({
+    children,
+    to,
+    ...props
+  }: React.ComponentProps<"a"> & { to: string }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
   useNavigate: () => navigate,
 }));
-vi.mock("@/components/AppShell", () => ({ AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
-vi.mock("@/components/GameCover", () => ({ Avatar: () => null, GameCover: () => null }));
-vi.mock("@/components/ui-bits", () => ({ Chip: ({ children }: { children: React.ReactNode }) => <span>{children}</span>, SectionHeader: ({ title }: { title: string }) => <h2>{title}</h2> }));
+vi.mock("@/components/AppShell", () => ({
+  AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+vi.mock("@/components/GameCover", () => ({
+  Avatar: () => null,
+  GameCover: () => null,
+}));
+vi.mock("@/components/ui-bits", () => ({
+  Chip: ({ children }: { children: React.ReactNode }) => (
+    <span>{children}</span>
+  ),
+  SectionHeader: ({ title }: { title: string }) => <h2>{title}</h2>,
+}));
 
 describe("auth recovery routes", () => {
   beforeEach(() => {
@@ -43,11 +61,18 @@ describe("auth recovery routes", () => {
   });
 
   it("logs in, stores the token, and opens the profile", async () => {
-    api.loginUser.mockResolvedValue({ access_token: "token", token_type: "bearer" });
+    api.loginUser.mockResolvedValue({
+      access_token: "token",
+      token_type: "bearer",
+    });
     render(<LoginPage />);
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "a@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "password123" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => expect(api.setToken).toHaveBeenCalledWith("token"));
@@ -55,16 +80,29 @@ describe("auth recovery routes", () => {
   });
 
   it("registers before logging in and opens the profile", async () => {
-    api.registerUser.mockResolvedValue({ id: "user-id", email: "a@example.com" });
-    api.loginUser.mockResolvedValue({ access_token: "token", token_type: "bearer" });
+    api.registerUser.mockResolvedValue({
+      id: "user-id",
+      email: "a@example.com",
+    });
+    api.loginUser.mockResolvedValue({
+      access_token: "token",
+      token_type: "bearer",
+    });
     render(<RegisterPage />);
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "a@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "password123" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => expect(api.setToken).toHaveBeenCalledWith("token"));
-    expect(api.registerUser).toHaveBeenCalledWith("a@example.com", "password123");
+    expect(api.registerUser).toHaveBeenCalledWith(
+      "a@example.com",
+      "password123",
+    );
     expect(api.loginUser).toHaveBeenCalledWith("a@example.com", "password123");
     expect(navigate).toHaveBeenCalledWith({ to: "/profile" });
   });
@@ -73,11 +111,17 @@ describe("auth recovery routes", () => {
     api.loginUser.mockRejectedValue(new Error("offline"));
     render(<LoginPage />);
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "a@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "password123" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Login failed. Please try again.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Login failed. Please try again.",
+    );
     expect(screen.getByLabelText("Email")).toHaveValue("a@example.com");
     expect(screen.getByLabelText("Password")).toHaveValue("password123");
   });
@@ -94,9 +138,13 @@ describe("auth recovery routes", () => {
   });
 
   it("offers a sign-in link when the profile request is unauthorized", async () => {
-    api.getCurrentUser.mockRejectedValue(new api.ApiError("Your session expired. Please log in again.", 401));
+    api.getCurrentUser.mockRejectedValue(
+      new api.ApiError("Your session expired. Please log in again.", 401),
+    );
     render(<ProfilePage />);
 
-    expect(await screen.findByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    expect(
+      await screen.findByRole("link", { name: "Sign in" }),
+    ).toHaveAttribute("href", "/login");
   });
 });

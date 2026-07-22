@@ -20,7 +20,9 @@ export function ThemeSelector({ compact = false }: { compact?: boolean }) {
             aria-label="Dark mode"
             aria-pressed={mode === "dark"}
             className={`grid size-6 place-items-center rounded transition ${
-              mode === "dark" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+              mode === "dark"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground"
             }`}
           >
             <Moon className="size-3.5" />
@@ -30,7 +32,9 @@ export function ThemeSelector({ compact = false }: { compact?: boolean }) {
             aria-label="Light mode"
             aria-pressed={mode === "light"}
             className={`grid size-6 place-items-center rounded transition ${
-              mode === "light" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+              mode === "light"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground"
             }`}
           >
             <Sun className="size-3.5" />
@@ -56,7 +60,6 @@ export function ThemeSelector({ compact = false }: { compact?: boolean }) {
             }}
           />
         ))}
-
       </div>
     </div>
   );
