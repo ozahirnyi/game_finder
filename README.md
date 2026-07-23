@@ -270,6 +270,18 @@ https://game-finder.up.railway.app
 ### API Docs:
 https://game-finder.up.railway.app/docs
 
+### Lightsail production deployment
+
+The Lightsail deployment workflow runs after a push to `main` and requires these GitHub repository secrets:
+
+- `LIGHTSAIL_HOST` — the static IPv4 address.
+- `LIGHTSAIL_SSH_PRIVATE_KEY` — a dedicated private deploy key, not the Lightsail console key.
+- `LIGHTSAIL_KNOWN_HOSTS` — the exact `ssh-keyscan -H <static-ip>` output.
+
+Install the deploy key public half in `/home/ec2-user/.ssh/authorized_keys` on the instance. Keep the production application environment in `/home/ec2-user/.game-finder.env`; it is copied to the release directory during deployment and is never committed. The initial server bootstrap must clone this repository to `/home/ec2-user/game_finder`.
+
+The workflow runs tests, builds Compose services, applies Alembic migrations, starts the stack, and verifies `http://127.0.0.1:8000/health`. It does not require AWS credentials or CodeDeploy.
+
 ---
 
 ## Smoke Tests
