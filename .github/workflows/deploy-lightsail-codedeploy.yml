@@ -1,0 +1,61 @@
+name: Deploy to Lightsail via CodeDeploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Verify deployment configuration
+        run: |
+          test -f appspec.yml
+          test -f docker-compose.lightsail.yml
+          test -x scripts/deploy/application_start.sh
+          bash -n scripts/deploy/*.sh scripts/ops/*.sh
+
+      - name: Create deployment package
+        run: |
+          git archive --format=tar.gz HEAD > deployment.tar.gz
+          tar -tzf deployment.tar.gz | grep '^appspec.yml$'
+          tar -tzf deployment.tar.gz | grep '^docker-compose.lightsail.yml$'
+          tar -tzf deployment.tar.gz | grep '^scripts/deploy/'
+
+      - name: Upload to S3
+        run: |
+          TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+          COMMIT_SHA="$(git rev-parse --short HEAD)"
+          S3_KEY="game-finder/deployments/${TIMESTAMP}-${COMMIT_SHA}.tar.gz"
+          aws s3 cp deployment.tar.gz "s3://${{ secrets.CODEDEPLOY_S3_BUCKET }}/${S3_KEY}"
+          echo "S3_KEY=${S3_KEY}" >> "$GITHUB_ENV"
+
+      - name: Create CodeDeploy deployment
+        id: deploy
+        run: |
+          DEPLOYMENT_ID="$(aws deploy create-deployment \
+            --application-name "${{ secrets.CODEDEPLOY_APP_NAME }}" \
+            --deployment-group-name "${{ secrets.CODEDEPLOY_DEPLOYMENT_GROUP }}" \
+            --s3-location "bucket=${{ secrets.CODEDEPLOY_S3_BUCKET }},key=${S3_KEY},bundleType=tgz" \
+            --deployment-config-name CodeDeployDefault.OneAtATime \
+            --file-exists-behavior OVERWRITE \
+            --description "GitHub Actions commit ${GITHUB_SHA:0:7}" \
+            --query 'deploymentId' \
+            --output text)"
+          echo "deployment_id=${DEPLOYMENT_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for deployment
+        run: aws deploy wait deployment-successful --deployment-id "${{ steps.deploy.outputs.deployment_id }}"
+
+      - name: Public health check
+        run: curl -f --retry 5 --retry-delay 5 --retry-all-errors "${{ secrets.LIGHTSAIL_URL }}"

@@ -267,6 +267,19 @@ The backend is deployed and accessible at:
 
 https://game-finder.up.railway.app
 
+### Lightsail production target
+
+The planned Lightsail target is `api.gamefinder.example.com`, deployed from `main`
+through CodeDeploy. Repository configuration lives in `docker-compose.lightsail.yml`,
+`appspec.yml`, and `scripts/deploy/`. Production values are retrieved from AWS
+Parameter Store under `/game-finder/production`; never commit `.env`.
+
+For an emergency deployment on the instance, restore the last known-good `.env`, then
+run `docker compose -f docker-compose.lightsail.yml build`, `docker compose -f
+docker-compose.lightsail.yml run --rm app alembic upgrade head`, and `docker compose
+-f docker-compose.lightsail.yml up -d`. Install `scripts/ops/backup_game_finder_db.sh`
+as `/home/ec2-user/scripts/backup_game-finder-db.sh` and schedule it daily at 03:00.
+
 ### API Docs:
 https://game-finder.up.railway.app/docs
 
