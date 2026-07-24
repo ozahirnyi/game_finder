@@ -137,7 +137,7 @@ docker compose run --rm app alembic upgrade head
 docker compose up --build app
 ```
 
-In a second terminal, start the Next.js frontend:
+In a second terminal, start the Vite/TanStack frontend:
 
 ```bash
 cd web
@@ -145,25 +145,19 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-The web app runs at `http://localhost:3000` and calls the API URL from `web/.env.local`:
+The web app runs at `http://localhost:3000`. For local development, set its API URL in `web/.env.local`:
 
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-For a deployed frontend, point it at the Railway backend after the latest API deploy:
-
-```bash
-NEXT_PUBLIC_API_URL=https://game-finder.up.railway.app
+VITE_API_URL=http://localhost:8000
 ```
 
 For the API, keep these values in `.env`:
 
 ```bash
-FRONTEND_ORIGIN=http://localhost:3000
-FRONTEND_ORIGINS=http://localhost:3000,https://your-frontend-domain.example
-FRONTEND_PUBLIC_URL=http://localhost:3000
-BACKEND_PUBLIC_URL=http://localhost:8000
+FRONTEND_ORIGIN=https://example.com
+FRONTEND_ORIGINS=https://example.com
+FRONTEND_PUBLIC_URL=https://example.com
+BACKEND_PUBLIC_URL=https://example.com/api
 DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/gamefinder
 REDIS_URL=redis://redis:6379/0
 RAWG_API_KEY=your-rawg-key
@@ -182,14 +176,7 @@ OPENAI_TIMEOUT_SECONDS=8
 AI_FALLBACK_ENABLED=true
 SECRET_KEY=your-secret-key
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
-```
-
-On Railway, set `FRONTEND_ORIGINS` to the comma-separated list of frontend URLs that should be allowed by CORS. For example:
-
-```bash
-FRONTEND_ORIGINS=http://localhost:3000,https://your-gamefinder-frontend.railway.app
-FRONTEND_PUBLIC_URL=https://your-gamefinder-frontend.railway.app
-BACKEND_PUBLIC_URL=https://your-gamefinder-api.railway.app
+GOOGLE_REDIRECT_URI=https://example.com/api/auth/google/callback
 ```
 
 Set `AI_FALLBACK_ENABLED=false` in production if you want `/recommendations` to fail visibly with `503` when OpenAI is unavailable instead of returning local fallback recommendations.
@@ -202,7 +189,7 @@ Telegram alerts MVP uses a Telegram bot. Create a bot with BotFather, set `TELEG
 `TELEGRAM_BOT_USERNAME`, and `TELEGRAM_WEBHOOK_SECRET`, then point Telegram at:
 
 ```bash
-https://your-gamefinder-api.railway.app/telegram/webhook/your-webhook-secret
+https://example.com/api/telegram/webhook/your-webhook-secret
 ```
 
 The profile page can then open `https://t.me/<bot>?start=<link-token>`. After the user presses Start,
@@ -263,12 +250,11 @@ Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy.
 
 ## Deployment
 
-The backend is deployed and accessible at:
+The application is deployed at [https://example.com](https://example.com).
 
-https://game-finder.up.railway.app
+### API Docs
 
-### API Docs:
-https://game-finder.up.railway.app/docs
+[https://example.com/api/docs](https://example.com/api/docs)
 
 ### Lightsail production deployment
 
@@ -280,17 +266,17 @@ The Lightsail deployment workflow runs after a push to `main` and requires these
 
 Install the deploy key public half in `/home/ec2-user/.ssh/authorized_keys` on the instance. Keep the production application environment in `/home/ec2-user/.game-finder.env`; it is copied to the release directory during deployment and is never committed. The initial server bootstrap must clone this repository to `/home/ec2-user/game_finder`.
 
-The workflow runs tests, builds Compose services, applies Alembic migrations, starts the stack, and verifies `http://127.0.0.1:8000/health`. It does not require AWS credentials or CodeDeploy.
+The workflow runs tests, builds Compose services, applies Alembic migrations, starts the stack, and verifies `http://127.0.0.1:8000/health`. Nginx serves the frontend from port 3000 and proxies API requests from `https://example.com/api/` to port 8000. It does not require AWS credentials or CodeDeploy.
 
 ---
 
 ## Smoke Tests
 
-- GET `/health`
-- GET `/docs`
-- GET `/search/games?q=witcher`
-- GET `/catalog/upcoming-games`
-- POST `/recommendations`
+- GET `/api/health`
+- GET `/api/docs`
+- GET `/api/search/games?q=witcher`
+- GET `/api/catalog/upcoming-games`
+- POST `/api/recommendations`
 
 ---
 
