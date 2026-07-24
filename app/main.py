@@ -89,11 +89,6 @@ def get_backend_public_url(request: Request) -> str:
     backend_url = os.getenv("BACKEND_PUBLIC_URL", "").strip().rstrip("/")
     if backend_url:
         return backend_url
-    railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip().rstrip("/")
-    if railway_domain:
-        if railway_domain.startswith(("http://", "https://")):
-            return railway_domain
-        return f"https://{railway_domain}"
     return str(request.base_url).rstrip("/")
 
 
