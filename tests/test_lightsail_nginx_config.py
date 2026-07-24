@@ -1,4 +1,10 @@
-server {
+from pathlib import Path
+
+
+def test_lightsail_nginx_uses_playfinder_as_canonical_https_host() -> None:
+    config = Path("infra/lightsail/nginx/game-finder.conf").read_text(encoding="utf-8")
+
+    assert config == """server {
     listen 80;
     server_name example.com;
     return 301 https://example.com$request_uri;
@@ -30,3 +36,4 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
+"""
