@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="size-4 rounded-sm bg-background" />
           </div>
           <span className="text-xl font-bold uppercase tracking-tight">
-            GameFinder
+            PlayFinder
           </span>
         </Link>
 
@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="grid size-7 place-items-center rounded-md bg-primary">
             <div className="size-3.5 rounded-sm bg-background" />
           </div>
-          <span className="font-bold uppercase tracking-tight">GameFinder</span>
+          <span className="font-bold uppercase tracking-tight">PlayFinder</span>
         </Link>
         <button className="grid size-9 place-items-center rounded-md border border-border">
           <Bell className="size-4" />

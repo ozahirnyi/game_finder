@@ -56,7 +56,7 @@ function renderPage() {
   );
 }
 
-describe("GameFinder friends", () => {
+describe("PlayFinder friends", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.isAuthenticated.mockReturnValue(true);
@@ -86,7 +86,7 @@ describe("GameFinder friends", () => {
     renderPage();
 
     fireEvent.change(
-      await screen.findByPlaceholderText(/search gamefinder players/i),
+      await screen.findByPlaceholderText(/search playfinder players/i),
       { target: { value: "Ni" } },
     );
     expect(await screen.findByText("Niko")).toBeVisible();

@@ -1,4 +1,4 @@
-# Game Finder
+# PlayFinder
 
 A learning **full-stack** project: **game search**, user collections, external API integration, authentication, caching, and (later) AI-powered recommendations. The backend is written **by hand in FastAPI**; the frontend can be scaffolded with AI assistance (e.g. Next.js).
 
@@ -41,7 +41,7 @@ The project grows **incrementally** in a single repo (not a chain of throwaway e
 7. **Frontend** — UI on top of your API.
 8. **Interview prep** — algorithms, SQL, architecture narrative (track hours in progression_bot if you like).
 
-Detailed specs and checklists live in **ClickUp** (Game Finder Phase 1–7 tasks) or in `progression_bot/scripts/clickup_create_gamefinder_roadmap.py` (phase description text).
+Detailed specs and checklists live in **ClickUp** (PlayFinder Phase 1–7 tasks) or in `progression_bot/scripts/clickup_create_gamefinder_roadmap.py` (phase description text).
 
 ---
 
