@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe("API requests", () => {
-  it("uses the Railway fallback URL and omits Authorization for public requests", async () => {
+  it("uses the same-origin API prefix and omits Authorization for public requests", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ configured: true }), {
         headers: { "Content-Type": "application/json" },
@@ -27,7 +27,7 @@ describe("API requests", () => {
     await expect(getGoogleStatus()).resolves.toEqual({ configured: true });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://game-finder.up.railway.app/auth/google/status",
+      "/api/auth/google/status",
       expect.objectContaining({
         headers: expect.not.objectContaining({
           Authorization: expect.anything(),

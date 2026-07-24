@@ -297,8 +297,7 @@ export type ProfileSummaryResponse = {
 
 const API_URL = (
   import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://game-finder.up.railway.app"
+  "/api"
 ).replace(/\/+$/, "");
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
