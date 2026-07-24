@@ -330,7 +330,7 @@ def notify_saved_game(user: User, game_title: str) -> None:
     try:
         send_telegram_message(
             chat_id,
-            f"{game_title} was added to your Game Finder alerts. I will use this chat for future price and release alerts.",
+            f"{game_title} was added to your PlayFinder alerts. I will use this chat for future price and release alerts.",
         )
     except Exception:
         print("Telegram notification failed")
@@ -719,7 +719,7 @@ def create_conversation(
     current_user: User = Depends(get_current_user),
 ):
     if data.recipient_id == current_user.id or not are_friends(db, current_user.id, data.recipient_id):
-        raise HTTPException(status_code=403, detail="You can only message GameFinder friends")
+        raise HTTPException(status_code=403, detail="You can only message PlayFinder friends")
     low_id, high_id = user_pair(current_user.id, data.recipient_id)
     conversation = db.query(Conversation).filter(Conversation.user_low_id == low_id, Conversation.user_high_id == high_id).first()
     if conversation:
@@ -797,7 +797,7 @@ def create_game_invite(
     current_user: User = Depends(get_current_user),
 ):
     if data.recipient_id == current_user.id or not are_friends(db, current_user.id, data.recipient_id):
-        raise HTTPException(status_code=403, detail="You can only invite GameFinder friends")
+        raise HTTPException(status_code=403, detail="You can only invite PlayFinder friends")
     recipient = db.query(User).filter(User.id == data.recipient_id).first()
     invite = GameInvite(sender_id=current_user.id, recipient_id=recipient.id, game_id=data.game_id, game_name=data.game_name.strip(), note=data.note)
     db.add(invite)
@@ -1306,7 +1306,7 @@ def send_telegram_test_alert(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=409, detail="Connect Telegram first")
     ok = send_telegram_message(
         current_user.telegram_chat_id,
-        "Game Finder alerts are connected. Future favorites can use this chat for price and release updates.",
+        "PlayFinder alerts are connected. Future favorites can use this chat for price and release updates.",
     )
     if not ok:
         raise HTTPException(status_code=502, detail="Telegram did not accept the message")
@@ -1332,7 +1332,7 @@ def telegram_webhook(secret: str, update: dict, db: Session = Depends(get_db)):
     user.telegram_username = username
     user.telegram_linked_at = telegram_linked_at()
     db.commit()
-    send_telegram_message(chat_id, "Telegram alerts are connected to your Game Finder account.")
+    send_telegram_message(chat_id, "Telegram alerts are connected to your PlayFinder account.")
     return {"status": "linked"}
 
 
