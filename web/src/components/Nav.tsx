@@ -43,7 +43,7 @@ export function Nav() {
         <span className={styles.brandMark} aria-hidden="true">
           GF
         </span>
-        Game Finder
+        PlayFinder
       </Link>
       <button
         aria-controls="mobile-navigation"
