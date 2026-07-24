@@ -56,7 +56,7 @@ function renderPage() {
   );
 }
 
-describe("GameFinder friends", () => {
+describe("PlayFinder friends", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.isAuthenticated.mockReturnValue(true);

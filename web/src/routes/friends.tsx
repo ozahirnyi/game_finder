@@ -39,11 +39,11 @@ import {
 export const Route = createFileRoute("/friends")({
   head: () => ({
     meta: [
-      { title: "Friends — GameFinder" },
+      { title: "Friends — PlayFinder" },
       {
         name: "description",
         content:
-          "GameFinder friends, messages, invitations, and Steam friends.",
+          "PlayFinder friends, messages, invitations, and Steam friends.",
       },
     ],
   }),
@@ -246,7 +246,7 @@ export function FriendsPage() {
       <AppShell>
         <SectionHeader
           title="Friends"
-          hint="Sign in to find GameFinder players and use messages."
+          hint="Sign in to find PlayFinder players and use messages."
         />
         <div className="rounded-3xl border border-border bg-surface p-6">
           <p className="text-sm text-muted-foreground">
@@ -268,7 +268,7 @@ export function FriendsPage() {
         <main className="space-y-10 lg:col-span-8">
           <section>
             <SectionHeader
-              title="GameFinder friends"
+              title="PlayFinder friends"
               hint={`${friendsQuery.data?.length ?? 0} confirmed friends`}
               action={
                 <button
@@ -286,7 +286,7 @@ export function FriendsPage() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search GameFinder players"
+                placeholder="Search PlayFinder players"
                 className="flex-1 bg-transparent text-sm outline-none"
               />
             </div>
@@ -301,7 +301,7 @@ export function FriendsPage() {
                     <div className="min-w-0 flex-1">
                       <p className="font-bold">{user.display_name}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {user.bio || "GameFinder player"}
+                        {user.bio || "PlayFinder player"}
                       </p>
                     </div>
                     <button
@@ -380,7 +380,7 @@ export function FriendsPage() {
               )}
               {friendsQuery.isSuccess && friendsQuery.data.length === 0 && (
                 <p className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted-foreground">
-                  Find another GameFinder player above to send the first friend
+                  Find another PlayFinder player above to send the first friend
                   request.
                 </p>
               )}
@@ -393,7 +393,7 @@ export function FriendsPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-bold">{user.display_name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {user.bio || "GameFinder friend"}
+                      {user.bio || "PlayFinder friend"}
                     </p>
                   </div>
                   <button
@@ -426,7 +426,7 @@ export function FriendsPage() {
             <section className="rounded-2xl border border-primary/30 bg-surface p-5">
               <SectionHeader
                 title={`Invite ${invitee.display_name}`}
-                hint="This sends a GameFinder invitation; it does not launch Steam."
+                hint="This sends a PlayFinder invitation; it does not launch Steam."
               />
               <form onSubmit={submitInvite} className="flex flex-wrap gap-3">
                 <input

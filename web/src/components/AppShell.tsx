@@ -43,7 +43,7 @@ function notificationText(notification: Notification) {
     return `${notification.payload.from ?? "A friend"} sent you a message.`;
   if (notification.type === "game_invite")
     return `${notification.payload.from ?? "A friend"} invited you to play ${notification.payload.game_name ?? "a game"}.`;
-  return "You have a new GameFinder notification.";
+  return "You have a new PlayFinder notification.";
 }
 
 function NotificationMenu({
@@ -143,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="size-4 rounded-sm bg-background" />
           </div>
           <span className="text-xl font-bold uppercase tracking-tight">
-            GameFinder
+            PlayFinder
           </span>
         </Link>
 
@@ -211,7 +211,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="grid size-7 place-items-center rounded-md bg-primary">
             <div className="size-3.5 rounded-sm bg-background" />
           </div>
-          <span className="font-bold uppercase tracking-tight">GameFinder</span>
+          <span className="font-bold uppercase tracking-tight">PlayFinder</span>
         </Link>
         <NotificationMenu authenticated={authenticated} mobile />
       </header>
