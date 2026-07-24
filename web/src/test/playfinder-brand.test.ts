@@ -17,6 +17,7 @@ describe("PlayFinder public brand", () => {
       .join("\n");
 
     expect(source).toContain("PlayFinder");
+    expect(source).toContain("PF");
     expect(source).not.toMatch(/GameFinder|Game Finder/);
   });
 });

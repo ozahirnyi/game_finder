@@ -41,7 +41,7 @@ export function Nav() {
     <header className={styles.rail}>
       <Link className={styles.brand} href="/">
         <span className={styles.brandMark} aria-hidden="true">
-          GF
+          PF
         </span>
         PlayFinder
       </Link>
