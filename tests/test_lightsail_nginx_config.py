@@ -30,8 +30,14 @@ server {
     ssl_certificate /etc/letsencrypt/live/playfinder.cc/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/playfinder.cc/privkey.pem;
 
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
