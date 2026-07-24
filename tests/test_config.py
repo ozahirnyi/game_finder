@@ -36,14 +36,14 @@ def test_get_frontend_url_prefers_public_frontend_url(monkeypatch):
     assert get_frontend_url() == "https://web.example.com"
 
 
-def test_get_backend_public_url_uses_railway_https(monkeypatch):
+def test_get_backend_public_url_uses_request_url_without_public_override(monkeypatch):
     class Request:
         base_url = "http://internal.example/"
 
     monkeypatch.delenv("BACKEND_PUBLIC_URL", raising=False)
     monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "game-finder.up.railway.app")
 
-    assert get_backend_public_url(Request()) == "https://game-finder.up.railway.app"
+    assert get_backend_public_url(Request()) == "http://internal.example"
 
 
 def test_ai_fallback_can_be_disabled(monkeypatch):
