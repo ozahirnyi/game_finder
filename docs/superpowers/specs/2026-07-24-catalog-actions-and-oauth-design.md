@@ -18,7 +18,7 @@ Allow authenticated PlayFinder users to save catalog games to their library and 
 
 The existing `Game` model remains the user's library. A new authenticated endpoint, `POST /library/catalog-games/{rawg_id}`, fetches the catalog record server-side and creates a `Game` using `source="catalog"` and `external_id="rawg:{rawg_id}"`. It returns `201` for a new row and `200` for the existing row, relying on the existing owner/source/external-id uniqueness invariant. `GET /games` already exposes `source` and `external_id`, so the UI can build its library state from a single request.
 
-Wishlist does not have a durable data model: it currently overloads `Game.notes`. Introduce one focused wishlist persistence model with `owner_id`, title/detail display data, `source`, and `external_id`, with a unique owner/source/external-id constraint. Its catalog create endpoint fetches RAWG data on the server, is idempotent, and its list endpoint lets the client derive all card states in one request. Existing manually saved games remain library games; no notes-based migration is performed because those text markers are ambiguous.
+Wishlist already has a durable `WishlistItem` model with `user_id`, `catalog_game_id`, title, cover URL, and a unique `(user_id, catalog_game_id)` constraint, although the current UI still overloads `Game.notes`. Add its idempotent catalog create and list endpoints on top of that model. The create endpoint fetches RAWG data on the server and uses the catalog ID as the durable identity; the list endpoint lets the client derive all card states in one request. Existing manually saved games remain library games; no notes-based migration is performed because those text markers are ambiguous.
 
 ### Frontend catalog actions
 
