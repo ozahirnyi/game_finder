@@ -24,7 +24,7 @@ import { Bell, Heart, Search, TrendingDown, X } from "lucide-react";
 export const Route = createFileRoute("/wishlist")({
   head: () => ({
     meta: [
-      { title: "Wishlist — GameFinder" },
+      { title: "Wishlist — PlayFinder" },
       {
         name: "description",
         content: "Your saved catalog games and price alerts.",

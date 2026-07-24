@@ -13,7 +13,7 @@ describe("Lovable AppShell", () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getAllByText("GameFinder").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PlayFinder").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Wishlist").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Friends").length).toBeGreaterThan(0);
   });

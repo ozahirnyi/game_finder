@@ -10,7 +10,7 @@ import { lovableQueryKeys } from "@/lib/lovable-data";
 export const Route = createFileRoute("/deals")({
   head: () => ({
     meta: [
-      { title: "Deals — GameFinder" },
+      { title: "Deals — PlayFinder" },
       {
         name: "description",
         content: "Public game deals and discounts across storefronts.",
