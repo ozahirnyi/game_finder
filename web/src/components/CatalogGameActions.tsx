@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Heart } from "lucide-react";
 import type { CatalogGame } from "@/lib/api";
 import {
   ApiError,
@@ -6,6 +7,7 @@ import {
   listFavorites,
   listSavedGames,
   listWishlist,
+  removeFavorite,
   saveCatalogGameToFavorites,
   saveCatalogGameToLibrary,
   saveCatalogGameToWishlist,
@@ -55,6 +57,10 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
     mutationFn: () => saveCatalogGameToFavorites(game.id),
     onSuccess: invalidateCollections,
   });
+  const removeFavoriteMutation = useMutation({
+    mutationFn: () => removeFavorite(game.id),
+    onSuccess: invalidateCollections,
+  });
 
   if (!authenticated) return null;
 
@@ -64,9 +70,10 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
   const inWishlist = wishlist.data?.some(
     (item) => item.catalog_game_id === game.id,
   ) || wishlistMutation.isSuccess;
-  const inFavorites = favorites.data?.some(
-    (item) => item.catalog_game_id === game.id,
-  ) || favoriteMutation.isSuccess;
+  const inFavorites = removeFavoriteMutation.isSuccess
+    ? false
+    : favorites.data?.some((item) => item.catalog_game_id === game.id) ||
+      favoriteMutation.isSuccess;
 
   return (
     <div className="flex flex-wrap gap-2" aria-label={`Save ${game.name}`}>
@@ -88,15 +95,32 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
       </button>
       <button
         type="button"
-        onClick={() => favoriteMutation.mutate()}
-        disabled={inFavorites || favoriteMutation.isPending}
-        className="rounded-lg border border-border px-3 py-2 text-sm font-bold hover:bg-secondary disabled:cursor-default disabled:opacity-70"
+        onClick={() =>
+          inFavorites
+            ? removeFavoriteMutation.mutate()
+            : favoriteMutation.mutate()
+        }
+        disabled={favoriteMutation.isPending || removeFavoriteMutation.isPending}
+        aria-label={
+          favoriteMutation.isPending
+            ? `Adding ${game.name} to favorites`
+            : removeFavoriteMutation.isPending
+              ? `Removing ${game.name} from favorites`
+              : inFavorites
+                ? `Remove ${game.name} from favorites`
+                : `Add ${game.name} to favorites`
+        }
+        className="grid size-10 place-items-center rounded-lg border border-border hover:bg-secondary disabled:cursor-default disabled:opacity-70"
       >
-        {inFavorites ? "In favorites" : favoriteMutation.isPending ? "Adding…" : "Add to favorites"}
+        <Heart
+          className="size-4"
+          fill={inFavorites ? "currentColor" : "none"}
+          aria-hidden="true"
+        />
       </button>
-      {(libraryMutation.error || wishlistMutation.error || favoriteMutation.error) && (
+      {(libraryMutation.error || wishlistMutation.error || favoriteMutation.error || removeFavoriteMutation.error) && (
         <p className="w-full text-xs text-destructive" role="alert">
-          {mutationMessage(libraryMutation.error || wishlistMutation.error || favoriteMutation.error)}
+          {mutationMessage(libraryMutation.error || wishlistMutation.error || favoriteMutation.error || removeFavoriteMutation.error)}
         </p>
       )}
     </div>
