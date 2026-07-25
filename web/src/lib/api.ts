@@ -829,6 +829,13 @@ export function removeFavorite(catalogGameId: number) {
   });
 }
 
+export function saveCatalogGameToFavorites(rawgId: number) {
+  return request<CatalogCollectionItem>(
+    `/favorites/catalog-games/${encodeURIComponent(rawgId)}`,
+    { method: "POST", auth: true },
+  );
+}
+
 export function listWishlist() {
   return request<CatalogCollectionItem[]>("/wishlist", { auth: true });
 }

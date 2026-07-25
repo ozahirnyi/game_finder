@@ -5,6 +5,7 @@ import contextlib
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -940,6 +941,61 @@ def add_favorite(
     db.add(item)
     db.commit()
     db.refresh(item)
+    return collection_response(item)
+
+
+@app.post("/favorites/catalog-games/{rawg_id}", response_model=CatalogCollectionRead)
+async def save_catalog_favorite_game(
+    rawg_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if rawg_id < 1:
+        raise HTTPException(status_code=400, detail="rawg_id must be >= 1")
+
+    existing = (
+        db.query(Favorite)
+        .filter(
+            Favorite.user_id == current_user.id,
+            Favorite.catalog_game_id == rawg_id,
+        )
+        .first()
+    )
+    if existing:
+        response.status_code = 200
+        return collection_response(existing)
+
+    try:
+        detail = await fetch_rawg_game_detail(rawg_id)
+    except RAWGError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+    item = Favorite(
+        user_id=current_user.id,
+        catalog_game_id=rawg_id,
+        title=detail["name"],
+        cover_url=detail.get("background_image"),
+    )
+    db.add(item)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = (
+            db.query(Favorite)
+            .filter(
+                Favorite.user_id == current_user.id,
+                Favorite.catalog_game_id == rawg_id,
+            )
+            .first()
+        )
+        if existing:
+            response.status_code = 200
+            return collection_response(existing)
+        raise
+    db.refresh(item)
+    response.status_code = 201
     return collection_response(item)
 
 
