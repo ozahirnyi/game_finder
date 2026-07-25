@@ -131,6 +131,7 @@ function dashboard() {
           title: "Balatro",
           reason: "Because you enjoy roguelikes",
           tags: ["Cards"],
+          cover_url: "https://cdn.example/balatro.jpg",
         },
       ],
     }),
@@ -162,6 +163,10 @@ describe("live dashboard and profile data", () => {
   it("renders dashboard blocks from the summary response and useful disconnected states", async () => {
     renderPage(<Dashboard />);
     expect((await screen.findAllByText("Balatro")).length).toBeGreaterThan(0);
+    expect(await screen.findByRole("img", { name: "Balatro" })).toHaveAttribute(
+      "src",
+      "https://cdn.example/balatro.jpg",
+    );
     expect(screen.getByText("No price drops yet.")).toBeVisible();
     expect(screen.getAllByText("Connect Steam").length).toBeGreaterThan(0);
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
