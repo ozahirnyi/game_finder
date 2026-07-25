@@ -511,6 +511,97 @@ def test_homepage_deals_returns_steam_store_deals(monkeypatch):
     assert payload["results"][0]["background_image"].startswith("https://shared.akamai.steamstatic.com/")
 
 
+def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_deal_candidates(country: str):
+        assert country == "US"
+        return {
+            "popular": [
+                {"steam_appid": 1, "name": "Hades", "background_image": "steam-hades", "url": "https://store.test/hades", "current": {"cut": 50}},
+                {"steam_appid": 2, "name": "Baldur's Gate 3", "background_image": "steam-bg3", "url": "https://store.test/bg3", "current": {"cut": 20}},
+                {"steam_appid": 3, "name": "Stardew Valley", "background_image": "steam-stardew", "url": "https://store.test/stardew", "current": {"cut": 40}},
+            ],
+            "candidates": [
+                {"steam_appid": 1, "name": "Hades", "background_image": "steam-hades", "url": "https://store.test/hades", "current": {"cut": 50}},
+                {"steam_appid": 4, "name": "Civilization VII", "background_image": "steam-civ", "url": "https://store.test/civ", "current": {"cut": 25}},
+            ],
+        }
+
+    async def fake_fetch_rawg_games(query: str, page: int):
+        assert page == 1
+        return {
+            "results": {
+                "Hades": [{"id": 1, "name": "Hades", "released": "2020-09-17", "background_image": "rawg-hades", "genres": ["Action", "RPG"]}],
+                "Civilization VII": [{"id": 2, "name": "Civilization VII", "released": "2025-02-11", "background_image": "rawg-civ", "genres": ["Strategy"]}],
+            }.get(query, [])
+        }
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
+        favorite_genres=[], steam_country_code=None
+    )
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+
+    try:
+        response = client.get("/prices/genre-deals")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["name"] for item in payload["popular"]] == ["Hades", "Baldur's Gate 3", "Stardew Valley"]
+    assert [section["genre"] for section in payload["sections"]] == ["Action", "RPG", "Adventure", "Strategy", "Indie"]
+    assert [item["name"] for item in payload["sections"][0]["results"]] == ["Hades"]
+    assert payload["sections"][2]["results"] == []
+    assert [item["name"] for item in payload["sections"][3]["results"]] == ["Civilization VII"]
+
+
+def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
+    cache_keys = []
+    candidate_calls = 0
+
+    async def fake_cache(key, _ttl, fetch):
+        nonlocal candidate_calls
+        cache_keys.append(key)
+        if candidate_calls:
+            return {"popular": [], "sections": []}
+        candidate_calls += 1
+        return await fetch()
+
+    async def fake_fetch_deal_candidates(_country: str):
+        return {
+            "popular": [],
+            "candidates": [
+                {"steam_appid": appid, "name": f"Action {appid}", "background_image": None, "url": None, "current": None}
+                for appid in range(1, 8)
+            ],
+        }
+
+    async def fake_fetch_rawg_games(query: str, _page: int):
+        return {"results": [{"id": int(query.split()[-1]), "name": query, "released": None, "background_image": None, "genres": ["ACTION"]}]}
+
+    user = SimpleNamespace(favorite_genres=[" Action "], steam_country_code="us")
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+
+    try:
+        first = client.get("/prices/genre-deals")
+        second = client.get("/prices/genre-deals")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 200
+    assert len(first.json()["sections"][0]["results"]) == 5
+    assert second.status_code == 200
+    assert cache_keys[0] == cache_keys[1]
+    assert cache_keys[0].startswith("steam_genre_deals_v1:")
+
+
 def test_cors_allows_localhost_origin():
     response = client.options(
         "/health",
