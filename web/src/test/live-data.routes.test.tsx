@@ -8,13 +8,18 @@ import { Route as SteamRoute } from "@/routes/steam";
 
 const api = vi.hoisted(() => ({
   getDashboard: vi.fn(),
+  getGoogleLinkUrl: vi.fn(),
   getProfileSummary: vi.fn(),
+  getSteamLinkUrl: vi.fn(),
   syncSteamLibrary: vi.fn(),
   updateProfile: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-  createFileRoute: () => (options: unknown) => options,
+  createFileRoute: () => (options: object) => ({
+    ...options,
+    useSearch: () => ({}),
+  }),
   Link: ({ children, ...props }: React.ComponentProps<"a">) => (
     <a {...props}>{children}</a>
   ),
@@ -227,7 +232,9 @@ describe("live dashboard and profile data", () => {
       (await screen.findAllByText("Connect Steam to sync your library."))
         .length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText("Connect Steam", { selector: "a" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Connect Steam" }),
+    ).toBeVisible();
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
   });
 });

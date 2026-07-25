@@ -5,6 +5,7 @@ import { ArrowLeft, ExternalLink, Share2, Star } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
+import { CatalogGameActions } from "@/components/CatalogGameActions";
 import {
   getCatalogGame,
   getGamePriceHistory,
@@ -371,6 +372,9 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
           <PricePanel gameId={String(game.id)} />
         </main>
         <aside className="space-y-6 lg:col-span-4">
+          <div className="rounded-2xl border border-border bg-surface p-6">
+            <CatalogGameActions game={game} />
+          </div>
           <div className="rounded-2xl border border-border bg-surface p-6">
             <SectionHeader title="At a glance" />
             <dl className="space-y-3 text-sm">

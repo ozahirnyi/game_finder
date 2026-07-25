@@ -79,7 +79,7 @@ export type SavedGame = {
   title: string;
   notes: string | null;
   info: string | null;
-  source: "manual" | "steam" | "psn";
+  source: "manual" | "steam" | "psn" | "catalog";
   external_id: string | null;
   playtime_forever: number | null;
   playtime_2weeks: number | null;
@@ -503,6 +503,10 @@ export function getSteamSignInUrl() {
   return request<OAuthLoginUrl>("/auth/steam/login-url");
 }
 
+export function getSteamLinkUrl() {
+  return request<SteamLoginUrl>("/steam/login-url", { auth: true });
+}
+
 export function exchangeSteamCode(exchangeCode: string) {
   return request<TokenResponse>("/auth/steam/exchange", {
     method: "POST",
@@ -565,6 +569,13 @@ export function createSavedGame(title: string, info?: string, notes = "") {
     auth: true,
     body: { title, notes, info },
   });
+}
+
+export function saveCatalogGameToLibrary(rawgId: number) {
+  return request<SavedGame>(
+    `/library/catalog-games/${encodeURIComponent(rawgId)}`,
+    { method: "POST", auth: true },
+  );
 }
 
 export function updateSavedGame(id: string, notes: string) {
@@ -832,6 +843,13 @@ export function addWishlistItem(
     auth: true,
     body: { catalog_game_id: catalogGameId, title, cover_url: coverUrl },
   });
+}
+
+export function saveCatalogGameToWishlist(rawgId: number) {
+  return request<CatalogCollectionItem>(
+    `/wishlist/catalog-games/${encodeURIComponent(rawgId)}`,
+    { method: "POST", auth: true },
+  );
 }
 
 export function updateWishlistItem(

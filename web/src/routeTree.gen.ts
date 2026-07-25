@@ -21,6 +21,7 @@ import { Route as FriendsRouteImport } from './routes/friends'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
 const WishlistRoute = WishlistRouteImport.update({
   id: '/wishlist',
@@ -82,6 +83,11 @@ const GamesGameIdRoute = GamesGameIdRouteImport.update({
   path: '/games/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/games/$gameId': typeof GamesGameIdRoute
 }
 export interface FileRoutesByTo {
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/games/$gameId': typeof GamesGameIdRoute
 }
 export interface FileRoutesById {
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/games/$gameId': typeof GamesGameIdRoute
 }
 export interface FileRouteTypes {
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/auth/callback'
     | '/games/$gameId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/auth/callback'
     | '/games/$gameId'
   id:
     | '__root__'
@@ -168,6 +179,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/auth/callback'
     | '/games/$gameId'
   fileRoutesById: FileRoutesById
 }
@@ -183,6 +195,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SteamRoute: typeof SteamRoute
   WishlistRoute: typeof WishlistRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
 }
 
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -287,6 +307,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SteamRoute: SteamRoute,
   WishlistRoute: WishlistRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   GamesGameIdRoute: GamesGameIdRoute,
 }
 export const routeTree = rootRouteImport

@@ -11,7 +11,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { Avatar } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { getProfileSummary, updateProfile } from "@/lib/api";
+import { getGoogleLinkUrl, getProfileSummary, updateProfile } from "@/lib/api";
 import { lovableQueryKeys } from "@/lib/lovable-data";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
@@ -63,6 +63,10 @@ export function ProfilePage() {
       setEditing(false);
       client.invalidateQueries({ queryKey: lovableQueryKeys.profileSummary });
     },
+  });
+  const linkGoogle = useMutation({
+    mutationFn: getGoogleLinkUrl,
+    onSuccess: ({ url }) => window.location.assign(url),
   });
   const open = () => {
     setBio(profile?.bio ?? "");
@@ -295,12 +299,28 @@ export function ProfilePage() {
                   Connect
                 </Link>
               ) : (
-                <span className="text-xs text-muted-foreground">
-                  Not connected
-                </span>
+                r.n === "Google" ? (
+                  <button
+                    type="button"
+                    onClick={() => linkGoogle.mutate()}
+                    disabled={linkGoogle.isPending}
+                    className="rounded border border-border px-2 py-1 text-xs font-bold disabled:opacity-60"
+                  >
+                    {linkGoogle.isPending ? "Opening Google…" : "Connect"}
+                  </button>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    Not connected
+                  </span>
+                )
               )}
             </div>
           ))}
+          {linkGoogle.error && (
+            <p className="text-xs text-destructive" role="alert">
+              Could not open Google. Please try again.
+            </p>
+          )}
         </aside>
       </div>
     </AppShell>

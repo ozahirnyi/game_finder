@@ -1,14 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { getDashboard, syncSteamLibrary } from "@/lib/api";
+import { getDashboard, getSteamLinkUrl, syncSteamLibrary } from "@/lib/api";
 import { lovableQueryKeys } from "@/lib/lovable-data";
-export const Route = createFileRoute("/steam")({ component: SteamPage });
+export const Route = createFileRoute("/steam")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    linked: search.linked === "1" ? "1" : undefined,
+    error: typeof search.error === "string" ? search.error : undefined,
+  }),
+  component: SteamPage,
+});
 const icon = (id: number, hash: string) =>
   `https://media.steampowered.com/steamcommunity/public/images/apps/${id}/${hash}.jpg`;
 function SteamPage() {
   const c = useQueryClient();
+  const search = Route.useSearch();
   const q = useQuery({
     queryKey: lovableQueryKeys.dashboard,
     queryFn: getDashboard,
@@ -22,6 +30,16 @@ function SteamPage() {
     onSuccess: () =>
       c.invalidateQueries({ queryKey: lovableQueryKeys.dashboard }),
   });
+  const connect = useMutation({
+    mutationFn: getSteamLinkUrl,
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+  useEffect(() => {
+    if (search.linked === "1") {
+      c.invalidateQueries({ queryKey: lovableQueryKeys.dashboard });
+      c.invalidateQueries({ queryKey: lovableQueryKeys.steam });
+    }
+  }, [c, search.linked]);
   if ((q.error as { status?: number } | null)?.status === 401)
     return (
       <AppShell>
@@ -35,7 +53,24 @@ function SteamPage() {
           title="Steam integration"
           hint={b?.message || "Connect Steam to view your library."}
         />
-        <Link to="/steam">Connect Steam</Link>
+        {search.linked === "1" && (
+          <p role="status" className="mb-3 text-sm text-primary">
+            Steam account connected. Your library is ready to sync.
+          </p>
+        )}
+        {(search.error || connect.error) && (
+          <p role="alert" className="mb-3 text-sm text-destructive">
+            {search.error || "Could not open Steam. Please try again."}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => connect.mutate()}
+          disabled={connect.isPending}
+          className="rounded-lg bg-primary px-4 py-2 font-bold text-primary-foreground disabled:opacity-60"
+        >
+          {connect.isPending ? "Opening Steam…" : "Connect Steam"}
+        </button>
       </AppShell>
     );
   return (
