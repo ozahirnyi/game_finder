@@ -137,6 +137,19 @@ describe("auth recovery routes", () => {
     expect(form).not.toHaveClass("form-stack");
   });
 
+  it("lets visitors return home from either auth form", () => {
+    const { unmount } = render(<LoginPage />);
+    expect(
+      screen.getByRole("link", { name: "← Back to PlayFinder" }),
+    ).toHaveAttribute("href", "/");
+
+    unmount();
+    render(<RegisterPage />);
+    expect(
+      screen.getByRole("link", { name: "← Back to PlayFinder" }),
+    ).toHaveAttribute("href", "/");
+  });
+
   it("offers a sign-in link when the profile request is unauthorized", async () => {
     api.getCurrentUser.mockRejectedValue(
       new api.ApiError("Your session expired. Please log in again.", 401),

@@ -83,7 +83,7 @@ export function ProfilePage() {
   const signOut = () => {
     clearToken();
     client.clear();
-    navigate({ to: "/login" });
+    navigate({ to: "/" });
   };
   if (query.isError)
     return (

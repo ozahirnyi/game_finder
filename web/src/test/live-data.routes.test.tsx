@@ -211,7 +211,7 @@ describe("live dashboard and profile data", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     expect(api.clearToken).toHaveBeenCalledOnce();
-    expect(navigate).toHaveBeenCalledWith({ to: "/login" });
+    expect(navigate).toHaveBeenCalledWith({ to: "/" });
   });
 
   it("keeps sign out available when the profile summary cannot load", async () => {
@@ -233,7 +233,7 @@ describe("live dashboard and profile data", () => {
 
     expect(api.clearToken).toHaveBeenCalledOnce();
     expect(clear).toHaveBeenCalledOnce();
-    expect(navigate).toHaveBeenCalledWith({ to: "/login" });
+    expect(navigate).toHaveBeenCalledWith({ to: "/" });
   });
 
   it("shows a sign-in action when protected summary requests return 401", async () => {
