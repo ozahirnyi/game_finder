@@ -104,7 +104,11 @@ export function Dashboard() {
                 </Link>
               }
             />
-            {recommendations.length ? (
+            {data?.recommendations.status === "error" ? (
+              <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive" role="alert">
+                {message(data.recommendations, "Recommendations are temporarily unavailable. Please try again later.")}
+              </p>
+            ) : recommendations.length ? (
               <div className="grid grid-cols-2 gap-5 lg:grid-cols-3">
                 {recommendations.map((item) => (
                   <Link

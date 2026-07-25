@@ -167,6 +167,21 @@ describe("live dashboard and profile data", () => {
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
   });
 
+  it("shows a recommendation-provider error instead of the empty CTA", async () => {
+    api.getDashboard.mockResolvedValue({
+      ...dashboard(),
+      recommendations: {
+        status: "error",
+        data: [],
+        message: "Recommendations are temporarily unavailable. Please try again later.",
+      },
+    });
+    renderPage(<Dashboard />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Recommendations are temporarily unavailable. Please try again later.",
+    );
+  });
+
   it("renders profile and library values from the profile summary without demo cards", async () => {
     renderPage(<ProfilePage />);
     expect(

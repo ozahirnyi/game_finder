@@ -15,6 +15,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.openai_client import get_recommendation
+from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations
 from app.cache import build_cache_key, get_json_cached
 from app.integrations.rawg import (
     fetch_rawg_game_detail,
@@ -339,34 +340,6 @@ def notify_saved_game(user: User, game_title: str) -> None:
 
 def steam_frontend_redirect(**params: str) -> RedirectResponse:
     return RedirectResponse(f"{get_frontend_url()}/steam?{urlencode(params)}", status_code=303)
-
-
-def build_steam_recommendation_prompt(games: list[dict], extra_prompt: str | None = None) -> str:
-    top_games = games[:10]
-    if not top_games:
-        raise HTTPException(status_code=409, detail="Steam library has no playable history yet")
-
-    game_lines = []
-    for index, game in enumerate(top_games, start=1):
-        minutes = int(game.get("playtime_forever") or 0)
-        hours = round(minutes / 60, 1)
-        game_lines.append(f"{index}. {game.get('name')} - {hours} hours played")
-
-    request = (extra_prompt or "").strip()
-    if not request:
-        request = "Recommend games I am likely to enjoy next based on my most played Steam games."
-
-    return "\n".join(
-        [
-            request,
-            "",
-            "My most played Steam games:",
-            *game_lines,
-            "",
-            "Use the playtime as the strongest preference signal.",
-            "Avoid recommending games that are already in this Steam list.",
-        ]
-    )
 
 
 @app.get("/", include_in_schema=False)
@@ -1250,10 +1223,17 @@ async def dashboard(current_user: User = Depends(get_current_user), db: Session 
         library_data["total_playtime_minutes"] += steam_minutes
         library_data["total_playtime_hours"] = round(library_data["total_playtime_minutes"] / 60, 1)
         library = DataBlock(status="ready", data=library_data)
+    if steam_block.status == "ready" and steam_games:
+        try:
+            recommendation_block = DataBlock(status="ready", data=await get_cached_steam_recommendations(current_user.id, steam_games))
+        except Exception:
+            recommendation_block = DataBlock(status="error", data=[], message="Recommendations are temporarily unavailable. Please try again later.")
+    else:
+        recommendation_block = empty_block("Add games or connect Steam to get recommendations.")
     return DashboardRead(
         user=DataBlock(status="ready", data=user_profile_response(current_user, db=db).model_dump(mode="json")),
         library=library,
-        recommendations=empty_block("Add games or connect Steam to get recommendations."),
+        recommendations=recommendation_block,
         deals=deals_block,
         steam=steam_block,
         social=social_block(db, current_user.id),
@@ -1684,10 +1664,7 @@ async def steam_recommendations(
     if not current_user.steam_id:
         raise HTTPException(status_code=409, detail="Connect Steam first")
     games = await fetch_owned_games(current_user.steam_id)
-    prompt = build_steam_recommendation_prompt(games, data.prompt)
-    liked_app_ids = [int(game["appid"]) for game in games[:10] if game.get("appid") is not None]
-    result = await asyncio.to_thread(get_recommendation, prompt, liked_app_ids)
-    return result
+    return await get_cached_steam_recommendations(current_user.id, games, data.prompt)
 
 
 @app.get("/search/games",response_model=GameSearchResponse)
