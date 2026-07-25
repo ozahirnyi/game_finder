@@ -5,6 +5,7 @@ import { Search, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
+import { CatalogGameActions } from "@/components/CatalogGameActions";
 import {
   getRecommendations,
   searchGames,
@@ -77,6 +78,7 @@ export function SearchPage() {
     enabled: mode === "ai" && Boolean(submitted),
   });
   const games = catalog.data?.results.map(toGameCard) ?? [];
+  const catalogGames = catalog.data?.results ?? [];
   const ask = () => setSubmitted(query.trim());
 
   return (
@@ -178,37 +180,33 @@ export function SearchPage() {
               No catalog games matched “{query}”.
             </p>
           )}
-          {games.map((game) =>
-            game.id ? (
-              <Link
-                key={game.id}
-                to="/games/$gameId"
-                params={{ gameId: game.id }}
-                className="overflow-hidden rounded-xl border border-border bg-surface"
-              >
-                <GameCover
-                  from={game.imageUrl ?? "#1f2937"}
-                  to="#111827"
-                  title={game.title ?? "Untitled game"}
-                  className="aspect-[3/4] w-full"
-                />
-                <p className="p-3 font-bold">{game.title}</p>
-              </Link>
-            ) : (
+          {catalogGames.map((game) => {
+            if (!game.id || !game.name) return null;
+            return (
               <article
-                key={game.title}
+                key={game.id}
                 className="overflow-hidden rounded-xl border border-border bg-surface"
               >
-                <GameCover
-                  from={game.imageUrl ?? "#1f2937"}
-                  to="#111827"
-                  title={game.title ?? "Untitled game"}
-                  className="aspect-[3/4] w-full"
-                />
-                <p className="p-3 font-bold">{game.title}</p>
+                <Link
+                  to="/games/$gameId"
+                  params={{ gameId: String(game.id) }}
+                  aria-label={`View details for ${game.name}`}
+                  className="block"
+                >
+                  <GameCover
+                    from={game.background_image ?? "#1f2937"}
+                    to="#111827"
+                    title={game.name}
+                    className="aspect-[3/4] w-full"
+                  />
+                  <p className="p-3 font-bold">{game.name}</p>
+                </Link>
+                <div className="px-3 pb-3">
+                  <CatalogGameActions game={{ id: game.id, name: game.name }} />
+                </div>
               </article>
-            ),
-          )}
+            );
+          })}
         </div>
       )}
     </AppShell>

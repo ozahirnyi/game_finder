@@ -79,7 +79,7 @@ export type SavedGame = {
   title: string;
   notes: string | null;
   info: string | null;
-  source: "manual" | "steam" | "psn";
+  source: "manual" | "steam" | "psn" | "catalog";
   external_id: string | null;
   playtime_forever: number | null;
   playtime_2weeks: number | null;
@@ -567,6 +567,13 @@ export function createSavedGame(title: string, info?: string, notes = "") {
   });
 }
 
+export function saveCatalogGameToLibrary(rawgId: number) {
+  return request<SavedGame>(
+    `/library/catalog-games/${encodeURIComponent(rawgId)}`,
+    { method: "POST", auth: true },
+  );
+}
+
 export function updateSavedGame(id: string, notes: string) {
   return request<SavedGame>(`/games/${id}`, {
     method: "PATCH",
@@ -832,6 +839,13 @@ export function addWishlistItem(
     auth: true,
     body: { catalog_game_id: catalogGameId, title, cover_url: coverUrl },
   });
+}
+
+export function saveCatalogGameToWishlist(rawgId: number) {
+  return request<CatalogCollectionItem>(
+    `/wishlist/catalog-games/${encodeURIComponent(rawgId)}`,
+    { method: "POST", auth: true },
+  );
 }
 
 export function updateWishlistItem(
