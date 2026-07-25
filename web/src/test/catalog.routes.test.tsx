@@ -9,6 +9,7 @@ import { SearchPage } from "@/routes/search";
 const api = vi.hoisted(() => ({
   ApiError: class ApiError extends Error {},
   getCatalogGame: vi.fn(),
+  getGenreDeals: vi.fn(),
   getGamePriceHistory: vi.fn(),
   getHomepageDeals: vi.fn(),
   getSavedGame: vi.fn(),
@@ -79,6 +80,44 @@ describe("catalog routes", () => {
         },
       ],
     });
+    api.getGenreDeals.mockResolvedValue({
+      popular: [
+        {
+          id: 274755,
+          name: "Hades II",
+          released: "2024-05-06",
+          background_image: "https://cdn.example/hades.jpg",
+          url: "https://store.steampowered.com/app/1145350",
+          current: {
+            shop: "Steam",
+            price: { amount: 19.99, currency: "USD" },
+            regular: { amount: 29.99, currency: "USD" },
+            cut: 33,
+          },
+        },
+      ],
+      sections: [
+        {
+          genre: "Action",
+          results: [
+            {
+              id: 274755,
+              name: "Hades II",
+              released: "2024-05-06",
+              background_image: "https://cdn.example/hades.jpg",
+              url: "https://store.steampowered.com/app/1145350",
+              current: {
+                shop: "Steam",
+                price: { amount: 19.99, currency: "USD" },
+                regular: { amount: 29.99, currency: "USD" },
+                cut: 33,
+              },
+            },
+          ],
+        },
+        { genre: "Strategy", results: [] },
+      ],
+    });
     api.getCatalogGame.mockResolvedValue({
       id: 274755,
       name: "Hades II",
@@ -122,15 +161,66 @@ describe("catalog routes", () => {
     renderPage(<DealsPage />);
 
     expect((await screen.findAllByText("Hades II")).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: /open deal/i })).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: /open deal/i })[0]).toHaveAttribute(
       "href",
       "https://store.steampowered.com/app/1145350",
     );
-    expect(screen.getByRole("link", { name: /game details/i })).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: /game details/i })[0]).toHaveAttribute(
       "href",
       "/games/274755",
     );
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
+  });
+
+  it("shows popular Steam discounts and honest genre sections", async () => {
+    renderPage(<DealsPage />);
+
+    expect(await screen.findByText("Popular on Steam")).toBeVisible();
+    expect(screen.getByText("Action")).toBeVisible();
+    expect(screen.getByText("Strategy")).toBeVisible();
+    expect(screen.getByText("No matching current deals.")).toBeVisible();
+    expect(screen.getAllByText(/-33%/).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /open deal/i })[0]).toHaveAttribute(
+      "href",
+      "https://store.steampowered.com/app/1145350",
+    );
+    expect(api.getGenreDeals).toHaveBeenCalledTimes(1);
+    expect(api.getHomepageDeals).not.toHaveBeenCalled();
+  });
+
+  it("keeps a Steam link when a deal has no catalog match", async () => {
+    api.getGenreDeals.mockResolvedValueOnce({
+      popular: [],
+      sections: [
+        {
+          genre: "Indie",
+          results: [
+            {
+              id: null,
+              name: "Unmatched Indie Deal",
+              released: null,
+              background_image: null,
+              url: "https://store.steampowered.com/app/999",
+              current: {
+                shop: "Steam",
+                price: { amount: 4.99, currency: "USD" },
+                regular: { amount: 9.99, currency: "USD" },
+                cut: 50,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    renderPage(<DealsPage />);
+
+    expect(await screen.findByText("Unmatched Indie Deal")).toBeVisible();
+    expect(screen.getByRole("link", { name: /open deal/i })).toHaveAttribute(
+      "href",
+      "https://store.steampowered.com/app/999",
+    );
+    expect(screen.queryByRole("link", { name: /game details/i })).not.toBeInTheDocument();
   });
 
   it("renders real catalog metadata and price-low values without placeholder copy", async () => {
