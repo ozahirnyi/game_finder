@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import uuid
 
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 import app.main as main
 
@@ -171,6 +172,145 @@ def test_catalog_wishlist_save_requires_authentication():
     response = client.post("/wishlist/catalog-games/274755")
 
     assert response.status_code == 401
+
+
+def test_catalog_favorite_save_is_idempotent_and_server_authoritative(monkeypatch):
+    owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        assert rawg_id == 274755
+        return {
+            "id": rawg_id,
+            "name": "Hades II",
+            "background_image": "https://example.com/hades-ii.jpg",
+        }
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        first = client.post("/favorites/catalog-games/274755")
+        again = client.post("/favorites/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert first.json()["catalog_game_id"] == 274755
+    assert first.json()["title"] == "Hades II"
+    assert first.json()["cover_url"] == "https://example.com/hades-ii.jpg"
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
+    assert len(db.games) == 1
+
+
+def test_catalog_favorite_save_is_isolated_by_owner(monkeypatch):
+    first_owner_id = uuid.uuid4()
+    second_owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II", "background_image": None}
+
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
+        first = client.post("/favorites/catalog-games/274755")
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=second_owner_id)
+        second = client.post("/favorites/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert len(db.games) == 2
+    assert {game.user_id for game in db.games} == {first_owner_id, second_owner_id}
+
+
+def test_catalog_favorite_save_requires_authentication():
+    response = client.post("/favorites/catalog-games/274755")
+
+    assert response.status_code == 401
+
+
+def test_catalog_favorite_save_rejects_invalid_rawg_id():
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=uuid.uuid4())
+    main.app.dependency_overrides[main.get_db] = lambda: CatalogGameDb()
+
+    try:
+        response = client.post("/favorites/catalog-games/0")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "rawg_id must be >= 1"
+
+
+def test_catalog_favorite_save_recovers_from_concurrent_duplicate(monkeypatch):
+    owner_id = uuid.uuid4()
+
+    class RaceFavoriteQuery:
+        def __init__(self, db):
+            self.db = db
+
+        def filter(self, *_criteria):
+            return self
+
+        def first(self):
+            return self.db.existing
+
+    class RaceFavoriteDb:
+        def __init__(self):
+            self.existing = None
+            self.rollback_called = False
+
+        def query(self, _model):
+            return RaceFavoriteQuery(self)
+
+        def add(self, _item):
+            return None
+
+        def commit(self):
+            self.existing = SimpleNamespace(
+                id=uuid.uuid4(),
+                catalog_game_id=274755,
+                title="Hades II",
+                cover_url="https://example.com/hades-ii.jpg",
+                created_at=datetime.now(timezone.utc),
+                updated_at=None,
+            )
+            raise IntegrityError("INSERT INTO favorites", {}, Exception("duplicate"))
+
+        def rollback(self):
+            self.rollback_called = True
+
+        def refresh(self, _item):
+            raise AssertionError("a racing duplicate must not be refreshed")
+
+    db = RaceFavoriteDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {
+            "id": rawg_id,
+            "name": "Hades II",
+            "background_image": "https://example.com/hades-ii.jpg",
+        }
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        response = client.post("/favorites/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["catalog_game_id"] == 274755
+    assert db.rollback_called is True
 
 
 def test_catalog_game_detail_returns_normalized_rawg_data(monkeypatch):

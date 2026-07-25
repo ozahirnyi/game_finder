@@ -29,6 +29,7 @@ export type LovableSavedGameCard = {
 export const lovableQueryKeys = {
   me: ["auth", "me"] as const,
   savedGames: ["games"] as const,
+  favorites: ["favorites"] as const,
   wishlist: ["wishlist"] as const,
   deals: (country: string) => ["deals", country] as const,
   steam: ["steam"] as const,

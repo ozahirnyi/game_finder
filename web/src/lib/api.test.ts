@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getCurrentUser, getGoogleStatus, setToken } from "./api";
+import {
+  getCurrentUser,
+  getGoogleStatus,
+  saveCatalogGameToFavorites,
+  setToken,
+} from "./api";
 
 const TOKEN_KEY = "game_finder_token";
 
@@ -51,6 +56,36 @@ describe("API requests", () => {
     expect(new Headers(options.headers).get("Authorization")).toBe(
       `Bearer ${window.localStorage.getItem(TOKEN_KEY)}`,
     );
+  });
+
+  it("posts a RAWG id to the server-authoritative favorites endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "favorite-1",
+          catalog_game_id: 274755,
+          title: "Hades II",
+          cover_url: null,
+          created_at: "2026-07-25T00:00:00Z",
+          updated_at: null,
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    setToken(validToken());
+
+    await saveCatalogGameToFavorites(274755);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/favorites/catalog-games/274755",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const [, options] = fetchMock.mock.calls[0];
+    expect(new Headers(options.headers).get("Authorization")).toBe(
+      `Bearer ${window.localStorage.getItem(TOKEN_KEY)}`,
+    );
+    expect(options.body).toBeUndefined();
   });
 
   it("returns non-JSON error text in ApiError", async () => {
