@@ -116,12 +116,13 @@ export function Dashboard() {
                     to={item.rawg_id ? "/games/$gameId" : "/search"}
                     params={item.rawg_id ? { gameId: String(item.rawg_id) } : undefined}
                     className="overflow-hidden rounded-xl border border-border bg-surface transition hover:border-white/20"
-                  >
-                    <GameCover
-                      src={item.cover_url}
-                      title={item.title}
-                      className="aspect-[4/5] w-full"
-                    />
+                    >
+                      <GameCover
+                        from={item.cover_url ?? "#334155"}
+                        to="#0f172a"
+                        title={item.title}
+                        className="aspect-[4/5] w-full"
+                      />
                     <div className="p-4">
                       <div className="mb-2 flex items-center gap-1.5">
                         <Sparkles className="size-3 text-primary" />
