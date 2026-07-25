@@ -89,10 +89,11 @@ describe("AppShell", () => {
       </AppShell>,
     );
 
-    expect(screen.getByRole("link", { name: "Signed in" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
       "href",
       "/profile",
     );
+    expect(screen.queryByText("Signed in")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Sign in" }),
     ).not.toBeInTheDocument();
