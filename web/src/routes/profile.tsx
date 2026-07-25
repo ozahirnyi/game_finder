@@ -89,7 +89,16 @@ export function ProfilePage() {
     return (
       <AppShell>
         <SectionHeader title="Profile" hint="Sign in to view your profile." />
-        <Link to="/login">Sign in</Link>
+        <div className="flex gap-3">
+          <Link to="/login">Sign in</Link>
+          <button
+            type="button"
+            onClick={signOut}
+            className="text-sm font-semibold text-muted-foreground hover:text-foreground"
+          >
+            Sign out
+          </button>
+        </div>
       </AppShell>
     );
   const rows = [

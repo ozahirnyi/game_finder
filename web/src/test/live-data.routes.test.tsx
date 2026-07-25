@@ -214,6 +214,28 @@ describe("live dashboard and profile data", () => {
     expect(navigate).toHaveBeenCalledWith({ to: "/login" });
   });
 
+  it("keeps sign out available when the profile summary cannot load", async () => {
+    api.getProfileSummary.mockRejectedValue({ status: 500 });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const clear = vi.spyOn(client, "clear");
+    render(
+      <QueryClientProvider client={client}>
+        <ProfilePage />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      await screen.findByText("Sign in to view your profile."),
+    ).toBeVisible();
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(api.clearToken).toHaveBeenCalledOnce();
+    expect(clear).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith({ to: "/login" });
+  });
+
   it("shows a sign-in action when protected summary requests return 401", async () => {
     api.getProfileSummary.mockRejectedValue({ status: 401 });
     api.getDashboard.mockRejectedValue({ status: 401 });
