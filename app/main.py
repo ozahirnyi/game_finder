@@ -5,6 +5,7 @@ import contextlib
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -977,7 +978,22 @@ async def save_catalog_favorite_game(
         cover_url=detail.get("background_image"),
     )
     db.add(item)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = (
+            db.query(Favorite)
+            .filter(
+                Favorite.user_id == current_user.id,
+                Favorite.catalog_game_id == rawg_id,
+            )
+            .first()
+        )
+        if existing:
+            response.status_code = 200
+            return collection_response(existing)
+        raise
     db.refresh(item)
     response.status_code = 201
     return collection_response(item)

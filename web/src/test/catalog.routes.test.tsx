@@ -7,6 +7,7 @@ import { CatalogGameActions } from "@/components/CatalogGameActions";
 import { SearchPage } from "@/routes/search";
 
 const api = vi.hoisted(() => ({
+  ApiError: class ApiError extends Error {},
   getCatalogGame: vi.fn(),
   getGamePriceHistory: vi.fn(),
   getHomepageDeals: vi.fn(),
@@ -294,6 +295,46 @@ describe("catalog routes", () => {
     expect(
       await screen.findByRole("button", { name: /in favorites/i }),
     ).toBeVisible();
+  });
+
+  it("shows the Favorites pending label while saving", async () => {
+    api.isAuthenticated.mockReturnValue(true);
+    api.listSavedGames.mockResolvedValue([]);
+    api.listWishlist.mockResolvedValue([]);
+    let resolveFavorite: (value: unknown) => void;
+    api.saveCatalogGameToFavorites.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFavorite = resolve;
+      }),
+    );
+
+    renderPage(<CatalogGameActions game={{ id: 274755, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] }} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /add to favorites/i }));
+
+    expect(
+      await screen.findByRole("button", { name: /adding/i }),
+    ).toBeDisabled();
+    resolveFavorite!({});
+    expect(
+      await screen.findByRole("button", { name: /in favorites/i }),
+    ).toBeVisible();
+  });
+
+  it("keeps the Favorites action retryable after a save failure", async () => {
+    api.isAuthenticated.mockReturnValue(true);
+    api.listSavedGames.mockResolvedValue([]);
+    api.listWishlist.mockResolvedValue([]);
+    api.saveCatalogGameToFavorites.mockRejectedValue(new Error("Unavailable"));
+
+    renderPage(<CatalogGameActions game={{ id: 274755, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] }} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /add to favorites/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not save this game. Please try again.",
+    );
+    expect(screen.getByRole("button", { name: /add to favorites/i })).toBeEnabled();
   });
 
   it("adds from search without replacing the explicit details link", async () => {
