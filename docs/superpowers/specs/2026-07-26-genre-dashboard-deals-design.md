@@ -2,8 +2,9 @@
 
 ## Goal
 
-Replace the `/deals` page's one flat deal list with up to five honest,
-genre-specific Steam deal sections tailored to the signed-in user's profile.
+Replace the `/deals` page's one flat deal list with a compact top-three block
+of current discounted Steam bestsellers and up to five honest, genre-specific
+Steam deal sections tailored to the signed-in user's profile.
 
 ## Scope and compatibility
 
@@ -28,12 +29,14 @@ array when no relevant active discount exists.
 
 Introduce response schemas for a grouped deals payload: a section contains a
 `genre` string and up to five existing `HomeDealItem` records; the top-level
-response contains `sections`.
+response contains `popular` (up to three current discounted Steam bestsellers)
+and `sections`.
 
 The new endpoint calls a focused service rather than invoking
 `fetch_steam_store_deals` directly. The service requests a larger bounded
-candidate pool from Steam, deduplicates on Steam app id, then enriches each
-unique candidate with one RAWG search. It normalizes RAWG genre names by
+candidate pool from Steam, retaining its first three discounted `top_sellers`
+as the popular-deals block. It deduplicates on Steam app id, then enriches
+each unique candidate with one RAWG search. It normalizes RAWG genre names by
 trimming and case-folding them. A candidate is placed only into sections whose
 normalized selected genre appears in the RAWG match's genres. No unrelated
 game may fill a partially populated section. Each section stops after five
@@ -50,13 +53,14 @@ authenticated caller's Steam country is used when available, otherwise `US`.
 
 ## `/deals` page design
 
-Extend the deals API types so the `/deals` query receives grouped `sections`.
-Replace its existing hero and flat card list with a compact section per genre.
-A deal card displays artwork, title, current price and discount, and an
-external Steam link. When its RAWG id exists, its title/artwork additionally
-exposes a catalog navigation target without nesting anchors. Empty and partial
-sections show the exact meaning: no matching current deals, rather than
-substituting other genres.
+Extend the deals API types so the `/deals` query receives `popular` and grouped
+`sections`. Replace its existing hero and flat card list with the top three
+popular discounted Steam games followed by a compact section per genre. A deal
+card displays artwork, title, current price and discount, and an external Steam
+link. When its RAWG id exists, its title/artwork additionally exposes a
+catalog navigation target without nesting anchors. Empty and partial sections
+show the exact meaning: no matching current deals, rather than substituting
+other genres.
 
 The layout keeps the `/deals` page's responsive card language so five sections
 remain usable on narrow screens.
@@ -70,10 +74,11 @@ error.
 
 ## Tests and verification
 
-Backend tests cover fallback genres, first-five selection, normalized
-classification, maximum five matches, empty sections, deduplication, and cache
-reuse for unchanged country and genre inputs. Frontend tests cover rendering
-genre headings, the no-matching-deals state, price/discount rendering, Steam
-links and catalog navigation where a RAWG id exists. Verification includes
-focused tests, the full relevant suites, the production frontend build and
-`git diff --check` before a draft PR.
+Backend tests cover top-three bestseller selection, fallback genres, first-five
+selection, normalized classification, maximum five matches, empty sections,
+deduplication, and cache reuse for unchanged country and genre inputs.
+Frontend tests cover rendering the popular block and genre headings, the
+no-matching-deals state, price/discount rendering, Steam links and catalog
+navigation where a RAWG id exists. Verification includes focused tests, the
+full relevant suites, the production frontend build and `git diff --check`
+before a draft PR.
