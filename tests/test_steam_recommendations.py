@@ -46,3 +46,21 @@ async def test_cached_recommendations_reuse_a_matching_user_library(monkeypatch)
     assert first == second
     assert calls["provider"] == 1
     assert str(user_id) in calls["keys"][0]
+
+
+@pytest.mark.anyio
+async def test_normalize_recommendations_removes_owned_duplicates_and_adds_rawg_metadata(monkeypatch):
+    async def rawg(title, page=1):
+        assert title == "Hades II"
+        return {"results": [{"id": 274755, "name": "Hades II", "background_image": "https://cdn.example/hades.jpg"}]}
+
+    monkeypatch.setattr(recommendations, "fetch_rawg_games", rawg)
+    items = await recommendations.normalize_recommendations(
+        {"recommendations": [
+            {"title": "Rainbow Six Siege", "reason": "owned", "tags": []},
+            {"title": "Hades II", "reason": "good", "tags": []},
+            {"title": "hades ii", "reason": "duplicate", "tags": []},
+        ]},
+        {"rainbow six siege"},
+    )
+    assert items == [{"title": "Hades II", "reason": "good", "tags": [], "rawg_id": 274755, "cover_url": "https://cdn.example/hades.jpg"}]
