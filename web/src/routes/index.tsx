@@ -109,16 +109,16 @@ export function Dashboard() {
                 {message(data.recommendations, "Recommendations are temporarily unavailable. Please try again later.")}
               </p>
             ) : recommendations.length ? (
-              <div className="grid grid-cols-2 gap-5 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {recommendations.map((item) => (
                   <Link
                     key={item.title}
-                    to="/search"
+                    to={item.rawg_id ? "/games/$gameId" : "/search"}
+                    params={item.rawg_id ? { gameId: String(item.rawg_id) } : undefined}
                     className="overflow-hidden rounded-xl border border-border bg-surface transition hover:border-white/20"
                   >
                     <GameCover
-                      from="#14b8a6"
-                      to="#0f172a"
+                      src={item.cover_url}
                       title={item.title}
                       className="aspect-[4/5] w-full"
                     />

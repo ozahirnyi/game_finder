@@ -6,6 +6,7 @@ import uuid
 from fastapi import HTTPException
 
 from app.openai_client import get_recommendation
+from app.integrations.rawg import fetch_rawg_games
 from app.redis_client import cache_get, cache_set
 
 CACHE_TTL_SECONDS = 6 * 60 * 60
@@ -28,6 +29,27 @@ def build_steam_library_fingerprint(games: list[dict]) -> str:
     return hashlib.sha256(json.dumps(normalized, separators=(",", ":")).encode()).hexdigest()
 
 
+async def normalize_recommendations(result: dict, owned_titles: set[str]) -> list[dict]:
+    normalized = []
+    seen = set()
+    for item in result.get("recommendations", []):
+        title = str(item.get("title") or "").strip()
+        key = title.casefold()
+        if not title or key in owned_titles or key in seen:
+            continue
+        seen.add(key)
+        enriched = {"title": title, "reason": item.get("reason") or "", "tags": item.get("tags") or [], "rawg_id": None, "cover_url": None}
+        try:
+            matches = await fetch_rawg_games(title, page=1)
+            match = next((game for game in matches.get("results", []) if str(game.get("name") or "").casefold() == key), None)
+            if match:
+                enriched.update(title=match["name"], rawg_id=match.get("id"), cover_url=match.get("background_image"))
+        except Exception:
+            pass
+        normalized.append(enriched)
+    return normalized
+
+
 async def get_cached_steam_recommendations(user_id: uuid.UUID, games: list[dict], extra_prompt: str | None = None) -> dict:
     key = f"steam_recommendations:{user_id}:{build_steam_library_fingerprint(games)}"
     try:
@@ -37,6 +59,7 @@ async def get_cached_steam_recommendations(user_id: uuid.UUID, games: list[dict]
     except Exception:
         pass
     result = await asyncio.to_thread(get_recommendation, build_steam_recommendation_prompt(games, extra_prompt), sorted({int(game["appid"]) for game in games if game.get("appid") is not None}))
+    result = {"recommendations": await normalize_recommendations(result, {str(game.get("name") or "").strip().casefold() for game in games})}
     try:
         await cache_set(key, result, CACHE_TTL_SECONDS)
     except Exception:
