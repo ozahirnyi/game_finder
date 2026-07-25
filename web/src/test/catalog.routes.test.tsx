@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
   listFavorites: vi.fn(),
   listSavedGames: vi.fn(),
   listWishlist: vi.fn(),
+  removeFavorite: vi.fn(),
   saveCatalogGameToFavorites: vi.fn(),
   saveCatalogGameToLibrary: vi.fn(),
   saveCatalogGameToWishlist: vi.fn(),
@@ -263,11 +264,11 @@ describe("catalog routes", () => {
       screen.getByRole("button", { name: /add to wishlist/i }),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: /add to favorites/i }),
+      screen.getByRole("button", { name: /add hades ii to favorites/i }),
     ).toBeVisible();
   });
 
-  it("saves a catalog game to Favorites from search", async () => {
+  it("adds a catalog game to Favorites from search with the heart", async () => {
     api.isAuthenticated.mockReturnValue(true);
     api.listSavedGames.mockResolvedValue([]);
     api.listWishlist.mockResolvedValue([]);
@@ -286,15 +287,35 @@ describe("catalog routes", () => {
     });
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /add to favorites/i }),
+      await screen.findByRole("button", { name: /add hades ii to favorites/i }),
     );
 
     await waitFor(() =>
       expect(api.saveCatalogGameToFavorites).toHaveBeenCalledWith(274755),
     );
     expect(
-      await screen.findByRole("button", { name: /in favorites/i }),
+      await screen.findByRole("button", { name: /remove hades ii from favorites/i }),
     ).toBeVisible();
+  });
+
+  it("removes a catalog game from Favorites with the filled heart", async () => {
+    api.isAuthenticated.mockReturnValue(true);
+    api.listSavedGames.mockResolvedValue([]);
+    api.listWishlist.mockResolvedValue([]);
+    api.listFavorites.mockResolvedValue([
+      { catalog_game_id: 274755, title: "Hades II" },
+    ]);
+    api.removeFavorite.mockResolvedValue(undefined);
+
+    renderPage(<CatalogGameActions game={{ id: 274755, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] }} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /remove hades ii from favorites/i }),
+    );
+
+    await waitFor(() =>
+      expect(api.removeFavorite).toHaveBeenCalledWith(274755),
+    );
   });
 
   it("shows the Favorites pending label while saving", async () => {
@@ -310,14 +331,14 @@ describe("catalog routes", () => {
 
     renderPage(<CatalogGameActions game={{ id: 274755, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] }} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /add to favorites/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /add hades ii to favorites/i }));
 
     expect(
-      await screen.findByRole("button", { name: /adding/i }),
+      await screen.findByRole("button", { name: /adding hades ii to favorites/i }),
     ).toBeDisabled();
     resolveFavorite!({});
     expect(
-      await screen.findByRole("button", { name: /in favorites/i }),
+      await screen.findByRole("button", { name: /remove hades ii from favorites/i }),
     ).toBeVisible();
   });
 
@@ -329,12 +350,12 @@ describe("catalog routes", () => {
 
     renderPage(<CatalogGameActions game={{ id: 274755, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] }} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /add to favorites/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /add hades ii to favorites/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Could not save this game. Please try again.",
     );
-    expect(screen.getByRole("button", { name: /add to favorites/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /add hades ii to favorites/i })).toBeEnabled();
   });
 
   it("adds from search without replacing the explicit details link", async () => {
