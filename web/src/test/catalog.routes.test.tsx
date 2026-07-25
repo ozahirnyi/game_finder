@@ -12,8 +12,10 @@ const api = vi.hoisted(() => ({
   getHomepageDeals: vi.fn(),
   getSavedGame: vi.fn(),
   isAuthenticated: vi.fn(),
+  listFavorites: vi.fn(),
   listSavedGames: vi.fn(),
   listWishlist: vi.fn(),
+  saveCatalogGameToFavorites: vi.fn(),
   saveCatalogGameToLibrary: vi.fn(),
   saveCatalogGameToWishlist: vi.fn(),
   searchGames: vi.fn(),
@@ -57,6 +59,7 @@ function renderPage(view: React.ReactElement) {
 describe("catalog routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    api.listFavorites.mockResolvedValue([]);
     api.getHomepageDeals.mockResolvedValue({
       results: [
         {
@@ -195,6 +198,9 @@ describe("catalog routes", () => {
     expect(
       screen.queryByRole("button", { name: /add to library/i }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /add to favorites/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("saves a catalog game and updates its library label", async () => {
@@ -254,6 +260,39 @@ describe("catalog routes", () => {
     ).toBeVisible();
     expect(
       screen.getByRole("button", { name: /add to wishlist/i }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /add to favorites/i }),
+    ).toBeVisible();
+  });
+
+  it("saves a catalog game to Favorites from search", async () => {
+    api.isAuthenticated.mockReturnValue(true);
+    api.listSavedGames.mockResolvedValue([]);
+    api.listWishlist.mockResolvedValue([]);
+    api.saveCatalogGameToFavorites.mockResolvedValue({
+      id: "favorite-1",
+      catalog_game_id: 274755,
+      title: "Hades II",
+      cover_url: null,
+      created_at: "2026-07-25T00:00:00Z",
+      updated_at: null,
+    });
+
+    renderPage(<SearchPage />);
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Hades" },
+    });
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /add to favorites/i }),
+    );
+
+    await waitFor(() =>
+      expect(api.saveCatalogGameToFavorites).toHaveBeenCalledWith(274755),
+    );
+    expect(
+      await screen.findByRole("button", { name: /in favorites/i }),
     ).toBeVisible();
   });
 
