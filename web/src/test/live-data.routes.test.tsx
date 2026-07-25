@@ -7,6 +7,7 @@ import { ProfilePage } from "@/routes/profile";
 import { Route as SteamRoute } from "@/routes/steam";
 
 const api = vi.hoisted(() => ({
+  clearToken: vi.fn(),
   getDashboard: vi.fn(),
   getGoogleLinkUrl: vi.fn(),
   getProfileSummary: vi.fn(),
@@ -14,6 +15,7 @@ const api = vi.hoisted(() => ({
   syncSteamLibrary: vi.fn(),
   updateProfile: vi.fn(),
 }));
+const navigate = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => ({
@@ -23,6 +25,7 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, ...props }: React.ComponentProps<"a">) => (
     <a {...props}>{children}</a>
   ),
+  useNavigate: () => navigate,
 }));
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => (
@@ -199,6 +202,38 @@ describe("live dashboard and profile data", () => {
         favorite_genres: ["Roguelike", "Puzzle"],
       }),
     );
+  });
+
+  it("clears local session data and returns to login on sign out", async () => {
+    renderPage(<ProfilePage />);
+    await screen.findByRole("heading", { name: "player@example.com" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(api.clearToken).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith({ to: "/login" });
+  });
+
+  it("keeps sign out available when the profile summary cannot load", async () => {
+    api.getProfileSummary.mockRejectedValue({ status: 500 });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const clear = vi.spyOn(client, "clear");
+    render(
+      <QueryClientProvider client={client}>
+        <ProfilePage />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      await screen.findByText("Sign in to view your profile."),
+    ).toBeVisible();
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(api.clearToken).toHaveBeenCalledOnce();
+    expect(clear).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith({ to: "/login" });
   });
 
   it("shows a sign-in action when protected summary requests return 401", async () => {

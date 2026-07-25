@@ -31,7 +31,6 @@ const nav = [
   { to: "/friends", label: "Friends", icon: Users },
   { to: "/steam", label: "Steam", icon: Gamepad2 },
   { to: "/psn", label: "PSN", icon: Trophy },
-  { to: "/profile", label: "Profile", icon: User },
 ] as const;
 
 function notificationText(notification: Notification) {
@@ -199,7 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="flex items-center gap-3 rounded-lg border border-transparent p-2 hover:border-border"
             >
               <User className="size-10 shrink-0 rounded-full border border-border p-2 text-muted-foreground" />
-              <span className="truncate text-sm font-semibold">Signed in</span>
+              <span className="truncate text-sm font-semibold">Profile</span>
             </Link>
           )}
         </div>
