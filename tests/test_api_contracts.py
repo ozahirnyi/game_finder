@@ -10,6 +10,169 @@ import app.main as main
 client = TestClient(main.app)
 
 
+class CatalogGameDb:
+    def __init__(self):
+        self.games = []
+
+    def query(self, _model):
+        return CatalogGameQuery(self)
+
+    def add(self, game):
+        if game.id is None:
+            game.id = uuid.uuid4()
+        if game.created_at is None:
+            game.created_at = datetime.now(timezone.utc)
+        self.games.append(game)
+
+    def commit(self):
+        return None
+
+    def refresh(self, _game):
+        return None
+
+
+class CatalogGameQuery:
+    def __init__(self, db):
+        self.db = db
+        self.criteria = []
+
+    def filter(self, *criteria):
+        self.criteria.extend(criteria)
+        return self
+
+    def first(self):
+        expected = {
+            criterion.left.key: criterion.right.value
+            for criterion in self.criteria
+            if hasattr(criterion.left, "key") and hasattr(criterion.right, "value")
+        }
+        return next(
+            (game for game in self.db.games if all(getattr(game, field) == value for field, value in expected.items())),
+            None,
+        )
+
+
+def test_catalog_library_save_is_idempotent_and_server_authoritative(monkeypatch):
+    owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        assert rawg_id == 274755
+        return {"id": rawg_id, "name": "Hades II", "description_raw": "Fight beyond the Underworld."}
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        first = client.post("/library/catalog-games/274755")
+        again = client.post("/library/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert first.json()["title"] == "Hades II"
+    assert first.json()["info"] == "Fight beyond the Underworld."
+    assert first.json()["source"] == "catalog"
+    assert first.json()["external_id"] == "rawg:274755"
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
+    assert len(db.games) == 1
+
+
+def test_catalog_library_save_is_isolated_by_owner(monkeypatch):
+    first_owner_id = uuid.uuid4()
+    second_owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II", "description_raw": None}
+
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
+        first = client.post("/library/catalog-games/274755")
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=second_owner_id)
+        second = client.post("/library/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert len(db.games) == 2
+    assert {game.owner_id for game in db.games} == {first_owner_id, second_owner_id}
+
+
+def test_catalog_library_save_requires_authentication():
+    response = client.post("/library/catalog-games/274755")
+
+    assert response.status_code == 401
+
+
+def test_catalog_wishlist_save_is_idempotent_and_server_authoritative(monkeypatch):
+    owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        assert rawg_id == 274755
+        return {
+            "id": rawg_id,
+            "name": "Hades II",
+            "background_image": "https://example.com/hades-ii.jpg",
+        }
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        first = client.post("/wishlist/catalog-games/274755")
+        again = client.post("/wishlist/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert first.json()["catalog_game_id"] == 274755
+    assert first.json()["title"] == "Hades II"
+    assert first.json()["cover_url"] == "https://example.com/hades-ii.jpg"
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
+    assert len(db.games) == 1
+
+
+def test_catalog_wishlist_save_is_isolated_by_owner(monkeypatch):
+    first_owner_id = uuid.uuid4()
+    second_owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II", "background_image": None}
+
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
+        first = client.post("/wishlist/catalog-games/274755")
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=second_owner_id)
+        second = client.post("/wishlist/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert len(db.games) == 2
+    assert {game.user_id for game in db.games} == {first_owner_id, second_owner_id}
+
+
+def test_catalog_wishlist_save_requires_authentication():
+    response = client.post("/wishlist/catalog-games/274755")
+
+    assert response.status_code == 401
+
+
 def test_catalog_game_detail_returns_normalized_rawg_data(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()

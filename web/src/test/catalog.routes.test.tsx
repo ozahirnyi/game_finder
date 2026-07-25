@@ -3,12 +3,19 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DealsPage } from "@/routes/deals";
 import { GameDetailPage } from "@/routes/games.$gameId";
+import { CatalogGameActions } from "@/components/CatalogGameActions";
+import { SearchPage } from "@/routes/search";
 
 const api = vi.hoisted(() => ({
   getCatalogGame: vi.fn(),
   getGamePriceHistory: vi.fn(),
   getHomepageDeals: vi.fn(),
   getSavedGame: vi.fn(),
+  isAuthenticated: vi.fn(),
+  listSavedGames: vi.fn(),
+  listWishlist: vi.fn(),
+  saveCatalogGameToLibrary: vi.fn(),
+  saveCatalogGameToWishlist: vi.fn(),
   searchGames: vi.fn(),
 }));
 
@@ -165,5 +172,111 @@ describe("catalog routes", () => {
     expect(
       screen.getByRole("button", { name: /collapse description/i }),
     ).toBeVisible();
+  });
+
+  it("hides catalog actions for guests", () => {
+    api.isAuthenticated.mockReturnValue(false);
+
+    renderPage(
+      <CatalogGameActions
+        game={{
+          id: 274755,
+          name: "Hades II",
+          released: null,
+          background_image: null,
+          description_raw: null,
+          rating: null,
+          genres: [],
+          platforms: [],
+        }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /add to library/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("saves a catalog game and updates its library label", async () => {
+    api.isAuthenticated.mockReturnValue(true);
+    api.listSavedGames.mockResolvedValue([]);
+    api.listWishlist.mockResolvedValue([]);
+    api.saveCatalogGameToLibrary.mockResolvedValue({
+      id: "11111111-1111-4111-8111-111111111111",
+      title: "Hades II",
+      notes: null,
+      info: null,
+      source: "catalog",
+      external_id: "rawg:274755",
+      playtime_forever: null,
+      playtime_2weeks: null,
+      img_icon_url: null,
+      synced_at: null,
+      created_at: "2026-01-01T00:00:00Z",
+    });
+
+    renderPage(
+      <CatalogGameActions
+        game={{
+          id: 274755,
+          name: "Hades II",
+          released: null,
+          background_image: null,
+          description_raw: null,
+          rating: null,
+          genres: [],
+          platforms: [],
+        }}
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /add to library/i }),
+    );
+
+    await waitFor(() =>
+      expect(api.saveCatalogGameToLibrary).toHaveBeenCalledWith(274755),
+    );
+    expect(
+      await screen.findByRole("button", { name: /in library/i }),
+    ).toBeVisible();
+  });
+
+  it("shows catalog actions in game details for an authenticated user", async () => {
+    api.isAuthenticated.mockReturnValue(true);
+    api.listSavedGames.mockResolvedValue([]);
+    api.listWishlist.mockResolvedValue([]);
+
+    renderPage(<GameDetailPage gameId="274755" />);
+
+    expect(
+      await screen.findByRole("button", { name: /add to library/i }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /add to wishlist/i }),
+    ).toBeVisible();
+  });
+
+  it("adds from search without replacing the explicit details link", async () => {
+    api.isAuthenticated.mockReturnValue(true);
+    api.listSavedGames.mockResolvedValue([]);
+    api.listWishlist.mockResolvedValue([]);
+    api.saveCatalogGameToLibrary.mockResolvedValue({});
+
+    renderPage(<SearchPage />);
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Hades" },
+    });
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /add to library/i }),
+    );
+
+    await waitFor(() =>
+      expect(api.saveCatalogGameToLibrary).toHaveBeenCalledWith(274755),
+    );
+    expect(
+      screen.getByRole("link", { name: /view details for hades ii/i }),
+    ).toHaveAttribute("href", "/games/274755");
   });
 });
