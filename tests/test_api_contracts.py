@@ -173,6 +173,81 @@ def test_catalog_wishlist_save_requires_authentication():
     assert response.status_code == 401
 
 
+def test_catalog_favorite_save_is_idempotent_and_server_authoritative(monkeypatch):
+    owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        assert rawg_id == 274755
+        return {
+            "id": rawg_id,
+            "name": "Hades II",
+            "background_image": "https://example.com/hades-ii.jpg",
+        }
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        first = client.post("/favorites/catalog-games/274755")
+        again = client.post("/favorites/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert first.json()["catalog_game_id"] == 274755
+    assert first.json()["title"] == "Hades II"
+    assert first.json()["cover_url"] == "https://example.com/hades-ii.jpg"
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
+    assert len(db.games) == 1
+
+
+def test_catalog_favorite_save_is_isolated_by_owner(monkeypatch):
+    first_owner_id = uuid.uuid4()
+    second_owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II", "background_image": None}
+
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
+        first = client.post("/favorites/catalog-games/274755")
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=second_owner_id)
+        second = client.post("/favorites/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert len(db.games) == 2
+    assert {game.user_id for game in db.games} == {first_owner_id, second_owner_id}
+
+
+def test_catalog_favorite_save_requires_authentication():
+    response = client.post("/favorites/catalog-games/274755")
+
+    assert response.status_code == 401
+
+
+def test_catalog_favorite_save_rejects_invalid_rawg_id():
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=uuid.uuid4())
+    main.app.dependency_overrides[main.get_db] = lambda: CatalogGameDb()
+
+    try:
+        response = client.post("/favorites/catalog-games/0")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "rawg_id must be >= 1"
+
+
 def test_catalog_game_detail_returns_normalized_rawg_data(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()

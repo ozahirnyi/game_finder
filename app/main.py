@@ -943,6 +943,46 @@ def add_favorite(
     return collection_response(item)
 
 
+@app.post("/favorites/catalog-games/{rawg_id}", response_model=CatalogCollectionRead)
+async def save_catalog_favorite_game(
+    rawg_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if rawg_id < 1:
+        raise HTTPException(status_code=400, detail="rawg_id must be >= 1")
+
+    existing = (
+        db.query(Favorite)
+        .filter(
+            Favorite.user_id == current_user.id,
+            Favorite.catalog_game_id == rawg_id,
+        )
+        .first()
+    )
+    if existing:
+        response.status_code = 200
+        return collection_response(existing)
+
+    try:
+        detail = await fetch_rawg_game_detail(rawg_id)
+    except RAWGError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+    item = Favorite(
+        user_id=current_user.id,
+        catalog_game_id=rawg_id,
+        title=detail["name"],
+        cover_url=detail.get("background_image"),
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    response.status_code = 201
+    return collection_response(item)
+
+
 @app.delete("/favorites/{catalog_game_id}", status_code=204)
 def remove_favorite(
     catalog_game_id: int,
