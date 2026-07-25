@@ -46,6 +46,7 @@ async def test_cached_recommendations_reuse_a_matching_user_library(monkeypatch)
     assert first == second
     assert calls["provider"] == 1
     assert str(user_id) in calls["keys"][0]
+    assert calls["keys"][0].startswith("steam_recommendations:v2:")
 
 
 @pytest.mark.anyio
