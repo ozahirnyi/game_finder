@@ -109,6 +109,8 @@ class RecommendationItem(BaseModel):
     title: str
     reason: str
     tags: list[str] = Field(default_factory=list)
+    rawg_id: int | None = None
+    cover_url: str | None = None
 
 
 class RecommendationResponse(BaseModel):

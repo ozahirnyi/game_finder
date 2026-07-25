@@ -105,6 +105,8 @@ export type RecommendationItem = {
   title: string;
   reason: string;
   tags: string[];
+  rawg_id: number | null;
+  cover_url: string | null;
 };
 
 export type RecommendationResponse = {
