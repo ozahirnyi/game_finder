@@ -54,14 +54,14 @@ export function LoginPage() {
   }
 
   return (
-    <section className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+    <section className="relative flex min-h-screen items-center justify-center bg-background px-4 py-10">
+      <Link
+        to="/"
+        className="absolute left-6 top-6 text-sm font-semibold text-muted-foreground transition hover:text-foreground"
+      >
+        ← Back to PlayFinder
+      </Link>
       <div className="w-full max-w-md rounded-3xl border border-border bg-surface p-6 shadow-2xl shadow-black/20 sm:p-8">
-        <Link
-          to="/"
-          className="text-sm font-semibold text-muted-foreground transition hover:text-foreground"
-        >
-          ← Back to PlayFinder
-        </Link>
         <div className="mb-8">
           <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-primary">
             <LogIn className="size-4" /> Your saved games
