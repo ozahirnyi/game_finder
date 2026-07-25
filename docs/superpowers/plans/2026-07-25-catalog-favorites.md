@@ -207,7 +207,7 @@ it("posts a RAWG id to the server-authoritative favorites endpoint", async () =>
 
 - [ ] **Step 2: Run the focused test to verify failure**
 
-Run: `rtk npm --prefix web test -- --run web/src/lib/api.test.ts`
+Run: `rtk npm --prefix web test -- --run src/lib/api.test.ts`
 
 Expected: FAIL because `saveCatalogGameToFavorites` is not exported.
 
@@ -234,7 +234,7 @@ Import `saveCatalogGameToFavorites` in `web/src/lib/api.test.ts`.
 
 - [ ] **Step 4: Run the focused test to verify success**
 
-Run: `rtk npm --prefix web test -- --run web/src/lib/api.test.ts`
+Run: `rtk npm --prefix web test -- --run src/lib/api.test.ts`
 
 Expected: PASS (four API request tests).
 
@@ -294,7 +294,7 @@ it("shows the Favorites action in authenticated game details", async () => {
 
 - [ ] **Step 2: Run the focused UI tests to verify failure**
 
-Run: `rtk npm --prefix web test -- --run web/src/test/catalog.routes.test.tsx`
+Run: `rtk npm --prefix web test -- --run src/test/catalog.routes.test.tsx`
 
 Expected: FAIL because the Favorites functions and button do not yet exist in `CatalogGameActions`.
 
@@ -348,7 +348,7 @@ Extend the existing alert condition and argument so a Favorites mutation error i
 
 - [ ] **Step 4: Run focused UI tests to verify success**
 
-Run: `rtk npm --prefix web test -- --run web/src/test/catalog.routes.test.tsx`
+Run: `rtk npm --prefix web test -- --run src/test/catalog.routes.test.tsx`
 
 Expected: PASS, including guest, search action transition, and game-detail action coverage.
 
