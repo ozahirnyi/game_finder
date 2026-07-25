@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Check,
@@ -11,7 +11,12 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { Avatar } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { getGoogleLinkUrl, getProfileSummary, updateProfile } from "@/lib/api";
+import {
+  clearToken,
+  getGoogleLinkUrl,
+  getProfileSummary,
+  updateProfile,
+} from "@/lib/api";
 import { lovableQueryKeys } from "@/lib/lovable-data";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
@@ -42,6 +47,7 @@ const toggle = (values: string[], value: string) =>
 
 export function ProfilePage() {
   const client = useQueryClient();
+  const navigate = useNavigate();
   const query = useQuery({
     queryKey: lovableQueryKeys.profileSummary,
     queryFn: getProfileSummary,
@@ -73,6 +79,11 @@ export function ProfilePage() {
     setPlatforms(profile?.platforms ?? []);
     setGenres(profile?.favorite_genres ?? []);
     setEditing(true);
+  };
+  const signOut = () => {
+    clearToken();
+    client.clear();
+    navigate({ to: "/login" });
   };
   if (query.isError)
     return (
@@ -133,13 +144,22 @@ export function ProfilePage() {
                 "Set a short bio and preferences to improve recommendations."}
             </p>
           </div>
-          <button
-            onClick={open}
-            className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold"
-          >
-            <Edit3 className="size-3.5" />
-            Edit profile
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={open}
+              className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold"
+            >
+              <Edit3 className="size-3.5" />
+              Edit profile
+            </button>
+            <button
+              type="button"
+              onClick={signOut}
+              className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold text-muted-foreground hover:text-foreground"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </section>
       {editing && (
