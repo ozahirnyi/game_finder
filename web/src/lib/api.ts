@@ -503,6 +503,10 @@ export function getSteamSignInUrl() {
   return request<OAuthLoginUrl>("/auth/steam/login-url");
 }
 
+export function getSteamLinkUrl() {
+  return request<SteamLoginUrl>("/steam/login-url", { auth: true });
+}
+
 export function exchangeSteamCode(exchangeCode: string) {
   return request<TokenResponse>("/auth/steam/exchange", {
     method: "POST",

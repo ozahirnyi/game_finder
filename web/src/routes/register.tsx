@@ -1,7 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { FormEvent, useState } from "react";
 import { UserPlus } from "lucide-react";
-import { ApiError, loginUser, registerUser, setToken } from "@/lib/api";
+import {
+  ApiError,
+  getGoogleLoginUrl,
+  getSteamSignInUrl,
+  loginUser,
+  registerUser,
+  setToken,
+} from "@/lib/api";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
 
@@ -10,6 +17,7 @@ export function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<"google" | "steam" | null>(null);
   const [error, setError] = useState("");
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -30,6 +38,20 @@ export function RegisterPage() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function beginOAuth(provider: "google" | "steam") {
+    setError("");
+    setOauthProvider(provider);
+    try {
+      const { url } = await (provider === "google"
+        ? getGoogleLoginUrl()
+        : getSteamSignInUrl());
+      window.location.assign(url);
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : "Could not start sign-in. Please try again.");
+      setOauthProvider(null);
     }
   }
 
@@ -86,6 +108,19 @@ export function RegisterPage() {
             {loading ? "Creating..." : "Create account"}
           </button>
         </form>
+        <div className="my-6 border-t border-border pt-6">
+          <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Or continue with
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button type="button" onClick={() => beginOAuth("google")} disabled={Boolean(oauthProvider)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-60">
+              {oauthProvider === "google" ? "Opening Google…" : "Continue with Google"}
+            </button>
+            <button type="button" onClick={() => beginOAuth("steam")} disabled={Boolean(oauthProvider)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-60">
+              {oauthProvider === "steam" ? "Opening Steam…" : "Continue with Steam"}
+            </button>
+          </div>
+        </div>
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link
