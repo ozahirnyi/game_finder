@@ -830,11 +830,10 @@ def test_steam_recommendations_use_most_played_games(monkeypatch):
             },
         ]
 
-    def fake_get_recommendation(prompt, liked_game_ids):
-        assert "Half-Life 2 - 20.0 hours played" in prompt
-        assert "Portal - 10.0 hours played" in prompt
-        assert "something with puzzles" in prompt
-        assert liked_game_ids == [20, 10]
+    async def fake_cached_recommendations(user_id, games, prompt):
+        assert user_id == owner_id
+        assert [game["appid"] for game in games] == [20, 10]
+        assert prompt == "something with puzzles"
         return {
             "recommendations": [
                 {
@@ -843,10 +842,10 @@ def test_steam_recommendations_use_most_played_games(monkeypatch):
                     "tags": ["immersive", "sci-fi"],
                 }
             ]
-        }
+    }
 
     monkeypatch.setattr(main, "fetch_owned_games", fake_fetch_owned_games)
-    monkeypatch.setattr(main, "get_recommendation", fake_get_recommendation)
+    monkeypatch.setattr(main, "get_cached_steam_recommendations", fake_cached_recommendations)
 
     try:
         response = client.post("/steam/recommendations", json={"prompt": "something with puzzles"})
@@ -1119,6 +1118,38 @@ def test_dashboard_keeps_steam_external_failure_as_error(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["steam"]["status"] == "error"
+
+
+def test_dashboard_generates_recommendations_for_linked_steam_games(monkeypatch):
+    user = SimpleNamespace(id=uuid.uuid4(), email="player@example.com", created_at=datetime.now(timezone.utc), steam_id="76561198000000000", steam_persona_name="Steam Player", steam_avatar=None, steam_country_code="US", steam_linked_at=datetime.now(timezone.utc), telegram_chat_id=None, telegram_username=None, telegram_linked_at=None, bio=None, platforms=[], favorite_genres=[])
+
+    class Query:
+        def filter(self, *_args): return self
+        def order_by(self, *_args): return self
+        def all(self): return []
+        def first(self): return None
+
+    async def steam_games(_steam_id):
+        return [{"appid": 10, "name": "Portal", "playtime_forever": 120, "playtime_2weeks": 30, "img_icon_url": None}]
+
+    async def cached(user_id, games):
+        assert user_id == user.id
+        assert games[0]["appid"] == 10
+        return {"recommendations": [{"title": "Hades", "reason": "Action", "tags": ["Action"]}]}
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: SimpleNamespace(query=lambda _model: Query())
+    monkeypatch.setattr(main, "fetch_owned_games", steam_games)
+    monkeypatch.setattr(main, "fetch_steam_store_deals", lambda **_kwargs: [])
+    monkeypatch.setattr(main, "get_cached_steam_recommendations", cached)
+    try:
+        response = client.get("/dashboard")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["recommendations"]["status"] == "ready"
+    assert response.json()["recommendations"]["data"]["recommendations"][0]["title"] == "Hades"
 
 
 def test_steam_library_sync_removes_legacy_imports_without_saving_steam_games(monkeypatch):
