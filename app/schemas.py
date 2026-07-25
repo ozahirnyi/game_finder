@@ -274,6 +274,16 @@ class HomeDealResponse(BaseModel):
     results: list[HomeDealItem] = Field(default_factory=list)
 
 
+class GenreDealSection(BaseModel):
+    genre: str
+    results: list[HomeDealItem] = Field(default_factory=list)
+
+
+class GenreDealResponse(BaseModel):
+    popular: list[HomeDealItem] = Field(default_factory=list)
+    sections: list[GenreDealSection] = Field(default_factory=list)
+
+
 class PublicUserRead(BaseModel):
     id: uuid.UUID
     display_name: str
