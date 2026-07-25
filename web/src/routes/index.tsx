@@ -146,34 +146,6 @@ export function Dashboard() {
               </p>
             )}
           </section>
-          <section className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 to-transparent p-6">
-            <SectionHeader
-              title="Price drops"
-              hint={
-                deals.length
-                  ? "Current deals returned by price providers."
-                  : message(data?.deals ?? {}, "No price drops right now.")
-              }
-            />
-            {deals.length ? (
-              <div className="space-y-3">
-                {deals.slice(0, 3).map((deal) => (
-                  <a
-                    key={deal.name}
-                    href={deal.url ?? undefined}
-                    className="flex items-center justify-between rounded-xl bg-background/40 p-3"
-                  >
-                    <span className="font-bold">{deal.name}</span>
-                    <Chip tone="primary">
-                      {deal.current?.price
-                        ? `${deal.current.price.amount} ${deal.current.price.currency}`
-                        : "View deal"}
-                    </Chip>
-                  </a>
-                ))}
-              </div>
-            ) : null}
-          </section>
         </div>
         <aside className="space-y-10 lg:col-span-4">
           <section>
@@ -197,6 +169,34 @@ export function Dashboard() {
                 {steamConnected ? "Open Steam" : "Connect Steam"}
               </Link>
             </div>
+          </section>
+          <section className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 to-transparent p-5">
+            <SectionHeader
+              title="Price drops"
+              hint={
+                deals.length
+                  ? "Current deals"
+                  : message(data?.deals ?? {}, "No price drops right now.")
+              }
+            />
+            {deals.length ? (
+              <div className="space-y-2">
+                {deals.slice(0, 3).map((deal) => (
+                  <a
+                    key={deal.name}
+                    href={deal.url ?? undefined}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-background/40 p-2 text-sm"
+                  >
+                    <span className="truncate font-bold">{deal.name}</span>
+                    <Chip tone="primary">
+                      {deal.current?.price
+                        ? `${deal.current.price.amount} ${deal.current.price.currency}`
+                        : "View"}
+                    </Chip>
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </section>
         </aside>
       </div>

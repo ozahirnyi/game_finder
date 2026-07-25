@@ -51,7 +51,7 @@ async def normalize_recommendations(result: dict, owned_titles: set[str]) -> lis
 
 
 async def get_cached_steam_recommendations(user_id: uuid.UUID, games: list[dict], extra_prompt: str | None = None) -> dict:
-    key = f"steam_recommendations:{user_id}:{build_steam_library_fingerprint(games)}"
+    key = f"steam_recommendations:v2:{user_id}:{build_steam_library_fingerprint(games)}"
     try:
         cached = await cache_get(key)
         if cached is not None:
