@@ -32,6 +32,7 @@ export const lovableQueryKeys = {
   favorites: ["favorites"] as const,
   wishlist: ["wishlist"] as const,
   deals: (country: string) => ["deals", country] as const,
+  genreDeals: ["deals", "genre"] as const,
   steam: ["steam"] as const,
   search: (query: string) => ["search", query] as const,
   catalogGame: (id: string) => ["catalog", "game", id] as const,
