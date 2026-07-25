@@ -1,22 +1,24 @@
-# Genre Dashboard Deals Design
+# Genre Deals Page Design
 
 ## Goal
 
-Replace the dashboard's one flat `Price drops` list with up to five honest,
+Replace the `/deals` page's one flat deal list with up to five honest,
 genre-specific Steam deal sections tailored to the signed-in user's profile.
 
 ## Scope and compatibility
 
-The existing public `GET /prices/deals` endpoint remains unchanged. The
-authenticated dashboard endpoint becomes the source for grouped deals, so
-there is no breaking change for current consumers.
+The existing public `GET /prices/deals` endpoint remains unchanged. A new
+authenticated grouped-deals endpoint becomes the source for `/deals`, so
+there is no breaking change for current consumers. The dashboard and its
+`Price drops` block are explicitly out of scope.
 
 ## Genre selection
 
-The dashboard reads the first five values in `User.favorite_genres` in their
-saved order. Blank values are discarded and genre comparisons are
-case-insensitive after normalization. If the resulting list is empty, it uses
-this exact ordered fallback: `Action`, `RPG`, `Adventure`, `Strategy`, `Indie`.
+The grouped-deals endpoint reads the first five values in
+`User.favorite_genres` in their saved order. Blank values are discarded and
+genre comparisons are case-insensitive after normalization. If the resulting
+list is empty, it uses this exact ordered fallback: `Action`, `RPG`,
+`Adventure`, `Strategy`, `Indie`.
 
 The response preserves the selected display names and always contains one
 section for every selected genre, including a section with an empty `results`
@@ -28,7 +30,7 @@ Introduce response schemas for a grouped deals payload: a section contains a
 `genre` string and up to five existing `HomeDealItem` records; the top-level
 response contains `sections`.
 
-The dashboard calls a focused service rather than invoking
+The new endpoint calls a focused service rather than invoking
 `fetch_steam_store_deals` directly. The service requests a larger bounded
 candidate pool from Steam, deduplicates on Steam app id, then enriches each
 unique candidate with one RAWG search. It normalizes RAWG genre names by
@@ -43,28 +45,27 @@ missing RAWG match yields no genre classifications and therefore cannot appear
 in a selected section; it does not fail the entire response.
 
 The complete normalized grouped result is cached using the normalized country
-and ordered normalized genre set. Invalid countries remain a client error for
-the public endpoint; dashboard country data is normalized to the existing
-default (`US`) when absent.
+and ordered normalized genre set. Invalid countries are rejected. The
+authenticated caller's Steam country is used when available, otherwise `US`.
 
-## Frontend design
+## `/deals` page design
 
-Extend the dashboard data types so `data.deals` carries grouped `sections`.
-Replace the right-sidebar flat list with a compact section per genre. A deal
-card displays artwork, title, current price and discount, and is an external
-Steam link. When its RAWG id exists, its title/artwork additionally exposes a
-catalog navigation target without nesting anchors. Empty and partial sections
-show the exact meaning: no matching current deals, rather than substituting
-other genres.
+Extend the deals API types so the `/deals` query receives grouped `sections`.
+Replace its existing hero and flat card list with a compact section per genre.
+A deal card displays artwork, title, current price and discount, and an
+external Steam link. When its RAWG id exists, its title/artwork additionally
+exposes a catalog navigation target without nesting anchors. Empty and partial
+sections show the exact meaning: no matching current deals, rather than
+substituting other genres.
 
-The layout keeps the existing sidebar hierarchy and uses responsive compact
-cards so five sections remain usable on narrow screens.
+The layout keeps the `/deals` page's responsive card language so five sections
+remain usable on narrow screens.
 
 ## Errors and loading
 
-If Steam itself fails, the dashboard continues using the existing `DataBlock`
-error state and the UI renders its supplied message. Individual RAWG failures
-are isolated to the affected game. Empty sections are a ready response, not an
+If Steam itself fails, the grouped-deals endpoint returns an appropriate error
+and the `/deals` page retains its retry state. Individual RAWG failures are
+isolated to the affected game. Empty sections are a ready response, not an
 error.
 
 ## Tests and verification
