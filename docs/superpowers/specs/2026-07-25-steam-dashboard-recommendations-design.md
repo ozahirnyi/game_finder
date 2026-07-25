@@ -39,11 +39,9 @@ existing empty recommendation block with the connect/add-games message.
 
 ## Cache Invalidation
 
-Cache entries are logically invalidated by a changed fingerprint, since a changed
-Steam library generates a different key. The Steam library sync endpoint additionally
-deletes known recommendation cache entries for the current user after a successful
-sync so the next dashboard request cannot reuse a stale entry even if the provider's
-library response is temporarily unchanged.
+Cache entries are invalidated by a changed fingerprint: a successful Steam library
+sync changes the library input and therefore makes the next dashboard request use a
+different cache key. This avoids adding a mutable cache-key index solely for deletion.
 
 The cache TTL is exactly six hours. Keys are user-scoped, preventing one user's
 recommendations from being served to another user with a similar library.
