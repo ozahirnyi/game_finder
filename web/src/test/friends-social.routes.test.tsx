@@ -4,12 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as FriendsRoute } from "@/routes/friends";
 
 const api = vi.hoisted(() => ({
+  cancelFriendRequest: vi.fn(),
   createConversation: vi.fn(),
   createFriendRequest: vi.fn(),
   createGameInvite: vi.fn(),
   createMessage: vi.fn(),
   deleteFriend: vi.fn(),
   deleteFriendRequest: vi.fn(),
+  declineFriendRequest: vi.fn(),
+  getSocialFriendCommonGames: vi.fn(),
+  getSocialMe: vi.fn(),
+  getSocialPlayers: vi.fn(),
   getSocialInviteLink: vi.fn(),
   getSteamSocial: vi.fn(),
   isAuthenticated: vi.fn(),
@@ -22,6 +27,7 @@ const api = vi.hoisted(() => ({
   respondToGameInvite: vi.fn(),
   acceptFriendRequest: vi.fn(),
   searchUsers: vi.fn(),
+  updateSocialMe: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -42,6 +48,9 @@ vi.mock("@/components/AppShell", () => ({
   ),
 }));
 vi.mock("@/lib/api", () => api);
+vi.mock("@/hooks/useAuthState", () => ({
+  useAuthState: () => true,
+}));
 
 function renderPage() {
   const Page = (FriendsRoute as { component: React.ComponentType }).component;
@@ -66,7 +75,18 @@ describe("PlayFinder friends", () => {
       top_friend_games: [],
       public_libraries: 0,
       private_libraries: 0,
+      friends_total: 0,
+      friends_has_more: false,
     });
+    api.getSocialMe.mockResolvedValue({
+      public_id: "me-public",
+      nickname: "Me",
+      avatar: null,
+      friends: [],
+      incoming_requests: [],
+      outgoing_requests: [],
+    });
+    api.getSocialFriendCommonGames.mockResolvedValue({ games: [] });
     api.listFriends.mockResolvedValue([]);
     api.listFriendRequests.mockResolvedValue([]);
     api.listIncomingFriendRequests.mockResolvedValue([]);
@@ -79,21 +99,25 @@ describe("PlayFinder friends", () => {
   });
 
   it("searches registered players and sends a confirmation-based friend request", async () => {
-    api.searchUsers.mockResolvedValue([
-      { id: "user-2", display_name: "Niko", bio: "Co-op player", avatar: null },
-    ]);
+    api.getSocialPlayers.mockResolvedValue({
+      players: [
+        { public_id: "user-2-public", nickname: "Niko", avatar: null },
+      ],
+      next_cursor: null,
+    });
     api.createFriendRequest.mockResolvedValue({ id: "request-1" });
     renderPage();
 
     fireEvent.change(
-      await screen.findByPlaceholderText(/search playfinder players/i),
+      await screen.findByPlaceholderText(/search nickname/i),
       { target: { value: "Ni" } },
     );
+    fireEvent.click(screen.getByRole("button", { name: /search players/i }));
     expect(await screen.findByText("Niko")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /add niko/i }));
 
     await waitFor(() =>
-      expect(api.createFriendRequest).toHaveBeenCalledWith("user-2"),
+      expect(api.createFriendRequest).toHaveBeenCalledWith("user-2-public"),
     );
   });
 });

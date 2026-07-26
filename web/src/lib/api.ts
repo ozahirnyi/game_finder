@@ -184,6 +184,8 @@ export type SteamSocial = {
   top_friend_games: SteamFriendGame[];
   public_libraries: number;
   private_libraries: number;
+  friends_total: number;
+  friends_has_more: boolean;
 };
 
 export type TelegramAccount = {
@@ -197,6 +199,70 @@ export type TelegramLink = {
   configured: boolean;
   url: string | null;
   message: string | null;
+};
+
+export type SocialPlayer = {
+  public_id: string;
+  nickname: string;
+  avatar: string | null;
+};
+
+export type SocialFriend = SocialPlayer & {
+  id: string;
+};
+
+export type SocialCommonGame = {
+  appid: number;
+  name: string;
+  img_icon_url: string | null;
+};
+
+export type SocialCommonGames = {
+  games: SocialCommonGame[];
+};
+
+export type SocialRequest = SocialPlayer & {
+  id: string;
+  status: string;
+  created_at: string;
+};
+
+export type SocialMe = {
+  public_id: string;
+  nickname: string | null;
+  avatar: string | null;
+  friends: SocialFriend[];
+  incoming_requests: SocialRequest[];
+  outgoing_requests: SocialRequest[];
+};
+
+export type SocialPlayersPage = {
+  players: SocialPlayer[];
+  next_cursor: string | null;
+};
+
+export type SocialRelationship =
+  | "self"
+  | "none"
+  | "outgoing_pending"
+  | "incoming_pending"
+  | "friends";
+
+export type SocialProfile = SocialPlayer & {
+  relationship: SocialRelationship;
+};
+
+export type DirectMessage = {
+  id: string;
+  friendship_id: string;
+  author_id: string;
+  text: string;
+  created_at: string;
+};
+
+export type DirectMessagePage = {
+  messages: DirectMessage[];
+  next_cursor: string | null;
 };
 
 export type PublicUser = {
@@ -654,9 +720,9 @@ export function syncSteamLibrary() {
   });
 }
 
-export function getSteamSocial(friendsLimit = 12) {
+export function getSteamSocial(friendsLimit = 12, friendsOffset = 0) {
   return request<SteamSocial>(
-    `/steam/social?friends_limit=${encodeURIComponent(friendsLimit)}`,
+    `/steam/social?friends_limit=${encodeURIComponent(friendsLimit)}&friends_offset=${encodeURIComponent(friendsOffset)}`,
     { auth: true },
   );
 }
@@ -694,6 +760,93 @@ export function sendTelegramTestAlert() {
   });
 }
 
+export function getSocialMe() {
+  return request<SocialMe>("/social/me", { auth: true });
+}
+
+export function updateSocialMe(nickname: string) {
+  return request<SocialMe>("/social/me", {
+    method: "PATCH",
+    auth: true,
+    body: { nickname },
+  });
+}
+
+export function getSocialPlayers(query = "", cursor?: string) {
+  const search = [
+    query ? `q=${encodeURIComponent(query)}` : "",
+    cursor ? `cursor=${encodeURIComponent(cursor)}` : "",
+  ]
+    .filter(Boolean)
+    .join("&");
+  return request<SocialPlayersPage>(
+    `/social/players${search ? `?${search}` : ""}`,
+    { auth: true },
+  );
+}
+
+export function getSocialProfile(publicId: string) {
+  return request<SocialProfile>(
+    `/social/profiles/${encodeURIComponent(publicId)}`,
+    { auth: true },
+  );
+}
+
+export function createFriendRequest(publicId: string) {
+  return request<SocialRequest>("/social/friend-requests", {
+    method: "POST",
+    auth: true,
+    body: { public_id: publicId },
+  });
+}
+
+export function cancelFriendRequest(requestId: string) {
+  return request<SocialRequest>(
+    `/social/friend-requests/${encodeURIComponent(requestId)}`,
+    { method: "DELETE", auth: true },
+  );
+}
+
+export function acceptFriendRequest(requestId: string) {
+  return request<SocialRequest>(
+    `/social/friend-requests/${encodeURIComponent(requestId)}/accept`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function declineFriendRequest(requestId: string) {
+  return request<SocialRequest>(
+    `/social/friend-requests/${encodeURIComponent(requestId)}/decline`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function getSocialFriendCommonGames(friendId: string) {
+  return request<SocialCommonGames>(
+    `/social/friends/${encodeURIComponent(friendId)}/common-games`,
+    { auth: true },
+  );
+}
+
+export function getDirectMessages(friendId: string, cursor?: string) {
+  const search = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  return request<DirectMessagePage>(
+    `/social/friends/${encodeURIComponent(friendId)}/messages${search}`,
+    { auth: true },
+  );
+}
+
+export function sendDirectMessage(friendId: string, text: string) {
+  return request<DirectMessage>(
+    `/social/friends/${encodeURIComponent(friendId)}/messages`,
+    {
+      method: "POST",
+      auth: true,
+      body: { text },
+    },
+  );
+}
+
 export function searchUsers(query: string) {
   return request<PublicUser[]>(`/users/search?q=${encodeURIComponent(query)}`, {
     auth: true,
@@ -708,7 +861,7 @@ export function listIncomingFriendRequests() {
   return request<FriendRequest[]>("/friends/requests/incoming", { auth: true });
 }
 
-export function createFriendRequest(recipientId: string, message?: string) {
+export function createLegacyFriendRequest(recipientId: string, message?: string) {
   return request<FriendRequest>("/friends/requests", {
     method: "POST",
     auth: true,
@@ -716,7 +869,7 @@ export function createFriendRequest(recipientId: string, message?: string) {
   });
 }
 
-export function acceptFriendRequest(requestId: string) {
+export function acceptLegacyFriendRequest(requestId: string) {
   return request<Friendship>(
     `/friends/requests/${encodeURIComponent(requestId)}/accept`,
     { method: "POST", auth: true },

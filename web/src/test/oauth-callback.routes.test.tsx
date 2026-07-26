@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({
 const routeState = vi.hoisted(() => ({
   search: {} as Record<string, string>,
 }));
-const navigate = vi.fn();
+const replace = vi.fn();
 
 vi.mock("@/lib/api", () => api);
 vi.mock("@tanstack/react-router", () => ({
@@ -21,7 +21,7 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to }: React.ComponentProps<"a"> & { to: string }) => (
     <a href={to}>{children}</a>
   ),
-  useNavigate: () => navigate,
+  useRouter: () => ({ history: { replace } }),
 }));
 
 import { Route as CallbackRoute } from "@/routes/auth.callback";
@@ -41,18 +41,22 @@ describe("OAuth callback route", () => {
   });
 
   it("exchanges Google code, stores the token, and opens profile", async () => {
-    routeState.search = { provider: "google", exchange_code: "one-time-code" };
+    routeState.search = {
+      provider: "google",
+      exchangeCode: "one-time-code",
+      returnTo: "/profile",
+    };
     api.exchangeGoogleCode.mockResolvedValue({ access_token: "token", token_type: "bearer" });
 
     renderCallback();
 
     await waitFor(() => expect(api.exchangeGoogleCode).toHaveBeenCalledWith("one-time-code"));
     expect(api.setToken).toHaveBeenCalledWith("token");
-    expect(navigate).toHaveBeenCalledWith({ to: "/profile" });
+    expect(replace).toHaveBeenCalledWith("/profile");
   });
 
   it("does not store a token for an invalid Steam callback", async () => {
-    routeState.search = { provider: "steam", exchange_code: "expired-code" };
+    routeState.search = { provider: "steam", exchangeCode: "expired-code" };
     api.exchangeSteamCode.mockRejectedValue(new Error("expired"));
 
     renderCallback();
