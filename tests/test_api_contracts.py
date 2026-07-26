@@ -911,6 +911,74 @@ def test_steam_social_builds_friend_overlap():
     assert "img_icon_url" in payload["top_friend_games"][0]
 
 
+def test_steam_social_returns_requested_friend_page_and_metadata(monkeypatch):
+    linked_at = datetime.now(timezone.utc)
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
+        id=uuid.uuid4(),
+        steam_id="76561198000000000",
+        steam_persona_name="Steam Player",
+        steam_avatar=None,
+        steam_country_code="UA",
+        steam_linked_at=linked_at,
+    )
+
+    async def fake_fetch_owned_games(steam_id):
+        if steam_id == "76561198000000000":
+            return []
+        if steam_id == "friend-3":
+            return []
+        raise AssertionError(f"unexpected friend library request: {steam_id}")
+
+    async def fake_fetch_steam_friends(steam_id, *, limit, offset):
+        assert steam_id == "76561198000000000"
+        assert limit == 2
+        assert offset == 2
+        return (
+            [
+                {
+                    "steam_id": "friend-3",
+                    "persona_name": "Third",
+                    "avatar": None,
+                    "friend_since": 1,
+                },
+            ],
+            3,
+        )
+
+    monkeypatch.setattr(main, "fetch_owned_games", fake_fetch_owned_games)
+    monkeypatch.setattr(main, "fetch_steam_friends", fake_fetch_steam_friends)
+
+    try:
+        response = client.get("/steam/social?friends_limit=2&friends_offset=2")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [friend["steam_id"] for friend in payload["friends"]] == ["friend-3"]
+    assert payload["friends_total"] == 3
+    assert payload["friends_has_more"] is False
+
+
+def test_steam_social_rejects_invalid_friend_pagination():
+    linked_at = datetime.now(timezone.utc)
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
+        id=uuid.uuid4(),
+        steam_id="76561198000000000",
+        steam_persona_name="Steam Player",
+        steam_avatar=None,
+        steam_country_code="UA",
+        steam_linked_at=linked_at,
+    )
+
+    try:
+        assert client.get("/steam/social?friends_limit=0").status_code == 400
+        assert client.get("/steam/social?friends_limit=25").status_code == 400
+        assert client.get("/steam/social?friends_offset=-1").status_code == 400
+    finally:
+        main.app.dependency_overrides.clear()
+
+
 def test_steam_recommendations_require_linked_account():
     owner_id = uuid.uuid4()
     main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(

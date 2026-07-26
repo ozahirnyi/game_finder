@@ -1,140 +1,33 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { FormEvent, useState } from "react";
-import { LogIn } from "lucide-react";
-import {
-  ApiError,
-  getGoogleLoginUrl,
-  getSteamSignInUrl,
-  loginUser,
-  setToken,
-} from "@/lib/api";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { LoginScreen } from "@/features/auth/LoginScreen";
+import { validateInternalReturnTo } from "@/features/auth/auth-navigation";
 
-export const Route = createFileRoute("/login")({ component: LoginPage });
+type LoginSearch = {
+  returnTo: string;
+};
 
-export function LoginPage() {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [oauthProvider, setOauthProvider] = useState<"google" | "steam" | null>(null);
-  const [error, setError] = useState("");
+export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>): LoginSearch => ({
+    returnTo: validateInternalReturnTo(search.returnTo) ?? "/",
+  }),
+  head: () => ({
+    meta: [
+      { title: "Sign in — PlayFinder" },
+      { name: "description", content: "Sign in to your PlayFinder account." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
+  component: LoginPage,
+});
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const data = await loginUser(email, password);
-      setToken(data.access_token);
-      await navigate({ to: "/profile" });
-    } catch (reason) {
-      setError(
-        reason instanceof ApiError
-          ? reason.message
-          : "Login failed. Please try again.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function beginOAuth(provider: "google" | "steam") {
-    setError("");
-    setOauthProvider(provider);
-    try {
-      const { url } = await (provider === "google"
-        ? getGoogleLoginUrl()
-        : getSteamSignInUrl());
-      window.location.assign(url);
-    } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Could not start sign-in. Please try again.");
-      setOauthProvider(null);
-    }
-  }
-
+function LoginPage() {
+  const { returnTo } = Route.useSearch();
+  const router = useRouter();
   return (
-    <section className="relative flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <Link
-        to="/"
-        className="absolute left-6 top-6 text-sm font-semibold text-muted-foreground transition hover:text-foreground"
-      >
-        ← Back to PlayFinder
-      </Link>
-      <div className="w-full max-w-md rounded-3xl border border-border bg-surface p-6 shadow-2xl shadow-black/20 sm:p-8">
-        <div className="mb-8">
-          <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-primary">
-            <LogIn className="size-4" /> Your saved games
-          </p>
-          <h1 className="mt-3 text-3xl font-extrabold tracking-tight">
-            Welcome back
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to keep building your personal game library.
-          </p>
-        </div>
-        {error && (
-          <p
-            className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-            role="alert"
-          >
-            {error}
-          </p>
-        )}
-        <form className="space-y-4" onSubmit={onSubmit}>
-          <label className="grid gap-2 text-sm font-medium">
-            <span>Email</span>
-            <input
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-medium">
-            <span>Password</span>
-            <input
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </label>
-          <button
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            type="submit"
-            disabled={loading}
-          >
-            <LogIn className="size-4" />
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
-        <div className="my-6 border-t border-border pt-6">
-          <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Or continue with
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={() => beginOAuth("google")} disabled={Boolean(oauthProvider)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-60">
-              {oauthProvider === "google" ? "Opening Google…" : "Continue with Google"}
-            </button>
-            <button type="button" onClick={() => beginOAuth("steam")} disabled={Boolean(oauthProvider)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-60">
-              {oauthProvider === "steam" ? "Opening Steam…" : "Continue with Steam"}
-            </button>
-          </div>
-        </div>
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          New here?{" "}
-          <Link
-            to="/register"
-            className="font-semibold text-primary hover:underline"
-          >
-            Create an account
-          </Link>
-          .
-        </p>
-      </div>
-    </section>
+    <LoginScreen
+      navigate={(target) => router.history.push(target)}
+      navigateExternal={(target) => window.location.assign(target)}
+      returnTo={returnTo}
+    />
   );
 }

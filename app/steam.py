@@ -140,7 +140,12 @@ async def fetch_steam_profiles(steam_ids: list[str]) -> dict[str, dict[str, str 
     return profiles
 
 
-async def fetch_steam_friends(steam_id: str, limit: int = 24) -> list[dict[str, Any]]:
+async def fetch_steam_friends(
+    steam_id: str,
+    *,
+    limit: int = 24,
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], int]:
     api_key = get_steam_api_key()
     if not api_key:
         raise HTTPException(status_code=503, detail="STEAM_API_KEY is not configured")
@@ -164,7 +169,8 @@ async def fetch_steam_friends(steam_id: str, limit: int = 24) -> list[dict[str, 
         raise HTTPException(status_code=409, detail="Steam friends list is private or unavailable")
 
     sorted_friends = sorted(friends, key=lambda item: item.get("friend_since") or 0, reverse=True)
-    selected = sorted_friends[: max(1, min(limit, 50))]
+    total = len(sorted_friends)
+    selected = sorted_friends[offset : offset + limit]
     profile_map = await fetch_steam_profiles([str(friend.get("steamid")) for friend in selected if friend.get("steamid")])
 
     return [
@@ -176,7 +182,7 @@ async def fetch_steam_friends(steam_id: str, limit: int = 24) -> list[dict[str, 
         }
         for friend in selected
         if friend.get("steamid")
-    ]
+    ], total
 
 
 async def fetch_owned_games(steam_id: str) -> list[dict[str, Any]]:
