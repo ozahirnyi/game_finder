@@ -25,6 +25,15 @@ The response preserves the selected display names and always contains one
 section for every selected genre, including a section with an empty `results`
 array when no relevant active discount exists.
 
+When a profile contains one to four selected genres, those genres remain first
+but the response fills the remaining slots with unique genres that are most
+represented by the current enriched Steam candidate pool. The static fallback
+order is used only as a deterministic tie-breaker. This calculation reuses the
+same Steam candidates and RAWG enrichment, so it adds no external request.
+
+An empty section remains valid when fewer than five active matching discounts
+exist; the feature never guarantees five by inserting irrelevant games.
+
 ## Backend design
 
 Introduce response schemas for a grouped deals payload: a section contains a
@@ -64,6 +73,9 @@ other genres.
 
 The layout keeps the `/deals` page's responsive card language so five sections
 remain usable on narrow screens.
+
+Deal cards use a smaller cover and denser metadata/buttons than the original
+featured layout, so a five-game section stays compact without becoming a table.
 
 ## Errors and loading
 
