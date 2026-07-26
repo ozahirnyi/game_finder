@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Dashboard } from "@/routes/index";
-import { LibraryPage } from "@/routes/library";
+import { LibraryPage, Route as LibraryRoute } from "@/routes/library";
 import { ProfilePage } from "@/routes/profile";
 import { Route as SteamRoute } from "@/routes/steam";
 import { SteamLibraryPanel } from "@/features/library/SteamLibraryPanel";
@@ -18,11 +18,12 @@ const api = vi.hoisted(() => ({
   updateProfile: vi.fn(),
 }));
 const navigate = vi.fn();
+const librarySearch = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => ({
     ...options,
-    useSearch: () => ({}),
+    useSearch: librarySearch,
   }),
   Link: ({ children, ...props }: React.ComponentProps<"a">) => (
     <a {...props}>{children}</a>
@@ -161,6 +162,7 @@ describe("live dashboard and profile data", () => {
     api.getDashboard.mockResolvedValue(dashboard());
     api.getProfileSummary.mockResolvedValue(summary());
     api.isAuthenticated.mockReturnValue(true);
+    librarySearch.mockReturnValue({ tab: "library" });
   });
 
   it("renders dashboard blocks from the summary response and useful disconnected states", async () => {
@@ -320,6 +322,52 @@ describe("live dashboard and profile data", () => {
       screen.getByRole("button", { name: "Connect Steam" }),
     ).toBeVisible();
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
+  });
+
+  it("selects the Steam tab from the library URL search", async () => {
+    librarySearch.mockReturnValue({ tab: "steam" });
+
+    renderPage(<LibraryPage />);
+
+    expect(await screen.findByRole("tab", { name: "Steam" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: "Library" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "PSN" })).toBeVisible();
+    expect(screen.getByText("Steam integration")).toBeVisible();
+  });
+
+  it("selects the PSN tab from the library URL search", async () => {
+    librarySearch.mockReturnValue({ tab: "psn" });
+
+    renderPage(<LibraryPage />);
+
+    expect(await screen.findByRole("tab", { name: "PSN" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: "Library" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Steam" })).toBeVisible();
+    expect(screen.getByText("PlayStation library")).toBeVisible();
+  });
+
+  it("falls back to the saved-games library for an unsupported tab", async () => {
+    librarySearch.mockReturnValue(
+      (
+        LibraryRoute as unknown as {
+          validateSearch: (search: Record<string, unknown>) => { tab: string };
+        }
+      ).validateSearch({ tab: "unsupported" }),
+    );
+
+    renderPage(<LibraryPage />);
+
+    expect(await screen.findByRole("tab", { name: "Library" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(await screen.findByText("Hades II")).toBeVisible();
   });
 
   it("renders the reusable Steam library panel for a connected dashboard", async () => {

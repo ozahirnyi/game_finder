@@ -3,6 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
+import { PsnLibraryPanel } from "@/features/library/PsnLibraryPanel";
+import { SteamLibraryPanel } from "@/features/library/SteamLibraryPanel";
 import { getProfileSummary, searchGames, type SavedGame } from "@/lib/api";
 import {
   lovableQueryKeys,
@@ -10,7 +12,19 @@ import {
   type LovableSavedGameCard,
 } from "@/lib/lovable-data";
 
-export const Route = createFileRoute("/library")({ component: LibraryPage });
+type LibraryTab = "library" | "steam" | "psn";
+const libraryTabs: readonly LibraryTab[] = ["library", "steam", "psn"];
+
+export const Route = createFileRoute("/library")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: libraryTabs.includes(search.tab as LibraryTab)
+      ? (search.tab as LibraryTab)
+      : "library",
+    linked: search.linked === "1" ? "1" : undefined,
+    error: typeof search.error === "string" ? search.error : undefined,
+  }),
+  component: LibraryPage,
+});
 
 function SavedGameCover({ game }: { game: LovableSavedGameCard }) {
   const catalogCover = useQuery({
@@ -57,7 +71,46 @@ function LibraryGameRow({ game }: { game: SavedGame }) {
   );
 }
 
+function SavedGamesLibrary({
+  games,
+  hint,
+  unauthorized,
+}: {
+  games: SavedGame[];
+  hint: string;
+  unauthorized: boolean;
+}) {
+  return unauthorized ? (
+    <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted-foreground">
+      <p>{hint}</p>
+      <Link
+        to="/login"
+        className="mt-4 inline-block rounded-lg bg-primary px-3 py-2 font-bold text-primary-foreground"
+      >
+        Sign in
+      </Link>
+    </div>
+  ) : games.length ? (
+    <div className="space-y-3">
+      {games.map((game) => (
+        <LibraryGameRow key={game.id} game={game} />
+      ))}
+    </div>
+  ) : (
+    <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted-foreground">
+      <p>{hint}</p>
+      <Link
+        to="/search"
+        className="mt-4 inline-block rounded-lg bg-primary px-3 py-2 font-bold text-primary-foreground"
+      >
+        Add a game
+      </Link>
+    </div>
+  );
+}
+
 export function LibraryPage() {
+  const { tab, linked, error } = Route.useSearch();
   const query = useQuery({
     queryKey: lovableQueryKeys.profileSummary,
     queryFn: getProfileSummary,
@@ -100,33 +153,50 @@ export function LibraryPage() {
           ))}
         </div>
       </div>
-      {unauthorized ? (
-        <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted-foreground">
-          <p>{hint}</p>
-          <Link
-            to="/login"
-            className="mt-4 inline-block rounded-lg bg-primary px-3 py-2 font-bold text-primary-foreground"
-          >
-            Sign in
-          </Link>
-        </div>
-      ) : games.length ? (
-        <div className="space-y-3">
-          {games.map((game) => (
-            <LibraryGameRow key={game.id} game={game} />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted-foreground">
-          <p>{hint}</p>
-          <Link
-            to="/search"
-            className="mt-4 inline-block rounded-lg bg-primary px-3 py-2 font-bold text-primary-foreground"
-          >
-            Add a game
-          </Link>
-        </div>
-      )}
+      <div
+        role="tablist"
+        aria-label="Library platform"
+        className="mb-8 flex w-fit rounded-lg border border-border p-1"
+      >
+        <Link
+          role="tab"
+          aria-selected={tab === "library"}
+          to="/library"
+          search={{ linked, error }}
+          className="rounded-md px-3 py-2 text-sm font-bold"
+        >
+          Library
+        </Link>
+        <Link
+          role="tab"
+          aria-selected={tab === "steam"}
+          to="/library"
+          search={{ tab: "steam", linked, error }}
+          className="rounded-md px-3 py-2 text-sm font-bold"
+        >
+          Steam
+        </Link>
+        <Link
+          role="tab"
+          aria-selected={tab === "psn"}
+          to="/library"
+          search={{ tab: "psn", linked, error }}
+          className="rounded-md px-3 py-2 text-sm font-bold"
+        >
+          PSN
+        </Link>
+      </div>
+      {tab === "library" ? (
+        <SavedGamesLibrary
+          games={games}
+          hint={hint}
+          unauthorized={unauthorized}
+        />
+      ) : null}
+      {tab === "steam" ? (
+        <SteamLibraryPanel linked={linked} error={error} />
+      ) : null}
+      {tab === "psn" ? <PsnLibraryPanel /> : null}
     </AppShell>
   );
 }
