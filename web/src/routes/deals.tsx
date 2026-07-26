@@ -27,6 +27,12 @@ function money(amount: number | undefined, currency: string | undefined) {
 }
 
 function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolean }) {
+  const buttonClass = compact
+    ? "rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition hover:opacity-90"
+    : "rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90";
+  const catalogClass = compact
+    ? "rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold transition hover:bg-white/5"
+    : "rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold transition hover:bg-white/5";
   return (
     <div className={compact ? "mt-3 flex flex-wrap gap-2" : "mt-8 flex flex-wrap gap-3"}>
       {deal.url ? (
@@ -34,7 +40,7 @@ function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolea
           href={deal.url}
           target="_blank"
           rel="noreferrer"
-          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
+          className={buttonClass}
         >
           Open deal
         </a>
@@ -45,7 +51,7 @@ function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolea
         <Link
           to="/games/$gameId"
           params={{ gameId: String(deal.id) }}
-          className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold transition hover:bg-white/5"
+          className={catalogClass}
         >
           Game details
         </Link>
@@ -56,16 +62,16 @@ function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolea
   );
 }
 
-function DealPrices({ deal }: { deal: HomeDeal }) {
+function DealPrices({ deal, compact = false }: { deal: HomeDeal; compact?: boolean }) {
   return (
-    <div className="flex flex-wrap items-end gap-5">
+    <div className={compact ? "flex flex-wrap items-end gap-3" : "flex flex-wrap items-end gap-5"}>
       <div>
         {deal.current?.regular && (
           <p className="font-mono text-xs text-muted-foreground line-through">
             {money(deal.current.regular.amount, deal.current.regular.currency)}
           </p>
         )}
-        <p className="font-mono text-3xl font-black text-primary">
+        <p className={compact ? "font-mono text-xl font-black text-primary" : "font-mono text-3xl font-black text-primary"}>
           {money(deal.current?.price?.amount, deal.current?.price?.currency)}
         </p>
       </div>
@@ -83,30 +89,30 @@ function DealPrices({ deal }: { deal: HomeDeal }) {
 
 function DealCard({ deal }: { deal: HomeDeal }) {
   return (
-    <article className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 transition hover:border-white/20">
+    <article className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition hover:border-white/20">
       <GameCover
         from={deal.background_image ?? "#0f172a"}
         to="#0f172a"
         title={deal.name}
         compact
-        className="size-24 shrink-0 rounded-xl"
+        className="size-20 shrink-0 rounded-lg"
       />
       <div className="min-w-0 flex-1">
         {deal.id ? (
           <Link
             to="/games/$gameId"
             params={{ gameId: String(deal.id) }}
-            className="block truncate text-lg font-bold hover:text-primary"
+            className="block truncate text-base font-bold hover:text-primary"
           >
             {deal.name}
           </Link>
         ) : (
-          <h4 className="truncate text-lg font-bold">{deal.name}</h4>
+          <h4 className="truncate text-base font-bold">{deal.name}</h4>
         )}
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
           {deal.released ? `Released ${deal.released}` : "Release date is not listed."}
         </p>
-        <div className="mt-3"><DealPrices deal={deal} /></div>
+        <div className="mt-2"><DealPrices deal={deal} compact /></div>
         <DealLinks deal={deal} compact />
       </div>
     </article>
