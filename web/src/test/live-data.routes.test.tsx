@@ -5,6 +5,7 @@ import { Dashboard } from "@/routes/index";
 import { LibraryPage } from "@/routes/library";
 import { ProfilePage } from "@/routes/profile";
 import { Route as SteamRoute } from "@/routes/steam";
+import { SteamLibraryPanel } from "@/features/library/SteamLibraryPanel";
 
 const api = vi.hoisted(() => ({
   clearToken: vi.fn(),
@@ -319,5 +320,37 @@ describe("live dashboard and profile data", () => {
       screen.getByRole("button", { name: "Connect Steam" }),
     ).toBeVisible();
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
+  });
+
+  it("renders the reusable Steam library panel for a connected dashboard", async () => {
+    api.getDashboard.mockResolvedValue({
+      ...dashboard(),
+      steam: ready({
+        steam,
+        games: [
+          {
+            appid: 1145350,
+            name: "Hades II",
+            playtime_forever: 125,
+            img_icon_url: null,
+          },
+        ],
+      }),
+    });
+
+    renderPage(<SteamLibraryPanel />);
+
+    expect(await screen.findByText("Steam library")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Sync now" })).toBeVisible();
+  });
+
+  it("shows the Steam connected message in the reusable panel", async () => {
+    renderPage(<SteamLibraryPanel linked="1" />);
+
+    expect(
+      await screen.findByText(
+        "Steam account connected. Your library is ready to sync.",
+      ),
+    ).toBeVisible();
   });
 });
