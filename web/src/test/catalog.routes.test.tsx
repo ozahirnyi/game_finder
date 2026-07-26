@@ -223,6 +223,21 @@ describe("catalog routes", () => {
     expect(screen.queryByRole("link", { name: /game details/i })).not.toBeInTheDocument();
   });
 
+  it("uses compact deal cards while retaining Steam and catalog links", async () => {
+    renderPage(<DealsPage />);
+
+    expect(await screen.findByText("Popular on Steam")).toBeVisible();
+    expect(screen.getAllByAltText("Hades II")[0].parentElement).toHaveClass("size-20");
+    expect(screen.getAllByRole("link", { name: /open deal/i })[0]).toHaveAttribute(
+      "href",
+      "https://store.steampowered.com/app/1145350",
+    );
+    expect(screen.getAllByRole("link", { name: /game details/i })[0]).toHaveAttribute(
+      "href",
+      "/games/274755",
+    );
+  });
+
   it("renders real catalog metadata and price-low values without placeholder copy", async () => {
     renderPage(<GameDetailPage gameId="274755" />);
 
