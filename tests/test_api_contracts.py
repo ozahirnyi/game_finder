@@ -553,10 +553,10 @@ def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch
     assert response.status_code == 200
     payload = response.json()
     assert [item["name"] for item in payload["popular"]] == ["Hades", "Baldur's Gate 3", "Stardew Valley"]
-    assert [section["genre"] for section in payload["sections"]] == ["Action", "RPG", "Adventure", "Strategy", "Indie"]
+    assert [section["genre"] for section in payload["sections"]] == ["Action", "RPG", "Strategy", "Adventure", "Indie"]
     assert [item["name"] for item in payload["sections"][0]["results"]] == ["Hades"]
-    assert payload["sections"][2]["results"] == []
-    assert [item["name"] for item in payload["sections"][3]["results"]] == ["Civilization VII"]
+    assert [item["name"] for item in payload["sections"][2]["results"]] == ["Civilization VII"]
+    assert payload["sections"][3]["results"] == []
 
 
 def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
@@ -599,7 +599,46 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
     assert len(first.json()["sections"][0]["results"]) == 5
     assert second.status_code == 200
     assert cache_keys[0] == cache_keys[1]
-    assert cache_keys[0].startswith("steam_genre_deals_v1:")
+    assert cache_keys[0].startswith("steam_genre_deals_v2:")
+
+
+def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_deal_candidates(_country: str):
+        return {
+            "popular": [],
+            "candidates": [
+                {"steam_appid": 1, "name": "Action One", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 2, "name": "Action Two", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 3, "name": "Action Three", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 4, "name": "Adventure One", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 5, "name": "Adventure Two", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 6, "name": "RPG One", "background_image": None, "url": None, "current": None},
+            ],
+        }
+
+    async def fake_fetch_rawg_games(query: str, _page: int):
+        genre = query.split()[0]
+        return {"results": [{"id": hash(query), "name": query, "released": None, "background_image": None, "genres": [genre]}]}
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
+        favorite_genres=["Sports"], steam_country_code="US"
+    )
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+
+    try:
+        response = client.get("/prices/genre-deals")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert [section["genre"] for section in response.json()["sections"]] == [
+        "Sports", "Action", "Adventure", "RPG", "Strategy"
+    ]
 
 
 def test_cors_allows_localhost_origin():
