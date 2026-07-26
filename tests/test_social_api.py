@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from pathlib import Path
+import re
 import uuid
 
 import pytest
@@ -53,10 +55,11 @@ def test_social_profile_nickname_and_player_search_are_public_but_private_fields
     alice, bob, charlie, _hidden = create_users(social_db)
     api = use_social_api(alice, social_db)
 
-    updated = api.patch("/social/me", json={"nickname": "  ALICE PLAYER  "})
+    updated = api.patch("/social/me", json={"nickname": "  ALICE_PLAYER  "})
     assert updated.status_code == 200
-    assert updated.json()["nickname"] == "ALICE PLAYER"
+    assert updated.json()["nickname"] == "ALICE_PLAYER"
     assert api.patch("/social/me", json={"nickname": "bob"}).status_code == 409
+    assert api.patch("/social/me", json={"nickname": "Straße"}).status_code == 422
 
     players = api.get("/social/players?q=ar&limit=1")
     assert players.status_code == 200
@@ -91,6 +94,7 @@ def test_friend_request_lifecycle_includes_cancel_and_restricts_other_users(soci
     assert cancelled.json()["status"] == "cancelled"
 
     accepted_request = use_social_api(alice, social_db).post("/social/friend-requests", json={"public_id": bob.public_id})
+    assert social_db.query(FriendRequest).count() == 1
     accepted = use_social_api(bob, social_db).post(f"/social/friend-requests/{accepted_request.json()['id']}/accept")
     assert accepted.status_code == 200
     assert accepted.json()["status"] == "accepted"
@@ -138,3 +142,21 @@ def test_friendship_model_enforces_canonical_pair_and_social_migration_exists():
         for constraint in Friendship.__table__.constraints
         if hasattr(constraint, "sqltext")
     )
+
+    versions = Path("alembic/versions")
+    historical_revisions = {
+        "a1b2c3d4e5f6_add_user_profile_fields.py",
+        "d5e6f7a8b9c0_add_game_catalogue_id.py",
+        "e6f7a8b9c0d1_add_social_features.py",
+        "f7a8b9c0d1e2_add_collections_and_price_alerts.py",
+    }
+    assert all((versions / revision).is_file() for revision in historical_revisions)
+    social_migration = versions / "b2c3d4e5f6a7_add_social_features.py"
+    contents = social_migration.read_text(encoding="utf-8")
+    assert 'revision = "b2c3d4e5f6a7"' in contents
+    assert 'down_revision = "f7a8b9c0d1e2"' in contents
+    revision_ids = [
+        re.search(r"revision(?:\s*:\s*[^=]+)?\s*=\s*['\"]([^'\"]+)['\"]", path.read_text(encoding="utf-8")).group(1)
+        for path in versions.glob("*.py")
+    ]
+    assert len(revision_ids) == len(set(revision_ids))

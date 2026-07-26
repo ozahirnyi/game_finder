@@ -49,7 +49,12 @@ class UserLogin(BaseModel):
 
 
 class SocialProfileUpdate(BaseModel):
-    nickname: str = Field(min_length=3, max_length=32)
+    nickname: str = Field(
+        min_length=3,
+        max_length=32,
+        pattern=r"^[A-Za-z0-9_]+$",
+        description="3-32 ASCII letters, digits, or underscores",
+    )
 
     @field_validator("nickname", mode="before")
     @classmethod

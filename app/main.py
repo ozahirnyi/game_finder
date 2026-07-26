@@ -427,7 +427,7 @@ def get_social_me(db: Session = Depends(get_db), current_user: User = Depends(ge
 
 @app.patch("/social/me", response_model=SocialMeRead)
 def update_social_me(data: SocialProfileUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    duplicate = db.query(User).filter(func.lower(User.public_nickname) == data.nickname.casefold(), User.id != current_user.id).first()
+    duplicate = db.query(User).filter(func.lower(User.public_nickname) == data.nickname.lower(), User.id != current_user.id).first()
     if duplicate:
         raise HTTPException(status_code=409, detail="Nickname is already in use")
     current_user.public_nickname = data.nickname
@@ -443,14 +443,14 @@ def list_social_players(
 ):
     nickname_order = func.lower(User.public_nickname)
     query = db.query(User).filter(User.public_nickname.is_not(None), User.id != current_user.id)
-    search = q.strip().casefold()
+    search = q.strip().lower()
     if search:
         query = query.filter(nickname_order.contains(search))
     if cursor:
         cursor_user = db.query(User).filter(User.public_id == cursor, User.public_nickname.is_not(None)).first()
         if cursor_user is None:
             raise HTTPException(status_code=400, detail="Invalid player cursor")
-        cursor_nickname = cursor_user.public_nickname.casefold()
+        cursor_nickname = cursor_user.public_nickname.lower()
         query = query.filter(or_(nickname_order > cursor_nickname, and_(nickname_order == cursor_nickname, User.public_id > cursor)))
     users = query.order_by(nickname_order, User.public_id).limit(limit + 1).all()
     has_next_page = len(users) > limit
@@ -480,8 +480,16 @@ def create_friend_request(data: FriendRequestCreate, db: Session = Depends(get_d
         raise HTTPException(status_code=409, detail="Users are already friends")
     if relationship in {"outgoing_pending", "incoming_pending"}:
         raise HTTPException(status_code=409, detail="A friend request is already pending")
-    request = FriendRequest(sender_id=current_user.id, recipient_id=recipient.id)
-    db.add(request)
+    request = db.query(FriendRequest).filter(
+        FriendRequest.sender_id == current_user.id,
+        FriendRequest.recipient_id == recipient.id,
+    ).first()
+    if request is None:
+        request = FriendRequest(sender_id=current_user.id, recipient_id=recipient.id)
+        db.add(request)
+    else:
+        request.status = "pending"
+        request.created_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(request)
     return social_request_response(request, recipient)
