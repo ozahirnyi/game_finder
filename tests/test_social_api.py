@@ -166,4 +166,6 @@ def test_social_migration_removes_legacy_friend_request_pair_constraint_before_l
     migration = Path("alembic/versions/b2c3d4e5f6a7_add_social_features.py").read_text(encoding="utf-8")
 
     assert 'op.drop_constraint("uq_friend_request_pair", "friend_requests", type_="unique")' in migration
+    assert "DELETE FROM friend_requests AS duplicate" in migration
+    assert "USING friend_requests AS retained" in migration
     assert 'op.create_unique_constraint("uq_friend_request_pair", "friend_requests", ["sender_id", "recipient_id"])' in migration

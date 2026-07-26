@@ -114,14 +114,28 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
     op.drop_index("ix_direct_messages_friendship_created", table_name="direct_messages")
     op.drop_table("direct_messages")
     op.drop_index("ix_friend_requests_sender_status", table_name="friend_requests")
     op.drop_index("ix_friend_requests_recipient_status", table_name="friend_requests")
     request_constraints = {
-        constraint["name"] for constraint in sa.inspect(op.get_bind()).get_unique_constraints("friend_requests")
+        constraint["name"] for constraint in sa.inspect(bind).get_unique_constraints("friend_requests")
     }
     if "uq_friend_request_pair" not in request_constraints:
+        bind.execute(sa.text("""
+            DELETE FROM friend_requests AS duplicate
+            USING friend_requests AS retained
+            WHERE duplicate.sender_id = retained.sender_id
+              AND duplicate.recipient_id = retained.recipient_id
+              AND (
+                  COALESCE(duplicate.updated_at, duplicate.created_at) < COALESCE(retained.updated_at, retained.created_at)
+                  OR (
+                      COALESCE(duplicate.updated_at, duplicate.created_at) = COALESCE(retained.updated_at, retained.created_at)
+                      AND duplicate.id < retained.id
+                  )
+              )
+        """))
         op.create_unique_constraint("uq_friend_request_pair", "friend_requests", ["sender_id", "recipient_id"])
     op.drop_index("uq_users_public_nickname_casefold", table_name="users")
     op.drop_index("uq_users_public_id", table_name="users")
