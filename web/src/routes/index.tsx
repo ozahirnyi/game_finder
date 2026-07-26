@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
@@ -17,6 +18,17 @@ export function Dashboard() {
     queryFn: getDashboard,
   });
   const data = query.data;
+  const cacheExpiresAt = data?.recommendations.data?.cache_expires_at;
+  useEffect(() => {
+    if (!cacheExpiresAt) return;
+    const delay = new Date(cacheExpiresAt).getTime() - Date.now();
+    if (delay <= 0) {
+      void query.refetch();
+      return;
+    }
+    const timer = window.setTimeout(() => void query.refetch(), delay);
+    return () => window.clearTimeout(timer);
+  }, [cacheExpiresAt, query.refetch]);
   const recommendations = data?.recommendations.data?.recommendations ?? [];
   const deals = data?.deals.data?.results ?? [];
   const library = data?.library.data;
