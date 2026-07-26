@@ -15,8 +15,9 @@ function errorMessage(reason: unknown, fallback: string) {
   return reason instanceof Error ? reason.message : fallback;
 }
 
-function conversationPath(friendId: string) {
-  return `/friends/${encodeURIComponent(friendId)}/messages`;
+function conversationPath(friendId: string, draft: string) {
+  const path = `/friends/${encodeURIComponent(friendId)}/messages`;
+  return draft ? `${path}?draft=${encodeURIComponent(draft)}` : path;
 }
 
 function loginHref(returnTo: string) {
@@ -191,7 +192,7 @@ export function ConversationScreen({
         <h1 className="text-2xl font-bold">Sign in to open messages</h1>
         <a
           className="mt-5 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-          href={loginHref(conversationPath(friendId))}
+          href={loginHref(conversationPath(friendId, initialDraft))}
         >
           Sign in
         </a>

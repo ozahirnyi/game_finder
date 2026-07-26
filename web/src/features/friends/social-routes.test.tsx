@@ -216,6 +216,19 @@ describe("ConversationScreen", () => {
     );
   });
 
+  it("preserves a shared-game draft in the signed-out login returnTo", () => {
+    auth.useAuthState.mockReturnValue(false);
+    const draft = "Let's play Deep Rock Galactic!";
+    const returnTo = `/friends/${encodeURIComponent("friend/id")}/messages?draft=${encodeURIComponent(draft)}`;
+
+    render(<ConversationScreen friendId="friend/id" initialDraft={draft} />);
+
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      `/login?returnTo=${encodeURIComponent(returnTo)}`,
+    );
+  });
+
   it("uses the subscribed auth snapshot before loading a conversation", async () => {
     api.isAuthenticated.mockReturnValue(false);
     auth.useAuthState.mockReturnValue(true);
