@@ -26,7 +26,6 @@ export default defineConfig({
       "src/components/lovable/**",
       "src/components/ui.test.tsx",
       "src/test/auth-recovery.routes.test.tsx",
-      "src/test/library-wishlist.routes.test.tsx",
       "src/test/steam-friends.integration.test.tsx",
     ],
   },
