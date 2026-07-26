@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   getGoogleLinkUrl: vi.fn(),
   getProfileSummary: vi.fn(),
   getSteamLinkUrl: vi.fn(),
+  isAuthenticated: vi.fn(),
   syncSteamLibrary: vi.fn(),
   updateProfile: vi.fn(),
 }));
@@ -158,6 +159,7 @@ describe("live dashboard and profile data", () => {
     vi.clearAllMocks();
     api.getDashboard.mockResolvedValue(dashboard());
     api.getProfileSummary.mockResolvedValue(summary());
+    api.isAuthenticated.mockReturnValue(true);
   });
 
   it("renders dashboard blocks from the summary response and useful disconnected states", async () => {
@@ -269,6 +271,32 @@ describe("live dashboard and profile data", () => {
       .component;
     renderPage(<SteamPage />);
     expect(await screen.findByText("Sign in", { selector: "a" })).toBeVisible();
+  });
+
+  it("sends guests to sign in instead of opening the protected Steam linker", async () => {
+    api.isAuthenticated.mockReturnValue(false);
+    const SteamPage = (SteamRoute as { component: React.ComponentType })
+      .component;
+    renderPage(<SteamPage />);
+
+    expect(screen.getByText("Sign in", { selector: "a" })).toHaveAttribute(
+      "to",
+      "/login",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Connect Steam" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("labels the dashboard Steam entry as sign in for guests", async () => {
+    api.isAuthenticated.mockReturnValue(false);
+    renderPage(<Dashboard />);
+
+    const signInLinks = await screen.findAllByText("Sign in to connect Steam", {
+      selector: "a",
+    });
+    expect(signInLinks).toHaveLength(2);
+    signInLinks.forEach((link) => expect(link).toHaveAttribute("to", "/login"));
   });
 
   it("renders the library from its profile-summary block", async () => {
