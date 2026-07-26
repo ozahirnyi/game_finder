@@ -59,6 +59,7 @@ const message = {
 describe("PublicProfileScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     api.isAuthenticated.mockReturnValue(true);
     auth.useAuthState.mockReturnValue(true);
     api.getSocialMe.mockResolvedValue(emptySocial);
@@ -227,6 +228,30 @@ describe("ConversationScreen", () => {
       "href",
       `/login?returnTo=${encodeURIComponent(returnTo)}`,
     );
+  });
+
+  it("uses a short session-backed handoff for a 2000-character draft", async () => {
+    auth.useAuthState.mockReturnValue(false);
+    const draft = "界".repeat(2000);
+    const returnTo = `/friends/${encodeURIComponent("friend/id")}/messages?draftKey=resume`;
+    const signedOut = render(
+      <ConversationScreen friendId="friend/id" initialDraft={draft} />,
+    );
+    const signIn = screen.getByRole("link", { name: "Sign in" });
+
+    expect(signIn).toHaveAttribute(
+      "href",
+      `/login?returnTo=${encodeURIComponent(returnTo)}`,
+    );
+    expect(signIn.getAttribute("href")).not.toContain(encodeURIComponent(draft));
+    signIn.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(signIn);
+    signedOut.unmount();
+
+    auth.useAuthState.mockReturnValue(true);
+    render(<ConversationScreen friendId="friend/id" draftKey="resume" />);
+
+    expect(await screen.findByLabelText("Message")).toHaveValue(draft);
   });
 
   it("uses the subscribed auth snapshot before loading a conversation", async () => {

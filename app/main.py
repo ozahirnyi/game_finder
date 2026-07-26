@@ -1041,7 +1041,10 @@ def list_outgoing_friend_requests(
 ):
     requests = (
         db.query(FriendRequest)
-        .filter(FriendRequest.sender_id == current_user.id)
+        .filter(
+            FriendRequest.sender_id == current_user.id,
+            FriendRequest.status == "pending",
+        )
         .order_by(FriendRequest.created_at.desc())
         .offset(offset).limit(limit).all()
     )
@@ -1057,7 +1060,10 @@ def list_incoming_friend_requests(
 ):
     requests = (
         db.query(FriendRequest)
-        .filter(FriendRequest.recipient_id == current_user.id)
+        .filter(
+            FriendRequest.recipient_id == current_user.id,
+            FriendRequest.status == "pending",
+        )
         .order_by(FriendRequest.created_at.desc())
         .offset(offset).limit(limit).all()
     )
@@ -1098,7 +1104,11 @@ def accept_friend_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    request = db.query(FriendRequest).filter(FriendRequest.id == request_id, FriendRequest.recipient_id == current_user.id).first()
+    request = db.query(FriendRequest).filter(
+        FriendRequest.id == request_id,
+        FriendRequest.recipient_id == current_user.id,
+        FriendRequest.status == "pending",
+    ).first()
     if not request:
         raise HTTPException(status_code=404, detail="Friend request not found")
     low_id, high_id = user_pair(request.sender_id, request.recipient_id)

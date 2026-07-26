@@ -4,6 +4,7 @@ import { ConversationScreen } from "@/features/friends/ConversationScreen";
 
 type ConversationSearch = {
   draft?: string;
+  draftKey?: "resume";
 };
 
 export const Route = createFileRoute("/friends_/$friendId/messages")({
@@ -12,6 +13,7 @@ export const Route = createFileRoute("/friends_/$friendId/messages")({
       typeof search.draft === "string"
         ? search.draft.slice(0, 2000)
         : undefined,
+    draftKey: search.draftKey === "resume" ? "resume" : undefined,
   }),
   head: () => ({
     meta: [
@@ -28,10 +30,14 @@ export const Route = createFileRoute("/friends_/$friendId/messages")({
 
 function ConversationPage() {
   const { friendId } = Route.useParams();
-  const { draft } = Route.useSearch();
+  const { draft, draftKey } = Route.useSearch();
   return (
     <AppShell>
-      <ConversationScreen friendId={friendId} initialDraft={draft} />
+      <ConversationScreen
+        draftKey={draftKey}
+        friendId={friendId}
+        initialDraft={draft}
+      />
     </AppShell>
   );
 }

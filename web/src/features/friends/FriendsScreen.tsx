@@ -104,8 +104,11 @@ export function FriendsScreen() {
   const [relationshipBusy, setRelationshipBusy] = useState("");
 
   const [query, setQuery] = useState("");
+  const [activePlayerQuery, setActivePlayerQuery] = useState("");
   const [players, setPlayers] = useState<SocialPlayer[]>([]);
+  const [playerCursor, setPlayerCursor] = useState<string | null>(null);
   const [playersLoading, setPlayersLoading] = useState(false);
+  const [playersLoadingMore, setPlayersLoadingMore] = useState(false);
   const [playersError, setPlayersError] = useState("");
 
   const [steamFriends, setSteamFriends] = useState<SteamFriend[]>([]);
@@ -286,15 +289,36 @@ export function FriendsScreen() {
 
   async function searchPlayers(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const searchQuery = query.trim();
     setPlayersLoading(true);
     setPlayersError("");
+    setPlayerCursor(null);
     try {
-      const page = await getSocialPlayers(query.trim());
-      setPlayers(page.players);
+      const page = await getSocialPlayers(searchQuery);
+      setPlayers(mergeById([], page.players, (player) => player.public_id));
+      setPlayerCursor(page.next_cursor);
+      setActivePlayerQuery(searchQuery);
     } catch (reason) {
       setPlayersError(messageFor(reason, "Could not search players."));
     } finally {
       setPlayersLoading(false);
+    }
+  }
+
+  async function loadMorePlayers() {
+    if (!playerCursor || playersLoadingMore) return;
+    setPlayersLoadingMore(true);
+    setPlayersError("");
+    try {
+      const page = await getSocialPlayers(activePlayerQuery, playerCursor);
+      setPlayers((current) =>
+        mergeById(current, page.players, (player) => player.public_id),
+      );
+      setPlayerCursor(page.next_cursor);
+    } catch (reason) {
+      setPlayersError(messageFor(reason, "Could not load more players."));
+    } finally {
+      setPlayersLoadingMore(false);
     }
   }
 
@@ -553,20 +577,34 @@ export function FriendsScreen() {
           </p>
         ) : null}
         {players.length ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {players.map((player) => (
-              <PlayerCard
-                busyId={relationshipBusy}
-                key={player.public_id}
-                onAccept={(request) => void respondToIncoming(request, true)}
-                onAdd={() => void addPlayer(player)}
-                onCancel={(request) => void cancelOutgoing(request)}
-                onDecline={(request) => void respondToIncoming(request, false)}
-                player={player}
-                social={social}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-3 md:grid-cols-2">
+              {players.map((player) => (
+                <PlayerCard
+                  busyId={relationshipBusy}
+                  key={player.public_id}
+                  onAccept={(request) => void respondToIncoming(request, true)}
+                  onAdd={() => void addPlayer(player)}
+                  onCancel={(request) => void cancelOutgoing(request)}
+                  onDecline={(request) =>
+                    void respondToIncoming(request, false)
+                  }
+                  player={player}
+                  social={social}
+                />
+              ))}
+            </div>
+            {playerCursor ? (
+              <button
+                className={secondaryButtonClass}
+                disabled={playersLoadingMore}
+                onClick={() => void loadMorePlayers()}
+                type="button"
+              >
+                {playersLoadingMore ? "Loading more..." : "Show more players"}
+              </button>
+            ) : null}
+          </>
         ) : null}
       </section>
 
