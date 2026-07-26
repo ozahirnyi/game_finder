@@ -96,6 +96,16 @@ class SocialMeRead(BaseModel):
     outgoing_requests: list[SocialRequestRead] = Field(default_factory=list)
 
 
+class SocialCommonGameRead(BaseModel):
+    appid: int
+    name: str
+    img_icon_url: str | None = None
+
+
+class SocialCommonGamesRead(BaseModel):
+    games: list[SocialCommonGameRead] = Field(default_factory=list)
+
+
 class FriendRequestCreate(BaseModel):
     public_id: str = Field(min_length=1, max_length=32)
 

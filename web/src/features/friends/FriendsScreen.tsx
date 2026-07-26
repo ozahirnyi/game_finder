@@ -1,20 +1,16 @@
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import {
   ApiError,
+  type SocialCommonGame,
   type SocialMe,
   type SocialPlayer,
   type SocialRequest,
   type SteamFriend,
-  type SteamFriendGame,
   acceptFriendRequest,
   cancelFriendRequest,
   createFriendRequest,
   declineFriendRequest,
+  getSocialFriendCommonGames,
   getSocialMe,
   getSocialPlayers,
   getSteamSocial,
@@ -47,8 +43,12 @@ function messageHref(friendId: string, game = "") {
 
 async function copyText(text: string) {
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall back for browsers that expose Clipboard API but reject its use.
+    }
   }
 
   const input = document.createElement("textarea");
@@ -109,7 +109,6 @@ export function FriendsScreen() {
   const [playersError, setPlayersError] = useState("");
 
   const [steamFriends, setSteamFriends] = useState<SteamFriend[]>([]);
-  const [steamGames, setSteamGames] = useState<SteamFriendGame[]>([]);
   const [steamTotal, setSteamTotal] = useState(0);
   const [steamHasMore, setSteamHasMore] = useState(false);
   const [steamOffset, setSteamOffset] = useState(0);
@@ -120,6 +119,12 @@ export function FriendsScreen() {
   const [selectedGames, setSelectedGames] = useState<Record<string, string>>(
     {},
   );
+  const [friendGames, setFriendGames] = useState<
+    Record<
+      string,
+      { games: SocialCommonGame[]; loading: boolean; error: string }
+    >
+  >({});
   const [copyStatus, setCopyStatus] = useState("");
 
   const refreshSocial = useCallback(async () => {
@@ -137,9 +142,6 @@ export function FriendsScreen() {
     try {
       const page = await getSteamSocial(steamPageSize, 0);
       setSteamFriends(mergeById([], page.friends, (item) => item.steam_id));
-      setSteamGames(
-        mergeById([], page.top_friend_games, (item) => String(item.appid)),
-      );
       setSteamTotal(page.friends_total);
       setSteamHasMore(page.friends_has_more);
       setSteamOffset(page.friends.length);
@@ -164,7 +166,9 @@ export function FriendsScreen() {
       })
       .catch((reason) => {
         if (active)
-          setSocialError(messageFor(reason, "Could not load PlayFinder friends."));
+          setSocialError(
+            messageFor(reason, "Could not load PlayFinder friends."),
+          );
       })
       .finally(() => {
         if (active) setSocialLoading(false);
@@ -174,6 +178,47 @@ export function FriendsScreen() {
       active = false;
     };
   }, [authenticated, loadFirstSteamPage]);
+
+  useEffect(() => {
+    if (!social?.friends.length) {
+      setFriendGames({});
+      return;
+    }
+    let active = true;
+    setFriendGames(
+      Object.fromEntries(
+        social.friends.map((friend) => [
+          friend.id,
+          { games: [], loading: true, error: "" },
+        ]),
+      ),
+    );
+    void Promise.all(
+      social.friends.map(async (friend) => {
+        try {
+          const result = await getSocialFriendCommonGames(friend.id);
+          return [
+            friend.id,
+            { games: result.games, loading: false, error: "" },
+          ] as const;
+        } catch (reason) {
+          return [
+            friend.id,
+            {
+              games: [],
+              loading: false,
+              error: messageFor(reason, "Could not verify shared Steam games."),
+            },
+          ] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (active) setFriendGames(Object.fromEntries(entries));
+    });
+    return () => {
+      active = false;
+    };
+  }, [social?.friends]);
 
   if (!authenticated) {
     return (
@@ -287,13 +332,6 @@ export function FriendsScreen() {
       setSteamFriends((current) =>
         mergeById(current, page.friends, (item) => item.steam_id),
       );
-      setSteamGames((current) =>
-        mergeById(
-          current,
-          page.top_friend_games,
-          (item) => String(item.appid),
-        ),
-      );
       setSteamTotal(page.friends_total);
       setSteamHasMore(page.friends_has_more);
       setSteamOffset((current) => current + page.friends.length);
@@ -352,7 +390,10 @@ export function FriendsScreen() {
         <p className="mt-2 text-sm text-muted-foreground">
           Other PlayFinder players will find you by this unique name.
         </p>
-        <form className="mt-5 space-y-3" onSubmit={(event) => void saveNickname(event)}>
+        <form
+          className="mt-5 space-y-3"
+          onSubmit={(event) => void saveNickname(event)}
+        >
           <label className="block text-sm font-bold" htmlFor="social-nickname">
             Public nickname
           </label>
@@ -383,13 +424,15 @@ export function FriendsScreen() {
   }
 
   return (
-    <main className="space-y-10">
+    <div className="space-y-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-primary">
             PlayFinder social
           </p>
-          <h1 className="mt-2 text-4xl font-extrabold tracking-tight">Friends</h1>
+          <h1 className="mt-2 text-4xl font-extrabold tracking-tight">
+            Friends
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Find players, manage requests, and continue private conversations.
           </p>
@@ -437,7 +480,9 @@ export function FriendsScreen() {
             {social.friends.map((friend) => (
               <FriendCard
                 friend={friend}
-                games={steamGames}
+                games={friendGames[friend.id]?.games ?? []}
+                gamesError={friendGames[friend.id]?.error ?? ""}
+                gamesLoading={friendGames[friend.id]?.loading ?? true}
                 key={friend.id}
                 onGameChange={(game) =>
                   setSelectedGames((current) => ({
@@ -571,9 +616,7 @@ export function FriendsScreen() {
                 onClick={() => void loadMoreSteam()}
                 type="button"
               >
-                {steamLoadingMore
-                  ? "Loading more…"
-                  : "Show more Steam friends"}
+                {steamLoadingMore ? "Loading more…" : "Show more Steam friends"}
               </button>
             ) : null}
             {steamError && !steamFriends.length ? (
@@ -588,18 +631,22 @@ export function FriendsScreen() {
           </>
         )}
       </section>
-    </main>
+    </div>
   );
 }
 
 function FriendCard({
   friend,
   games,
+  gamesLoading,
+  gamesError,
   selectedGame,
   onGameChange,
 }: {
   friend: SocialMe["friends"][number];
-  games: SteamFriendGame[];
+  games: SocialCommonGame[];
+  gamesLoading: boolean;
+  gamesError: string;
   selectedGame: string;
   onGameChange: (game: string) => void;
 }) {
@@ -618,13 +665,19 @@ function FriendCard({
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <a
-          className={primaryButtonClass}
-          href={messageHref(friend.id)}
-        >
+        <a className={primaryButtonClass} href={messageHref(friend.id)}>
           Message {friend.nickname}
         </a>
       </div>
+      {gamesLoading ? (
+        <p className="mt-4 text-xs text-muted-foreground" role="status">
+          Checking shared Steam games…
+        </p>
+      ) : gamesError ? (
+        <p className="mt-4 text-xs text-muted-foreground">
+          Shared Steam games unavailable.
+        </p>
+      ) : null}
       {games.length ? (
         <div className="mt-4 border-t border-border pt-4">
           <label
@@ -687,7 +740,7 @@ function RequestList({
               <button
                 aria-label={`Accept ${request.nickname}`}
                 className={primaryButtonClass}
-                disabled={busyId === request.id}
+                disabled={Boolean(busyId)}
                 onClick={() => onAccept(request)}
                 type="button"
               >
@@ -696,7 +749,7 @@ function RequestList({
               <button
                 aria-label={`Decline ${request.nickname}`}
                 className={secondaryButtonClass}
-                disabled={busyId === request.id}
+                disabled={Boolean(busyId)}
                 onClick={() => onDecline(request)}
                 type="button"
               >
@@ -731,7 +784,7 @@ function OutgoingList({
             <button
               aria-label={`Cancel request to ${request.nickname}`}
               className={`${secondaryButtonClass} mt-4`}
-              disabled={busyId === request.id}
+              disabled={Boolean(busyId)}
               onClick={() => onCancel(request)}
               type="button"
             >
@@ -788,10 +841,7 @@ function PlayerCard({
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {friend ? (
-          <a
-            className={primaryButtonClass}
-            href={messageHref(friend.id)}
-          >
+          <a className={primaryButtonClass} href={messageHref(friend.id)}>
             Message {player.nickname}
           </a>
         ) : incoming ? (
@@ -799,7 +849,7 @@ function PlayerCard({
             <button
               aria-label={`Accept ${player.nickname}`}
               className={primaryButtonClass}
-              disabled={busyId === incoming.id}
+              disabled={Boolean(busyId)}
               onClick={() => onAccept(incoming)}
               type="button"
             >
@@ -808,7 +858,7 @@ function PlayerCard({
             <button
               aria-label={`Decline ${player.nickname}`}
               className={secondaryButtonClass}
-              disabled={busyId === incoming.id}
+              disabled={Boolean(busyId)}
               onClick={() => onDecline(incoming)}
               type="button"
             >
@@ -819,7 +869,7 @@ function PlayerCard({
           <button
             aria-label={`Cancel request to ${player.nickname}`}
             className={secondaryButtonClass}
-            disabled={busyId === outgoing.id}
+            disabled={Boolean(busyId)}
             onClick={() => onCancel(outgoing)}
             type="button"
           >
@@ -829,7 +879,7 @@ function PlayerCard({
           <button
             aria-label={`Add ${player.nickname}`}
             className={primaryButtonClass}
-            disabled={busyId === player.public_id}
+            disabled={Boolean(busyId)}
             onClick={onAdd}
             type="button"
           >
@@ -850,9 +900,7 @@ function SteamFriendCard({ friend }: { friend: SteamFriend }) {
           nickname={friend.persona_name ?? "Steam friend"}
         />
         <div>
-          <h3 className="font-bold">
-            {friend.persona_name ?? "Steam friend"}
-          </h3>
+          <h3 className="font-bold">{friend.persona_name ?? "Steam friend"}</h3>
           <p className="text-xs text-muted-foreground">
             {friend.library_public
               ? `${friend.common_games_count} games in common`

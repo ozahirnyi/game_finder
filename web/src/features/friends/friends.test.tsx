@@ -7,6 +7,7 @@ const api = vi.hoisted(() => ({
   cancelFriendRequest: vi.fn(),
   createFriendRequest: vi.fn(),
   declineFriendRequest: vi.fn(),
+  getSocialFriendCommonGames: vi.fn(),
   getSocialMe: vi.fn(),
   getSocialPlayers: vi.fn(),
   getSteamSocial: vi.fn(),
@@ -119,6 +120,15 @@ describe("FriendsScreen", () => {
       players: [],
       next_cursor: null,
     });
+    api.getSocialFriendCommonGames.mockResolvedValue({
+      games: [
+        {
+          appid: 1,
+          name: "Deep Rock Galactic",
+          img_icon_url: null,
+        },
+      ],
+    });
     api.getSteamSocial.mockResolvedValue(steamPage());
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -131,7 +141,9 @@ describe("FriendsScreen", () => {
 
     render(<FriendsScreen />);
 
-    expect(screen.getByRole("heading", { name: "Sign in to see friends" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Sign in to see friends" }),
+    ).toBeVisible();
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
       "href",
       "/login?returnTo=%2Ffriends",
@@ -141,11 +153,15 @@ describe("FriendsScreen", () => {
   });
 
   it("renders PlayFinder relationships and a separately counted Steam page", async () => {
-    api.getSteamSocial.mockResolvedValue(steamPage([steamFriend], { total: 37 }));
+    api.getSteamSocial.mockResolvedValue(
+      steamPage([steamFriend], { total: 37 }),
+    );
 
     render(<FriendsScreen />);
 
-    expect(await screen.findByRole("heading", { name: "My friends" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "My friends" }),
+    ).toBeVisible();
     expect(screen.getByRole("link", { name: "Message Alex" })).toHaveAttribute(
       "href",
       "/friends/friend-id/messages",
@@ -154,6 +170,7 @@ describe("FriendsScreen", () => {
     expect(screen.getByText("Mira")).toBeVisible();
     expect(await screen.findByText("37 Steam friends")).toBeVisible();
     expect(screen.getByText("Steam Alex")).toBeVisible();
+    expect(api.getSocialFriendCommonGames).toHaveBeenCalledWith(friend.id);
     expect(api.getSteamSocial).toHaveBeenCalledWith(12, 0);
   });
 
@@ -171,12 +188,20 @@ describe("FriendsScreen", () => {
     await waitFor(() =>
       expect(api.updateSocialMe).toHaveBeenCalledWith("Night Owl"),
     );
-    expect(await screen.findByRole("heading", { name: "My friends" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "My friends" }),
+    ).toBeVisible();
   });
 
   it("accepts incoming and cancels outgoing requests, then refreshes relationships", async () => {
-    api.acceptFriendRequest.mockResolvedValue({ ...incoming, status: "accepted" });
-    api.cancelFriendRequest.mockResolvedValue({ ...outgoing, status: "cancelled" });
+    api.acceptFriendRequest.mockResolvedValue({
+      ...incoming,
+      status: "accepted",
+    });
+    api.cancelFriendRequest.mockResolvedValue({
+      ...outgoing,
+      status: "cancelled",
+    });
     api.getSocialMe
       .mockResolvedValueOnce(social)
       .mockResolvedValueOnce({ ...social, incoming_requests: [] })
@@ -192,7 +217,9 @@ describe("FriendsScreen", () => {
     await waitFor(() =>
       expect(api.acceptFriendRequest).toHaveBeenCalledWith(incoming.id),
     );
-    fireEvent.click(await screen.findByRole("button", { name: "Cancel request to Mira" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Cancel request to Mira" }),
+    );
     await waitFor(() =>
       expect(api.cancelFriendRequest).toHaveBeenCalledWith(outgoing.id),
     );
@@ -218,9 +245,12 @@ describe("FriendsScreen", () => {
 
     render(<FriendsScreen />);
 
-    fireEvent.change(await screen.findByRole("textbox", { name: "Find PlayFinder players" }), {
-      target: { value: "zoe" },
-    });
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Find PlayFinder players" }),
+      {
+        target: { value: "zoe" },
+      },
+    );
     fireEvent.click(screen.getByRole("button", { name: "Search players" }));
 
     expect(await screen.findByText("Zoe")).toBeVisible();
@@ -233,7 +263,9 @@ describe("FriendsScreen", () => {
       (await screen.findAllByRole("button", { name: "Cancel request to Zoe" }))
         .length,
     ).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "Add Zoe" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add Zoe" }),
+    ).not.toBeInTheDocument();
   });
 
   it("copies the public profile link and falls back when Clipboard API is unavailable", async () => {
@@ -249,15 +281,68 @@ describe("FriendsScreen", () => {
 
     render(<FriendsScreen />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Copy invite link" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Copy invite link" }),
+    );
 
     await waitFor(() => expect(execCommand).toHaveBeenCalledWith("copy"));
     expect(screen.getByRole("status")).toHaveTextContent("Invite link copied");
   });
 
+  it("falls back after Clipboard API rejects the write", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: execCommand,
+    });
+
+    render(<FriendsScreen />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Copy invite link" }),
+    );
+
+    await waitFor(() => expect(execCommand).toHaveBeenCalledWith("copy"));
+    expect(screen.getByRole("status")).toHaveTextContent("Invite link copied");
+  });
+
+  it("disables every relationship action while one request is pending", async () => {
+    let resolveAccept: (() => void) | undefined;
+    api.acceptFriendRequest.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveAccept = resolve;
+      }),
+    );
+
+    render(<FriendsScreen />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Accept Sam" }));
+
+    expect(screen.getByRole("button", { name: "Decline Sam" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Cancel request to Mira" }),
+    ).toBeDisabled();
+    resolveAccept?.();
+  });
+
+  it("does not render another main landmark inside the application shell", async () => {
+    const { container } = render(<FriendsScreen />);
+
+    expect(
+      await screen.findByRole("heading", { name: "My friends" }),
+    ).toBeVisible();
+    expect(container.querySelector("main")).not.toBeInTheDocument();
+  });
+
   it("loads later Steam pages without duplicate friends", async () => {
     api.getSteamSocial
-      .mockResolvedValueOnce(steamPage([steamFriend], { total: 2, hasMore: true }))
+      .mockResolvedValueOnce(
+        steamPage([steamFriend], { total: 2, hasMore: true }),
+      )
       .mockResolvedValueOnce(
         steamPage(
           [
@@ -274,7 +359,9 @@ describe("FriendsScreen", () => {
 
     render(<FriendsScreen />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Show more Steam friends" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Show more Steam friends" }),
+    );
 
     expect(await screen.findByText("Steam Sam")).toBeVisible();
     expect(screen.getAllByText("Steam Alex")).toHaveLength(1);
@@ -285,12 +372,32 @@ describe("FriendsScreen", () => {
     render(<FriendsScreen />);
 
     const gameSelect = await screen.findByLabelText("Game to invite Alex to");
-    expect(screen.queryByRole("link", { name: "Invite Alex to play" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Invite Alex to play" }),
+    ).not.toBeInTheDocument();
     fireEvent.change(gameSelect, { target: { value: "Deep Rock Galactic" } });
 
-    expect(screen.getByRole("link", { name: "Invite Alex to play" })).toHaveAttribute(
+    expect(
+      screen.getByRole("link", { name: "Invite Alex to play" }),
+    ).toHaveAttribute(
       "href",
       "/friends/friend-id/messages?draft=Let's%20play%20Deep%20Rock%20Galactic!",
     );
+  });
+
+  it("does not use global Steam recommendations as a friend's shared games", async () => {
+    api.getSocialFriendCommonGames.mockResolvedValue({ games: [] });
+
+    render(<FriendsScreen />);
+
+    expect(
+      await screen.findByRole("heading", { name: "My friends" }),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(api.getSocialFriendCommonGames).toHaveBeenCalledWith(friend.id),
+    );
+    expect(
+      screen.queryByLabelText("Game to invite Alex to"),
+    ).not.toBeInTheDocument();
   });
 });

@@ -131,6 +131,96 @@ def test_messages_require_confirmed_friendship_trim_text_and_page_backwards(soci
     assert use_social_api(charlie, social_db).get(f"/social/friends/{alice.id}/messages").status_code == 403
 
 
+def test_common_games_use_the_exact_friends_private_steam_links(monkeypatch, social_db):
+    alice, bob, _charlie, _hidden = create_users(social_db)
+    bob.steam_id = "bob-steam"
+    social_db.add(Friendship(user_low_id=alice.id, user_high_id=bob.id))
+    social_db.commit()
+    requested_steam_ids = []
+
+    async def fake_fetch_owned_games(steam_id):
+        requested_steam_ids.append(steam_id)
+        if steam_id == "alice-steam":
+            return [
+                {
+                    "appid": 1,
+                    "name": "Deep Rock Galactic",
+                    "playtime_forever": 120,
+                    "playtime_2weeks": 0,
+                    "img_icon_url": "alice-icon",
+                },
+                {
+                    "appid": 2,
+                    "name": "Portal 2",
+                    "playtime_forever": 60,
+                    "playtime_2weeks": 0,
+                    "img_icon_url": None,
+                },
+            ]
+        return [
+            {
+                "appid": 1,
+                "name": "Deep Rock Galactic",
+                "playtime_forever": 300,
+                "playtime_2weeks": 10,
+                "img_icon_url": "bob-icon",
+            },
+            {
+                "appid": 3,
+                "name": "Helldivers 2",
+                "playtime_forever": 90,
+                "playtime_2weeks": 20,
+                "img_icon_url": None,
+            },
+        ]
+
+    monkeypatch.setattr(main, "fetch_owned_games", fake_fetch_owned_games)
+
+    response = use_social_api(alice, social_db).get(
+        f"/social/friends/{bob.id}/common-games",
+    )
+
+    assert response.status_code == 200
+    assert requested_steam_ids == ["alice-steam", "bob-steam"]
+    assert response.json() == {
+        "games": [
+            {
+                "appid": 1,
+                "name": "Deep Rock Galactic",
+                "img_icon_url": "alice-icon",
+            },
+        ],
+    }
+    assert "steam_id" not in response.text
+    assert "playtime" not in response.text
+
+
+def test_common_games_require_friendship_and_both_linked_accounts(monkeypatch, social_db):
+    alice, bob, charlie, _hidden = create_users(social_db)
+    calls = []
+
+    async def fake_fetch_owned_games(steam_id):
+        calls.append(steam_id)
+        return []
+
+    monkeypatch.setattr(main, "fetch_owned_games", fake_fetch_owned_games)
+
+    not_friends = use_social_api(alice, social_db).get(
+        f"/social/friends/{charlie.id}/common-games",
+    )
+    assert not_friends.status_code == 403
+
+    social_db.add(Friendship(user_low_id=alice.id, user_high_id=bob.id))
+    social_db.commit()
+    missing_link = use_social_api(alice, social_db).get(
+        f"/social/friends/{bob.id}/common-games",
+    )
+
+    assert missing_link.status_code == 409
+    assert "steam_id" not in missing_link.text
+    assert calls == []
+
+
 def test_friendship_model_enforces_canonical_pair_and_social_migration_exists():
     high = uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
     low = uuid.UUID("00000000-0000-0000-0000-000000000001")

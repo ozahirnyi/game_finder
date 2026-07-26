@@ -7,6 +7,7 @@ import {
   declineFriendRequest,
   getDirectMessages,
   getSocialMe,
+  getSocialFriendCommonGames,
   getSocialPlayers,
   getSocialProfile,
   getSteamSocial,
@@ -148,6 +149,30 @@ describe("social API client", () => {
         method: "POST",
         body: JSON.stringify({ text: " Hello " }),
       }),
+    );
+  });
+
+  it("requests common Steam games for the exact confirmed friend", async () => {
+    const fetchMock = apiMocks.fetch(
+      apiMocks.success({
+        games: [
+          {
+            appid: 1,
+            name: "Deep Rock Galactic",
+            img_icon_url: null,
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getSocialFriendCommonGames("friend/id");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toMatch(
+      /\/social\/friends\/friend%2Fid\/common-games$/,
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ method: "GET" }),
     );
   });
 

@@ -31,7 +31,7 @@ from app.database import DirectMessage, FriendRequest, Friendship, get_db, User,
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, FriendRequestCreate, SocialFriendRead, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead
+    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, FriendRequestCreate, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -565,6 +565,45 @@ def list_direct_messages(
     has_next_page = len(messages) > limit
     messages = list(reversed(messages[:limit]))
     return DirectMessagePageRead(messages=messages, next_cursor=messages[0].id if has_next_page else None)
+
+
+@app.get(
+    "/social/friends/{friend_id}/common-games",
+    response_model=SocialCommonGamesRead,
+)
+async def list_common_friend_games(
+    friend_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    confirmed_friendship(db, current_user.id, friend_id)
+    friend = db.query(User).filter(User.id == friend_id).first()
+    if (
+        friend is None
+        or current_user.steam_id is None
+        or friend.steam_id is None
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Both friends must connect Steam to compare games",
+        )
+
+    own_games, friend_games = await asyncio.gather(
+        fetch_owned_games(current_user.steam_id),
+        fetch_owned_games(friend.steam_id),
+    )
+    friend_appids = {game["appid"] for game in friend_games}
+    return SocialCommonGamesRead(
+        games=[
+            SocialCommonGameRead(
+                appid=game["appid"],
+                name=game["name"],
+                img_icon_url=game.get("img_icon_url"),
+            )
+            for game in own_games
+            if game["appid"] in friend_appids
+        ],
+    )
 
 
 def create_google_transaction(db: Session, mode: str, user_id: uuid.UUID | None = None) -> OAuthLoginUrl:
