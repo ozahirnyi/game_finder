@@ -12,8 +12,8 @@ import {
   declineFriendRequest,
   getSocialMe,
   getSocialProfile,
-  isAuthenticated,
 } from "@/lib/api";
+import { useAuthState } from "@/hooks/useAuthState";
 
 const cardClass =
   "mx-auto max-w-xl rounded-3xl border border-border bg-surface p-7";
@@ -35,11 +35,14 @@ function loginHref(returnTo: string) {
 }
 
 export function PublicProfileScreen({ publicId }: { publicId: string }) {
-  const authenticated = isAuthenticated();
+  const authenticated = useAuthState();
   const activePublicId = useRef(publicId);
   activePublicId.current = publicId;
   const [profile, setProfile] = useState<SocialProfile | null>(null);
   const [social, setSocial] = useState<SocialMe | null>(null);
+  const [outgoingRequest, setOutgoingRequest] = useState<SocialRequest | null>(
+    null,
+  );
   const [loading, setLoading] = useState(authenticated);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -49,6 +52,7 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
     let active = true;
     setProfile(null);
     setSocial(null);
+    setOutgoingRequest(null);
     setLoading(true);
     setBusy(false);
     setError("");
@@ -63,7 +67,14 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
           profileData.relationship === "friends"
         ) {
           const socialData = await getSocialMe();
-          if (active) setSocial(socialData);
+          if (active) {
+            setSocial(socialData);
+            setOutgoingRequest(
+              socialData.outgoing_requests.find(
+                (request) => request.public_id === publicId,
+              ) ?? null,
+            );
+          }
         }
       })
       .catch((reason) => {
@@ -92,6 +103,7 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
     try {
       const request = await createFriendRequest(requestedPublicId);
       if (activePublicId.current !== requestedPublicId) return;
+      setOutgoingRequest(request);
       setSocial((current) =>
         current
           ? {
@@ -113,7 +125,8 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
   }
 
   async function cancelRequest() {
-    const request = matchingRequest(social?.outgoing_requests);
+    const request =
+      outgoingRequest ?? matchingRequest(social?.outgoing_requests);
     if (!request) {
       setError("This friend request is no longer pending.");
       return;
@@ -127,6 +140,7 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
       setProfile((current) =>
         current ? { ...current, relationship: "none" } : current,
       );
+      setOutgoingRequest(null);
       setSocial((current) =>
         current
           ? {
@@ -205,7 +219,8 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
       );
     }
     if (relationship === "outgoing_pending") {
-      const request = matchingRequest(social?.outgoing_requests);
+      const request =
+        outgoingRequest ?? matchingRequest(social?.outgoing_requests);
       return request ? (
         <div className="flex flex-wrap items-center gap-3">
           <p className="font-bold text-primary">Request sent</p>

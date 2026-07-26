@@ -14,12 +14,14 @@ import { Route as SteamRouteImport } from './routes/steam'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as PsnRouteImport } from './routes/psn'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as FriendsRouteImport } from './routes/friends'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsersPublicIdRouteImport } from './routes/users.$publicId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as FriendsFriendIdMessagesRouteImport } from './routes/friends_.$friendId.messages'
 
 const WishlistRoute = WishlistRouteImport.update({
@@ -45,6 +47,11 @@ const PsnRoute = PsnRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LibraryRoute = LibraryRouteImport.update({
@@ -77,6 +84,11 @@ const GamesGameIdRoute = GamesGameIdRouteImport.update({
   path: '/games/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FriendsFriendIdMessagesRoute = FriendsFriendIdMessagesRouteImport.update({
   id: '/friends_/$friendId/messages',
   path: '/friends/$friendId/messages',
@@ -88,11 +100,13 @@ export interface FileRoutesByFullPath {
   '/deals': typeof DealsRoute
   '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/psn': typeof PsnRoute
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/users/$publicId': typeof UsersPublicIdRoute
   '/friends/$friendId/messages': typeof FriendsFriendIdMessagesRoute
@@ -102,11 +116,13 @@ export interface FileRoutesByTo {
   '/deals': typeof DealsRoute
   '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/psn': typeof PsnRoute
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/users/$publicId': typeof UsersPublicIdRoute
   '/friends/$friendId/messages': typeof FriendsFriendIdMessagesRoute
@@ -117,11 +133,13 @@ export interface FileRoutesById {
   '/deals': typeof DealsRoute
   '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/psn': typeof PsnRoute
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/users/$publicId': typeof UsersPublicIdRoute
   '/friends_/$friendId/messages': typeof FriendsFriendIdMessagesRoute
@@ -133,11 +151,13 @@ export interface FileRouteTypes {
     | '/deals'
     | '/friends'
     | '/library'
+    | '/login'
     | '/profile'
     | '/psn'
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/auth/callback'
     | '/games/$gameId'
     | '/users/$publicId'
     | '/friends/$friendId/messages'
@@ -147,11 +167,13 @@ export interface FileRouteTypes {
     | '/deals'
     | '/friends'
     | '/library'
+    | '/login'
     | '/profile'
     | '/psn'
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/auth/callback'
     | '/games/$gameId'
     | '/users/$publicId'
     | '/friends/$friendId/messages'
@@ -161,11 +183,13 @@ export interface FileRouteTypes {
     | '/deals'
     | '/friends'
     | '/library'
+    | '/login'
     | '/profile'
     | '/psn'
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/auth/callback'
     | '/games/$gameId'
     | '/users/$publicId'
     | '/friends_/$friendId/messages'
@@ -176,11 +200,13 @@ export interface RootRouteChildren {
   DealsRoute: typeof DealsRoute
   FriendsRoute: typeof FriendsRoute
   LibraryRoute: typeof LibraryRoute
+  LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   PsnRoute: typeof PsnRoute
   SearchRoute: typeof SearchRoute
   SteamRoute: typeof SteamRoute
   WishlistRoute: typeof WishlistRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
   UsersPublicIdRoute: typeof UsersPublicIdRoute
   FriendsFriendIdMessagesRoute: typeof FriendsFriendIdMessagesRoute
@@ -221,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/library': {
@@ -265,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/friends_/$friendId/messages': {
       id: '/friends_/$friendId/messages'
       path: '/friends/$friendId/messages'
@@ -280,11 +320,13 @@ const rootRouteChildren: RootRouteChildren = {
   DealsRoute: DealsRoute,
   FriendsRoute: FriendsRoute,
   LibraryRoute: LibraryRoute,
+  LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   PsnRoute: PsnRoute,
   SearchRoute: SearchRoute,
   SteamRoute: SteamRoute,
   WishlistRoute: WishlistRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   GamesGameIdRoute: GamesGameIdRoute,
   UsersPublicIdRoute: UsersPublicIdRoute,
   FriendsFriendIdMessagesRoute: FriendsFriendIdMessagesRoute,

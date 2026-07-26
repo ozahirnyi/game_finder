@@ -21,7 +21,12 @@ const api = vi.hoisted(() => ({
   sendDirectMessage: vi.fn(),
 }));
 
+const auth = vi.hoisted(() => ({
+  useAuthState: vi.fn(),
+}));
+
 vi.mock("@/lib/api", () => api);
+vi.mock("@/hooks/useAuthState", () => auth);
 
 const player = {
   public_id: "alex-public",
@@ -55,11 +60,12 @@ describe("PublicProfileScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.isAuthenticated.mockReturnValue(true);
+    auth.useAuthState.mockReturnValue(true);
     api.getSocialMe.mockResolvedValue(emptySocial);
   });
 
   it("preserves the public profile as returnTo when asking a signed-out visitor to log in", () => {
-    api.isAuthenticated.mockReturnValue(false);
+    auth.useAuthState.mockReturnValue(false);
 
     render(<PublicProfileScreen publicId="alex/public" />);
 
@@ -97,6 +103,49 @@ describe("PublicProfileScreen", () => {
       expect(api.createFriendRequest).toHaveBeenCalledWith(player.public_id),
     );
     expect(await screen.findByText("Request sent")).toBeVisible();
+  });
+
+  it("can immediately cancel a newly-created request by its returned id", async () => {
+    api.getSocialProfile.mockResolvedValue({ ...player, relationship: "none" });
+    api.createFriendRequest.mockResolvedValue({
+      ...player,
+      id: "new-request-id",
+      status: "pending",
+      created_at: "2026-07-26T12:00:00Z",
+    });
+    api.cancelFriendRequest.mockResolvedValue({
+      ...player,
+      id: "new-request-id",
+      status: "cancelled",
+      created_at: "2026-07-26T12:00:00Z",
+    });
+
+    render(<PublicProfileScreen publicId={player.public_id} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add friend" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Cancel request" }),
+    );
+
+    await waitFor(() =>
+      expect(api.cancelFriendRequest).toHaveBeenCalledWith("new-request-id"),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Add friend" }),
+    ).toBeVisible();
+  });
+
+  it("uses the subscribed auth snapshot when hydration changes it", async () => {
+    api.isAuthenticated.mockReturnValue(false);
+    auth.useAuthState.mockReturnValue(true);
+    api.getSocialProfile.mockResolvedValue({ ...player, relationship: "self" });
+
+    render(<PublicProfileScreen publicId={player.public_id} />);
+
+    expect(
+      await screen.findByRole("heading", { name: player.nickname }),
+    ).toBeVisible();
+    expect(api.isAuthenticated).not.toHaveBeenCalled();
   });
 
   it("accepts an incoming request and exposes the confirmed conversation", async () => {
@@ -146,6 +195,7 @@ describe("ConversationScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.isAuthenticated.mockReturnValue(true);
+    auth.useAuthState.mockReturnValue(true);
     api.getSocialMe.mockResolvedValue({ ...emptySocial, friends: [friend] });
     api.getDirectMessages.mockResolvedValue({
       messages: [],
@@ -155,7 +205,7 @@ describe("ConversationScreen", () => {
   });
 
   it("preserves the conversation as returnTo for signed-out visitors", () => {
-    api.isAuthenticated.mockReturnValue(false);
+    auth.useAuthState.mockReturnValue(false);
 
     render(<ConversationScreen friendId="friend/id" />);
 
@@ -164,6 +214,18 @@ describe("ConversationScreen", () => {
       "href",
       "/login?returnTo=%2Ffriends%2Ffriend%252Fid%2Fmessages",
     );
+  });
+
+  it("uses the subscribed auth snapshot before loading a conversation", async () => {
+    api.isAuthenticated.mockReturnValue(false);
+    auth.useAuthState.mockReturnValue(true);
+
+    render(<ConversationScreen friendId={friend.id} />);
+
+    await waitFor(() =>
+      expect(api.getDirectMessages).toHaveBeenCalledWith(friend.id),
+    );
+    expect(api.isAuthenticated).not.toHaveBeenCalled();
   });
 
   it("prefills but does not submit a draft, then trims and refreshes after send", async () => {

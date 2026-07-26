@@ -6,12 +6,8 @@ import {
   useState,
 } from "react";
 import type { DirectMessage } from "@/lib/api";
-import {
-  getDirectMessages,
-  getSocialMe,
-  isAuthenticated,
-  sendDirectMessage,
-} from "@/lib/api";
+import { getDirectMessages, getSocialMe, sendDirectMessage } from "@/lib/api";
+import { useAuthState } from "@/hooks/useAuthState";
 
 const cardClass = "rounded-2xl border border-border bg-surface p-5";
 
@@ -48,7 +44,7 @@ export function ConversationScreen({
   friendId: string;
   initialDraft?: string;
 }) {
-  const authenticated = isAuthenticated();
+  const authenticated = useAuthState();
   const activeFriendId = useRef(friendId);
   activeFriendId.current = friendId;
   const seenCursors = useRef(new Set<string>());
