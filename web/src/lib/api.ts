@@ -186,6 +186,60 @@ export type TelegramLink = {
   message: string | null;
 };
 
+export type SocialPlayer = {
+  public_id: string;
+  nickname: string;
+  avatar: string | null;
+};
+
+export type SocialFriend = SocialPlayer & {
+  id: string;
+};
+
+export type SocialRequest = SocialPlayer & {
+  id: string;
+  status: string;
+  created_at: string;
+};
+
+export type SocialMe = {
+  public_id: string;
+  nickname: string | null;
+  avatar: string | null;
+  friends: SocialFriend[];
+  incoming_requests: SocialRequest[];
+  outgoing_requests: SocialRequest[];
+};
+
+export type SocialPlayersPage = {
+  players: SocialPlayer[];
+  next_cursor: string | null;
+};
+
+export type SocialRelationship =
+  | "self"
+  | "none"
+  | "outgoing_pending"
+  | "incoming_pending"
+  | "friends";
+
+export type SocialProfile = SocialPlayer & {
+  relationship: SocialRelationship;
+};
+
+export type DirectMessage = {
+  id: string;
+  friendship_id: string;
+  author_id: string;
+  text: string;
+  created_at: string;
+};
+
+export type DirectMessagePage = {
+  messages: DirectMessage[];
+  next_cursor: string | null;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://game-finder.up.railway.app";
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
@@ -497,4 +551,82 @@ export function sendTelegramTestAlert() {
     method: "POST",
     auth: true,
   });
+}
+
+export function getSocialMe() {
+  return request<SocialMe>("/social/me", { auth: true });
+}
+
+export function updateSocialMe(nickname: string) {
+  return request<SocialMe>("/social/me", {
+    method: "PATCH",
+    auth: true,
+    body: { nickname },
+  });
+}
+
+export function getSocialPlayers(query = "", cursor?: string) {
+  const search = [
+    query ? `q=${encodeURIComponent(query)}` : "",
+    cursor ? `cursor=${encodeURIComponent(cursor)}` : "",
+  ]
+    .filter(Boolean)
+    .join("&");
+  return request<SocialPlayersPage>(`/social/players${search ? `?${search}` : ""}`, {
+    auth: true,
+  });
+}
+
+export function getSocialProfile(publicId: string) {
+  return request<SocialProfile>(`/social/profiles/${encodeURIComponent(publicId)}`, {
+    auth: true,
+  });
+}
+
+export function createFriendRequest(publicId: string) {
+  return request<SocialRequest>("/social/friend-requests", {
+    method: "POST",
+    auth: true,
+    body: { public_id: publicId },
+  });
+}
+
+export function cancelFriendRequest(requestId: string) {
+  return request<SocialRequest>(`/social/friend-requests/${encodeURIComponent(requestId)}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export function acceptFriendRequest(requestId: string) {
+  return request<SocialRequest>(
+    `/social/friend-requests/${encodeURIComponent(requestId)}/accept`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function declineFriendRequest(requestId: string) {
+  return request<SocialRequest>(
+    `/social/friend-requests/${encodeURIComponent(requestId)}/decline`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function getDirectMessages(friendId: string, cursor?: string) {
+  const search = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  return request<DirectMessagePage>(
+    `/social/friends/${encodeURIComponent(friendId)}/messages${search}`,
+    { auth: true },
+  );
+}
+
+export function sendDirectMessage(friendId: string, text: string) {
+  return request<DirectMessage>(
+    `/social/friends/${encodeURIComponent(friendId)}/messages`,
+    {
+      method: "POST",
+      auth: true,
+      body: { text },
+    },
+  );
 }
