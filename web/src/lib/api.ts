@@ -121,6 +121,7 @@ export type RecommendationItem = {
 
 export type RecommendationResponse = {
   recommendations: RecommendationItem[];
+  cache_expires_at?: string | null;
 };
 
 export type SteamLoginUrl = {

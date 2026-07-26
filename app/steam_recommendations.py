@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 
@@ -59,7 +60,10 @@ async def get_cached_steam_recommendations(user_id: uuid.UUID, games: list[dict]
     except Exception:
         pass
     result = await asyncio.to_thread(get_recommendation, build_steam_recommendation_prompt(games, extra_prompt), sorted({int(game["appid"]) for game in games if game.get("appid") is not None}))
-    result = {"recommendations": await normalize_recommendations(result, {str(game.get("name") or "").strip().casefold() for game in games})}
+    result = {
+        "recommendations": await normalize_recommendations(result, {str(game.get("name") or "").strip().casefold() for game in games}),
+        "cache_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=CACHE_TTL_SECONDS)).isoformat(),
+    }
     try:
         await cache_set(key, result, CACHE_TTL_SECONDS)
     except Exception:

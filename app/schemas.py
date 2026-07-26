@@ -115,6 +115,7 @@ class RecommendationItem(BaseModel):
 
 class RecommendationResponse(BaseModel):
     recommendations: list[RecommendationItem] = Field(default_factory=list)
+    cache_expires_at: datetime | None = None
 
 
 class GameSearchItem(BaseModel):
