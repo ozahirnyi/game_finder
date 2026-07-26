@@ -8,6 +8,12 @@ import {
 import type { DirectMessage } from "@/lib/api";
 import { getDirectMessages, getSocialMe, sendDirectMessage } from "@/lib/api";
 import { useAuthState } from "@/hooks/useAuthState";
+import {
+  consumeMessageDraft,
+  messageDraftResumePath,
+  rememberMessageDraft,
+  validateInternalReturnTo,
+} from "@/features/auth/auth-navigation";
 
 const cardClass = "rounded-2xl border border-border bg-surface p-5";
 
@@ -41,14 +47,17 @@ function mergeMessages(
 export function ConversationScreen({
   friendId,
   initialDraft = "",
+  draftKey,
 }: {
   friendId: string;
   initialDraft?: string;
+  draftKey?: string;
 }) {
   const authenticated = useAuthState();
   const activeFriendId = useRef(friendId);
   activeFriendId.current = friendId;
   const seenCursors = useRef(new Set<string>());
+  const restoredDraft = useRef<{ key: string; value: string } | null>(null);
   const [friendName, setFriendName] = useState("Friend");
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -113,9 +122,16 @@ export function ConversationScreen({
 
   useEffect(() => {
     if (!authenticated) return;
+    const restoreKey = `${friendId}:${draftKey ?? ""}`;
+    if (restoredDraft.current?.key !== restoreKey) {
+      restoredDraft.current = {
+        key: restoreKey,
+        value: consumeMessageDraft(friendId, draftKey),
+      };
+    }
     setMessages([]);
     setNextCursor(null);
-    setText(initialDraft);
+    setText(initialDraft || restoredDraft.current.value);
     setLoading(true);
     setLoadingEarlier(false);
     setSending(false);
@@ -133,7 +149,7 @@ export function ConversationScreen({
     return () => {
       window.clearInterval(pollingId);
     };
-  }, [authenticated, friendId, initialDraft, refreshLatest]);
+  }, [authenticated, draftKey, friendId, initialDraft, refreshLatest]);
 
   async function loadEarlier() {
     const cursor = nextCursor;
@@ -187,12 +203,21 @@ export function ConversationScreen({
   }
 
   if (!authenticated) {
+    const directReturnTo = conversationPath(friendId, initialDraft);
+    const useStoredDraft =
+      Boolean(initialDraft) && validateInternalReturnTo(directReturnTo) === null;
+    const returnTo = useStoredDraft
+      ? messageDraftResumePath(friendId)
+      : directReturnTo;
     return (
       <article className={cardClass}>
         <h1 className="text-2xl font-bold">Sign in to open messages</h1>
         <a
           className="mt-5 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-          href={loginHref(conversationPath(friendId, initialDraft))}
+          href={loginHref(returnTo)}
+          onClick={() => {
+            if (useStoredDraft) rememberMessageDraft(friendId, initialDraft);
+          }}
         >
           Sign in
         </a>

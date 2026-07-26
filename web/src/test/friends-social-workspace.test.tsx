@@ -268,6 +268,51 @@ describe("FriendsScreen", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("loads the next player directory page and deduplicates overlapping results", async () => {
+    const firstPage = Array.from({ length: 20 }, (_, index) => ({
+      public_id: `player-${index + 1}`,
+      nickname: `Player ${index + 1}`,
+      avatar: null,
+    }));
+    api.getSocialPlayers
+      .mockResolvedValueOnce({
+        players: firstPage,
+        next_cursor: "player-20",
+      })
+      .mockResolvedValueOnce({
+        players: [
+          firstPage[19],
+          {
+            public_id: "player-21",
+            nickname: "Player 21",
+            avatar: null,
+          },
+        ],
+        next_cursor: null,
+      });
+
+    render(<FriendsScreen />);
+
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Find PlayFinder players" }),
+      { target: { value: "player" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Search players" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Show more players" }),
+    );
+
+    expect(await screen.findByText("Player 21")).toBeVisible();
+    expect(screen.getAllByText("Player 20")).toHaveLength(1);
+    expect(api.getSocialPlayers).toHaveBeenLastCalledWith(
+      "player",
+      "player-20",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Show more players" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("copies the public profile link and falls back when Clipboard API is unavailable", async () => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,

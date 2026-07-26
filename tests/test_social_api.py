@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.main as main
-from app.database import Base, DirectMessage, FriendRequest, Friendship, User
+from app.database import Base, DirectMessage, FriendRequest, Friendship, Notification, User
 
 
 client = TestClient(main.app)
@@ -25,7 +25,13 @@ def social_db():
     )
     Base.metadata.create_all(
         engine,
-        tables=[User.__table__, FriendRequest.__table__, Friendship.__table__, DirectMessage.__table__],
+        tables=[
+            User.__table__,
+            FriendRequest.__table__,
+            Friendship.__table__,
+            DirectMessage.__table__,
+            Notification.__table__,
+        ],
     )
     session = sessionmaker(bind=engine)()
     try:
@@ -101,6 +107,31 @@ def test_friend_request_lifecycle_includes_cancel_and_restricts_other_users(soci
     assert use_social_api(alice, social_db).get(f"/social/profiles/{bob.public_id}").json()["relationship"] == "friends"
     mine = use_social_api(bob, social_db).get("/social/me")
     assert mine.json()["friends"] == [{"id": str(alice.id), "public_id": alice.public_id, "nickname": "Alice", "avatar": alice.steam_avatar}]
+
+
+@pytest.mark.parametrize("status", ["cancelled", "declined", "accepted"])
+def test_legacy_friend_routes_hide_and_reject_resolved_requests(social_db, status):
+    alice, bob, _charlie, _hidden = create_users(social_db)
+    friend_request = FriendRequest(
+        sender_id=alice.id,
+        recipient_id=bob.id,
+        status=status,
+    )
+    social_db.add(friend_request)
+    social_db.commit()
+
+    outgoing = use_social_api(alice, social_db).get("/friends/requests")
+    incoming = use_social_api(bob, social_db).get("/friends/requests/incoming")
+    accepted = use_social_api(bob, social_db).post(
+        f"/friends/requests/{friend_request.id}/accept",
+    )
+
+    assert outgoing.status_code == 200
+    assert outgoing.json() == []
+    assert incoming.status_code == 200
+    assert incoming.json() == []
+    assert accepted.status_code == 404
+    assert social_db.query(Friendship).count() == 0
 
 
 def test_messages_require_confirmed_friendship_trim_text_and_page_backwards(social_db):
