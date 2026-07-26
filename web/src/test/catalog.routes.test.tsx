@@ -176,9 +176,8 @@ describe("catalog routes", () => {
     renderPage(<DealsPage />);
 
     expect(await screen.findByText("Popular on Steam")).toBeVisible();
-    expect(screen.getByText("Action")).toBeVisible();
-    expect(screen.getByText("Strategy")).toBeVisible();
-    expect(screen.getByText("No matching current deals.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Action" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Strategy" })).toBeVisible();
     expect(screen.getAllByText(/-33%/).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /open deal/i })[0]).toHaveAttribute(
       "href",
@@ -186,6 +185,15 @@ describe("catalog routes", () => {
     );
     expect(api.getGenreDeals).toHaveBeenCalledTimes(1);
     expect(api.getHomepageDeals).not.toHaveBeenCalled();
+  });
+
+  it("shows one genre at a time through tabs", async () => {
+    renderPage(<DealsPage />);
+
+    expect(await screen.findByRole("button", { name: "Action" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Strategy" }));
+    expect(screen.getByText("No matching current deals.")).toBeVisible();
+    expect(screen.queryByText("Current discounts")).not.toBeInTheDocument();
   });
 
   it("keeps a Steam link when a deal has no catalog match", async () => {
