@@ -522,6 +522,7 @@ def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch
                 {"steam_appid": 1, "name": "Hades", "background_image": "steam-hades", "url": "https://store.test/hades", "current": {"cut": 50}},
                 {"steam_appid": 2, "name": "Baldur's Gate 3", "background_image": "steam-bg3", "url": "https://store.test/bg3", "current": {"cut": 20}},
                 {"steam_appid": 3, "name": "Stardew Valley", "background_image": "steam-stardew", "url": "https://store.test/stardew", "current": {"cut": 40}},
+                {"steam_appid": 5, "name": "Cyberpunk 2077", "background_image": "steam-cyberpunk", "url": "https://store.test/cyberpunk", "current": {"cut": 55}},
             ],
             "candidates": [
                 {"steam_appid": 1, "name": "Hades", "background_image": "steam-hades", "url": "https://store.test/hades", "current": {"cut": 50}},
@@ -552,7 +553,7 @@ def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch
 
     assert response.status_code == 200
     payload = response.json()
-    assert [item["name"] for item in payload["popular"]] == ["Hades", "Baldur's Gate 3", "Stardew Valley"]
+    assert [item["name"] for item in payload["popular"]] == ["Hades", "Baldur's Gate 3", "Stardew Valley", "Cyberpunk 2077"]
     assert [section["genre"] for section in payload["sections"]] == ["Action", "RPG", "Strategy", "Adventure", "Indie"]
     assert [item["name"] for item in payload["sections"][0]["results"]] == ["Hades"]
     assert [item["name"] for item in payload["sections"][2]["results"]] == ["Civilization VII"]

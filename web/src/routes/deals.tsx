@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Clock } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
@@ -89,13 +90,13 @@ function DealPrices({ deal, compact = false }: { deal: HomeDeal; compact?: boole
 
 function DealCard({ deal }: { deal: HomeDeal }) {
   return (
-    <article className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition hover:border-white/20">
+    <article className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition hover:border-white/20 md:flex-col md:items-stretch">
       <GameCover
         from={deal.background_image ?? "#0f172a"}
         to="#0f172a"
         title={deal.name}
         compact
-        className="size-20 shrink-0 rounded-lg"
+        className="size-20 shrink-0 rounded-lg md:h-auto md:w-full md:aspect-video"
       />
       <div className="min-w-0 flex-1">
         {deal.id ? (
@@ -120,12 +121,14 @@ function DealCard({ deal }: { deal: HomeDeal }) {
 }
 
 export function DealsPage() {
+  const [activeGenre, setActiveGenre] = useState<string | null>(null);
   const dealsQuery = useQuery({
     queryKey: lovableQueryKeys.genreDeals,
     queryFn: getGenreDeals,
   });
   const popular = dealsQuery.data?.popular ?? [];
   const sections = dealsQuery.data?.sections ?? [];
+  const activeSection = sections.find((section) => section.genre === activeGenre) ?? sections[0];
 
   return (
     <AppShell>
@@ -155,30 +158,40 @@ export function DealsPage() {
       {popular.length ? (
         <section className="mb-10">
           <SectionHeader title="Popular on Steam" hint="Discounted bestsellers" />
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {popular.map((deal) => <DealCard deal={deal} key={`popular-${deal.id ?? deal.name}`} />)}
           </div>
         </section>
       ) : null}
 
-      <div className="space-y-10">
-        {sections.map((section) => (
-          <section key={section.genre}>
-            <SectionHeader title={section.genre} hint="Current discounts" />
-            {section.results.length ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {section.results.map((deal) => (
-                  <DealCard deal={deal} key={`${section.genre}-${deal.id ?? deal.name}`} />
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-                No matching current deals.
-              </p>
-            )}
-          </section>
-        ))}
-      </div>
+      {activeSection ? (
+        <section>
+          <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+            {sections.map((section) => (
+              <button
+                key={section.genre}
+                type="button"
+                onClick={() => setActiveGenre(section.genre)}
+                className={`shrink-0 rounded-lg border px-4 py-2 text-sm font-bold transition ${activeSection.genre === section.genre ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface hover:border-white/30"}`}
+              >
+                {section.genre}
+              </button>
+            ))}
+          </div>
+          <SectionHeader title={activeSection.genre} hint={`${activeSection.results.length} current discounts`} />
+          {activeSection.results.length ? (
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              {activeSection.results.map((deal) => (
+                <DealCard deal={deal} key={`${activeSection.genre}-${deal.id ?? deal.name}`} />
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
+              No matching current deals.
+            </p>
+          )}
+        </section>
+      ) : null}
     </AppShell>
   );
 }
