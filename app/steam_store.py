@@ -43,6 +43,11 @@ def _steam_deal(item: dict[str, Any]) -> dict[str, Any] | None:
 
 
 async def fetch_steam_store_deals(country: str = "US", page_size: int = 12) -> list[dict[str, Any]]:
+    payload = await fetch_steam_store_deal_candidates(country)
+    return payload["candidates"][:page_size]
+
+
+async def fetch_steam_store_deal_candidates(country: str = "US", page_size: int = 60) -> dict[str, list[dict[str, Any]]]:
     params = {"cc": country, "l": "english"}
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -54,10 +59,15 @@ async def fetch_steam_store_deals(country: str = "US", page_size: int = 12) -> l
         raise HTTPException(status_code=502, detail="Steam Store request failed") from exc
 
     data = response.json()
-    candidates = [
-        *(data.get("top_sellers") or {}).get("items", []),
-        *(data.get("specials") or {}).get("items", []),
-    ]
+    top_sellers = (data.get("top_sellers") or {}).get("items", [])
+    candidates = [*top_sellers, *((data.get("specials") or {}).get("items", []))]
+    popular = []
+    for item in top_sellers:
+        deal = _steam_deal(item)
+        if deal:
+            popular.append(deal)
+        if len(popular) == 3:
+            break
     seen: set[int] = set()
     deals = []
     for item in candidates:
@@ -68,4 +78,4 @@ async def fetch_steam_store_deals(country: str = "US", page_size: int = 12) -> l
         deals.append(deal)
         if len(deals) >= page_size:
             break
-    return deals
+    return {"popular": popular, "candidates": deals}

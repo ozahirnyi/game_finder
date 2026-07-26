@@ -74,6 +74,16 @@ export type HomeDealResponse = {
   results: HomeDeal[];
 };
 
+export type GenreDealSection = {
+  genre: string;
+  results: HomeDeal[];
+};
+
+export type GenreDealResponse = {
+  popular: HomeDeal[];
+  sections: GenreDealSection[];
+};
+
 export type SavedGame = {
   id: string;
   title: string;
@@ -555,6 +565,10 @@ export function getHomepageDeals(country = "US", pageSize = 6) {
   return request<HomeDealResponse>(
     `/prices/deals?country=${encodeURIComponent(country)}&page_size=${encodeURIComponent(pageSize)}`,
   );
+}
+
+export function getGenreDeals() {
+  return request<GenreDealResponse>("/prices/genre-deals", { auth: true });
 }
 
 export function listSavedGames() {
