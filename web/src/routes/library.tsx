@@ -71,16 +71,50 @@ function LibraryGameRow({ game }: { game: SavedGame }) {
   );
 }
 
-function SavedGamesLibrary({
-  games,
-  hint,
-  unauthorized,
-}: {
-  games: SavedGame[];
-  hint: string;
-  unauthorized: boolean;
-}) {
-  return unauthorized ? (
+function SavedGamesLibrary() {
+  const query = useQuery({
+    queryKey: lovableQueryKeys.profileSummary,
+    queryFn: getProfileSummary,
+  });
+  const block = query.data?.library;
+  const stats = block?.data;
+  const games = stats?.games ?? [];
+  const unauthorized =
+    (query.error as { status?: number } | null)?.status === 401;
+  const hint = unauthorized
+    ? "Sign in to view your library."
+    : query.isPending
+      ? "Loading library…"
+      : block?.status === "ready"
+        ? `${stats?.total_games ?? games.length} games synced`
+        : block?.message || "Your library is empty.";
+
+  return (
+    <>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <p className="text-sm text-muted-foreground">{hint}</p>
+        <div className="flex items-center gap-6 font-mono">
+          {[
+            ["Games", stats?.total_games],
+            [
+              "Hours",
+              stats?.total_playtime_hours === undefined
+                ? undefined
+                : `${stats.total_playtime_hours}h`,
+            ],
+            ["Manual", stats?.manual_games],
+            ["PSN", stats?.psn_games],
+          ].map(([label, value]) => (
+            <div key={String(label)}>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                {label}
+              </p>
+              <p className="text-xl font-bold">{value ?? "—"}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      {unauthorized ? (
     <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted-foreground">
       <p>{hint}</p>
       <Link
@@ -106,52 +140,18 @@ function SavedGamesLibrary({
         Add a game
       </Link>
     </div>
+      )}
+    </>
   );
 }
 
 export function LibraryPage() {
   const { tab, linked, error } = Route.useSearch();
-  const query = useQuery({
-    queryKey: lovableQueryKeys.profileSummary,
-    queryFn: getProfileSummary,
-  });
-  const block = query.data?.library;
-  const stats = block?.data;
-  const games = stats?.games ?? [];
-  const unauthorized =
-    (query.error as { status?: number } | null)?.status === 401;
-  const hint = unauthorized
-    ? "Sign in to view your library."
-    : query.isPending
-      ? "Loading library…"
-      : block?.status === "ready"
-        ? `${stats?.total_games ?? games.length} games synced`
-        : block?.message || "Your library is empty.";
 
   return (
     <AppShell>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <SectionHeader title="Library" hint={hint} />
-        <div className="flex items-center gap-6 font-mono">
-          {[
-            ["Games", stats?.total_games],
-            [
-              "Hours",
-              stats?.total_playtime_hours === undefined
-                ? undefined
-                : `${stats.total_playtime_hours}h`,
-            ],
-            ["Manual", stats?.manual_games],
-            ["PSN", stats?.psn_games],
-          ].map(([label, value]) => (
-            <div key={String(label)}>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                {label}
-              </p>
-              <p className="text-xl font-bold">{value ?? "—"}</p>
-            </div>
-          ))}
-        </div>
+        <SectionHeader title="Library" />
       </div>
       <div
         role="tablist"
@@ -186,13 +186,7 @@ export function LibraryPage() {
           PSN
         </Link>
       </div>
-      {tab === "library" ? (
-        <SavedGamesLibrary
-          games={games}
-          hint={hint}
-          unauthorized={unauthorized}
-        />
-      ) : null}
+      {tab === "library" ? <SavedGamesLibrary /> : null}
       {tab === "steam" ? (
         <SteamLibraryPanel linked={linked} error={error} />
       ) : null}
