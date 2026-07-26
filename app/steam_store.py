@@ -70,7 +70,7 @@ async def fetch_steam_store_deal_candidates(country: str = "US", page_size: int 
         deal = _steam_deal(item)
         if deal:
             popular.append(deal)
-        if len(popular) == 3:
+        if len(popular) == 4:
             break
     seen: set[int] = set()
     deals = []
