@@ -9,8 +9,11 @@ const api = vi.hoisted(() => ({
   getSteamSocial: vi.fn(),
 }));
 
+const redirect = vi.fn((options) => options);
+
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: unknown) => options,
+  redirect,
   Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
     <a href={to}>{children}</a>
   ),
@@ -137,6 +140,19 @@ describe("Steam and Friends routes", () => {
       top_friend_games: [],
       public_libraries: 1,
       private_libraries: 0,
+    });
+  });
+
+  test("redirects legacy Steam callbacks to the Library Steam tab", () => {
+    const beforeLoad = (SteamRoute as {
+      beforeLoad: (context: { search: { linked?: "1"; error?: string } }) => void;
+    }).beforeLoad;
+
+    expect(() => beforeLoad({ search: { linked: "1", error: "example" } })).toThrow();
+    expect(redirect).toHaveBeenCalledWith({
+      to: "/library",
+      search: { tab: "steam", linked: "1", error: "example" },
+      replace: true,
     });
   });
 

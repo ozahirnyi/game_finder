@@ -74,6 +74,18 @@ describe("AppShell", () => {
     expect(screen.queryByText("updated 4m ago")).not.toBeInTheDocument();
   });
 
+  it("keeps Library navigation while hiding standalone Steam and PSN links", () => {
+    render(
+      <AppShell>
+        <main>Home</main>
+      </AppShell>,
+    );
+
+    expect(screen.getAllByRole("link", { name: "Library" })).toHaveLength(2);
+    expect(screen.queryByRole("link", { name: "Steam" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "PSN" })).not.toBeInTheDocument();
+  });
+
   it("updates the sidebar after an auth change", () => {
     const { rerender } = render(
       <AppShell>
