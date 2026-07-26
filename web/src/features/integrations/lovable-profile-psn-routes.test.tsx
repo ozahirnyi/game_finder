@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as ProfileRoute } from "@/routes/profile";
 import { Route as PsnRoute } from "@/routes/psn";
+import { PsnLibraryPanel } from "@/features/library/PsnLibraryPanel";
 
 const api = vi.hoisted(() => ({
   confirmPsnImport: vi.fn(),
@@ -211,5 +212,12 @@ describe("Lovable profile and PSN routes", () => {
     ).toBeGreaterThanOrEqual(10);
     expect(screen.queryByText("alex_v_ps")).not.toBeInTheDocument();
     expect(screen.queryByText("Marcus V.")).not.toBeInTheDocument();
+  });
+
+  it("renders the reusable PlayStation library panel", () => {
+    render(<PsnLibraryPanel />);
+
+    expect(screen.getByText("PlayStation library")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Choose export" })).toBeVisible();
   });
 });
