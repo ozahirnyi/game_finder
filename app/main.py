@@ -5,6 +5,7 @@ import contextlib
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
+from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Query
@@ -29,13 +30,14 @@ from app.psn_export import normalize_title, parse_psn_export, psn_external_id
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
+from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
     HomeDealResponse, GenreDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
-    CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead
+    CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
+    DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -559,6 +561,458 @@ def update_user_profile(
     db.commit()
     db.refresh(current_user)
     return user_profile_response(current_user, db=db)
+
+
+def social_player_response(user: User) -> SocialPlayerRead:
+    if user.public_nickname is None:
+        raise HTTPException(status_code=409, detail="User has not configured a public nickname")
+    return SocialPlayerRead(
+        public_id=user.public_id,
+        nickname=user.public_nickname,
+        avatar=user.steam_avatar,
+    )
+
+
+def social_request_response(
+    friend_request: FriendRequest,
+    other_user: User,
+) -> SocialRequestRead:
+    return SocialRequestRead(
+        id=friend_request.id,
+        status=friend_request.status,
+        created_at=friend_request.created_at,
+        **social_player_response(other_user).model_dump(),
+    )
+
+
+def social_relationship(
+    db: Session,
+    viewer_id: uuid.UUID,
+    profile_id: uuid.UUID,
+) -> str:
+    if viewer_id == profile_id:
+        return "self"
+    low_id, high_id = user_pair(viewer_id, profile_id)
+    if db.query(Friendship).filter(
+        Friendship.user_low_id == low_id,
+        Friendship.user_high_id == high_id,
+    ).first():
+        return "friends"
+    if db.query(FriendRequest).filter(
+        FriendRequest.sender_id == viewer_id,
+        FriendRequest.recipient_id == profile_id,
+        FriendRequest.status == "pending",
+    ).first():
+        return "outgoing_pending"
+    if db.query(FriendRequest).filter(
+        FriendRequest.sender_id == profile_id,
+        FriendRequest.recipient_id == viewer_id,
+        FriendRequest.status == "pending",
+    ).first():
+        return "incoming_pending"
+    return "none"
+
+
+def confirmed_friendship(
+    db: Session,
+    user_id: uuid.UUID,
+    friend_id: uuid.UUID,
+) -> Friendship:
+    if user_id == friend_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Direct messages are only available to confirmed friends",
+        )
+    low_id, high_id = user_pair(user_id, friend_id)
+    friendship = db.query(Friendship).filter(
+        Friendship.user_low_id == low_id,
+        Friendship.user_high_id == high_id,
+    ).first()
+    if friendship is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Direct messages are only available to confirmed friends",
+        )
+    return friendship
+
+
+@app.get("/social/me", response_model=SocialMeRead)
+def get_social_me(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friendships = db.query(Friendship).filter(
+        or_(
+            Friendship.user_low_id == current_user.id,
+            Friendship.user_high_id == current_user.id,
+        ),
+    ).all()
+    friend_ids = [
+        friendship.user_high_id
+        if friendship.user_low_id == current_user.id
+        else friendship.user_low_id
+        for friendship in friendships
+    ]
+    friends = []
+    if friend_ids:
+        friends = [
+            SocialFriendRead(id=user.id, **social_player_response(user).model_dump())
+            for user in db.query(User).filter(User.id.in_(friend_ids)).all()
+            if user.public_nickname is not None
+        ]
+
+    incoming = db.query(FriendRequest).filter(
+        FriendRequest.recipient_id == current_user.id,
+        FriendRequest.status == "pending",
+    ).order_by(FriendRequest.created_at.desc()).all()
+    outgoing = db.query(FriendRequest).filter(
+        FriendRequest.sender_id == current_user.id,
+        FriendRequest.status == "pending",
+    ).order_by(FriendRequest.created_at.desc()).all()
+    request_user_ids = [
+        friend_request.sender_id for friend_request in incoming
+    ] + [
+        friend_request.recipient_id for friend_request in outgoing
+    ]
+    users = {
+        user.id: user
+        for user in db.query(User).filter(User.id.in_(request_user_ids)).all()
+    } if request_user_ids else {}
+    return SocialMeRead(
+        public_id=current_user.public_id,
+        nickname=current_user.public_nickname,
+        avatar=current_user.steam_avatar,
+        friends=friends,
+        incoming_requests=[
+            social_request_response(friend_request, users[friend_request.sender_id])
+            for friend_request in incoming
+            if friend_request.sender_id in users
+            and users[friend_request.sender_id].public_nickname is not None
+        ],
+        outgoing_requests=[
+            social_request_response(friend_request, users[friend_request.recipient_id])
+            for friend_request in outgoing
+            if friend_request.recipient_id in users
+            and users[friend_request.recipient_id].public_nickname is not None
+        ],
+    )
+
+
+@app.patch("/social/me", response_model=SocialMeRead)
+def update_social_me(
+    data: SocialProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    duplicate = db.query(User).filter(
+        func.lower(User.public_nickname) == data.nickname.lower(),
+        User.id != current_user.id,
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=409, detail="Nickname is already in use")
+    current_user.public_nickname = data.nickname
+    db.commit()
+    db.refresh(current_user)
+    return get_social_me(db=db, current_user=current_user)
+
+
+@app.get("/social/players", response_model=SocialPlayersPageRead)
+def list_social_players(
+    q: str = "",
+    cursor: str | None = None,
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    nickname_order = func.lower(User.public_nickname)
+    query = db.query(User).filter(
+        User.public_nickname.is_not(None),
+        User.id != current_user.id,
+    )
+    search = q.strip().lower()
+    if search:
+        query = query.filter(nickname_order.contains(search))
+    if cursor:
+        cursor_user = db.query(User).filter(
+            User.public_id == cursor,
+            User.public_nickname.is_not(None),
+        ).first()
+        if cursor_user is None:
+            raise HTTPException(status_code=400, detail="Invalid player cursor")
+        cursor_nickname = cursor_user.public_nickname.lower()
+        query = query.filter(
+            or_(
+                nickname_order > cursor_nickname,
+                and_(
+                    nickname_order == cursor_nickname,
+                    User.public_id > cursor,
+                ),
+            ),
+        )
+    users = query.order_by(nickname_order, User.public_id).limit(limit + 1).all()
+    has_next_page = len(users) > limit
+    users = users[:limit]
+    return SocialPlayersPageRead(
+        players=[social_player_response(user) for user in users],
+        next_cursor=users[-1].public_id if has_next_page else None,
+    )
+
+
+@app.get("/social/profiles/{public_id}", response_model=SocialProfileRead)
+def get_social_profile(
+    public_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    profile = db.query(User).filter(User.public_id == public_id).first()
+    if profile is None or profile.public_nickname is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return SocialProfileRead(
+        relationship=social_relationship(db, current_user.id, profile.id),
+        **social_player_response(profile).model_dump(),
+    )
+
+
+@app.post(
+    "/social/friend-requests",
+    status_code=201,
+    response_model=SocialRequestRead,
+)
+def create_social_friend_request(
+    data: SocialFriendRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.public_nickname is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Set a public nickname before sending friend requests",
+        )
+    recipient = db.query(User).filter(User.public_id == data.public_id).first()
+    if recipient is None or recipient.public_nickname is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if recipient.id == current_user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot send a friend request to yourself",
+        )
+    relationship = social_relationship(db, current_user.id, recipient.id)
+    if relationship == "friends":
+        raise HTTPException(status_code=409, detail="Users are already friends")
+    if relationship in {"outgoing_pending", "incoming_pending"}:
+        raise HTTPException(
+            status_code=409,
+            detail="A friend request is already pending",
+        )
+    friend_request = db.query(FriendRequest).filter(
+        FriendRequest.sender_id == current_user.id,
+        FriendRequest.recipient_id == recipient.id,
+    ).first()
+    if friend_request is None:
+        friend_request = FriendRequest(
+            sender_id=current_user.id,
+            recipient_id=recipient.id,
+        )
+        db.add(friend_request)
+    else:
+        friend_request.status = "pending"
+        friend_request.created_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(friend_request)
+    return social_request_response(friend_request, recipient)
+
+
+def resolve_social_friend_request(
+    request_id: uuid.UUID,
+    status: str,
+    db: Session,
+    current_user: User,
+) -> SocialRequestRead:
+    friend_request = db.query(FriendRequest).filter(
+        FriendRequest.id == request_id,
+    ).first()
+    if friend_request is None:
+        raise HTTPException(status_code=404, detail="Friend request not found")
+    if friend_request.recipient_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the recipient can respond to this friend request",
+        )
+    if friend_request.status != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail="Friend request has already been resolved",
+        )
+    sender = db.query(User).filter(User.id == friend_request.sender_id).first()
+    friend_request.status = status
+    if status == "accepted":
+        low_id, high_id = user_pair(
+            friend_request.sender_id,
+            friend_request.recipient_id,
+        )
+        db.add(Friendship(user_low_id=low_id, user_high_id=high_id))
+    db.commit()
+    db.refresh(friend_request)
+    return social_request_response(friend_request, sender)
+
+
+@app.post(
+    "/social/friend-requests/{request_id}/accept",
+    response_model=SocialRequestRead,
+)
+def accept_social_friend_request(
+    request_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return resolve_social_friend_request(request_id, "accepted", db, current_user)
+
+
+@app.post(
+    "/social/friend-requests/{request_id}/decline",
+    response_model=SocialRequestRead,
+)
+def decline_social_friend_request(
+    request_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return resolve_social_friend_request(request_id, "declined", db, current_user)
+
+
+@app.delete(
+    "/social/friend-requests/{request_id}",
+    response_model=SocialRequestRead,
+)
+def cancel_social_friend_request(
+    request_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friend_request = db.query(FriendRequest).filter(
+        FriendRequest.id == request_id,
+    ).first()
+    if friend_request is None:
+        raise HTTPException(status_code=404, detail="Friend request not found")
+    if friend_request.sender_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the sender can cancel this friend request",
+        )
+    if friend_request.status != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail="Friend request has already been resolved",
+        )
+    recipient = db.query(User).filter(
+        User.id == friend_request.recipient_id,
+    ).first()
+    friend_request.status = "cancelled"
+    db.commit()
+    db.refresh(friend_request)
+    return social_request_response(friend_request, recipient)
+
+
+@app.post(
+    "/social/friends/{friend_id}/messages",
+    status_code=201,
+    response_model=DirectMessageRead,
+)
+def send_direct_message(
+    friend_id: uuid.UUID,
+    data: DirectMessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friendship = confirmed_friendship(db, current_user.id, friend_id)
+    direct_message = DirectMessage(
+        friendship_id=friendship.id,
+        author_id=current_user.id,
+        text=data.text,
+    )
+    db.add(direct_message)
+    db.commit()
+    db.refresh(direct_message)
+    return direct_message
+
+
+@app.get(
+    "/social/friends/{friend_id}/messages",
+    response_model=DirectMessagePageRead,
+)
+def list_direct_messages(
+    friend_id: uuid.UUID,
+    limit: int = Query(default=50, ge=1, le=50),
+    cursor: uuid.UUID | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friendship = confirmed_friendship(db, current_user.id, friend_id)
+    query = db.query(DirectMessage).filter(
+        DirectMessage.friendship_id == friendship.id,
+    )
+    if cursor is not None:
+        cursor_message = query.filter(DirectMessage.id == cursor).first()
+        if cursor_message is None:
+            raise HTTPException(status_code=400, detail="Invalid message cursor")
+        query = query.filter(
+            or_(
+                DirectMessage.created_at < cursor_message.created_at,
+                and_(
+                    DirectMessage.created_at == cursor_message.created_at,
+                    DirectMessage.id < cursor_message.id,
+                ),
+            ),
+        )
+    direct_messages = query.order_by(
+        DirectMessage.created_at.desc(),
+        DirectMessage.id.desc(),
+    ).limit(limit + 1).all()
+    has_next_page = len(direct_messages) > limit
+    direct_messages = list(reversed(direct_messages[:limit]))
+    return DirectMessagePageRead(
+        messages=direct_messages,
+        next_cursor=direct_messages[0].id if has_next_page else None,
+    )
+
+
+@app.get(
+    "/social/friends/{friend_id}/common-games",
+    response_model=SocialCommonGamesRead,
+)
+async def list_common_friend_games(
+    friend_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    confirmed_friendship(db, current_user.id, friend_id)
+    friend = db.query(User).filter(User.id == friend_id).first()
+    if (
+        friend is None
+        or current_user.steam_id is None
+        or friend.steam_id is None
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Both friends must connect Steam to compare games",
+        )
+
+    own_games, friend_games = await asyncio.gather(
+        fetch_owned_games(current_user.steam_id),
+        fetch_owned_games(friend.steam_id),
+    )
+    friend_appids = {game["appid"] for game in friend_games}
+    return SocialCommonGamesRead(
+        games=[
+            SocialCommonGameRead(
+                appid=game["appid"],
+                name=game["name"],
+                img_icon_url=game.get("img_icon_url"),
+            )
+            for game in own_games
+            if game["appid"] in friend_appids
+        ],
+    )
 
 
 @app.get("/users/search", response_model=list[PublicUserRead])
@@ -1554,7 +2008,15 @@ async def sync_steam_library(db: Session = Depends(get_db), current_user: User =
     )
 
 
-def build_steam_social_response(user: User, own_games: list[dict], friends: list[dict], friend_libraries: list[list[dict] | None]):
+def build_steam_social_response(
+    user: User,
+    own_games: list[dict],
+    friends: list[dict],
+    friend_libraries: list[list[dict] | None],
+    *,
+    friends_total: int | None = None,
+    friends_has_more: bool = False,
+):
     own_game_map = {int(game["appid"]): game for game in own_games if game.get("appid") is not None}
     friend_game_totals: dict[int, dict] = {}
     friend_items = []
@@ -1629,6 +2091,8 @@ def build_steam_social_response(user: User, own_games: list[dict], friends: list
     return SteamSocialRead(
         steam=steam_account_response(user),
         friends=friend_items,
+        friends_total=len(friends) if friends_total is None else friends_total,
+        friends_has_more=friends_has_more,
         top_friend_games=top_friend_games,
         public_libraries=public_libraries,
         private_libraries=private_libraries,
@@ -1636,14 +2100,27 @@ def build_steam_social_response(user: User, own_games: list[dict], friends: list
 
 
 @app.get("/steam/social", response_model=SteamSocialRead)
-async def get_steam_social(current_user: User = Depends(get_current_user), friends_limit: int = 12):
+async def get_steam_social(
+    current_user: User = Depends(get_current_user),
+    friends_limit: int = 12,
+    friends_offset: int = 0,
+):
     if not current_user.steam_id:
         raise HTTPException(status_code=409, detail="Connect Steam first")
     if friends_limit < 1 or friends_limit > 24:
         raise HTTPException(status_code=400, detail="friends_limit must be between 1 and 24")
+    if friends_offset < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="friends_offset must be greater than or equal to 0",
+        )
 
     own_games = await fetch_owned_games(current_user.steam_id)
-    friends = await fetch_steam_friends(current_user.steam_id, limit=friends_limit)
+    friends, friends_total = await fetch_steam_friends(
+        current_user.steam_id,
+        limit=friends_limit,
+        offset=friends_offset,
+    )
 
     async def load_friend_library(friend):
         try:
@@ -1652,7 +2129,14 @@ async def get_steam_social(current_user: User = Depends(get_current_user), frien
             return None
 
     friend_libraries = await asyncio.gather(*(load_friend_library(friend) for friend in friends))
-    return build_steam_social_response(current_user, own_games, friends, friend_libraries)
+    return build_steam_social_response(
+        current_user,
+        own_games,
+        friends,
+        friend_libraries,
+        friends_total=friends_total,
+        friends_has_more=friends_offset + len(friends) < friends_total,
+    )
 
 
 @app.post("/steam/recommendations", response_model=RecommendationResponse)
