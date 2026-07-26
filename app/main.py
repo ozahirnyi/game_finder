@@ -26,13 +26,14 @@ from app.integrations.rawg import (
 )
 from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
-from app.steam_store import fetch_steam_store_deals
+from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates
+from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
+    HomeDealResponse, GenreDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead
 from app.steam import (
@@ -1797,6 +1798,27 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
             }
 
         return {"results": await asyncio.gather(*(attach_rawg_id(deal) for deal in steam_deals))}
+
+    return await get_json_cached(key, CACHE_TTL, fetch)
+
+
+@app.get("/prices/genre-deals", response_model=GenreDealResponse)
+async def genre_deals(current_user: User = Depends(get_current_user)):
+    country = (current_user.steam_country_code or "US").strip().upper()
+    genres = select_deal_genres(current_user.favorite_genres)
+    key = build_cache_key(
+        "steam_genre_deals_v1",
+        country=country,
+        genres=[normalize_genre(genre) for genre in genres],
+    )
+
+    async def fetch():
+        return await build_genre_deal_groups(
+            country,
+            genres,
+            fetch_steam_store_deal_candidates,
+            fetch_rawg_games,
+        )
 
     return await get_json_cached(key, CACHE_TTL, fetch)
 
