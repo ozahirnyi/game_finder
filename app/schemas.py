@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from datetime import datetime
 from typing import Optional
 import uuid
@@ -46,6 +46,76 @@ class UserRead(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+
+
+class SocialProfileUpdate(BaseModel):
+    nickname: str = Field(min_length=3, max_length=32)
+
+    @field_validator("nickname", mode="before")
+    @classmethod
+    def trim_nickname(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+
+class SocialPlayerRead(BaseModel):
+    public_id: str
+    nickname: str
+    avatar: str | None = None
+
+
+class SocialPlayersPageRead(BaseModel):
+    players: list[SocialPlayerRead] = Field(default_factory=list)
+    next_cursor: str | None = None
+
+
+class SocialFriendRead(SocialPlayerRead):
+    id: uuid.UUID
+
+
+class SocialRequestRead(SocialPlayerRead):
+    id: uuid.UUID
+    status: str
+    created_at: datetime
+
+
+class SocialProfileRead(SocialPlayerRead):
+    relationship: str
+
+
+class SocialMeRead(BaseModel):
+    public_id: str
+    nickname: str | None = None
+    avatar: str | None = None
+    friends: list[SocialFriendRead] = Field(default_factory=list)
+    incoming_requests: list[SocialRequestRead] = Field(default_factory=list)
+    outgoing_requests: list[SocialRequestRead] = Field(default_factory=list)
+
+
+class FriendRequestCreate(BaseModel):
+    public_id: str = Field(min_length=1, max_length=32)
+
+
+class DirectMessageCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def trim_and_require_text(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+
+class DirectMessageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    friendship_id: uuid.UUID
+    author_id: uuid.UUID
+    text: str
+    created_at: datetime
+
+
+class DirectMessagePageRead(BaseModel):
+    messages: list[DirectMessageRead] = Field(default_factory=list)
+    next_cursor: uuid.UUID | None = None
 
 
 class GoogleStatusRead(BaseModel):
