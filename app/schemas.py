@@ -229,6 +229,8 @@ class SteamFriendRead(BaseModel):
 class SteamSocialRead(BaseModel):
     steam: SteamAccountRead
     friends: list[SteamFriendRead] = Field(default_factory=list)
+    friends_total: int = 0
+    friends_has_more: bool = False
     top_friend_games: list[SteamFriendGameRead] = Field(default_factory=list)
     public_libraries: int = 0
     private_libraries: int = 0

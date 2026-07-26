@@ -878,7 +878,15 @@ async def sync_steam_library(db: Session = Depends(get_db), current_user: User =
     )
 
 
-def build_steam_social_response(user: User, own_games: list[dict], friends: list[dict], friend_libraries: list[list[dict] | None]):
+def build_steam_social_response(
+    user: User,
+    own_games: list[dict],
+    friends: list[dict],
+    friend_libraries: list[list[dict] | None],
+    *,
+    friends_total: int | None = None,
+    friends_has_more: bool = False,
+):
     own_game_map = {int(game["appid"]): game for game in own_games if game.get("appid") is not None}
     friend_game_totals: dict[int, dict] = {}
     friend_items = []
@@ -953,6 +961,8 @@ def build_steam_social_response(user: User, own_games: list[dict], friends: list
     return SteamSocialRead(
         steam=steam_account_response(user),
         friends=friend_items,
+        friends_total=len(friends) if friends_total is None else friends_total,
+        friends_has_more=friends_has_more,
         top_friend_games=top_friend_games,
         public_libraries=public_libraries,
         private_libraries=private_libraries,
@@ -960,14 +970,24 @@ def build_steam_social_response(user: User, own_games: list[dict], friends: list
 
 
 @app.get("/steam/social", response_model=SteamSocialRead)
-async def get_steam_social(current_user: User = Depends(get_current_user), friends_limit: int = 12):
+async def get_steam_social(
+    current_user: User = Depends(get_current_user),
+    friends_limit: int = 12,
+    friends_offset: int = 0,
+):
     if not current_user.steam_id:
         raise HTTPException(status_code=409, detail="Connect Steam first")
     if friends_limit < 1 or friends_limit > 24:
         raise HTTPException(status_code=400, detail="friends_limit must be between 1 and 24")
+    if friends_offset < 0:
+        raise HTTPException(status_code=400, detail="friends_offset must be greater than or equal to 0")
 
     own_games = await fetch_owned_games(current_user.steam_id)
-    friends = await fetch_steam_friends(current_user.steam_id, limit=friends_limit)
+    friends, friends_total = await fetch_steam_friends(
+        current_user.steam_id,
+        limit=friends_limit,
+        offset=friends_offset,
+    )
 
     async def load_friend_library(friend):
         try:
@@ -976,7 +996,14 @@ async def get_steam_social(current_user: User = Depends(get_current_user), frien
             return None
 
     friend_libraries = await asyncio.gather(*(load_friend_library(friend) for friend in friends))
-    return build_steam_social_response(current_user, own_games, friends, friend_libraries)
+    return build_steam_social_response(
+        current_user,
+        own_games,
+        friends,
+        friend_libraries,
+        friends_total=friends_total,
+        friends_has_more=friends_offset + len(friends) < friends_total,
+    )
 
 
 @app.post("/steam/recommendations", response_model=RecommendationResponse)
