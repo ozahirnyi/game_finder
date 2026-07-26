@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Dashboard } from "@/routes/index";
 import { LibraryPage, Route as LibraryRoute } from "@/routes/library";
 import { ProfilePage } from "@/routes/profile";
+import { Route as PsnRoute } from "@/routes/psn";
 import { Route as SteamRoute } from "@/routes/steam";
 import { SteamLibraryPanel } from "@/features/library/SteamLibraryPanel";
 
@@ -18,6 +19,7 @@ const api = vi.hoisted(() => ({
   updateProfile: vi.fn(),
 }));
 const navigate = vi.fn();
+const redirect = vi.hoisted(() => vi.fn((options) => options));
 const librarySearch = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-router", () => ({
@@ -28,6 +30,7 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, ...props }: React.ComponentProps<"a">) => (
     <a {...props}>{children}</a>
   ),
+  redirect,
   useNavigate: () => navigate,
 }));
 vi.mock("@/components/AppShell", () => ({
@@ -65,6 +68,30 @@ const steam = {
   country_code: null,
   linked_at: null,
 };
+
+describe("legacy platform redirects", () => {
+  beforeEach(() => redirect.mockClear());
+
+  it("preserves Steam callback state in the Library Steam tab", () => {
+    expect(() =>
+      SteamRoute.beforeLoad?.({ search: { linked: "1", error: "example" } }),
+    ).toThrow();
+    expect(redirect).toHaveBeenCalledWith({
+      to: "/library",
+      search: { tab: "steam", linked: "1", error: "example" },
+      replace: true,
+    });
+  });
+
+  it("redirects PSN to the Library PSN tab", () => {
+    expect(() => PsnRoute.beforeLoad?.({ search: {} })).toThrow();
+    expect(redirect).toHaveBeenCalledWith({
+      to: "/library",
+      search: { tab: "psn" },
+      replace: true,
+    });
+  });
+});
 
 function summary() {
   return {
@@ -270,17 +297,13 @@ describe("live dashboard and profile data", () => {
 
   it("shows a Steam sign-in action when the dashboard request returns 401", async () => {
     api.getDashboard.mockRejectedValue({ status: 401 });
-    const SteamPage = (SteamRoute as { component: React.ComponentType })
-      .component;
-    renderPage(<SteamPage />);
+    renderPage(<SteamLibraryPanel />);
     expect(await screen.findByText("Sign in", { selector: "a" })).toBeVisible();
   });
 
   it("sends guests to sign in instead of opening the protected Steam linker", async () => {
     api.isAuthenticated.mockReturnValue(false);
-    const SteamPage = (SteamRoute as { component: React.ComponentType })
-      .component;
-    renderPage(<SteamPage />);
+    renderPage(<SteamLibraryPanel />);
 
     expect(screen.getByText("Sign in", { selector: "a" })).toHaveAttribute(
       "to",
@@ -311,9 +334,7 @@ describe("live dashboard and profile data", () => {
   });
 
   it("uses the dashboard steam block for its not-connected state", async () => {
-    const SteamPage = (SteamRoute as { component: React.ComponentType })
-      .component;
-    renderPage(<SteamPage />);
+    renderPage(<SteamLibraryPanel />);
     expect(
       (await screen.findAllByText("Connect Steam to sync your library."))
         .length,

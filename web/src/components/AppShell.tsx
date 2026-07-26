@@ -7,8 +7,6 @@ import {
   Heart,
   Tag,
   Users,
-  Gamepad2,
-  Trophy,
   User,
   Bell,
 } from "lucide-react";
@@ -29,8 +27,6 @@ const nav = [
   { to: "/wishlist", label: "Wishlist", icon: Heart },
   { to: "/deals", label: "Deals", icon: Tag },
   { to: "/friends", label: "Friends", icon: Users },
-  { to: "/steam", label: "Steam", icon: Gamepad2 },
-  { to: "/psn", label: "PSN", icon: Trophy },
 ] as const;
 
 function notificationText(notification: Notification) {

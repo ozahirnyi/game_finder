@@ -1,13 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AppShell } from "@/components/AppShell";
-import { PsnLibraryPanel } from "@/features/library/PsnLibraryPanel";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/psn")({ component: PsnPage });
-
-export function PsnPage() {
-  return (
-    <AppShell>
-      <PsnLibraryPanel />
-    </AppShell>
-  );
-}
+export const Route = createFileRoute("/psn")({
+  beforeLoad: () => {
+    throw redirect({
+      to: "/library",
+      search: { tab: "psn" },
+      replace: true,
+    });
+  },
+});
