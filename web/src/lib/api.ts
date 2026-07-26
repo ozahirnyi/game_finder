@@ -171,6 +171,8 @@ export type SteamSocial = {
   top_friend_games: SteamFriendGame[];
   public_libraries: number;
   private_libraries: number;
+  friends_total: number;
+  friends_has_more: boolean;
 };
 
 export type TelegramAccount = {
@@ -516,8 +518,11 @@ export function syncSteamLibrary() {
   return request<SteamLibrarySync>("/steam/library/sync", { method: "POST", auth: true });
 }
 
-export function getSteamSocial(friendsLimit = 12) {
-  return request<SteamSocial>(`/steam/social?friends_limit=${encodeURIComponent(friendsLimit)}`, { auth: true });
+export function getSteamSocial(friendsLimit = 12, friendsOffset = 0) {
+  return request<SteamSocial>(
+    `/steam/social?friends_limit=${encodeURIComponent(friendsLimit)}&friends_offset=${encodeURIComponent(friendsOffset)}`,
+    { auth: true },
+  );
 }
 
 export function getSteamRecommendations(prompt?: string) {

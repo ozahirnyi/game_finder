@@ -9,6 +9,7 @@ import {
   getSocialMe,
   getSocialPlayers,
   getSocialProfile,
+  getSteamSocial,
   sendDirectMessage,
   updateSocialMe,
 } from "./api";
@@ -147,6 +148,27 @@ describe("social API client", () => {
         method: "POST",
         body: JSON.stringify({ text: " Hello " }),
       }),
+    );
+  });
+
+  it("requests a bounded Steam friends page with an explicit offset", async () => {
+    const fetchMock = apiMocks.fetch(
+      apiMocks.success({
+        steam: { linked: true },
+        friends: [],
+        top_friend_games: [],
+        public_libraries: 0,
+        private_libraries: 0,
+        friends_total: 37,
+        friends_has_more: true,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getSteamSocial(12, 24);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toMatch(
+      /\/steam\/social\?friends_limit=12&friends_offset=24$/,
     );
   });
 });

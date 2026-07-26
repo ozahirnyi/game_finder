@@ -1,16 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LibraryScreen } from "./LibraryScreen";
-import { SavedGameDetailScreen } from "./SavedGameDetailScreen";
 import { WishlistScreen } from "./WishlistScreen";
-import { deleteSavedGame, getSavedGame, isAuthenticated, listSavedGames, updateSavedGame } from "@/lib/api";
+import { deleteSavedGame, isAuthenticated, listSavedGames } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
   deleteSavedGame: vi.fn(),
-  getSavedGame: vi.fn(),
   isAuthenticated: vi.fn(),
   listSavedGames: vi.fn(),
-  updateSavedGame: vi.fn(),
 }));
 
 const hades = {
@@ -85,23 +82,6 @@ describe("LibraryScreen", () => {
 
     expect(await screen.findByText("Network unavailable")).toBeVisible();
     expect(screen.getByText("Hades II")).toBeVisible();
-  });
-});
-
-describe("SavedGameDetailScreen", () => {
-  it("keeps the current note visible and reports an inline error when an update fails", async () => {
-    mockAuth(true);
-    vi.mocked(getSavedGame).mockResolvedValue({ ...hades, notes: "First run" });
-    vi.mocked(updateSavedGame).mockRejectedValue(new Error("Could not save"));
-
-    render(<SavedGameDetailScreen id="g1" />);
-
-    const notes = await screen.findByLabelText("Notes");
-    fireEvent.change(notes, { target: { value: "Second run" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save notes" }));
-
-    expect(await screen.findByText("Could not save")).toBeVisible();
-    expect(screen.getByDisplayValue("Second run")).toBeVisible();
   });
 });
 

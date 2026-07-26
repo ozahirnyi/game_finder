@@ -5,12 +5,15 @@ import { DealsScreen } from "./DealsScreen";
 import { DiscoveryScreen } from "./DiscoveryScreen";
 import { GameDetailScreen } from "./GameDetailScreen";
 import { SearchScreen } from "./SearchScreen";
-import SearchPage from "@/app/search/page";
 
-const navigationState = vi.hoisted(() => ({ params: new URLSearchParams() }));
-
-vi.mock("next/navigation", () => ({
-  useSearchParams: () => navigationState.params,
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({
+    children,
+    to,
+  }: {
+    children: React.ReactNode;
+    to: string;
+  }) => <a href={to}>{children}</a>,
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -40,12 +43,13 @@ describe("discovery API regions", () => {
     expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
   });
 
-  it("shows the fallback cover when a result has no background image", async () => {
+  it("shows a generated cover when a result has no background image", async () => {
     vi.mocked(getHomepageDeals).mockResolvedValue({
       results: [{ id: 1, name: "Hades II", released: null, background_image: null, url: null, current: null, history_low_all: null }],
     });
     render(<DealsScreen />);
-    expect(await screen.findByLabelText("Hades II cover unavailable")).toBeVisible();
+    expect((await screen.findAllByText("Hades II")).length).toBeGreaterThan(0);
+    expect(screen.getByText(/GF · HADE/)).toBeVisible();
   });
 
   it("renders trending and upcoming games from their API regions", async () => {
@@ -90,17 +94,5 @@ describe("discovery API regions", () => {
     expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
     expect(getCatalogGame).toHaveBeenCalledTimes(catalogCalls + 1);
     expect(getGamePriceHistory).toHaveBeenCalledTimes(priceCalls);
-  });
-
-  it("updates search results when App Router query params change", async () => {
-    navigationState.params = new URLSearchParams("q=hades");
-    vi.mocked(searchGames).mockResolvedValue({ results: [{ id: 1, name: "Hades II", released: null, background_image: null }] });
-    const view = render(<SearchPage />);
-    expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
-    navigationState.params = new URLSearchParams("q=celeste");
-    vi.mocked(searchGames).mockResolvedValue({ results: [{ id: 2, name: "Celeste", released: null, background_image: null }] });
-    view.rerender(<SearchPage />);
-    expect(await screen.findByRole("heading", { name: "Celeste" })).toBeVisible();
-    expect(searchGames).toHaveBeenLastCalledWith("celeste");
   });
 });

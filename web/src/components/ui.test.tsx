@@ -4,14 +4,19 @@ import { GameCover } from "./GameCover";
 import { Badge, Button, Panel, Section, StatePanel } from "./ui";
 
 describe("design primitives", () => {
-  it("uses an image when artwork is available and a labelled fallback otherwise", () => {
-    const { rerender } = render(<GameCover title="Hades II" src="https://cdn.example/hades.jpg" />);
+  it("renders the generated cover title and compact initials", () => {
+    const { rerender } = render(
+      <GameCover from="#111111" title="Hades II" to="#222222" />,
+    );
 
-    expect(screen.getByRole("img", { name: "Hades II" })).toHaveAttribute("src", "https://cdn.example/hades.jpg");
+    expect(screen.getByText("Hades II")).toBeVisible();
+    expect(screen.getByText(/GF · HADE/)).toBeVisible();
 
-    rerender(<GameCover title="Hades II" src={null} />);
+    rerender(
+      <GameCover compact from="#111111" title="Hades II" to="#222222" />,
+    );
 
-    expect(screen.getByLabelText("Hades II cover unavailable")).toBeInTheDocument();
+    expect(screen.getByText("HI")).toBeVisible();
   });
 
   it("renders error state with an enabled retry action", () => {
