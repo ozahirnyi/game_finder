@@ -3,7 +3,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { getDashboard, getSteamLinkUrl, syncSteamLibrary } from "@/lib/api";
+import {
+  getDashboard,
+  getSteamLinkUrl,
+  isAuthenticated,
+  syncSteamLibrary,
+} from "@/lib/api";
 import { lovableQueryKeys } from "@/lib/lovable-data";
 export const Route = createFileRoute("/steam")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -17,9 +22,11 @@ const icon = (id: number, hash: string) =>
 function SteamPage() {
   const c = useQueryClient();
   const search = Route.useSearch();
+  const authenticated = isAuthenticated();
   const q = useQuery({
     queryKey: lovableQueryKeys.dashboard,
     queryFn: getDashboard,
+    enabled: authenticated,
   });
   const b = q.data?.steam;
   const l = b?.data && "steam" in b.data ? b.data : null;
@@ -40,6 +47,16 @@ function SteamPage() {
       c.invalidateQueries({ queryKey: lovableQueryKeys.steam });
     }
   }, [c, search.linked]);
+  if (!authenticated)
+    return (
+      <AppShell>
+        <SectionHeader
+          title="Steam integration"
+          hint="Sign in before connecting your Steam library."
+        />
+        <Link to="/login">Sign in</Link>
+      </AppShell>
+    );
   if ((q.error as { status?: number } | null)?.status === 401)
     return (
       <AppShell>

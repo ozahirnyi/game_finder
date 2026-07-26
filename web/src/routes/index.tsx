@@ -4,7 +4,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { getDashboard } from "@/lib/api";
+import { getDashboard, isAuthenticated } from "@/lib/api";
 import { lovableQueryKeys } from "@/lib/lovable-data";
 import { ArrowRight, Search, Sparkles } from "lucide-react";
 
@@ -13,6 +13,7 @@ const message = (value: { message?: string | null }, fallback: string) =>
   value.message || fallback;
 
 export function Dashboard() {
+  const authenticated = isAuthenticated();
   const query = useQuery({
     queryKey: lovableQueryKeys.dashboard,
     queryFn: getDashboard,
@@ -55,10 +56,14 @@ export function Dashboard() {
             </p>
           </div>
           <Link
-            to="/steam"
+            to={authenticated ? "/steam" : "/login"}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:opacity-90"
           >
-            {steamConnected ? "View Steam library" : "Connect Steam"}
+            {steamConnected
+              ? "View Steam library"
+              : authenticated
+                ? "Connect Steam"
+                : "Sign in to connect Steam"}
           </Link>
         </div>
         <Link
@@ -176,10 +181,14 @@ export function Dashboard() {
                     )}
               </p>
               <Link
-                to="/steam"
+                to={authenticated ? "/steam" : "/login"}
                 className="inline-flex rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-bold"
               >
-                {steamConnected ? "Open Steam" : "Connect Steam"}
+                {steamConnected
+                  ? "Open Steam"
+                  : authenticated
+                    ? "Connect Steam"
+                    : "Sign in to connect Steam"}
               </Link>
             </div>
           </section>
