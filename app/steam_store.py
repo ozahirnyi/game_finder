@@ -66,10 +66,12 @@ async def fetch_steam_store_deal_candidates(country: str = "US", page_size: int 
         *((data.get("new_releases") or {}).get("items", [])),
     ]
     popular = []
-    for item in top_sellers:
+    popular_seen: set[int] = set()
+    for item in [*top_sellers, *((data.get("specials") or {}).get("items", []))]:
         deal = _steam_deal(item)
-        if deal:
+        if deal and deal["steam_appid"] not in popular_seen:
             popular.append(deal)
+            popular_seen.add(deal["steam_appid"])
         if len(popular) == 4:
             break
     seen: set[int] = set()

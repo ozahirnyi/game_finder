@@ -44,6 +44,7 @@ async def test_cached_recommendations_reuse_a_matching_user_library(monkeypatch)
     second = await recommendations.get_cached_steam_recommendations(user_id, games())
 
     assert first == second
+    assert first["cache_expires_at"]
     assert calls["provider"] == 1
     assert str(user_id) in calls["keys"][0]
     assert calls["keys"][0].startswith("steam_recommendations:v2:")
