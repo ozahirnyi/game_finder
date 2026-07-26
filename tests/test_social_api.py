@@ -160,3 +160,10 @@ def test_friendship_model_enforces_canonical_pair_and_social_migration_exists():
         for path in versions.glob("*.py")
     ]
     assert len(revision_ids) == len(set(revision_ids))
+
+
+def test_social_migration_removes_legacy_friend_request_pair_constraint_before_lifecycle_upgrade():
+    migration = Path("alembic/versions/b2c3d4e5f6a7_add_social_features.py").read_text(encoding="utf-8")
+
+    assert 'op.drop_constraint("uq_friend_request_pair", "friend_requests", type_="unique")' in migration
+    assert 'op.create_unique_constraint("uq_friend_request_pair", "friend_requests", ["sender_id", "recipient_id"])' in migration

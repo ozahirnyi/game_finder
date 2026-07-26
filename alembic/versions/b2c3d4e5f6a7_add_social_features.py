@@ -62,6 +62,11 @@ def upgrade() -> None:
         )
     else:
         request_columns = {column["name"] for column in inspector.get_columns("friend_requests")}
+        request_constraints = {
+            constraint["name"] for constraint in inspector.get_unique_constraints("friend_requests")
+        }
+        if "uq_friend_request_pair" in request_constraints:
+            op.drop_constraint("uq_friend_request_pair", "friend_requests", type_="unique")
         if "status" not in request_columns:
             op.add_column("friend_requests", sa.Column("status", sa.String(length=16), nullable=True, server_default="pending"))
             bind.execute(sa.text("UPDATE friend_requests SET status = 'pending' WHERE status IS NULL"))
@@ -113,6 +118,11 @@ def downgrade() -> None:
     op.drop_table("direct_messages")
     op.drop_index("ix_friend_requests_sender_status", table_name="friend_requests")
     op.drop_index("ix_friend_requests_recipient_status", table_name="friend_requests")
+    request_constraints = {
+        constraint["name"] for constraint in sa.inspect(op.get_bind()).get_unique_constraints("friend_requests")
+    }
+    if "uq_friend_request_pair" not in request_constraints:
+        op.create_unique_constraint("uq_friend_request_pair", "friend_requests", ["sender_id", "recipient_id"])
     op.drop_index("uq_users_public_nickname_casefold", table_name="users")
     op.drop_index("uq_users_public_id", table_name="users")
     op.drop_column("users", "public_nickname")
