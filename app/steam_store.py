@@ -60,7 +60,11 @@ async def fetch_steam_store_deal_candidates(country: str = "US", page_size: int 
 
     data = response.json()
     top_sellers = (data.get("top_sellers") or {}).get("items", [])
-    candidates = [*top_sellers, *((data.get("specials") or {}).get("items", []))]
+    candidates = [
+        *top_sellers,
+        *((data.get("specials") or {}).get("items", [])),
+        *((data.get("new_releases") or {}).get("items", [])),
+    ]
     popular = []
     for item in top_sellers:
         deal = _steam_deal(item)
