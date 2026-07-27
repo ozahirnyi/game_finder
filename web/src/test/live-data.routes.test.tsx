@@ -259,6 +259,53 @@ describe("live dashboard and profile data", () => {
     );
   });
 
+  it("renders saved collection covers from the profile summary", async () => {
+    api.getProfileSummary.mockResolvedValue({
+      ...summary(),
+      favorites: ready([{ ...game, cover_url: "https://cdn.example/favorite.jpg" }]),
+      wishlist: ready([{ ...game, id: "wish-1", title: "Wishlist game", cover_url: "https://cdn.example/wishlist.jpg" }]),
+    });
+    renderPage(<ProfilePage />);
+    expect(await screen.findByRole("img", { name: "Hades II" })).toHaveAttribute("src", "https://cdn.example/favorite.jpg");
+    expect(screen.getByRole("img", { name: "Wishlist game" })).toHaveAttribute("src", "https://cdn.example/wishlist.jpg");
+  });
+
+  it("renders manual library games with an intentional cover fallback", async () => {
+    api.getProfileSummary.mockResolvedValue({
+      ...summary(),
+      library: ready({
+        ...summary().library.data,
+        games: [{ ...game, id: "manual-1", title: "Manual game", source: "manual", img_icon_url: null }],
+      }),
+    });
+    renderPage(<ProfilePage />);
+    expect(await screen.findByText("Manual game")).toBeVisible();
+  });
+
+  it("updates only the selected library visibility", async () => {
+    api.updateProfile.mockResolvedValue({
+      bio: "Arcade fan",
+      platforms: ["PC"],
+      favorite_genres: ["Roguelike"],
+    });
+    renderPage(<ProfilePage />);
+    await screen.findByRole("heading", { name: "player@example.com" });
+    fireEvent.click(screen.getByRole("button", { name: /edit profile/i }));
+    fireEvent.change(screen.getByLabelText("Library visibility"), {
+      target: { value: "friends" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save profile" }));
+
+    await waitFor(() =>
+      expect(api.updateProfile.mock.calls[0]?.[0]).toEqual({
+        bio: "Arcade fan",
+        platforms: ["PC"],
+        favorite_genres: ["Roguelike"],
+        library_visibility: "friends",
+      }),
+    );
+  });
+
   it("clears local session data and returns to login on sign out", async () => {
     renderPage(<ProfilePage />);
     await screen.findByRole("heading", { name: "player@example.com" });

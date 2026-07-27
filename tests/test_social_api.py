@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.main as main
-from app.database import Base, DirectMessage, FriendRequest, Friendship, Notification, User
+from app.database import Base, DirectMessage, Favorite, FriendRequest, Friendship, Game, Notification, OAuthIdentity, User, WishlistItem
 
 
 client = TestClient(main.app)
@@ -31,6 +31,10 @@ def social_db():
             Friendship.__table__,
             DirectMessage.__table__,
             Notification.__table__,
+            OAuthIdentity.__table__,
+            Game.__table__,
+            Favorite.__table__,
+            WishlistItem.__table__,
         ],
     )
     session = sessionmaker(bind=engine)()
@@ -55,6 +59,113 @@ def create_users(db):
     db.add_all([alice, bob, charlie, hidden])
     db.commit()
     return alice, bob, charlie, hidden
+
+
+def test_profile_visibility_defaults_to_public_for_existing_user(social_db):
+    user = User(email="existing@example.com", public_id="existing-id")
+    social_db.add(user)
+    social_db.commit()
+    social_db.refresh(user)
+
+    assert (
+        user.library_visibility,
+        user.favorites_visibility,
+        user.wishlist_visibility,
+        user.steam_visibility,
+    ) == ("public", "public", "public", "public")
+
+
+@pytest.mark.parametrize("field", ["library_visibility", "favorites_visibility", "wishlist_visibility", "steam_visibility"])
+def test_profile_rejects_invalid_visibility_values(social_db, field):
+    alice, *_ = create_users(social_db)
+
+    response = use_social_api(alice, social_db).patch("/profile", json={field: "team"})
+
+    assert response.status_code == 422
+
+
+def test_profile_patch_persists_each_visibility_independently(social_db):
+    alice, *_ = create_users(social_db)
+
+    response = use_social_api(alice, social_db).patch(
+        "/profile",
+        json={
+            "library_visibility": "friends",
+            "favorites_visibility": "private",
+            "wishlist_visibility": "public",
+            "steam_visibility": "friends",
+        },
+    )
+
+    assert response.status_code == 200
+    assert {
+        field: response.json()[field]
+        for field in ("library_visibility", "favorites_visibility", "wishlist_visibility", "steam_visibility")
+    } == {
+        "library_visibility": "friends",
+        "favorites_visibility": "private",
+        "wishlist_visibility": "public",
+        "steam_visibility": "friends",
+    }
+    social_db.refresh(alice)
+    assert alice.library_visibility == "friends"
+    assert alice.favorites_visibility == "private"
+    assert alice.wishlist_visibility == "public"
+    assert alice.steam_visibility == "friends"
+
+
+@pytest.mark.parametrize(
+    ("viewer", "visibility", "visible"),
+    [
+        ("owner", "private", True),
+        ("friend", "friends", True),
+        ("stranger", "friends", False),
+        ("anonymous", "public", True),
+        ("anonymous", "private", False),
+    ],
+)
+def test_public_profile_library_visibility_does_not_leak_hidden_data(social_db, viewer, visibility, visible):
+    alice, bob, charlie, _hidden = create_users(social_db)
+    bob.library_visibility = visibility
+    social_db.add(Game(owner_id=bob.id, title="Secret game", source="manual"))
+    social_db.add(Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)))
+    social_db.commit()
+    current_user = {"owner": bob, "friend": alice, "stranger": charlie}.get(viewer)
+    main.app.dependency_overrides[main.get_db] = lambda: social_db
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: current_user
+
+    response = client.get(f"/users/{bob.public_id}")
+
+    assert response.status_code == 200
+    library = response.json()["library"]
+    if visible:
+        assert library["status"] == "ready"
+        assert library["data"][0]["title"] == "Secret game"
+    else:
+        assert library == {"status": "hidden", "data": [], "message": "This section is private."}
+        assert "Secret game" not in response.text
+
+
+def test_public_profile_returns_owned_library_and_collection_covers(social_db):
+    alice, bob, *_ = create_users(social_db)
+    social_db.add_all([
+        Game(owner_id=bob.id, title="Zelda", source="manual"),
+        Game(owner_id=bob.id, title="Astro", source="psn", img_icon_url="https://cover/astro"),
+        Game(owner_id=bob.id, title="Baldur", source="steam", external_id="42", img_icon_url="hash"),
+        Favorite(user_id=bob.id, catalog_game_id=1, title="Favorite", cover_url="https://cover/favorite"),
+        WishlistItem(user_id=bob.id, catalog_game_id=2, title="Wishlist", cover_url="https://cover/wishlist"),
+    ])
+    social_db.commit()
+    main.app.dependency_overrides[main.get_db] = lambda: social_db
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: alice
+
+    response = client.get(f"/users/{bob.public_id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [game["title"] for game in payload["library"]["data"]] == ["Astro", "Baldur", "Zelda"]
+    assert payload["favorites"]["data"][0]["cover_url"] == "https://cover/favorite"
+    assert payload["wishlist"]["data"][0]["cover_url"] == "https://cover/wishlist"
 
 
 def test_social_profile_nickname_and_player_search_are_public_but_private_fields_are_not(social_db):

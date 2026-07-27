@@ -62,12 +62,20 @@ class UserRead(BaseModel):
     display_name: str
     created_at: datetime
     google_linked: bool = False
+    public_nickname: str | None = None
+
+
+Visibility = Literal["private", "friends", "public"]
 
 
 class UserProfileRead(UserRead):
     bio: str | None = None
     platforms: list[str] = Field(default_factory=list)
     favorite_genres: list[str] = Field(default_factory=list)
+    library_visibility: Visibility = "public"
+    favorites_visibility: Visibility = "public"
+    wishlist_visibility: Visibility = "public"
+    steam_visibility: Visibility = "public"
 
 
 class UserProfileUpdate(BaseModel):
@@ -75,12 +83,49 @@ class UserProfileUpdate(BaseModel):
     bio: str | None = Field(default=None, max_length=1000)
     platforms: list[str] | None = Field(default=None, max_length=20)
     favorite_genres: list[str] | None = Field(default=None, max_length=20)
+    library_visibility: Visibility | None = None
+    favorites_visibility: Visibility | None = None
+    wishlist_visibility: Visibility | None = None
+    steam_visibility: Visibility | None = None
 
 
 class DataBlock(BaseModel):
     status: Literal["ready", "empty", "not_connected", "error"]
     data: Any = None
     message: str | None = None
+
+
+class PublicDataBlock(BaseModel):
+    status: Literal["ready", "empty", "hidden"]
+    data: Any = None
+    message: str | None = None
+
+
+class PublicLibraryGameRead(BaseModel):
+    id: uuid.UUID
+    title: str
+    source: str
+    cover_url: str | None = None
+    playtime_forever: int | None = None
+    detail_game_id: str | None = None
+
+
+class PublicSteamAccountRead(BaseModel):
+    linked: bool
+    persona_name: str | None = None
+    avatar: str | None = None
+    profile_url: str | None = None
+
+
+class PublicProfileRead(BaseModel):
+    public_id: str
+    nickname: str
+    avatar: str | None = None
+    relationship: str
+    library: PublicDataBlock
+    favorites: PublicDataBlock
+    wishlist: PublicDataBlock
+    steam: PublicDataBlock
 
 
 class DashboardRead(BaseModel):
@@ -288,6 +333,7 @@ class SteamFriendGameRead(BaseModel):
 
 class SteamFriendRead(BaseModel):
     steam_id: str
+    public_id: str | None = None
     persona_name: str | None = None
     avatar: str | None = None
     friend_since: int | None = None

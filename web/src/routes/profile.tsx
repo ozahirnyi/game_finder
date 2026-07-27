@@ -9,7 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { Avatar } from "@/components/GameCover";
+import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
 import {
   clearToken,
@@ -44,6 +44,11 @@ const toggle = (values: string[], value: string) =>
   values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value];
+const VISIBILITY_OPTIONS = [
+  ["public", "Public"],
+  ["friends", "Only friends"],
+  ["private", "Only me"],
+] as const;
 
 export function ProfilePage() {
   const client = useQueryClient();
@@ -63,6 +68,7 @@ export function ProfilePage() {
   const [bio, setBio] = useState("");
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
+  const [visibilityChanges, setVisibilityChanges] = useState<Record<string, "private" | "friends" | "public">>({});
   const save = useMutation({
     mutationFn: updateProfile,
     onSuccess: () => {
@@ -78,6 +84,7 @@ export function ProfilePage() {
     setBio(profile?.bio ?? "");
     setPlatforms(profile?.platforms ?? []);
     setGenres(profile?.favorite_genres ?? []);
+    setVisibilityChanges({});
     setEditing(true);
   };
   const signOut = () => {
@@ -146,7 +153,7 @@ export function ProfilePage() {
           />
           <div className="flex-1">
             <h1 className="text-3xl font-extrabold">
-              {user?.email ?? "Your profile"}
+              {user?.public_nickname ?? user?.display_name ?? user?.email ?? "Your profile"}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {profile?.bio ||
@@ -175,7 +182,12 @@ export function ProfilePage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            save.mutate({ bio, platforms, favorite_genres: genres });
+            save.mutate({
+              bio,
+              platforms,
+              favorite_genres: genres,
+              ...visibilityChanges,
+            });
           }}
           className="mb-8 rounded-2xl border border-border bg-surface p-6"
         >
@@ -223,6 +235,31 @@ export function ProfilePage() {
                 ))}
               </div>
             </fieldset>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {[
+              ["Library visibility", "library_visibility"],
+              ["Favorites visibility", "favorites_visibility"],
+              ["Wishlist visibility", "wishlist_visibility"],
+              ["Steam visibility", "steam_visibility"],
+            ].map(([label, field]) => (
+              <label key={label} className="text-sm font-bold">
+                {label}
+                <select
+                  aria-label={label}
+                  value={visibilityChanges[field] ?? profile?.[field as keyof typeof profile] ?? "public"}
+                  onChange={(event) => setVisibilityChanges((current) => ({
+                    ...current,
+                    [field]: event.target.value as "private" | "friends" | "public",
+                  }))}
+                  className="mt-2 w-full rounded border border-border bg-background p-2"
+                >
+                  {VISIBILITY_OPTIONS.map(([optionValue, optionLabel]) => (
+                    <option key={optionValue} value={optionValue}>{optionLabel}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
           </div>
           <button className="mt-4 rounded bg-primary px-4 py-2 font-bold text-primary-foreground">
             Save profile
@@ -279,15 +316,29 @@ export function ProfilePage() {
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             <div>
+              <SectionHeader title="Library" />
+              {stats?.games?.length ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {stats.games.map((g) => (
+                    <div key={g.id} className="overflow-hidden rounded-lg border border-border bg-surface">
+                      <GameCover className="h-24" from={g.img_icon_url ?? "#155e75"} to="#164e63" title={g.title} />
+                      <p className="p-3 font-bold">{g.title}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : <p>No library games yet.</p>}
+            </div>
+            <div>
               <SectionHeader title="Favorite games" />
               {favorites.length ? (
                 favorites.map((g) => (
-                  <p
+                  <div
                     key={g.id}
-                    className="rounded-lg border border-border bg-surface p-3 font-bold"
+                    className="overflow-hidden rounded-lg border border-border bg-surface"
                   >
-                    {g.title}
-                  </p>
+                    <GameCover className="h-24" from={g.cover_url ?? "#0f766e"} to="#164e63" title={g.title} />
+                    <p className="p-3 font-bold">{g.title}</p>
+                  </div>
                 ))
               ) : (
                 <p>No favorite games yet.</p>
@@ -296,7 +347,7 @@ export function ProfilePage() {
             <div>
               <SectionHeader title="Active wishlist" />
               {wishlist.length ? (
-                wishlist.map((g) => <p key={g.id}>{g.title}</p>)
+                wishlist.map((g) => <div key={g.id} className="overflow-hidden rounded-lg border border-border bg-surface"><GameCover className="h-24" from={g.cover_url ?? "#7c3aed"} to="#312e81" title={g.title} /><p className="p-3 font-bold">{g.title}</p></div>)
               ) : (
                 <p>{s?.wishlist.message ?? "No wishlist games yet."}</p>
               )}
