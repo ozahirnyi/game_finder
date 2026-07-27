@@ -26,6 +26,10 @@ function errorMessage(reason: unknown, fallback: string) {
   return reason instanceof Error ? reason.message : fallback;
 }
 
+function requiresPublicNickname(message: string) {
+  return message.toLowerCase().includes("public nickname");
+}
+
 function publicProfilePath(publicId: string) {
   return `/users/${encodeURIComponent(publicId)}`;
 }
@@ -354,9 +358,16 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
       </p>
       <div className="mt-6">{relationshipAction(profile.relationship)}</div>
       {error ? (
-        <p role="alert" className="mt-4 text-sm text-destructive">
-          {error}
-        </p>
+        <div className="mt-4">
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+          {requiresPublicNickname(error) ? (
+            <a className={`${primaryButtonClass} mt-3 inline-flex`} href="/friends">
+              Choose nickname
+            </a>
+          ) : null}
+        </div>
       ) : null}
     </article>
   );
