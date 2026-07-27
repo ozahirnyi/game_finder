@@ -195,6 +195,14 @@ describe("live dashboard and profile data", () => {
     librarySearch.mockReturnValue({ tab: "library" });
   });
 
+  it("shows guest actions immediately without requesting a profile", () => {
+    api.isAuthenticated.mockReturnValue(false);
+    renderPage(<ProfilePage />);
+
+    expect(screen.getByText("Create account")).toBeVisible();
+    expect(api.getProfileSummary).not.toHaveBeenCalled();
+  });
+
   it("renders dashboard blocks from the summary response and useful disconnected states", async () => {
     renderPage(<Dashboard />);
     expect((await screen.findAllByText("Balatro")).length).toBeGreaterThan(0);

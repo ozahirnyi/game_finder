@@ -458,6 +458,42 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
     assert response.json()["history_low_all"] == {"amount": 8.99, "currency": "USD"}
 
 
+def test_game_price_history_uses_steam_when_itad_is_unavailable(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_rawg_game_detail(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II"}
+
+    async def unavailable_itad(_title: str, country: str):
+        assert country == "US"
+        from fastapi import HTTPException
+        raise HTTPException(status_code=502, detail="IsThereAnyDeal rejected the API key")
+
+    async def steam_price(title: str, country: str):
+        assert (title, country) == ("Hades II", "US")
+        return {
+            "itad_id": "steam:1145350",
+            "title": title,
+            "url": "https://store.steampowered.com/app/1145350/",
+            "current": {"shop": "Steam", "price": {"amount": 29.99, "currency": "USD"}, "regular": None, "cut": 0, "url": "https://store.steampowered.com/app/1145350/", "timestamp": None},
+            "history_low_all": None,
+            "history_low_1y": None,
+            "history_low_3m": None,
+            "deals": [],
+        }
+
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch_rawg_game_detail)
+    monkeypatch.setattr(main, "fetch_game_price_history", unavailable_itad)
+    monkeypatch.setattr(main, "fetch_steam_store_game_price", steam_price)
+
+    response = client.get("/prices/games/274755")
+
+    assert response.status_code == 200
+    assert response.json()["current"]["shop"] == "Steam"
+
+
 def test_homepage_deals_returns_steam_store_deals(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
