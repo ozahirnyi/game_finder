@@ -30,6 +30,7 @@ vi.mock("@/lib/api", () => ({
   isAuthenticated: vi.fn(),
   getDashboard: vi.fn(),
   getProfileSummary: vi.fn(),
+  getLibraryOverview: vi.fn(),
   listSavedGames: vi.fn(),
   getSteamLinkUrl: vi.fn(),
   syncSteamLibrary: vi.fn(),
@@ -173,12 +174,13 @@ describe("Library platform tabs", () => {
     });
   });
 
-  it("does not request saved games when the Steam tab is selected", async () => {
-    librarySearch.mockReturnValue({ tab: "steam" });
+  it("loads the aggregated overview instead of the legacy saved-game endpoint", async () => {
+    const { getLibraryOverview } = await import("@/lib/api");
+    vi.mocked(getLibraryOverview).mockResolvedValue({ games: [], steam_available: false, steam_error: null });
 
     renderScreen(<LibraryPage />);
 
-    expect(await screen.findByText("Steam integration")).toBeVisible();
+    await waitFor(() => expect(getLibraryOverview).toHaveBeenCalled());
     expect(getProfileSummary).not.toHaveBeenCalled();
   });
 });

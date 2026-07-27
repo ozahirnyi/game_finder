@@ -97,6 +97,20 @@ export type SavedGame = {
   synced_at: string | null;
   created_at: string;
 };
+export type LibraryGame = {
+  id: string;
+  source: "manual" | "psn" | "steam";
+  external_id: string | null;
+  detail_game_id: string | null;
+  title: string;
+  cover_url: string | null;
+  playtime_forever: number | null;
+};
+export type LibraryOverview = {
+  games: LibraryGame[];
+  steam_available: boolean;
+  steam_error: string | null;
+};
 
 export type PsnImportPreview = {
   games: string[];
@@ -640,6 +654,16 @@ export function getGenreDeals() {
 
 export function listSavedGames() {
   return request<SavedGame[]>("/games", { auth: true });
+}
+
+export function getLibraryOverview() {
+  return request<LibraryOverview>("/library/overview", { auth: true });
+}
+
+export function resolveSteamLibraryGame(appId: number) {
+  return request<{ game_id: number }>(`/library/steam-games/${appId}/resolve`, {
+    method: "POST", auth: true,
+  });
 }
 
 export function getSavedGame(id: string) {

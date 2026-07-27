@@ -1331,8 +1331,9 @@ def test_dashboard_generates_recommendations_for_linked_steam_games(monkeypatch)
     async def steam_games(_steam_id):
         return [{"appid": 10, "name": "Portal", "playtime_forever": 120, "playtime_2weeks": 30, "img_icon_url": None}]
 
-    async def cached(user_id, games):
-        assert user_id == user.id
+    async def cached(recommendation_user, saved_games, games):
+        assert recommendation_user.id == user.id
+        assert saved_games == []
         assert games[0]["appid"] == 10
         return {"recommendations": [{"title": "Hades", "reason": "Action", "tags": ["Action"]}]}
 
@@ -1340,7 +1341,7 @@ def test_dashboard_generates_recommendations_for_linked_steam_games(monkeypatch)
     main.app.dependency_overrides[main.get_db] = lambda: SimpleNamespace(query=lambda _model: Query())
     monkeypatch.setattr(main, "fetch_owned_games", steam_games)
     monkeypatch.setattr(main, "fetch_steam_store_deals", lambda **_kwargs: [])
-    monkeypatch.setattr(main, "get_cached_steam_recommendations", cached)
+    monkeypatch.setattr(main, "get_personalized_recommendations", cached)
     try:
         response = client.get("/dashboard")
     finally:
