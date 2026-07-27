@@ -347,16 +347,13 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
         <main className="space-y-10 lg:col-span-8">
           <section>
             <SectionHeader title="About" />
-            <button
-              type="button"
-              onClick={() => setExpandedDescription((value) => !value)}
-              className="w-full text-left text-sm leading-relaxed text-muted-foreground"
+            <div
+              data-testid="game-description"
+              className={`block text-sm leading-relaxed text-muted-foreground ${expandedDescription ? "" : "line-clamp-3"}`}
             >
-              <span className={expandedDescription ? "" : "line-clamp-3"}>
-                {game.description_raw ||
-                  "No public description is available for this catalog entry."}
-              </span>
-            </button>
+              {game.description_raw ||
+                "No public description is available for this catalog entry."}
+            </div>
             {game.description_raw ? (
               <button
                 type="button"

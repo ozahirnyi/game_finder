@@ -92,6 +92,16 @@ export function ProfilePage() {
     client.clear();
     navigate({ to: "/" });
   };
+  if (query.isError && (query.error as { status?: number }).status === 401)
+    return (
+      <AppShell>
+        <SectionHeader title="Profile" hint="Create an account or sign in to view your profile." />
+        <div className="flex gap-3">
+          <Link to="/login">Sign in</Link>
+          <Link to="/register">Create account</Link>
+        </div>
+      </AppShell>
+    );
   if (query.isError)
     return (
       <AppShell>
