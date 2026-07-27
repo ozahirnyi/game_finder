@@ -259,6 +259,30 @@ describe("live dashboard and profile data", () => {
     );
   });
 
+  it("updates only the selected library visibility", async () => {
+    api.updateProfile.mockResolvedValue({
+      bio: "Arcade fan",
+      platforms: ["PC"],
+      favorite_genres: ["Roguelike"],
+    });
+    renderPage(<ProfilePage />);
+    await screen.findByRole("heading", { name: "player@example.com" });
+    fireEvent.click(screen.getByRole("button", { name: /edit profile/i }));
+    fireEvent.change(screen.getByLabelText("Library visibility"), {
+      target: { value: "friends" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save profile" }));
+
+    await waitFor(() =>
+      expect(api.updateProfile.mock.calls[0]?.[0]).toEqual({
+        bio: "Arcade fan",
+        platforms: ["PC"],
+        favorite_genres: ["Roguelike"],
+        library_visibility: "friends",
+      }),
+    );
+  });
+
   it("clears local session data and returns to login on sign out", async () => {
     renderPage(<ProfilePage />);
     await screen.findByRole("heading", { name: "player@example.com" });

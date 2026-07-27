@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.main as main
-from app.database import Base, DirectMessage, FriendRequest, Friendship, Notification, User
+from app.database import Base, DirectMessage, FriendRequest, Friendship, Notification, OAuthIdentity, User
 
 
 client = TestClient(main.app)
@@ -31,6 +31,7 @@ def social_db():
             Friendship.__table__,
             DirectMessage.__table__,
             Notification.__table__,
+            OAuthIdentity.__table__,
         ],
     )
     session = sessionmaker(bind=engine)()
@@ -55,6 +56,59 @@ def create_users(db):
     db.add_all([alice, bob, charlie, hidden])
     db.commit()
     return alice, bob, charlie, hidden
+
+
+def test_profile_visibility_defaults_to_public_for_existing_user(social_db):
+    user = User(email="existing@example.com", public_id="existing-id")
+    social_db.add(user)
+    social_db.commit()
+    social_db.refresh(user)
+
+    assert (
+        user.library_visibility,
+        user.favorites_visibility,
+        user.wishlist_visibility,
+        user.steam_visibility,
+    ) == ("public", "public", "public", "public")
+
+
+@pytest.mark.parametrize("field", ["library_visibility", "favorites_visibility", "wishlist_visibility", "steam_visibility"])
+def test_profile_rejects_invalid_visibility_values(social_db, field):
+    alice, *_ = create_users(social_db)
+
+    response = use_social_api(alice, social_db).patch("/profile", json={field: "team"})
+
+    assert response.status_code == 422
+
+
+def test_profile_patch_persists_each_visibility_independently(social_db):
+    alice, *_ = create_users(social_db)
+
+    response = use_social_api(alice, social_db).patch(
+        "/profile",
+        json={
+            "library_visibility": "friends",
+            "favorites_visibility": "private",
+            "wishlist_visibility": "public",
+            "steam_visibility": "friends",
+        },
+    )
+
+    assert response.status_code == 200
+    assert {
+        field: response.json()[field]
+        for field in ("library_visibility", "favorites_visibility", "wishlist_visibility", "steam_visibility")
+    } == {
+        "library_visibility": "friends",
+        "favorites_visibility": "private",
+        "wishlist_visibility": "public",
+        "steam_visibility": "friends",
+    }
+    social_db.refresh(alice)
+    assert alice.library_visibility == "friends"
+    assert alice.favorites_visibility == "private"
+    assert alice.wishlist_visibility == "public"
+    assert alice.steam_visibility == "friends"
 
 
 def test_social_profile_nickname_and_player_search_are_public_but_private_fields_are_not(social_db):

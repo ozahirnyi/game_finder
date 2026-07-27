@@ -91,6 +91,10 @@ class User(Base):
     platforms: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
     favorite_genres: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
     public_nickname: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    library_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
+    favorites_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
+    wishlist_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
+    steam_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
 
 

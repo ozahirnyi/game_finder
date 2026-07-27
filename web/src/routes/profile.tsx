@@ -44,6 +44,11 @@ const toggle = (values: string[], value: string) =>
   values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value];
+const VISIBILITY_OPTIONS = [
+  ["public", "Public"],
+  ["friends", "Only friends"],
+  ["private", "Only me"],
+] as const;
 
 export function ProfilePage() {
   const client = useQueryClient();
@@ -63,6 +68,7 @@ export function ProfilePage() {
   const [bio, setBio] = useState("");
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
+  const [visibilityChanges, setVisibilityChanges] = useState<Record<string, "private" | "friends" | "public">>({});
   const save = useMutation({
     mutationFn: updateProfile,
     onSuccess: () => {
@@ -78,6 +84,7 @@ export function ProfilePage() {
     setBio(profile?.bio ?? "");
     setPlatforms(profile?.platforms ?? []);
     setGenres(profile?.favorite_genres ?? []);
+    setVisibilityChanges({});
     setEditing(true);
   };
   const signOut = () => {
@@ -175,7 +182,12 @@ export function ProfilePage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            save.mutate({ bio, platforms, favorite_genres: genres });
+            save.mutate({
+              bio,
+              platforms,
+              favorite_genres: genres,
+              ...visibilityChanges,
+            });
           }}
           className="mb-8 rounded-2xl border border-border bg-surface p-6"
         >
@@ -223,6 +235,31 @@ export function ProfilePage() {
                 ))}
               </div>
             </fieldset>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {[
+              ["Library visibility", "library_visibility"],
+              ["Favorites visibility", "favorites_visibility"],
+              ["Wishlist visibility", "wishlist_visibility"],
+              ["Steam visibility", "steam_visibility"],
+            ].map(([label, field]) => (
+              <label key={label} className="text-sm font-bold">
+                {label}
+                <select
+                  aria-label={label}
+                  value={visibilityChanges[field] ?? profile?.[field as keyof typeof profile] ?? "public"}
+                  onChange={(event) => setVisibilityChanges((current) => ({
+                    ...current,
+                    [field]: event.target.value as "private" | "friends" | "public",
+                  }))}
+                  className="mt-2 w-full rounded border border-border bg-background p-2"
+                >
+                  {VISIBILITY_OPTIONS.map(([optionValue, optionLabel]) => (
+                    <option key={optionValue} value={optionValue}>{optionLabel}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
           </div>
           <button className="mt-4 rounded bg-primary px-4 py-2 font-bold text-primary-foreground">
             Save profile
