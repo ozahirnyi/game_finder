@@ -347,23 +347,24 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
         <main className="space-y-10 lg:col-span-8">
           <section>
             <SectionHeader title="About" />
-            <div
-              data-testid="game-description"
-              className={`block text-sm leading-relaxed text-muted-foreground ${expandedDescription ? "" : "line-clamp-3"}`}
-            >
-              {game.description_raw ||
-                "No public description is available for this catalog entry."}
-            </div>
             {game.description_raw ? (
-              <button
-                type="button"
-                onClick={() => setExpandedDescription((value) => !value)}
-                className="mt-2 text-xs font-bold text-primary"
-              >
-                {expandedDescription
-                  ? "Collapse description"
-                  : "Show full description"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setExpandedDescription((value) => !value)}
+                  className="text-xs font-bold text-primary"
+                >
+                  {expandedDescription ? "Hide description" : "Show description"}
+                </button>
+                {expandedDescription ? (
+                  <div
+                    data-testid="game-description"
+                    className="mt-3 text-sm leading-relaxed text-muted-foreground"
+                  >
+                    {game.description_raw}
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </section>
           <PricePanel gameId={String(game.id)} />
