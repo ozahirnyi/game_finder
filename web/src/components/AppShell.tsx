@@ -220,7 +220,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <main className="lg:pl-64">
         <div className="mx-auto max-w-7xl px-5 py-8 pb-28 lg:px-10 lg:py-10">
-          {children}
+          <div
+            key={pathname}
+            data-testid="route-content"
+            className="animate-reveal"
+          >
+            {children}
+          </div>
         </div>
       </main>
 

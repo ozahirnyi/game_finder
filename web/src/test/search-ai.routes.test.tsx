@@ -10,7 +10,10 @@ const api = vi.hoisted(() => ({
 const routeSearch = vi.hoisted(() => vi.fn(() => ({ q: "" })));
 
 vi.mock("@tanstack/react-router", () => ({
-  createFileRoute: () => (options: object) => ({ ...options, useSearch: routeSearch }),
+  createFileRoute: () => (options: object) => ({
+    ...options,
+    useSearch: routeSearch,
+  }),
   Link: ({
     children,
     to,

@@ -74,6 +74,16 @@ describe("AppShell", () => {
     expect(screen.queryByText("updated 4m ago")).not.toBeInTheDocument();
   });
 
+  it("animates primary route content through the shared shell", () => {
+    render(
+      <AppShell>
+        <main>Home</main>
+      </AppShell>,
+    );
+
+    expect(screen.getByTestId("route-content")).toHaveClass("animate-reveal");
+  });
+
   it("keeps Library navigation while hiding standalone Steam and PSN links", () => {
     render(
       <AppShell>
