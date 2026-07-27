@@ -270,6 +270,18 @@ describe("live dashboard and profile data", () => {
     expect(screen.getByRole("img", { name: "Wishlist game" })).toHaveAttribute("src", "https://cdn.example/wishlist.jpg");
   });
 
+  it("renders manual library games with an intentional cover fallback", async () => {
+    api.getProfileSummary.mockResolvedValue({
+      ...summary(),
+      library: ready({
+        ...summary().library.data,
+        games: [{ ...game, id: "manual-1", title: "Manual game", source: "manual", img_icon_url: null }],
+      }),
+    });
+    renderPage(<ProfilePage />);
+    expect(await screen.findByText("Manual game")).toBeVisible();
+  });
+
   it("updates only the selected library visibility", async () => {
     api.updateProfile.mockResolvedValue({
       bio: "Arcade fan",

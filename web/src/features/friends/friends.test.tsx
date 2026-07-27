@@ -34,6 +34,7 @@ const linkedSteam = {
 
 const friend = {
   steam_id: "friend-1",
+  public_id: "alex-public",
   persona_name: "Alex",
   avatar: "https://example.test/alex.jpg",
   friend_since: null,
@@ -77,6 +78,17 @@ describe("FriendsScreen", () => {
     expect(
       screen.getByRole("img", { name: "Alex's Steam avatar" }),
     ).toHaveAttribute("src", friend.avatar);
+    expect(screen.getByRole("link", { name: "View profile" })).toHaveAttribute("href", "/users/alex-public");
+  });
+
+  it("keeps an unmatched Steam friend on the external Steam profile", async () => {
+    vi.mocked(getSteamSocial).mockResolvedValue({
+      steam: linkedSteam,
+      friends: [{ ...friend, public_id: null }],
+      top_friend_games: [], public_libraries: 1, private_libraries: 0,
+    });
+    render(<FriendsScreen />);
+    expect(await screen.findByRole("link", { name: "View Steam profile" })).toHaveAttribute("href", "https://steamcommunity.com/profiles/friend-1");
   });
 
   it("shows the Steam connect state for the backend's unlinked-account response", async () => {
