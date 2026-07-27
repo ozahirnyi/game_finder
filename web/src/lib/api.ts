@@ -265,6 +265,15 @@ export type SocialRelationship =
 export type SocialProfile = SocialPlayer & {
   relationship: SocialRelationship;
 };
+export type PublicSection<T> = { status: "ready" | "empty" | "hidden"; data: T; message?: string | null };
+export type PublicLibraryGame = { id: string; title: string; source: string; cover_url: string | null; playtime_forever: number | null; detail_game_id: string | null };
+export type PublicSteamAccount = { linked: boolean; persona_name: string | null; avatar: string | null; profile_url: string | null };
+export type PublicProfile = SocialProfile & {
+  library: PublicSection<PublicLibraryGame[]>;
+  favorites: PublicSection<CatalogCollectionItem[]>;
+  wishlist: PublicSection<CatalogCollectionItem[]>;
+  steam: PublicSection<PublicSteamAccount | null>;
+};
 
 export type DirectMessage = {
   id: string;
@@ -819,6 +828,10 @@ export function getSocialProfile(publicId: string) {
     `/social/profiles/${encodeURIComponent(publicId)}`,
     { auth: true },
   );
+}
+
+export function getPublicProfile(publicId: string) {
+  return request<PublicProfile>(`/users/${encodeURIComponent(publicId)}`);
 }
 
 export function createFriendRequest(publicId: string) {
