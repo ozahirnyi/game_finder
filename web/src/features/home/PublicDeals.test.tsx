@@ -32,6 +32,7 @@ describe("PublicDeals", () => {
     render(<PublicDeals initialCountry="UA" limit={3} />);
     expect(screen.getByLabelText("Loading price drops")).toBeVisible();
     expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
+    expect(screen.getByLabelText("Hades II cover unavailable")).toBeVisible();
     expect(getHomepageDeals).toHaveBeenCalledWith("UA", 3);
   });
 
