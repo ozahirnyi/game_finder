@@ -31,7 +31,9 @@ describe("PublicDeals", () => {
     vi.mocked(getHomepageDeals).mockResolvedValue({ results: [deal] });
     render(<PublicDeals initialCountry="UA" limit={3} />);
     expect(screen.getByLabelText("Loading price drops")).toBeVisible();
-    expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Hades II" }),
+    ).toBeVisible();
     expect(screen.getByLabelText("Hades II cover unavailable")).toBeVisible();
     expect(getHomepageDeals).toHaveBeenCalledWith("UA", 3);
   });
@@ -41,14 +43,20 @@ describe("PublicDeals", () => {
       .mockRejectedValueOnce(new Error("UA unavailable"))
       .mockResolvedValueOnce({ results: [deal] });
     render(<PublicDeals initialCountry="UA" limit={3} />);
-    expect(await screen.findByText("Showing USD prices because local offers are unavailable.")).toBeVisible();
+    expect(
+      await screen.findByText(
+        "Showing USD prices because local offers are unavailable.",
+      ),
+    ).toBeVisible();
     expect(getHomepageDeals).toHaveBeenNthCalledWith(2, "US", 3);
   });
 
   it("shows retry after the US fallback also fails", async () => {
     vi.mocked(getHomepageDeals).mockRejectedValue(new Error("offline"));
     render(<PublicDeals initialCountry="UA" limit={3} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Retry price drops" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Retry price drops" }),
+    );
     await waitFor(() => expect(getHomepageDeals).toHaveBeenCalledTimes(4));
   });
 });

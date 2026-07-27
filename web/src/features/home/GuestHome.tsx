@@ -11,7 +11,8 @@ export function GuestHome() {
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (query.trim()) void navigate({ to: "/search", search: { q: query.trim() } });
+    if (query.trim())
+      void navigate({ to: "/search", search: { q: query.trim() } });
   }
 
   return (
@@ -19,7 +20,10 @@ export function GuestHome() {
       <section className="stack">
         <p className="eyebrow">GameFinder</p>
         <h1>Find your next game</h1>
-        <p>Search games, discover new favourites, and find live price drops before you sign in.</p>
+        <p>
+          Search games, discover new favourites, and find live price drops
+          before you sign in.
+        </p>
         <form className="flex gap-2" onSubmit={submit}>
           <input
             type="search"
