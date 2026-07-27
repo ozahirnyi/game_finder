@@ -181,6 +181,7 @@ export type SteamFriendGame = {
 
 export type SteamFriend = {
   steam_id: string;
+  public_id: string | null;
   persona_name: string | null;
   avatar: string | null;
   friend_since: number | null;
