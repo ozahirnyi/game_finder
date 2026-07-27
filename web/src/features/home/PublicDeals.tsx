@@ -21,14 +21,14 @@ function DealCover({ deal }: { deal: HomeDeal }) {
   if (!deal.background_image) {
     return (
       <div
-        className="game-cover-fallback"
+        className="aspect-video w-full bg-secondary"
         aria-label={`${deal.name} cover unavailable`}
       />
     );
   }
   return (
     <img
-      className="game-cover"
+      className="aspect-video w-full object-cover"
       src={deal.background_image}
       alt={`${deal.name} cover`}
     />
@@ -92,18 +92,23 @@ export function PublicDeals({
 
   return (
     <section
-      className="stack stagger-enter"
+      className="stagger-enter mx-auto max-w-6xl space-y-6"
       data-testid="public-deals"
       aria-labelledby="price-drops-heading"
     >
-      <header className="section-header">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Live deals</p>
-          <h2 id="price-drops-heading">Price drops</h2>
+          <p className="mb-1 font-mono text-[11px] uppercase tracking-[0.25em] text-primary">
+            Live deals
+          </p>
+          <h2 id="price-drops-heading" className="text-2xl font-bold">
+            Price drops
+          </h2>
         </div>
-        <label>
+        <label className="text-sm font-medium text-muted-foreground">
           <span className="sr-only">Deal region</span>
           <select
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
             value={country}
             onChange={(event) => setCountry(event.target.value)}
           >
@@ -117,60 +122,93 @@ export function PublicDeals({
       </header>
 
       {state.status === "loading" ? (
-        <div className="game-grid" aria-label="Loading price drops">
+        <div
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          aria-label="Loading price drops"
+        >
           {Array.from(
             { length: Math.min(Math.max(limit, 3), 6) },
             (_, index) => (
-              <div className="game-card skeleton-shimmer" key={index} />
+              <div
+                className="aspect-[4/5] rounded-2xl border border-border skeleton-shimmer"
+                key={index}
+              />
             ),
           )}
         </div>
       ) : null}
 
       {state.status === "error" ? (
-        <div className="state-panel" role="status">
+        <div
+          className="rounded-xl border border-border bg-surface p-5 text-sm text-muted-foreground"
+          role="status"
+        >
           <p>Price drops could not be loaded.</p>
-          <button type="button" onClick={() => setRetry((value) => value + 1)}>
+          <button
+            className="mt-3 rounded-lg border border-border bg-secondary px-3 py-2 font-bold text-foreground transition hover:border-primary/60"
+            type="button"
+            onClick={() => setRetry((value) => value + 1)}
+          >
             Retry price drops
           </button>
         </div>
       ) : null}
 
       {state.status === "success" && state.deals.length === 0 ? (
-        <p>No price drops are available right now.</p>
+        <p className="rounded-xl border border-border bg-surface p-5 text-sm text-muted-foreground">
+          No price drops are available right now.
+        </p>
       ) : null}
 
       {state.status === "success" && state.deals.length > 0 ? (
         <>
           {state.fallback ? (
-            <p role="status">
+            <p
+              className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary"
+              role="status"
+            >
               Showing USD prices because local offers are unavailable.
             </p>
           ) : null}
-          <div className="game-grid">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {state.deals.slice(0, limit).map((deal) => {
               const storeUrl = deal.current?.url ?? deal.url;
               return (
                 <article
-                  className="game-card card-interactive"
+                  className="card-interactive overflow-hidden rounded-2xl border border-border bg-surface"
                   key={deal.id ?? deal.name}
                 >
                   <DealCover deal={deal} />
-                  <div className="stack compact">
-                    <h3>{deal.name}</h3>
-                    {deal.current?.shop ? <p>{deal.current.shop}</p> : null}
+                  <div className="space-y-2 p-4">
+                    <h3 className="font-bold">{deal.name}</h3>
+                    {deal.current?.shop ? (
+                      <p className="text-sm text-muted-foreground">
+                        {deal.current.shop}
+                      </p>
+                    ) : null}
                     {deal.current?.regular ? (
-                      <p>
+                      <p className="text-sm text-muted-foreground">
                         <s>
                           {deal.current.regular.amount}{" "}
                           {deal.current.regular.currency}
                         </s>
                       </p>
                     ) : null}
-                    <p>Current price: {money(deal.current)}</p>
-                    {deal.current?.cut ? <p>-{deal.current.cut}%</p> : null}
+                    <p className="font-semibold text-primary">
+                      Current price: {money(deal.current)}
+                    </p>
+                    {deal.current?.cut ? (
+                      <p className="text-sm font-bold text-primary">
+                        -{deal.current.cut}%
+                      </p>
+                    ) : null}
                     {storeUrl ? (
-                      <a href={storeUrl} target="_blank" rel="noreferrer">
+                      <a
+                        className="inline-flex text-sm font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        href={storeUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         Open store
                       </a>
                     ) : null}
