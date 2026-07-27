@@ -316,6 +316,19 @@ export function ProfilePage() {
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             <div>
+              <SectionHeader title="Library" />
+              {stats?.games?.length ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {stats.games.map((g) => (
+                    <div key={g.id} className="overflow-hidden rounded-lg border border-border bg-surface">
+                      <GameCover className="h-24" from={g.img_icon_url ?? "#155e75"} to="#164e63" title={g.title} />
+                      <p className="p-3 font-bold">{g.title}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : <p>No library games yet.</p>}
+            </div>
+            <div>
               <SectionHeader title="Favorite games" />
               {favorites.length ? (
                 favorites.map((g) => (
