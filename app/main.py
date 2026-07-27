@@ -154,7 +154,7 @@ def user_response(user: User, google_linked: bool | None = None, db: Session | N
     if google_linked is None:
         google_linked = bool(db and db.query(OAuthIdentity).filter(OAuthIdentity.user_id == user.id, OAuthIdentity.provider == "google").first())
     display_name = getattr(user, "display_name", None) or user.email.split("@", 1)[0]
-    return UserRead(id=user.id, email=user.email, display_name=display_name, public_nickname=user.public_nickname, created_at=user.created_at, google_linked=google_linked)
+    return UserRead(id=user.id, email=user.email, display_name=display_name, public_nickname=getattr(user, "public_nickname", None), created_at=user.created_at, google_linked=google_linked)
 
 
 def user_profile_response(user: User, google_linked: bool | None = None, db: Session | None = None) -> UserProfileRead:
