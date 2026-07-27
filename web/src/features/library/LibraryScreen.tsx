@@ -2,7 +2,13 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Button, Panel, StatePanel } from "@/components/ui";
-import { SavedGame, createSavedGame, deleteSavedGame, isAuthenticated, listSavedGames } from "@/lib/api";
+import {
+  SavedGame,
+  createSavedGame,
+  deleteSavedGame,
+  isAuthenticated,
+  listSavedGames,
+} from "@/lib/api";
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -29,7 +35,13 @@ export function LibraryScreen() {
           setInitialLoadError("");
         }
       })
-      .catch((reason) => active && setInitialLoadError(errorMessage(reason, "Could not load your library.")))
+      .catch(
+        (reason) =>
+          active &&
+          setInitialLoadError(
+            errorMessage(reason, "Could not load your library."),
+          ),
+      )
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
@@ -77,7 +89,13 @@ export function LibraryScreen() {
   }
 
   if (!authenticated) {
-    return <StatePanel kind="unauthenticated" title="Sign in to view your library" detail="Your saved games are available after you sign in." />;
+    return (
+      <StatePanel
+        kind="unauthenticated"
+        title="Sign in to view your library"
+        detail="Your saved games are available after you sign in."
+      />
+    );
   }
 
   if (loading) {
@@ -85,7 +103,14 @@ export function LibraryScreen() {
   }
 
   if (initialLoadError) {
-    return <StatePanel kind="error" title="Could not load your library" detail={initialLoadError} action={{ label: "Retry", onClick: retryLoad }} />;
+    return (
+      <StatePanel
+        kind="error"
+        title="Could not load your library"
+        detail={initialLoadError}
+        action={{ label: "Retry", onClick: retryLoad }}
+      />
+    );
   }
 
   return (
@@ -95,18 +120,32 @@ export function LibraryScreen() {
         <h1>Saved games</h1>
         <p>Keep a simple, personal list of the games you want to revisit.</p>
       </header>
-      {error ? <p className="alert error" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="alert error" role="alert">
+          {error}
+        </p>
+      ) : null}
       <Panel>
         <form className="stack" onSubmit={addGame}>
           <label>
             Game title
-            <input name="title" required placeholder="Add a game to your library" />
+            <input
+              name="title"
+              required
+              placeholder="Add a game to your library"
+            />
           </label>
-          <Button type="submit" disabled={creating}>{creating ? "Adding…" : "Add game"}</Button>
+          <Button type="submit" disabled={creating}>
+            {creating ? "Adding…" : "Add game"}
+          </Button>
         </form>
       </Panel>
       {games.length === 0 ? (
-        <StatePanel kind="empty" title="Your library is empty" detail="Add a game above to start your library." />
+        <StatePanel
+          kind="empty"
+          title="Your library is empty"
+          detail="Add a game above to start your library."
+        />
       ) : (
         <div className="stack">
           {games.map((game) => (
@@ -115,7 +154,12 @@ export function LibraryScreen() {
                 <h2>{game.title}</h2>
                 {game.notes ? <p>{game.notes}</p> : null}
               </div>
-              <Button variant="quiet" aria-label={`Remove ${game.title}`} disabled={removingId === game.id} onClick={() => removeGame(game)}>
+              <Button
+                variant="quiet"
+                aria-label={`Remove ${game.title}`}
+                disabled={removingId === game.id}
+                onClick={() => removeGame(game)}
+              >
                 {removingId === game.id ? "Removing…" : "Remove"}
               </Button>
             </Panel>

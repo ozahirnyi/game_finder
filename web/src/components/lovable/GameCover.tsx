@@ -6,7 +6,13 @@ type Props = {
   compact?: boolean;
 };
 
-export function GameCover({ from, to, title, className = "", compact = false }: Props) {
+export function GameCover({
+  from,
+  to,
+  title,
+  className = "",
+  compact = false,
+}: Props) {
   const initials = title
     .split(/\s|:/)
     .filter(Boolean)
@@ -22,9 +28,7 @@ export function GameCover({ from, to, title, className = "", compact = false }: 
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_90%,rgba(255,255,255,0.08),transparent_50%)]" />
       <div className="absolute inset-0 flex flex-col justify-between p-3">
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/50"
-        >
+        <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/50">
           GF · {title.split(" ")[0].slice(0, 4).toUpperCase()}
         </span>
         {compact ? (

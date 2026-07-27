@@ -8,230 +8,230 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as WishlistRouteImport } from './routes/wishlist'
-import { Route as SteamRouteImport } from './routes/steam'
-import { Route as SearchRouteImport } from './routes/search'
-import { Route as PsnRouteImport } from './routes/psn'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as LibraryRouteImport } from './routes/library'
-import { Route as FriendsRouteImport } from './routes/friends'
-import { Route as DealsRouteImport } from './routes/deals'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as WishlistRouteImport } from "./routes/wishlist";
+import { Route as SteamRouteImport } from "./routes/steam";
+import { Route as SearchRouteImport } from "./routes/search";
+import { Route as PsnRouteImport } from "./routes/psn";
+import { Route as ProfileRouteImport } from "./routes/profile";
+import { Route as LibraryRouteImport } from "./routes/library";
+import { Route as FriendsRouteImport } from "./routes/friends";
+import { Route as DealsRouteImport } from "./routes/deals";
+import { Route as IndexRouteImport } from "./routes/index";
+import { Route as GamesGameIdRouteImport } from "./routes/games.$gameId";
 
 const WishlistRoute = WishlistRouteImport.update({
-  id: '/wishlist',
-  path: '/wishlist',
+  id: "/wishlist",
+  path: "/wishlist",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SteamRoute = SteamRouteImport.update({
-  id: '/steam',
-  path: '/steam',
+  id: "/steam",
+  path: "/steam",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SearchRoute = SearchRouteImport.update({
-  id: '/search',
-  path: '/search',
+  id: "/search",
+  path: "/search",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PsnRoute = PsnRouteImport.update({
-  id: '/psn',
-  path: '/psn',
+  id: "/psn",
+  path: "/psn",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
+  id: "/profile",
+  path: "/profile",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const LibraryRoute = LibraryRouteImport.update({
-  id: '/library',
-  path: '/library',
+  id: "/library",
+  path: "/library",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const FriendsRoute = FriendsRouteImport.update({
-  id: '/friends',
-  path: '/friends',
+  id: "/friends",
+  path: "/friends",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const DealsRoute = DealsRouteImport.update({
-  id: '/deals',
-  path: '/deals',
+  id: "/deals",
+  path: "/deals",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
-  id: '/games/$gameId',
-  path: '/games/$gameId',
+  id: "/games/$gameId",
+  path: "/games/$gameId",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/deals': typeof DealsRoute
-  '/friends': typeof FriendsRoute
-  '/library': typeof LibraryRoute
-  '/profile': typeof ProfileRoute
-  '/psn': typeof PsnRoute
-  '/search': typeof SearchRoute
-  '/steam': typeof SteamRoute
-  '/wishlist': typeof WishlistRoute
-  '/games/$gameId': typeof GamesGameIdRoute
+  "/": typeof IndexRoute;
+  "/deals": typeof DealsRoute;
+  "/friends": typeof FriendsRoute;
+  "/library": typeof LibraryRoute;
+  "/profile": typeof ProfileRoute;
+  "/psn": typeof PsnRoute;
+  "/search": typeof SearchRoute;
+  "/steam": typeof SteamRoute;
+  "/wishlist": typeof WishlistRoute;
+  "/games/$gameId": typeof GamesGameIdRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/deals': typeof DealsRoute
-  '/friends': typeof FriendsRoute
-  '/library': typeof LibraryRoute
-  '/profile': typeof ProfileRoute
-  '/psn': typeof PsnRoute
-  '/search': typeof SearchRoute
-  '/steam': typeof SteamRoute
-  '/wishlist': typeof WishlistRoute
-  '/games/$gameId': typeof GamesGameIdRoute
+  "/": typeof IndexRoute;
+  "/deals": typeof DealsRoute;
+  "/friends": typeof FriendsRoute;
+  "/library": typeof LibraryRoute;
+  "/profile": typeof ProfileRoute;
+  "/psn": typeof PsnRoute;
+  "/search": typeof SearchRoute;
+  "/steam": typeof SteamRoute;
+  "/wishlist": typeof WishlistRoute;
+  "/games/$gameId": typeof GamesGameIdRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/deals': typeof DealsRoute
-  '/friends': typeof FriendsRoute
-  '/library': typeof LibraryRoute
-  '/profile': typeof ProfileRoute
-  '/psn': typeof PsnRoute
-  '/search': typeof SearchRoute
-  '/steam': typeof SteamRoute
-  '/wishlist': typeof WishlistRoute
-  '/games/$gameId': typeof GamesGameIdRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/deals": typeof DealsRoute;
+  "/friends": typeof FriendsRoute;
+  "/library": typeof LibraryRoute;
+  "/profile": typeof ProfileRoute;
+  "/psn": typeof PsnRoute;
+  "/search": typeof SearchRoute;
+  "/steam": typeof SteamRoute;
+  "/wishlist": typeof WishlistRoute;
+  "/games/$gameId": typeof GamesGameIdRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
-    | '/'
-    | '/deals'
-    | '/friends'
-    | '/library'
-    | '/profile'
-    | '/psn'
-    | '/search'
-    | '/steam'
-    | '/wishlist'
-    | '/games/$gameId'
-  fileRoutesByTo: FileRoutesByTo
+    | "/"
+    | "/deals"
+    | "/friends"
+    | "/library"
+    | "/profile"
+    | "/psn"
+    | "/search"
+    | "/steam"
+    | "/wishlist"
+    | "/games/$gameId";
+  fileRoutesByTo: FileRoutesByTo;
   to:
-    | '/'
-    | '/deals'
-    | '/friends'
-    | '/library'
-    | '/profile'
-    | '/psn'
-    | '/search'
-    | '/steam'
-    | '/wishlist'
-    | '/games/$gameId'
+    | "/"
+    | "/deals"
+    | "/friends"
+    | "/library"
+    | "/profile"
+    | "/psn"
+    | "/search"
+    | "/steam"
+    | "/wishlist"
+    | "/games/$gameId";
   id:
-    | '__root__'
-    | '/'
-    | '/deals'
-    | '/friends'
-    | '/library'
-    | '/profile'
-    | '/psn'
-    | '/search'
-    | '/steam'
-    | '/wishlist'
-    | '/games/$gameId'
-  fileRoutesById: FileRoutesById
+    | "__root__"
+    | "/"
+    | "/deals"
+    | "/friends"
+    | "/library"
+    | "/profile"
+    | "/psn"
+    | "/search"
+    | "/steam"
+    | "/wishlist"
+    | "/games/$gameId";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  DealsRoute: typeof DealsRoute
-  FriendsRoute: typeof FriendsRoute
-  LibraryRoute: typeof LibraryRoute
-  ProfileRoute: typeof ProfileRoute
-  PsnRoute: typeof PsnRoute
-  SearchRoute: typeof SearchRoute
-  SteamRoute: typeof SteamRoute
-  WishlistRoute: typeof WishlistRoute
-  GamesGameIdRoute: typeof GamesGameIdRoute
+  IndexRoute: typeof IndexRoute;
+  DealsRoute: typeof DealsRoute;
+  FriendsRoute: typeof FriendsRoute;
+  LibraryRoute: typeof LibraryRoute;
+  ProfileRoute: typeof ProfileRoute;
+  PsnRoute: typeof PsnRoute;
+  SearchRoute: typeof SearchRoute;
+  SteamRoute: typeof SteamRoute;
+  WishlistRoute: typeof WishlistRoute;
+  GamesGameIdRoute: typeof GamesGameIdRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/wishlist': {
-      id: '/wishlist'
-      path: '/wishlist'
-      fullPath: '/wishlist'
-      preLoaderRoute: typeof WishlistRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/steam': {
-      id: '/steam'
-      path: '/steam'
-      fullPath: '/steam'
-      preLoaderRoute: typeof SteamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/search': {
-      id: '/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof SearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/psn': {
-      id: '/psn'
-      path: '/psn'
-      fullPath: '/psn'
-      preLoaderRoute: typeof PsnRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/library': {
-      id: '/library'
-      path: '/library'
-      fullPath: '/library'
-      preLoaderRoute: typeof LibraryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/friends': {
-      id: '/friends'
-      path: '/friends'
-      fullPath: '/friends'
-      preLoaderRoute: typeof FriendsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/deals': {
-      id: '/deals'
-      path: '/deals'
-      fullPath: '/deals'
-      preLoaderRoute: typeof DealsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/games/$gameId': {
-      id: '/games/$gameId'
-      path: '/games/$gameId'
-      fullPath: '/games/$gameId'
-      preLoaderRoute: typeof GamesGameIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+    "/wishlist": {
+      id: "/wishlist";
+      path: "/wishlist";
+      fullPath: "/wishlist";
+      preLoaderRoute: typeof WishlistRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/steam": {
+      id: "/steam";
+      path: "/steam";
+      fullPath: "/steam";
+      preLoaderRoute: typeof SteamRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/search": {
+      id: "/search";
+      path: "/search";
+      fullPath: "/search";
+      preLoaderRoute: typeof SearchRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/psn": {
+      id: "/psn";
+      path: "/psn";
+      fullPath: "/psn";
+      preLoaderRoute: typeof PsnRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/profile": {
+      id: "/profile";
+      path: "/profile";
+      fullPath: "/profile";
+      preLoaderRoute: typeof ProfileRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/library": {
+      id: "/library";
+      path: "/library";
+      fullPath: "/library";
+      preLoaderRoute: typeof LibraryRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/friends": {
+      id: "/friends";
+      path: "/friends";
+      fullPath: "/friends";
+      preLoaderRoute: typeof FriendsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/deals": {
+      id: "/deals";
+      path: "/deals";
+      fullPath: "/deals";
+      preLoaderRoute: typeof DealsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/games/$gameId": {
+      id: "/games/$gameId";
+      path: "/games/$gameId";
+      fullPath: "/games/$gameId";
+      preLoaderRoute: typeof GamesGameIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -246,17 +246,17 @@ const rootRouteChildren: RootRouteChildren = {
   SteamRoute: SteamRoute,
   WishlistRoute: WishlistRoute,
   GamesGameIdRoute: GamesGameIdRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
 
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
+import type { getRouter } from "./router.tsx";
+import type { startInstance } from "./start.ts";
+declare module "@tanstack/react-start" {
   interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+    ssr: true;
+    router: Awaited<ReturnType<typeof getRouter>>;
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>;
   }
 }

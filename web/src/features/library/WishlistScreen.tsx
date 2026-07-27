@@ -27,13 +27,25 @@ export function WishlistScreen() {
   }, [authenticated]);
 
   if (!authenticated) {
-    return <StatePanel kind="unauthenticated" title="Wishlist" detail="Sign in to view your wishlist." />;
+    return (
+      <StatePanel
+        kind="unauthenticated"
+        title="Wishlist"
+        detail="Sign in to view your wishlist."
+      />
+    );
   }
   if (loading) {
     return <StatePanel kind="loading" title="Loading your wishlist" />;
   }
   if (error) {
-    return <StatePanel kind="error" title="Could not load your wishlist" detail={error} />;
+    return (
+      <StatePanel
+        kind="error"
+        title="Could not load your wishlist"
+        detail={error}
+      />
+    );
   }
 
   return (
@@ -41,16 +53,25 @@ export function WishlistScreen() {
       <header className="section-header">
         <p className="eyebrow">Wishlist</p>
         <h1>Games you want to play</h1>
-        <p>Until a dedicated wishlist API exists, this shows saved games marked with a “wishlist” keyword in their notes.</p>
+        <p>
+          Until a dedicated wishlist API exists, this shows saved games marked
+          with a “wishlist” keyword in their notes.
+        </p>
       </header>
       {games.length === 0 ? (
-        <StatePanel kind="empty" title="No wishlist games yet" detail="Add the word “wishlist” to a saved game’s notes to include it here." />
-      ) : games.map((game) => (
-        <Panel as="article" key={game.id}>
-          <h2>{game.title}</h2>
-          {game.notes ? <p>{game.notes}</p> : null}
-        </Panel>
-      ))}
+        <StatePanel
+          kind="empty"
+          title="No wishlist games yet"
+          detail="Add the word “wishlist” to a saved game’s notes to include it here."
+        />
+      ) : (
+        games.map((game) => (
+          <Panel as="article" key={game.id}>
+            <h2>{game.title}</h2>
+            {game.notes ? <p>{game.notes}</p> : null}
+          </Panel>
+        ))
+      )}
     </main>
   );
 }

@@ -22,5 +22,8 @@ function jsonResponse(body: unknown, status = 200) {
 export const apiMocks = {
   success: (body: unknown, status = 200) => jsonResponse(body, status),
   failure: (detail: string, status = 400) => jsonResponse({ detail }, status),
-  fetch: (...responses: Response[]) => vi.fn().mockImplementation(async () => responses.shift() ?? jsonResponse({})),
+  fetch: (...responses: Response[]) =>
+    vi
+      .fn()
+      .mockImplementation(async () => responses.shift() ?? jsonResponse({})),
 };

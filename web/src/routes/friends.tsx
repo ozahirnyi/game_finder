@@ -9,7 +9,11 @@ export const Route = createFileRoute("/friends")({
   head: () => ({
     meta: [
       { title: "Friends — GameFinder" },
-      { name: "description", content: "Your gaming circle: shared libraries, LFG opportunities, compatibility, and quick invites." },
+      {
+        name: "description",
+        content:
+          "Your gaming circle: shared libraries, LFG opportunities, compatibility, and quick invites.",
+      },
     ],
   }),
   component: FriendsPage,
@@ -18,7 +22,9 @@ export const Route = createFileRoute("/friends")({
 function FriendsPage() {
   const focus = friends[0];
   const sharedGames = games.filter((g) =>
-    ["helldivers2", "bg3", "drg", "hades2", "eldenring", "stardew"].includes(g.id),
+    ["helldivers2", "bg3", "drg", "hades2", "eldenring", "stardew"].includes(
+      g.id,
+    ),
   );
 
   return (
@@ -178,7 +184,8 @@ function FriendsPage() {
               </div>
             </div>
             <p className="mb-4 text-sm text-muted-foreground">
-              Both play roguelikes and long-run RPGs. High overlap on co-op titles.
+              Both play roguelikes and long-run RPGs. High overlap on co-op
+              titles.
             </p>
             <div className="flex gap-2">
               <button className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">
@@ -205,8 +212,8 @@ function FriendsPage() {
                     />
                     <p className="text-muted-foreground">
                       <span className="text-primary">{f.name}</span> {a.verb}{" "}
-                      <span className="text-foreground">{a.target}</span> {a.tag}
-                      .{" "}
+                      <span className="text-foreground">{a.target}</span>{" "}
+                      {a.tag}.{" "}
                       <span className="text-muted-foreground/60">{a.time}</span>
                     </p>
                   </div>
