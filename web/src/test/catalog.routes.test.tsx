@@ -257,9 +257,10 @@ describe("catalog routes", () => {
   it("renders real catalog metadata and price-low values without placeholder copy", async () => {
     renderPage(<GameDetailPage gameId="274755" />);
 
-    expect(
-      await screen.findByText("Fight beyond the Underworld."),
-    ).toBeVisible();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /show description/i }),
+    );
+    expect(screen.getByText("Fight beyond the Underworld.")).toBeVisible();
     expect(await screen.findByText("All-time low")).toBeVisible();
     expect(screen.getAllByText(/\$19\.99/).length).toBeGreaterThan(0);
     expect(screen.getByText(/\$12\.49/)).toBeVisible();
@@ -288,22 +289,16 @@ describe("catalog routes", () => {
     renderPage(
       <GameDetailPage gameId="11111111-1111-4111-8111-111111111111" />,
     );
-    expect(
-      await screen.findByText("Fight beyond the Underworld."),
-    ).toBeVisible();
-    expect(screen.getByTestId("game-description")).toHaveClass(
-      "block",
-      "line-clamp-3",
-    );
+    await screen.findByRole("button", { name: /show description/i });
+    expect(screen.queryByTestId("game-description")).not.toBeInTheDocument();
     expect(api.searchGames).toHaveBeenCalledWith("Hades II");
     fireEvent.click(
-      screen.getByRole("button", { name: /show full description/i }),
+      screen.getByRole("button", { name: /show description/i }),
     );
     expect(
-      screen.getByRole("button", { name: /collapse description/i }),
+      screen.getByRole("button", { name: /hide description/i }),
     ).toBeVisible();
-    expect(screen.getByTestId("game-description")).toHaveClass("block");
-    expect(screen.getByTestId("game-description")).not.toHaveClass("line-clamp-3");
+    expect(screen.getByTestId("game-description")).toHaveTextContent("Fight beyond the Underworld.");
   });
 
   it("hides catalog actions for guests", () => {
