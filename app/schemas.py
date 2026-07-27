@@ -332,6 +332,7 @@ class SteamFriendGameRead(BaseModel):
 
 class SteamFriendRead(BaseModel):
     steam_id: str
+    public_id: str | None = None
     persona_name: str | None = None
     avatar: str | None = None
     friend_since: int | None = None

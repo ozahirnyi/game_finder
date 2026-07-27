@@ -2295,6 +2295,7 @@ def build_steam_social_response(
 @app.get("/steam/social", response_model=SteamSocialRead)
 async def get_steam_social(
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
     friends_limit: int = 12,
     friends_offset: int = 0,
 ):
@@ -2314,6 +2315,14 @@ async def get_steam_social(
         limit=friends_limit,
         offset=friends_offset,
     )
+    try:
+        public_ids = {
+            user.steam_id: user.public_id
+            for user in db.query(User).filter(User.steam_id.in_([friend["steam_id"] for friend in friends])).all()
+        } if friends else {}
+    except Exception:
+        public_ids = {}
+    friends = [{**friend, "public_id": public_ids.get(friend["steam_id"])} for friend in friends]
 
     async def load_friend_library(friend):
         try:
