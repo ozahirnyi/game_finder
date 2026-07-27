@@ -5,6 +5,7 @@ import { useAuthState } from "@/hooks/useAuthState";
 import { getSteamAccount, type SteamAccount } from "@/lib/api";
 import { GuestHome } from "./GuestHome";
 import { SteamConnectPrompt } from "./SteamConnectPrompt";
+import { PersonalDashboard } from "./PersonalDashboard";
 
 type AccountState =
   | { status: "loading" }
@@ -33,10 +34,5 @@ export function HomeScreen() {
   }
   if (!state.account.linked) return <SteamConnectPrompt />;
 
-  return (
-    <section className="stack page-enter">
-      <p className="eyebrow">Your Steam dashboard</p>
-      <h1>Welcome back, {state.account.persona_name ?? "Steam player"}</h1>
-    </section>
-  );
+  return <PersonalDashboard steamAccount={state.account} />;
 }
