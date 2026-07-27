@@ -25,7 +25,10 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-  createFileRoute: () => (options: unknown) => options,
+  createFileRoute: () => (options: object) => ({
+    ...options,
+    useSearch: () => ({ q: "" }),
+  }),
   Link: ({
     children,
     to,
