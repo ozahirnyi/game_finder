@@ -106,6 +106,25 @@ describe("PublicProfileScreen", () => {
     expect(await screen.findByText("Request sent")).toBeVisible();
   });
 
+  it("links friend invitees to nickname setup when required", async () => {
+    api.getSocialProfile.mockResolvedValue({ ...player, relationship: "none" });
+    api.createFriendRequest.mockRejectedValue(
+      new Error("Set a public nickname before sending friend requests"),
+    );
+
+    render(<PublicProfileScreen publicId={player.public_id} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add friend" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Set a public nickname before sending friend requests",
+    );
+    expect(screen.getByRole("link", { name: "Choose nickname" })).toHaveAttribute(
+      "href",
+      "/friends",
+    );
+  });
+
   it("can immediately cancel a newly-created request by its returned id", async () => {
     api.getSocialProfile.mockResolvedValue({ ...player, relationship: "none" });
     api.createFriendRequest.mockResolvedValue({
