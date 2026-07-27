@@ -27,7 +27,7 @@ from app.integrations.rawg import (
 )
 from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
-from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates
+from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_price
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
@@ -2462,7 +2462,12 @@ async def game_price_history(rawg_id: int, country: str = "US"):
     async def fetch_price():
         return await fetch_game_price_history(title, country=normalized_country)
 
-    return await get_json_cached(price_key, CACHE_TTL, fetch_price)
+    try:
+        return await get_json_cached(price_key, CACHE_TTL, fetch_price)
+    except HTTPException as exc:
+        if exc.status_code not in {502, 503}:
+            raise
+        return await fetch_steam_store_game_price(title, country=normalized_country)
 
 
 @app.get("/prices/deals", response_model=HomeDealResponse)

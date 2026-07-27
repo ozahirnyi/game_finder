@@ -15,6 +15,7 @@ import {
   clearToken,
   getGoogleLinkUrl,
   getProfileSummary,
+  isAuthenticated,
   updateProfile,
 } from "@/lib/api";
 import { lovableQueryKeys } from "@/lib/lovable-data";
@@ -53,9 +54,11 @@ const VISIBILITY_OPTIONS = [
 export function ProfilePage() {
   const client = useQueryClient();
   const navigate = useNavigate();
+  const authenticated = isAuthenticated();
   const query = useQuery({
     queryKey: lovableQueryKeys.profileSummary,
     queryFn: getProfileSummary,
+    enabled: authenticated,
   });
   const s = query.data;
   const user = s?.account.data?.user;
@@ -92,6 +95,22 @@ export function ProfilePage() {
     client.clear();
     navigate({ to: "/" });
   };
+  if (!authenticated)
+    return (
+      <AppShell>
+        <SectionHeader title="Profile" hint="Create an account or sign in to view your profile." />
+        <div className="flex gap-3">
+          <Link to="/login">Sign in</Link>
+          <Link to="/register">Create account</Link>
+        </div>
+      </AppShell>
+    );
+  if (query.isFetching || !query.isFetchedAfterMount)
+    return (
+      <AppShell>
+        <SectionHeader title="Profile" hint="Checking your session…" />
+      </AppShell>
+    );
   if (query.isError && (query.error as { status?: number }).status === 401)
     return (
       <AppShell>
