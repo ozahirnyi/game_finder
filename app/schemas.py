@@ -94,6 +94,39 @@ class DataBlock(BaseModel):
     message: str | None = None
 
 
+class PublicDataBlock(BaseModel):
+    status: Literal["ready", "empty", "hidden"]
+    data: Any = None
+    message: str | None = None
+
+
+class PublicLibraryGameRead(BaseModel):
+    id: uuid.UUID
+    title: str
+    source: str
+    cover_url: str | None = None
+    playtime_forever: int | None = None
+    detail_game_id: str | None = None
+
+
+class PublicSteamAccountRead(BaseModel):
+    linked: bool
+    persona_name: str | None = None
+    avatar: str | None = None
+    profile_url: str | None = None
+
+
+class PublicProfileRead(BaseModel):
+    public_id: str
+    nickname: str
+    avatar: str | None = None
+    relationship: str
+    library: PublicDataBlock
+    favorites: PublicDataBlock
+    wishlist: PublicDataBlock
+    steam: PublicDataBlock
+
+
 class DashboardRead(BaseModel):
     user: DataBlock
     library: DataBlock
