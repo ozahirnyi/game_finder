@@ -86,6 +86,18 @@ describe("AppShell", () => {
     expect(screen.queryByRole("link", { name: "PSN" })).not.toBeInTheDocument();
   });
 
+  it("gives navigation links hover and keyboard-focus feedback", () => {
+    render(
+      <AppShell>
+        <main>Home</main>
+      </AppShell>,
+    );
+
+    const libraryLink = screen.getAllByRole("link", { name: "Library" })[0];
+    expect(libraryLink.className).toContain("hover:");
+    expect(libraryLink.className).toContain("focus-visible:");
+  });
+
   it("updates the sidebar after an auth change", () => {
     const { rerender } = render(
       <AppShell>

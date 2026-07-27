@@ -172,6 +172,14 @@ describe("catalog routes", () => {
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
   });
 
+  it("gives deal actions hover and keyboard-focus feedback", async () => {
+    renderPage(<DealsPage />);
+
+    const action = (await screen.findAllByRole("link", { name: /open deal/i }))[0];
+    expect(action.className).toContain("hover:");
+    expect(action.className).toContain("focus-visible:");
+  });
+
   it("shows popular Steam discounts and honest genre sections", async () => {
     renderPage(<DealsPage />);
 

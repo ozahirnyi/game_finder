@@ -72,7 +72,7 @@ function NotificationMenu({
       <button
         aria-label={mobile ? "Mobile notifications" : "Notifications"}
         onClick={() => setOpen((value) => !value)}
-        className="relative grid size-9 place-items-center rounded-md border border-border"
+        className="relative grid size-9 place-items-center rounded-md border border-border transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       >
         <Bell className="size-4" />
         {authenticated && unread > 0 ? (
@@ -151,7 +151,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   active
                     ? "bg-white/5 text-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -227,7 +227,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               key={item.to}
               to={item.to}
-              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-2 py-1.5 ${
+              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}
             >
