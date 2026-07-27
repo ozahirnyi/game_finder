@@ -3,6 +3,7 @@ export type UserRead = {
   email: string;
   created_at: string;
   google_linked: boolean;
+  public_nickname?: string | null;
 };
 
 export type GoogleStatus = { configured: boolean };

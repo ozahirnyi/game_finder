@@ -153,7 +153,7 @@ export function ProfilePage() {
           />
           <div className="flex-1">
             <h1 className="text-3xl font-extrabold">
-              {user?.email ?? "Your profile"}
+              {user?.public_nickname ?? user?.display_name ?? user?.email ?? "Your profile"}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {profile?.bio ||
