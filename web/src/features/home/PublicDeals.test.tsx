@@ -34,6 +34,10 @@ describe("PublicDeals", () => {
     expect(
       await screen.findByRole("heading", { name: "Hades II" }),
     ).toBeVisible();
+    expect(screen.getByTestId("public-deals")).toHaveClass("max-w-6xl");
+    expect(
+      screen.getByRole("heading", { name: "Hades II" }).closest("article"),
+    ).toHaveClass("bg-surface");
     expect(screen.getByLabelText("Hades II cover unavailable")).toBeVisible();
     expect(getHomepageDeals).toHaveBeenCalledWith("UA", 3);
   });
