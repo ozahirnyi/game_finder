@@ -28,6 +28,13 @@ const nav = [
   { to: "/deals", label: "Deals", icon: Tag },
   { to: "/friends", label: "Friends", icon: Users },
 ] as const;
+const mobileNav = [
+  { to: "/", label: "Home", icon: Home },
+  { to: "/library", label: "Library", icon: Library },
+  { to: "/deals", label: "Deals", icon: Tag },
+  { to: "/friends", label: "Friends", icon: Users },
+  { to: "/profile", label: "Profile", icon: User },
+] as const;
 
 function notificationText(notification: Notification) {
   if (notification.type === "friend_request")
@@ -219,7 +226,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-surface/90 px-2 py-2 backdrop-blur lg:hidden">
-        {nav.slice(0, 5).map((item) => {
+        {mobileNav.map((item) => {
           const active =
             item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
           const Icon = item.icon;

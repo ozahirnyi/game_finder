@@ -243,7 +243,7 @@ describe("catalog routes", () => {
     renderPage(<DealsPage />);
 
     expect(await screen.findByText("Popular on Steam")).toBeVisible();
-    expect(screen.getAllByAltText("Hades II")[0].parentElement).toHaveClass("size-20");
+    expect(screen.getAllByAltText("Hades II")[0].parentElement).toHaveClass("aspect-video");
     expect(screen.getAllByRole("link", { name: /open deal/i })[0]).toHaveAttribute(
       "href",
       "https://store.steampowered.com/app/1145350",
