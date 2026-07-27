@@ -91,6 +91,8 @@ describe("homepage branches", () => {
   it("marks homepage regions for shared entry and card motion", () => {
     render(<GuestHome />);
     expect(screen.getByTestId("guest-home")).toHaveClass("page-enter");
+    expect(screen.getByTestId("guest-home")).toHaveClass("max-w-6xl");
+    expect(screen.getByRole("searchbox")).toHaveClass("bg-surface");
     expect(screen.getByTestId("public-deals")).toHaveClass("stagger-enter");
   });
 });
