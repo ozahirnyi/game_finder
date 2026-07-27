@@ -17,7 +17,9 @@ export function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [oauthProvider, setOauthProvider] = useState<"google" | "steam" | null>(null);
+  const [oauthProvider, setOauthProvider] = useState<"google" | "steam" | null>(
+    null,
+  );
   const [error, setError] = useState("");
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -50,7 +52,11 @@ export function RegisterPage() {
         : getSteamSignInUrl());
       window.location.assign(url);
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Could not start sign-in. Please try again.");
+      setError(
+        reason instanceof ApiError
+          ? reason.message
+          : "Could not start sign-in. Please try again.",
+      );
       setOauthProvider(null);
     }
   }
@@ -119,11 +125,25 @@ export function RegisterPage() {
             Or continue with
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={() => beginOAuth("google")} disabled={Boolean(oauthProvider)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-60">
-              {oauthProvider === "google" ? "Opening Google…" : "Continue with Google"}
+            <button
+              type="button"
+              onClick={() => beginOAuth("google")}
+              disabled={Boolean(oauthProvider)}
+              className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-60"
+            >
+              {oauthProvider === "google"
+                ? "Opening Google…"
+                : "Continue with Google"}
             </button>
-            <button type="button" onClick={() => beginOAuth("steam")} disabled={Boolean(oauthProvider)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-60">
-              {oauthProvider === "steam" ? "Opening Steam…" : "Continue with Steam"}
+            <button
+              type="button"
+              onClick={() => beginOAuth("steam")}
+              disabled={Boolean(oauthProvider)}
+              className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-60"
+            >
+              {oauthProvider === "steam"
+                ? "Opening Steam…"
+                : "Continue with Steam"}
             </button>
           </div>
         </div>

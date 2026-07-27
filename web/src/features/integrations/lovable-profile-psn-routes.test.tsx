@@ -218,7 +218,6 @@ describe.skip("Lovable profile and PSN routes", () => {
     expect(screen.queryByText("alex_v_ps")).not.toBeInTheDocument();
     expect(screen.queryByText("Marcus V.")).not.toBeInTheDocument();
   });
-
 });
 
 describe("PsnLibraryPanel", () => {
@@ -228,9 +227,11 @@ describe("PsnLibraryPanel", () => {
     });
     render(
       <QueryClientProvider
-        client={new QueryClient({
-          defaultOptions: { queries: { retry: false } },
-        })}
+        client={
+          new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+          })
+        }
       >
         <PsnLibraryPanel />
       </QueryClientProvider>,

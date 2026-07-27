@@ -354,7 +354,9 @@ export function GameDetailPage({ gameId }: { gameId: string }) {
                   onClick={() => setExpandedDescription((value) => !value)}
                   className="text-xs font-bold text-primary"
                 >
-                  {expandedDescription ? "Hide description" : "Show description"}
+                  {expandedDescription
+                    ? "Hide description"
+                    : "Show description"}
                 </button>
                 {expandedDescription ? (
                   <div

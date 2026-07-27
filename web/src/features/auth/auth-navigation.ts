@@ -59,10 +59,7 @@ export function rememberMessageDraft(friendId: string, draft: string) {
 }
 
 export function consumeMessageDraft(friendId: string, draftKey?: string) {
-  if (
-    typeof window === "undefined" ||
-    draftKey !== MESSAGE_DRAFT_RESUME_KEY
-  ) {
+  if (typeof window === "undefined" || draftKey !== MESSAGE_DRAFT_RESUME_KEY) {
     return "";
   }
   const storageKey = messageDraftStorageKey(friendId);

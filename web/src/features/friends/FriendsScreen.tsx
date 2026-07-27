@@ -951,8 +951,22 @@ function SteamFriendCard({ friend }: { friend: SteamFriend }) {
           {friend.taste_match_percent}% taste match
         </p>
       ) : null}
-      {friend.public_id ? <a className="mt-3 inline-flex text-sm font-bold text-primary" href={`/users/${encodeURIComponent(friend.public_id)}`}>View profile</a> : (
-        <a className="mt-3 inline-flex text-sm font-bold text-primary" href={`https://steamcommunity.com/profiles/${encodeURIComponent(friend.steam_id)}`} rel="noreferrer" target="_blank">View Steam profile</a>
+      {friend.public_id ? (
+        <a
+          className="mt-3 inline-flex text-sm font-bold text-primary"
+          href={`/users/${encodeURIComponent(friend.public_id)}`}
+        >
+          View profile
+        </a>
+      ) : (
+        <a
+          className="mt-3 inline-flex text-sm font-bold text-primary"
+          href={`https://steamcommunity.com/profiles/${encodeURIComponent(friend.steam_id)}`}
+          rel="noreferrer"
+          target="_blank"
+        >
+          View Steam profile
+        </a>
       )}
     </article>
   );
