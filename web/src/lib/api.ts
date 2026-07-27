@@ -186,7 +186,8 @@ export type TelegramLink = {
   message: string | null;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://game-finder.up.railway.app";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://game-finder.up.railway.app";
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
 
@@ -224,7 +225,12 @@ function isTokenExpired(token: string) {
 
   try {
     const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const json = window.atob(normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, "="));
+    const json = window.atob(
+      normalizedPayload.padEnd(
+        Math.ceil(normalizedPayload.length / 4) * 4,
+        "=",
+      ),
+    );
     const data = JSON.parse(json) as { exp?: unknown };
     return typeof data.exp === "number" && data.exp * 1000 <= Date.now();
   } catch {
@@ -270,7 +276,10 @@ export function getAuthSnapshot() {
   return isAuthenticated();
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const headers = new Headers();
 
   if (options.body !== undefined) {
@@ -287,7 +296,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const response = await fetch(`${API_URL}${path}`, {
     method: options.method ?? "GET",
     headers,
-    body: options.formBody ?? (options.body !== undefined ? JSON.stringify(options.body) : undefined),
+    body:
+      options.formBody ??
+      (options.body !== undefined ? JSON.stringify(options.body) : undefined),
   });
 
   if (response.status === 204) {
@@ -295,13 +306,15 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json") ? await response.json() : null;
+  const payload = contentType.includes("application/json")
+    ? await response.json()
+    : null;
 
   if (!response.ok) {
     const detail = payload?.detail;
     let message = Array.isArray(detail)
       ? detail.map((item) => item.msg ?? JSON.stringify(item)).join(", ")
-      : detail ?? `Request failed with status ${response.status}`;
+      : (detail ?? `Request failed with status ${response.status}`);
     if (options.auth && response.status === 401) {
       removeStoredToken();
       message = "Your session expired. Please log in again.";
@@ -342,11 +355,17 @@ export function getGoogleLoginUrl() {
 }
 
 export function getGoogleLinkUrl() {
-  return request<OAuthLoginUrl>("/auth/google/link-url", { method: "POST", auth: true });
+  return request<OAuthLoginUrl>("/auth/google/link-url", {
+    method: "POST",
+    auth: true,
+  });
 }
 
 export function exchangeGoogleCode(exchangeCode: string) {
-  return request<TokenResponse>("/auth/google/exchange", { method: "POST", body: { exchange_code: exchangeCode } });
+  return request<TokenResponse>("/auth/google/exchange", {
+    method: "POST",
+    body: { exchange_code: exchangeCode },
+  });
 }
 
 export function getSteamSignInUrl() {
@@ -354,19 +373,28 @@ export function getSteamSignInUrl() {
 }
 
 export function exchangeSteamCode(exchangeCode: string) {
-  return request<TokenResponse>("/auth/steam/exchange", { method: "POST", body: { exchange_code: exchangeCode } });
+  return request<TokenResponse>("/auth/steam/exchange", {
+    method: "POST",
+    body: { exchange_code: exchangeCode },
+  });
 }
 
 export function searchGames(query: string) {
-  return request<SearchResponse>(`/search/games?q=${encodeURIComponent(query)}`);
+  return request<SearchResponse>(
+    `/search/games?q=${encodeURIComponent(query)}`,
+  );
 }
 
 export function getUpcomingGames(pageSize = 8) {
-  return request<SearchResponse>(`/catalog/upcoming-games?page_size=${encodeURIComponent(pageSize)}`);
+  return request<SearchResponse>(
+    `/catalog/upcoming-games?page_size=${encodeURIComponent(pageSize)}`,
+  );
 }
 
 export function getTrendingGames(pageSize = 8) {
-  return request<SearchResponse>(`/catalog/trending-games?page_size=${encodeURIComponent(pageSize)}`);
+  return request<SearchResponse>(
+    `/catalog/trending-games?page_size=${encodeURIComponent(pageSize)}`,
+  );
 }
 
 export function getRecommendations(prompt: string) {
@@ -381,12 +409,14 @@ export function getCatalogGame(id: string) {
 }
 
 export function getGamePriceHistory(id: string, country = "US") {
-  return request<GamePriceHistory>(`/prices/games/${encodeURIComponent(id)}?country=${encodeURIComponent(country)}`);
+  return request<GamePriceHistory>(
+    `/prices/games/${encodeURIComponent(id)}?country=${encodeURIComponent(country)}`,
+  );
 }
 
 export function getHomepageDeals(country = "US", pageSize = 6) {
   return request<HomeDealResponse>(
-    `/prices/deals?country=${encodeURIComponent(country)}&page_size=${encodeURIComponent(pageSize)}`
+    `/prices/deals?country=${encodeURIComponent(country)}&page_size=${encodeURIComponent(pageSize)}`,
   );
 }
 
@@ -459,11 +489,17 @@ export function getSteamLibrary() {
 }
 
 export function syncSteamLibrary() {
-  return request<SteamLibrarySync>("/steam/library/sync", { method: "POST", auth: true });
+  return request<SteamLibrarySync>("/steam/library/sync", {
+    method: "POST",
+    auth: true,
+  });
 }
 
 export function getSteamSocial(friendsLimit = 12) {
-  return request<SteamSocial>(`/steam/social?friends_limit=${encodeURIComponent(friendsLimit)}`, { auth: true });
+  return request<SteamSocial>(
+    `/steam/social?friends_limit=${encodeURIComponent(friendsLimit)}`,
+    { auth: true },
+  );
 }
 
 export function getSteamRecommendations(prompt?: string) {

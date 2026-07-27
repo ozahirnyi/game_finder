@@ -1,7 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { Check, RefreshCw, Shield, Lock, Users, Trophy, Award } from "lucide-react";
+import {
+  Check,
+  RefreshCw,
+  Shield,
+  Lock,
+  Users,
+  Trophy,
+  Award,
+} from "lucide-react";
 
 export const Route = createFileRoute("/psn")({
   head: () => ({
@@ -52,8 +60,9 @@ function PsnPage() {
               128 PS5 games · 47 platinums
             </h3>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              We match your PSN library with friends' PS accounts, surface Play Together
-              opportunities, and cross-reference PS Plus catalog with your wishlist.
+              We match your PSN library with friends' PS accounts, surface Play
+              Together opportunities, and cross-reference PS Plus catalog with
+              your wishlist.
             </p>
             <div className="mt-8 grid grid-cols-3 gap-6 border-t border-border pt-6 font-mono">
               {[
@@ -92,19 +101,32 @@ function PsnPage() {
           <h4 className="mb-2 font-bold">What we read</h4>
           <ul className="space-y-3 text-sm text-muted-foreground">
             <li className="flex gap-2">
-              <Check className="mt-0.5 size-4 shrink-0" style={{ color: "#4aa3ff" }} />
+              <Check
+                className="mt-0.5 size-4 shrink-0"
+                style={{ color: "#4aa3ff" }}
+              />
               Owned games, trophy list, and playtime (read-only).
             </li>
             <li className="flex gap-2">
-              <Check className="mt-0.5 size-4 shrink-0" style={{ color: "#4aa3ff" }} />
+              <Check
+                className="mt-0.5 size-4 shrink-0"
+                style={{ color: "#4aa3ff" }}
+              />
               Online presence and friends list for LFG matching.
             </li>
             <li className="flex gap-2">
-              <Check className="mt-0.5 size-4 shrink-0" style={{ color: "#4aa3ff" }} />
-              PS Plus tier so we surface catalog freebies you already have access to.
+              <Check
+                className="mt-0.5 size-4 shrink-0"
+                style={{ color: "#4aa3ff" }}
+              />
+              PS Plus tier so we surface catalog freebies you already have
+              access to.
             </li>
             <li className="flex gap-2">
-              <Lock className="mt-0.5 size-4 shrink-0" style={{ color: "#4aa3ff" }} />
+              <Lock
+                className="mt-0.5 size-4 shrink-0"
+                style={{ color: "#4aa3ff" }}
+              />
               We never send party invites or messages on your behalf.
             </li>
           </ul>
@@ -117,7 +139,10 @@ function PsnPage() {
           <div className="space-y-2 font-mono text-xs">
             {[
               { t: "12m ago", m: "Sync complete · 128 titles · +1 trophy" },
-              { t: "1h ago", m: "Earned trophy: Path of the Furies (Helldivers 2)" },
+              {
+                t: "1h ago",
+                m: "Earned trophy: Path of the Furies (Helldivers 2)",
+              },
               { t: "3h ago", m: "Party with Marcus, Alex (2h 14m)" },
               { t: "Yesterday", m: "PS Plus Essential renewed" },
             ].map((r) => (
@@ -133,7 +158,10 @@ function PsnPage() {
         </div>
 
         <div>
-          <SectionHeader title="Cross-play matches" hint="Friends on PS5 that share PC titles with you." />
+          <SectionHeader
+            title="Cross-play matches"
+            hint="Friends on PS5 that share PC titles with you."
+          />
           <div className="space-y-2">
             {[
               { name: "Marcus V.", g: "Helldivers 2", cross: "PC ↔ PS5" },

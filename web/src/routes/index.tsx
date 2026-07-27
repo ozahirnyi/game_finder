@@ -6,12 +6,20 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "GameFinder — Find games and deals" },
-      { name: "description", content: "Search games, discover live deals, and personalize your library with Steam." },
+      {
+        name: "description",
+        content:
+          "Search games, discover live deals, and personalize your library with Steam.",
+      },
     ],
   }),
   component: HomePage,
 });
 
 function HomePage() {
-  return <AppShell><HomeScreen /></AppShell>;
+  return (
+    <AppShell>
+      <HomeScreen />
+    </AppShell>
+  );
 }

@@ -5,12 +5,15 @@ import { Chip, SectionHeader } from "@/components/ui-bits";
 import { games } from "@/lib/mockData";
 import { Search, SlidersHorizontal, Plus, Heart, Users } from "lucide-react";
 
-
 export const Route = createFileRoute("/search")({
   head: () => ({
     meta: [
       { title: "Search — GameFinder" },
-      { name: "description", content: "Search games by title, genre, platform, mood, and active deals." },
+      {
+        name: "description",
+        content:
+          "Search games by title, genre, platform, mood, and active deals.",
+      },
     ],
   }),
   component: SearchPage,
@@ -145,7 +148,6 @@ function SearchPage() {
             </Link>
           </article>
         ))}
-
       </div>
     </AppShell>
   );
