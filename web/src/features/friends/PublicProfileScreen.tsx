@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type {
   SocialMe,
-  SocialProfile,
+  PublicProfile,
   SocialRelationship,
   SocialRequest,
 } from "@/lib/api";
@@ -11,7 +11,7 @@ import {
   createFriendRequest,
   declineFriendRequest,
   getSocialMe,
-  getSocialProfile,
+  getPublicProfile,
 } from "@/lib/api";
 import { useAuthState } from "@/hooks/useAuthState";
 
@@ -42,17 +42,16 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
   const authenticated = useAuthState();
   const activePublicId = useRef(publicId);
   activePublicId.current = publicId;
-  const [profile, setProfile] = useState<SocialProfile | null>(null);
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [social, setSocial] = useState<SocialMe | null>(null);
   const [outgoingRequest, setOutgoingRequest] = useState<SocialRequest | null>(
     null,
   );
-  const [loading, setLoading] = useState(authenticated);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!authenticated) return;
     let active = true;
     setProfile(null);
     setSocial(null);
@@ -61,15 +60,15 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
     setBusy(false);
     setError("");
 
-    getSocialProfile(publicId)
+    getPublicProfile(publicId)
       .then(async (profileData) => {
         if (!active) return;
         setProfile(profileData);
-        if (
+        if (authenticated && (
           profileData.relationship === "incoming_pending" ||
           profileData.relationship === "outgoing_pending" ||
           profileData.relationship === "friends"
-        ) {
+        )) {
           const socialData = await getSocialMe();
           if (active) {
             setSocial(socialData);
@@ -286,23 +285,6 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
     );
   }
 
-  if (!authenticated) {
-    return (
-      <article className={cardClass}>
-        <h1 className="text-2xl font-bold">Sign in to view this profile</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Sign in first, then choose whether to send a friend request.
-        </p>
-        <a
-          className={`${primaryButtonClass} mt-5 inline-flex`}
-          href={loginHref(publicProfilePath(publicId))}
-        >
-          Sign in
-        </a>
-      </article>
-    );
-  }
-
   if (loading) {
     return (
       <p role="status" className="text-center text-sm text-muted-foreground">
@@ -353,10 +335,20 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
           </p>
         </div>
       </div>
-      <p className="mt-5 text-sm text-muted-foreground">
-        This profile shares only a public nickname and avatar.
-      </p>
-      <div className="mt-6">{relationshipAction(profile.relationship)}</div>
+      <div className="mt-6">
+        {authenticated ? relationshipAction(profile.relationship) : (
+          <a className={primaryButtonClass} href={loginHref(publicProfilePath(publicId))}>Sign in to add friend</a>
+        )}
+      </div>
+      {[['Library', profile.library], ['Favorite games', profile.favorites], ['Active wishlist', profile.wishlist]].filter(([, block]) => block).map(([title, block]) => (
+        <section className="mt-6" key={title as string}>
+          <h2 className="font-bold">{title as string}</h2>
+          {(block as PublicProfile['library']).status === 'hidden' ? <p className="text-sm text-muted-foreground">This section is private.</p> :
+            (block as PublicProfile['library']).status === 'empty' ? <p className="text-sm text-muted-foreground">{(block as PublicProfile['library']).message}</p> :
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">{(block as PublicProfile['library']).data.map((item: { id: string; title: string; cover_url: string | null }) => <div className="rounded border border-border p-3" key={item.id}>{item.cover_url ? <img alt={item.title} className="mb-2 h-20 w-full object-cover" src={item.cover_url} /> : null}{item.title}</div>)}</div>}
+        </section>
+      ))}
+      {profile.steam?.status === 'ready' && profile.steam.data?.profile_url ? <a className={`${primaryButtonClass} mt-6 inline-flex`} href={profile.steam.data.profile_url} rel="noreferrer" target="_blank">View Steam profile</a> : null}
       {error ? (
         <div className="mt-4">
           <p role="alert" className="text-sm text-destructive">

@@ -29,7 +29,7 @@ from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
-from app.auth import hash_password, verify_password, create_access_token, get_current_user
+from app.auth import hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
@@ -37,7 +37,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     HomeDealResponse, GenreDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
-    DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead
+    DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -125,6 +125,20 @@ app.state.limiter = limiter
 CACHE_TTL = 3600
 
 
+def get_optional_current_user(request: Request, db: Session = Depends(get_db)) -> User | None:
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        return None
+    payload = decode_access_token(authorization.removeprefix("Bearer "))
+    sub = payload.get("sub")
+    if not isinstance(sub, str):
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+    try:
+        return get_user_by_id(db, uuid.UUID(sub))
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Invalid user id") from exc
+
+
 def steam_account_response(user: User) -> SteamAccountRead:
     return SteamAccountRead(
         linked=bool(user.steam_id),
@@ -140,7 +154,7 @@ def user_response(user: User, google_linked: bool | None = None, db: Session | N
     if google_linked is None:
         google_linked = bool(db and db.query(OAuthIdentity).filter(OAuthIdentity.user_id == user.id, OAuthIdentity.provider == "google").first())
     display_name = getattr(user, "display_name", None) or user.email.split("@", 1)[0]
-    return UserRead(id=user.id, email=user.email, display_name=display_name, created_at=user.created_at, google_linked=google_linked)
+    return UserRead(id=user.id, email=user.email, display_name=display_name, public_nickname=getattr(user, "public_nickname", None), created_at=user.created_at, google_linked=google_linked)
 
 
 def user_profile_response(user: User, google_linked: bool | None = None, db: Session | None = None) -> UserProfileRead:
@@ -153,6 +167,10 @@ def user_profile_response(user: User, google_linked: bool | None = None, db: Ses
         bio=getattr(user, "bio", None),
         platforms=platforms,
         favorite_genres=list(getattr(user, "favorite_genres", None) or []),
+        library_visibility=getattr(user, "library_visibility", "public"),
+        favorites_visibility=getattr(user, "favorites_visibility", "public"),
+        wishlist_visibility=getattr(user, "wishlist_visibility", "public"),
+        steam_visibility=getattr(user, "steam_visibility", "public"),
     )
 
 
@@ -292,6 +310,46 @@ def library_block(db: Session, user_id: uuid.UUID) -> DataBlock:
             "manual_games": sum(game.source == "manual" for game in games),
             "psn_games": sum(game.source == "psn" for game in games),
         },
+    )
+
+
+def can_view_section(owner: User, viewer: User | None, setting: str, db: Session) -> bool:
+    return (viewer is not None and viewer.id == owner.id) or setting == "public" or (
+        setting == "friends" and viewer is not None and are_friends(db, owner.id, viewer.id)
+    )
+
+
+def hidden_public_block() -> PublicDataBlock:
+    return PublicDataBlock(status="hidden", data=[], message="This section is private.")
+
+
+def public_library_game_response(game: Game) -> PublicLibraryGameRead:
+    cover_url = game.img_icon_url if (game.img_icon_url or "").startswith(("http://", "https://")) else None
+    if cover_url is None and game.source == "steam" and (game.external_id or "").isdigit() and game.img_icon_url:
+        cover_url = f"https://media.steampowered.com/steamcommunity/public/images/apps/{game.external_id}/{game.img_icon_url}.jpg"
+    return PublicLibraryGameRead(
+        id=game.id,
+        title=game.title,
+        source=game.source,
+        cover_url=cover_url,
+        playtime_forever=game.playtime_forever,
+        detail_game_id=game.external_id,
+    )
+
+
+def public_collection_block(items: list[Favorite] | list[WishlistItem], empty_message: str) -> PublicDataBlock:
+    data = [collection_response(item).model_dump(mode="json") for item in items]
+    return PublicDataBlock(status="ready" if data else "empty", data=data, message=None if data else empty_message)
+
+
+def public_steam_block(owner: User) -> PublicDataBlock:
+    steam_id = (owner.steam_id or "").strip()
+    if not steam_id:
+        return PublicDataBlock(status="empty", data=None, message="Steam is not connected.")
+    profile_url = f"https://steamcommunity.com/profiles/{steam_id}" if steam_id.isdigit() else None
+    return PublicDataBlock(
+        status="ready",
+        data=PublicSteamAccountRead(linked=True, persona_name=owner.steam_persona_name, avatar=owner.steam_avatar, profile_url=profile_url).model_dump(),
     )
 
 
@@ -622,6 +680,8 @@ def update_user_profile(
         if db.query(User.id).filter(User.display_name == display_name).first():
             raise HTTPException(status_code=409, detail="Display name is already taken")
     for field, value in updates.items():
+        if field.endswith("_visibility") and value is None:
+            continue
         setattr(current_user, field, value)
     db.commit()
     db.refresh(current_user)
@@ -835,6 +895,62 @@ def get_social_profile(
     return SocialProfileRead(
         relationship=social_relationship(db, current_user.id, profile.id),
         **social_player_response(profile).model_dump(),
+    )
+
+
+@app.get("/users/search", response_model=list[PublicUserRead])
+def search_users_before_public_profile(
+    q: str = Query(min_length=2, max_length=64),
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return search_users(q=q, limit=limit, db=db, current_user=current_user)
+
+
+@app.get("/users/{public_id}", response_model=PublicProfileRead)
+def get_public_profile(
+    public_id: str,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    owner = db.query(User).filter(User.public_id == public_id).first()
+    if owner is None or owner.public_nickname is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    relationship = "none" if current_user is None else social_relationship(db, current_user.id, owner.id)
+    if can_view_section(owner, current_user, owner.library_visibility, db):
+        games = db.query(Game).filter(Game.owner_id == owner.id).order_by(func.lower(Game.title)).all()
+        library = PublicDataBlock(
+            status="ready" if games else "empty",
+            data=[public_library_game_response(game).model_dump(mode="json") for game in games],
+            message=None if games else "No library games have been saved yet.",
+        )
+    else:
+        library = hidden_public_block()
+
+    if can_view_section(owner, current_user, owner.favorites_visibility, db):
+        favorites = db.query(Favorite).filter(Favorite.user_id == owner.id).order_by(Favorite.created_at.desc()).all()
+        favorites_block_public = public_collection_block(favorites, "No favorites have been saved yet.")
+    else:
+        favorites_block_public = hidden_public_block()
+
+    if can_view_section(owner, current_user, owner.wishlist_visibility, db):
+        wishlist = db.query(WishlistItem).filter(WishlistItem.user_id == owner.id).order_by(WishlistItem.created_at.desc()).all()
+        wishlist_block_public = public_collection_block(wishlist, "No wishlist games have been saved yet.")
+    else:
+        wishlist_block_public = hidden_public_block()
+
+    steam = public_steam_block(owner) if can_view_section(owner, current_user, owner.steam_visibility, db) else hidden_public_block()
+    return PublicProfileRead(
+        public_id=owner.public_id,
+        nickname=owner.public_nickname,
+        avatar=owner.steam_avatar,
+        relationship=relationship,
+        library=library,
+        favorites=favorites_block_public,
+        wishlist=wishlist_block_public,
+        steam=steam,
     )
 
 
@@ -1080,7 +1196,6 @@ async def list_common_friend_games(
     )
 
 
-@app.get("/users/search", response_model=list[PublicUserRead])
 def search_users(
     q: str = Query(min_length=2, max_length=64),
     limit: int = Query(default=20, ge=1, le=50),
@@ -2180,6 +2295,7 @@ def build_steam_social_response(
 @app.get("/steam/social", response_model=SteamSocialRead)
 async def get_steam_social(
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
     friends_limit: int = 12,
     friends_offset: int = 0,
 ):
@@ -2199,6 +2315,14 @@ async def get_steam_social(
         limit=friends_limit,
         offset=friends_offset,
     )
+    try:
+        public_ids = {
+            user.steam_id: user.public_id
+            for user in db.query(User).filter(User.steam_id.in_([friend["steam_id"] for friend in friends])).all()
+        } if friends else {}
+    except Exception:
+        public_ids = {}
+    friends = [{**friend, "public_id": public_ids.get(friend["steam_id"])} for friend in friends]
 
     async def load_friend_library(friend):
         try:

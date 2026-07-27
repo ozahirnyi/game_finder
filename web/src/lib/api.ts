@@ -3,6 +3,7 @@ export type UserRead = {
   email: string;
   created_at: string;
   google_linked: boolean;
+  public_nickname?: string | null;
 };
 
 export type GoogleStatus = { configured: boolean };
@@ -181,6 +182,7 @@ export type SteamFriendGame = {
 
 export type SteamFriend = {
   steam_id: string;
+  public_id: string | null;
   persona_name: string | null;
   avatar: string | null;
   friend_since: number | null;
@@ -264,6 +266,15 @@ export type SocialRelationship =
 
 export type SocialProfile = SocialPlayer & {
   relationship: SocialRelationship;
+};
+export type PublicSection<T> = { status: "ready" | "empty" | "hidden"; data: T; message?: string | null };
+export type PublicLibraryGame = { id: string; title: string; source: string; cover_url: string | null; playtime_forever: number | null; detail_game_id: string | null };
+export type PublicSteamAccount = { linked: boolean; persona_name: string | null; avatar: string | null; profile_url: string | null };
+export type PublicProfile = SocialProfile & {
+  library: PublicSection<PublicLibraryGame[]>;
+  favorites: PublicSection<CatalogCollectionItem[]>;
+  wishlist: PublicSection<CatalogCollectionItem[]>;
+  steam: PublicSection<PublicSteamAccount | null>;
 };
 
 export type DirectMessage = {
@@ -363,7 +374,12 @@ export type UserProfile = {
   bio: string | null;
   platforms: string[];
   favorite_genres: string[];
+  library_visibility?: Visibility;
+  favorites_visibility?: Visibility;
+  wishlist_visibility?: Visibility;
+  steam_visibility?: Visibility;
 };
+export type Visibility = "private" | "friends" | "public";
 export type DashboardResponse = {
   user: DataBlock<UserRead>;
   library: DataBlock<LibraryStats>;
@@ -814,6 +830,10 @@ export function getSocialProfile(publicId: string) {
     `/social/profiles/${encodeURIComponent(publicId)}`,
     { auth: true },
   );
+}
+
+export function getPublicProfile(publicId: string) {
+  return request<PublicProfile>(`/users/${encodeURIComponent(publicId)}`);
 }
 
 export function createFriendRequest(publicId: string) {

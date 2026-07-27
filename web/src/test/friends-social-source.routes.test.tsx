@@ -16,7 +16,7 @@ const api = vi.hoisted(() => ({
   declineFriendRequest: vi.fn(),
   getDirectMessages: vi.fn(),
   getSocialMe: vi.fn(),
-  getSocialProfile: vi.fn(),
+  getPublicProfile: vi.fn(),
   isAuthenticated: vi.fn(),
   sendDirectMessage: vi.fn(),
 }));
@@ -63,22 +63,23 @@ describe("PublicProfileScreen", () => {
     api.isAuthenticated.mockReturnValue(true);
     auth.useAuthState.mockReturnValue(true);
     api.getSocialMe.mockResolvedValue(emptySocial);
+    api.getPublicProfile.mockResolvedValue({ ...player, relationship: "none" });
   });
 
-  it("preserves the public profile as returnTo when asking a signed-out visitor to log in", () => {
+  it("preserves the public profile as returnTo when asking a signed-out visitor to log in", async () => {
     auth.useAuthState.mockReturnValue(false);
 
     render(<PublicProfileScreen publicId="alex/public" />);
 
-    expect(api.getSocialProfile).not.toHaveBeenCalled();
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+    expect(api.getPublicProfile).toHaveBeenCalledWith("alex/public");
+    expect(await screen.findByRole("link", { name: /sign in to add friend/i })).toHaveAttribute(
       "href",
       "/login?returnTo=%2Fusers%2Falex%252Fpublic",
     );
   });
 
   it("shows only safe public fields and sends an explicit friend request", async () => {
-    api.getSocialProfile.mockResolvedValue({ ...player, relationship: "none" });
+    api.getPublicProfile.mockResolvedValue({ ...player, relationship: "none" });
     api.createFriendRequest.mockResolvedValue({
       ...player,
       id: "request-id",
@@ -107,7 +108,7 @@ describe("PublicProfileScreen", () => {
   });
 
   it("links friend invitees to nickname setup when required", async () => {
-    api.getSocialProfile.mockResolvedValue({ ...player, relationship: "none" });
+    api.getPublicProfile.mockResolvedValue({ ...player, relationship: "none" });
     api.createFriendRequest.mockRejectedValue(
       new Error("Set a public nickname before sending friend requests"),
     );
@@ -126,7 +127,7 @@ describe("PublicProfileScreen", () => {
   });
 
   it("can immediately cancel a newly-created request by its returned id", async () => {
-    api.getSocialProfile.mockResolvedValue({ ...player, relationship: "none" });
+    api.getPublicProfile.mockResolvedValue({ ...player, relationship: "none" });
     api.createFriendRequest.mockResolvedValue({
       ...player,
       id: "new-request-id",
@@ -158,7 +159,7 @@ describe("PublicProfileScreen", () => {
   it("uses the subscribed auth snapshot when hydration changes it", async () => {
     api.isAuthenticated.mockReturnValue(false);
     auth.useAuthState.mockReturnValue(true);
-    api.getSocialProfile.mockResolvedValue({ ...player, relationship: "self" });
+    api.getPublicProfile.mockResolvedValue({ ...player, relationship: "self" });
 
     render(<PublicProfileScreen publicId={player.public_id} />);
 
@@ -169,7 +170,7 @@ describe("PublicProfileScreen", () => {
   });
 
   it("accepts an incoming request and exposes the confirmed conversation", async () => {
-    api.getSocialProfile.mockResolvedValue({
+    api.getPublicProfile.mockResolvedValue({
       ...player,
       relationship: "incoming_pending",
     });
