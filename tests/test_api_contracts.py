@@ -1230,6 +1230,13 @@ def test_dashboard_reports_ready_and_error_deal_states(monkeypatch):
     assert failed.json()["deals"]["status"] == "error"
 
 
+def test_steam_library_cover_url_uses_the_steam_cdn():
+    assert main.steam_library_cover_url("10", "iconhash") == (
+        "https://media.steampowered.com/steamcommunity/public/images/apps/10/iconhash.jpg"
+    )
+    assert main.steam_library_cover_url("10", None) is None
+
+
 def test_dashboard_library_stats_and_linked_steam_library_contract(monkeypatch):
     user = SimpleNamespace(
         id=uuid.uuid4(), email="player@example.com", created_at=datetime.now(timezone.utc),

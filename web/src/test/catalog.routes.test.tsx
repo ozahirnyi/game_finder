@@ -291,6 +291,10 @@ describe("catalog routes", () => {
     expect(
       await screen.findByText("Fight beyond the Underworld."),
     ).toBeVisible();
+    expect(screen.getByTestId("game-description")).toHaveClass(
+      "block",
+      "line-clamp-3",
+    );
     expect(api.searchGames).toHaveBeenCalledWith("Hades II");
     fireEvent.click(
       screen.getByRole("button", { name: /show full description/i }),
@@ -298,6 +302,8 @@ describe("catalog routes", () => {
     expect(
       screen.getByRole("button", { name: /collapse description/i }),
     ).toBeVisible();
+    expect(screen.getByTestId("game-description")).toHaveClass("block");
+    expect(screen.getByTestId("game-description")).not.toHaveClass("line-clamp-3");
   });
 
   it("hides catalog actions for guests", () => {

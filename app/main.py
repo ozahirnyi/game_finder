@@ -325,8 +325,8 @@ def hidden_public_block() -> PublicDataBlock:
 
 def public_library_game_response(game: Game) -> PublicLibraryGameRead:
     cover_url = game.img_icon_url if (game.img_icon_url or "").startswith(("http://", "https://")) else None
-    if cover_url is None and game.source == "steam" and (game.external_id or "").isdigit() and game.img_icon_url:
-        cover_url = f"https://media.steampowered.com/steamcommunity/public/images/apps/{game.external_id}/{game.img_icon_url}.jpg"
+    if cover_url is None and game.source == "steam":
+        cover_url = steam_library_cover_url(game.external_id, game.img_icon_url)
     return PublicLibraryGameRead(
         id=game.id,
         title=game.title,
@@ -335,6 +335,12 @@ def public_library_game_response(game: Game) -> PublicLibraryGameRead:
         playtime_forever=game.playtime_forever,
         detail_game_id=game.external_id,
     )
+
+
+def steam_library_cover_url(appid: str | int | None, icon_hash: str | None) -> str | None:
+    if not appid or not icon_hash:
+        return None
+    return f"https://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{icon_hash}.jpg"
 
 
 def public_collection_block(items: list[Favorite] | list[WishlistItem], empty_message: str) -> PublicDataBlock:
@@ -438,7 +444,12 @@ async def library_overview_route(
             games.append(LibraryGameRead(
                 id=str(game.id), source=source, external_id=game.external_id,
                 detail_game_id=str(game.id), title=game.title,
-                cover_url=game.img_icon_url, playtime_forever=game.playtime_forever,
+                cover_url=(
+                    steam_library_cover_url(game.external_id, game.img_icon_url)
+                    if game.source == "steam"
+                    else game.img_icon_url
+                ),
+                playtime_forever=game.playtime_forever,
             ))
 
     steam_error = None
@@ -453,7 +464,7 @@ async def library_overview_route(
                 games.append(LibraryGameRead(
                     id=f"steam:{appid}", source="steam", external_id=appid,
                     title=str(steam_game.get("name", "Unknown Steam game")),
-                    cover_url=steam_game.get("img_icon_url"),
+                    cover_url=steam_library_cover_url(appid, steam_game.get("img_icon_url")),
                     playtime_forever=int(steam_game.get("playtime_forever") or 0),
                 ))
         except Exception:
