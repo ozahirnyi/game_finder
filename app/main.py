@@ -2505,9 +2505,9 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
 
 
 @app.get("/prices/genre-deals", response_model=GenreDealResponse)
-async def genre_deals(current_user: User = Depends(get_current_user)):
-    country = (current_user.steam_country_code or "US").strip().upper()
-    genres = select_deal_genres(current_user.favorite_genres)
+async def genre_deals(current_user: User | None = Depends(get_optional_current_user)):
+    country = ((current_user.steam_country_code if current_user else None) or "US").strip().upper()
+    genres = select_deal_genres(current_user.favorite_genres if current_user else [])
     key = build_cache_key(
         "steam_genre_deals_v2",
         country=country,

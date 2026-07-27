@@ -575,7 +575,7 @@ def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch
             }.get(query, [])
         }
 
-    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: SimpleNamespace(
         favorite_genres=[], steam_country_code=None
     )
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
@@ -594,6 +594,30 @@ def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch
     assert [item["name"] for item in payload["sections"][0]["results"]] == ["Hades"]
     assert [item["name"] for item in payload["sections"][2]["results"]] == ["Civilization VII"]
     assert payload["sections"][3]["results"] == []
+
+
+def test_genre_deals_are_available_without_an_account(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_deal_candidates(country: str):
+        assert country == "US"
+        return {"popular": [], "candidates": []}
+
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: None
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates)
+    try:
+        response = client.get("/prices/genre-deals")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["popular"] == []
+    assert [section["genre"] for section in payload["sections"]] == [
+        "Action", "RPG", "Adventure", "Strategy", "Indie"
+    ]
 
 
 def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
@@ -621,7 +645,7 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
         return {"results": [{"id": int(query.split()[-1]), "name": query, "released": None, "background_image": None, "genres": ["ACTION"]}]}
 
     user = SimpleNamespace(favorite_genres=[" Action "], steam_country_code="us")
-    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: user
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
     monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
@@ -660,7 +684,7 @@ def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
         genre = query.split()[0]
         return {"results": [{"id": hash(query), "name": query, "released": None, "background_image": None, "genres": [genre]}]}
 
-    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: SimpleNamespace(
         favorite_genres=["Sports"], steam_country_code="US"
     )
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
