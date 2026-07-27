@@ -5,6 +5,19 @@ import pytest
 import app.steam_recommendations as recommendations
 
 
+class User:
+    def __init__(self, user_id, *, genres=None, platforms=None, bio=None):
+        self.id = user_id
+        self.favorite_genres = genres or []
+        self.platforms = platforms or []
+        self.bio = bio
+
+
+class Saved:
+    def __init__(self, title):
+        self.title = title
+
+
 def games(playtime: int = 120):
     return [
         {"appid": 20, "name": "Team Fortress Classic", "playtime_forever": playtime, "playtime_2weeks": 0},
@@ -66,3 +79,40 @@ async def test_normalize_recommendations_removes_owned_duplicates_and_adds_rawg_
         {"rainbow six siege"},
     )
     assert items == [{"title": "Hades II", "reason": "good", "tags": [], "rawg_id": 274755, "cover_url": "https://cdn.example/hades.jpg"}]
+
+
+@pytest.mark.anyio
+async def test_personal_recommendations_cache_key_changes_with_profile_library_and_playtime(monkeypatch):
+    keys = []
+
+    async def cache_get(key):
+        keys.append(key)
+        return None
+
+    async def cache_set(*_args):
+        return None
+
+    async def candidates():
+        return {"candidates": [{"steam_appid": 1, "name": "Owned", "background_image": None}, {"steam_appid": 2, "name": "Saved", "background_image": None}, {"steam_appid": 3, "name": "Eligible", "background_image": None}]}
+
+    monkeypatch.setattr(recommendations, "cache_get", cache_get)
+    monkeypatch.setattr(recommendations, "cache_set", cache_set)
+    monkeypatch.setattr(recommendations, "fetch_steam_store_deal_candidates", candidates)
+    user = User(uuid.uuid4(), genres=["Action"])
+    await recommendations.get_personalized_recommendations(user, [Saved("Saved")], [{"appid": 1, "name": "Owned", "playtime_forever": 1}])
+    await recommendations.get_personalized_recommendations(User(user.id, genres=["Puzzle"]), [Saved("Saved")], [{"appid": 1, "name": "Owned", "playtime_forever": 2}])
+
+    assert keys[0] != keys[1]
+
+
+@pytest.mark.anyio
+async def test_personal_recommendations_exclude_owned_and_saved_titles(monkeypatch):
+    async def cache_get(_key): return None
+    async def cache_set(*_args): return None
+    async def candidates():
+        return {"candidates": [{"steam_appid": 1, "name": "Owned", "background_image": None}, {"steam_appid": 2, "name": "Saved", "background_image": None}, {"steam_appid": 3, "name": "Eligible", "background_image": "cover"}]}
+    monkeypatch.setattr(recommendations, "cache_get", cache_get)
+    monkeypatch.setattr(recommendations, "cache_set", cache_set)
+    monkeypatch.setattr(recommendations, "fetch_steam_store_deal_candidates", candidates)
+    result = await recommendations.get_personalized_recommendations(User(uuid.uuid4()), [Saved("Saved")], [{"appid": 1, "name": "Owned"}])
+    assert [item["title"] for item in result["recommendations"]] == ["Eligible"]
