@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GameCover } from "@/components/GameCover";
 import { getHomepageDeals, type HomeDeal } from "@/lib/api";
 import { FALLBACK_REGION, shouldFallbackToUsd } from "./region";
 
@@ -14,6 +13,13 @@ const supportedCountries = ["UA", "US", "GB", "DE", "PL"];
 
 function money(value: HomeDeal["current"] extends infer T ? T : never) {
   return value?.price ? `${value.price.amount} ${value.price.currency}` : "Price unavailable";
+}
+
+function DealCover({ deal }: { deal: HomeDeal }) {
+  if (!deal.background_image) {
+    return <div className="game-cover-fallback" aria-label={`${deal.name} cover unavailable`} />;
+  }
+  return <img className="game-cover" src={deal.background_image} alt={`${deal.name} cover`} />;
 }
 
 export function PublicDeals({ initialCountry, limit }: { initialCountry: string; limit: number }) {
@@ -85,7 +91,7 @@ export function PublicDeals({ initialCountry, limit }: { initialCountry: string;
               const storeUrl = deal.current?.url ?? deal.url;
               return (
                 <article className="game-card card-interactive" key={deal.id ?? deal.name}>
-                  <GameCover title={deal.name} src={deal.background_image} />
+                  <DealCover deal={deal} />
                   <div className="stack compact">
                     <h3>{deal.name}</h3>
                     {deal.current?.shop ? <p>{deal.current.shop}</p> : null}
