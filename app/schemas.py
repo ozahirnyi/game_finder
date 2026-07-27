@@ -62,6 +62,7 @@ class UserRead(BaseModel):
     display_name: str
     created_at: datetime
     google_linked: bool = False
+    public_nickname: str | None = None
 
 
 Visibility = Literal["private", "friends", "public"]
