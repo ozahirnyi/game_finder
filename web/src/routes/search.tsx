@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
@@ -13,7 +13,12 @@ import {
 } from "@/lib/api";
 import { lovableQueryKeys, toGameCard } from "@/lib/lovable-data";
 
-export const Route = createFileRoute("/search")({ component: SearchPage });
+export const Route = createFileRoute("/search")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    q: typeof search.q === "string" ? search.q.trim() : "",
+  }),
+  component: SearchPage,
+});
 
 function normalized(value: string | null) {
   return value?.trim().toLocaleLowerCase() ?? "";
@@ -64,9 +69,15 @@ function AiRecommendationCard({ item }: { item: RecommendationItem }) {
 }
 
 export function SearchPage() {
+  const { q } = Route.useSearch();
   const [mode, setMode] = useState<"catalog" | "ai">("catalog");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(q);
   const [submitted, setSubmitted] = useState("");
+  useEffect(() => {
+    setMode("catalog");
+    setQuery(q);
+    setSubmitted("");
+  }, [q]);
   const catalog = useQuery({
     queryKey: lovableQueryKeys.search(query),
     queryFn: () => searchGames(query),

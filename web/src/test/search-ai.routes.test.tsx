@@ -7,9 +7,10 @@ const api = vi.hoisted(() => ({
   getRecommendations: vi.fn(),
   searchGames: vi.fn(),
 }));
+const routeSearch = vi.hoisted(() => vi.fn(() => ({ q: "" })));
 
 vi.mock("@tanstack/react-router", () => ({
-  createFileRoute: () => (options: unknown) => options,
+  createFileRoute: () => (options: object) => ({ ...options, useSearch: routeSearch }),
   Link: ({
     children,
     to,
@@ -44,6 +45,16 @@ function renderSearch() {
 }
 
 describe("AI search", () => {
+  it("prefills catalog search from the q route parameter", async () => {
+    routeSearch.mockReturnValue({ q: "Hades" });
+    api.searchGames.mockResolvedValue({ results: [] });
+
+    renderSearch();
+
+    expect(screen.getByPlaceholderText(/Search by title/)).toHaveValue("Hades");
+    await waitFor(() => expect(api.searchGames).toHaveBeenCalledWith("Hades"));
+  });
+
   it("sends a natural-language prompt to the recommendations API and displays its results", async () => {
     api.searchGames.mockResolvedValue({ results: [] });
     api.getRecommendations.mockResolvedValue({
