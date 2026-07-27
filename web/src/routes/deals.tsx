@@ -29,11 +29,11 @@ function money(amount: number | undefined, currency: string | undefined) {
 
 function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolean }) {
   const buttonClass = compact
-    ? "rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition hover:opacity-90"
-    : "rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90";
+    ? "rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    : "rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
   const catalogClass = compact
-    ? "rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold transition hover:bg-white/5"
-    : "rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold transition hover:bg-white/5";
+    ? "rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold transition-colors hover:border-primary/60 hover:bg-primary/10 active:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    : "rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold transition-colors hover:border-primary/60 hover:bg-primary/10 active:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
   return (
     <div className={compact ? "mt-3 flex flex-wrap gap-2" : "mt-8 flex flex-wrap gap-3"}>
       {deal.url ? (
