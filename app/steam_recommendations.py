@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from app.openai_client import get_recommendation
 from app.integrations.rawg import fetch_rawg_games
 from app.redis_client import cache_get, cache_set
+from app.steam_store import fetch_steam_store_deal_candidates
 
 CACHE_TTL_SECONDS = 6 * 60 * 60
 
@@ -64,6 +65,37 @@ async def get_cached_steam_recommendations(user_id: uuid.UUID, games: list[dict]
         "recommendations": await normalize_recommendations(result, {str(game.get("name") or "").strip().casefold() for game in games}),
         "cache_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=CACHE_TTL_SECONDS)).isoformat(),
     }
+    try:
+        await cache_set(key, result, CACHE_TTL_SECONDS)
+    except Exception:
+        pass
+    return result
+
+
+def _personal_fingerprint(user, saved_games: list, steam_games: list[dict]) -> str:
+    payload = {"steam": sorted((int(game.get("appid") or 0), int(game.get("playtime_forever") or 0)) for game in steam_games), "saved": sorted(str(game.title).casefold() for game in saved_games), "genres": sorted(str(value).casefold() for value in (getattr(user, "favorite_genres", None) or [])), "platforms": sorted(str(value).casefold() for value in (getattr(user, "platforms", None) or [])), "bio": str(getattr(user, "bio", None) or "").casefold()}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+async def get_personalized_recommendations(user, saved_games: list, steam_games: list[dict]) -> dict:
+    fingerprint = _personal_fingerprint(user, saved_games, steam_games)
+    key = f"steam_recommendations:v3:{user.id}:{fingerprint}"
+    try:
+        cached = await cache_get(key)
+        if cached is not None:
+            return cached
+    except Exception:
+        pass
+    owned_ids = {int(game.get("appid") or 0) for game in steam_games}
+    excluded = {str(game.get("name") or "").casefold() for game in steam_games} | {str(game.title).casefold() for game in saved_games}
+    try:
+        candidates = (await fetch_steam_store_deal_candidates()).get("candidates", [])
+    except Exception:
+        candidates = []
+    available = [candidate for candidate in candidates if int(candidate.get("steam_appid") or 0) not in owned_ids and str(candidate.get("name") or "").casefold() not in excluded]
+    offset = int(fingerprint[:8], 16) % max(len(available), 1)
+    selected = (available[offset:] + available[:offset])[:6]
+    result = {"recommendations": [{"title": candidate["name"], "reason": "Available on Steam and selected from your library and profile signals.", "tags": [], "rawg_id": None, "cover_url": candidate.get("background_image")} for candidate in selected], "cache_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=CACHE_TTL_SECONDS)).isoformat()}
     try:
         await cache_set(key, result, CACHE_TTL_SECONDS)
     except Exception:

@@ -25,6 +25,26 @@ class GameRead(BaseModel):
     created_at: datetime
 
 
+class LibraryGameRead(BaseModel):
+    id: str
+    source: Literal["manual", "psn", "steam"]
+    external_id: str | None = None
+    detail_game_id: str | None = None
+    title: str
+    cover_url: str | None = None
+    playtime_forever: int | None = None
+
+
+class LibraryOverviewRead(BaseModel):
+    games: list[LibraryGameRead] = Field(default_factory=list)
+    steam_available: bool = False
+    steam_error: str | None = None
+
+
+class SteamLibraryResolveRead(BaseModel):
+    game_id: int
+
+
 class GameUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=255)
     notes: Optional[str] = Field(default=None, max_length=255)
