@@ -16,7 +16,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.openai_client import get_recommendation
-from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations
+from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations, get_personalized_recommendations
 from app.cache import build_cache_key, get_json_cached
 from app.integrations.rawg import (
     fetch_rawg_game_detail,
@@ -33,7 +33,7 @@ from app.auth import hash_password, verify_password, create_access_token, get_cu
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
-    SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
+    SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
@@ -47,7 +47,7 @@ from app.steam import (
     fetch_steam_profile,
     verify_steam_openid,
 )
-from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user, build_display_name
+from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user, build_display_name, build_public_nickname
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -363,6 +363,71 @@ def health():
 @app.get("/games", response_model=list[GameRead])
 def list_game_route(db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
     return list_games(db, current_user.id)
+
+
+@app.get("/library/overview", response_model=LibraryOverviewRead)
+async def library_overview_route(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    games: list[LibraryGameRead] = []
+    seen: set[tuple[str, str]] = set()
+    for game in list_games(db, current_user.id):
+        source = "psn" if game.source == "psn" else "manual"
+        external_id = game.external_id or str(game.id)
+        key = (source, external_id)
+        if key not in seen:
+            seen.add(key)
+            games.append(LibraryGameRead(
+                id=str(game.id), source=source, external_id=game.external_id,
+                detail_game_id=str(game.id), title=game.title,
+                cover_url=game.img_icon_url, playtime_forever=game.playtime_forever,
+            ))
+
+    steam_error = None
+    steam_available = bool(current_user.steam_id)
+    if current_user.steam_id:
+        try:
+            for steam_game in await fetch_owned_games(current_user.steam_id):
+                appid = str(steam_game.get("appid", ""))
+                if not appid or ("steam", appid) in seen:
+                    continue
+                seen.add(("steam", appid))
+                games.append(LibraryGameRead(
+                    id=f"steam:{appid}", source="steam", external_id=appid,
+                    title=str(steam_game.get("name", "Unknown Steam game")),
+                    cover_url=steam_game.get("img_icon_url"),
+                    playtime_forever=int(steam_game.get("playtime_forever") or 0),
+                ))
+        except Exception:
+            steam_available = False
+            steam_error = "Steam library is temporarily unavailable."
+    games.sort(key=lambda game: (game.title.casefold(), game.source, game.id))
+    return LibraryOverviewRead(games=games, steam_available=steam_available, steam_error=steam_error)
+
+
+@app.post("/library/steam-games/{appid}/resolve", response_model=SteamLibraryResolveRead)
+async def resolve_steam_library_game(
+    appid: int, current_user: User = Depends(get_current_user)
+):
+    if not current_user.steam_id:
+        raise HTTPException(status_code=404, detail="Steam is not connected")
+    try:
+        owned = await fetch_owned_games(current_user.steam_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Steam library is temporarily unavailable") from exc
+    steam_game = next((game for game in owned if int(game.get("appid") or 0) == appid), None)
+    if not steam_game:
+        raise HTTPException(status_code=404, detail="Steam game is not in your library")
+    title = str(steam_game.get("name") or "").strip()
+    try:
+        matches = await fetch_rawg_games(title)
+    except RAWGError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+    normalized = " ".join(title.casefold().split())
+    exact = next((game for game in matches.get("results", []) if " ".join(str(game.get("name") or "").casefold().split()) == normalized), None)
+    if not exact or not exact.get("id"):
+        raise HTTPException(status_code=422, detail="No exact catalog match exists for this Steam game")
+    return SteamLibraryResolveRead(game_id=int(exact["id"]))
 
 
 @app.post("/games", status_code=201, response_model=GameRead)
@@ -1672,6 +1737,7 @@ async def dashboard(current_user: User = Depends(get_current_user), db: Session 
 
     steam = steam_account_response(current_user)
     steam_data = {"steam": steam.model_dump(mode="json"), "games": []}
+    steam_games: list[dict] = []
     if not steam.linked:
         steam_block = DataBlock(status="not_connected", data=steam_data)
     else:
@@ -1688,9 +1754,11 @@ async def dashboard(current_user: User = Depends(get_current_user), db: Session 
         library_data["total_playtime_minutes"] += steam_minutes
         library_data["total_playtime_hours"] = round(library_data["total_playtime_minutes"] / 60, 1)
         library = DataBlock(status="ready", data=library_data)
-    if steam_block.status == "ready" and steam_games:
+    saved_games = list_games(db, current_user.id)
+    has_profile_signals = bool(current_user.favorite_genres or current_user.platforms or current_user.bio)
+    if steam_block.status in {"ready", "empty", "not_connected"} and (steam_games or saved_games or has_profile_signals):
         try:
-            recommendation_block = DataBlock(status="ready", data=await get_cached_steam_recommendations(current_user.id, steam_games))
+            recommendation_block = DataBlock(status="ready", data=await get_personalized_recommendations(current_user, saved_games, steam_games if steam_block.status == "ready" else []))
         except Exception:
             recommendation_block = DataBlock(status="error", data=[], message="Recommendations are temporarily unavailable. Please try again later.")
     else:
@@ -1771,7 +1839,7 @@ async def google_callback(code: str | None = None, state: str | None = None, err
         else:
             user = get_user_by_email(db, email)
             if not user:
-                user = User(email=email, password_hash=None, display_name=build_display_name(db, email))
+                user = User(email=email, password_hash=None, display_name=build_display_name(db, email), public_nickname=build_public_nickname(db, str(claims.get("name") or email.split("@", 1)[0])))
                 db.add(user)
                 db.flush()
             db.add(OAuthIdentity(user_id=user.id, provider="google", provider_subject=subject, email=email))
@@ -1831,7 +1899,7 @@ async def steam_sign_in_callback(request: Request, state: str | None = None, db:
             profile = await fetch_steam_profile(steam_id)
             user = User(
                 email=steam_sign_in_email(steam_id), password_hash=None, display_name=build_display_name(db, steam_sign_in_email(steam_id)), steam_id=steam_id,
-                steam_persona_name=profile["persona_name"], steam_avatar=profile["avatar"],
+                steam_persona_name=profile["persona_name"], public_nickname=build_public_nickname(db, profile["persona_name"]), steam_avatar=profile["avatar"],
                 steam_country_code=profile["country_code"], steam_linked_at=datetime.now(timezone.utc),
             )
             db.add(user)

@@ -28,6 +28,13 @@ const nav = [
   { to: "/deals", label: "Deals", icon: Tag },
   { to: "/friends", label: "Friends", icon: Users },
 ] as const;
+const mobileNav = [
+  { to: "/", label: "Home", icon: Home },
+  { to: "/library", label: "Library", icon: Library },
+  { to: "/deals", label: "Deals", icon: Tag },
+  { to: "/friends", label: "Friends", icon: Users },
+  { to: "/profile", label: "Profile", icon: User },
+] as const;
 
 function notificationText(notification: Notification) {
   if (notification.type === "friend_request")
@@ -72,7 +79,7 @@ function NotificationMenu({
       <button
         aria-label={mobile ? "Mobile notifications" : "Notifications"}
         onClick={() => setOpen((value) => !value)}
-        className="relative grid size-9 place-items-center rounded-md border border-border"
+        className="relative grid size-9 place-items-center rounded-md border border-border transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       >
         <Bell className="size-4" />
         {authenticated && unread > 0 ? (
@@ -151,7 +158,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   active
                     ? "bg-white/5 text-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -219,7 +226,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-surface/90 px-2 py-2 backdrop-blur lg:hidden">
-        {nav.slice(0, 5).map((item) => {
+        {mobileNav.map((item) => {
           const active =
             item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
           const Icon = item.icon;
@@ -227,7 +234,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               key={item.to}
               to={item.to}
-              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-2 py-1.5 ${
+              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}
             >

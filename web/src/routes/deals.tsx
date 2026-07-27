@@ -29,11 +29,11 @@ function money(amount: number | undefined, currency: string | undefined) {
 
 function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolean }) {
   const buttonClass = compact
-    ? "rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition hover:opacity-90"
-    : "rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90";
+    ? "rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    : "rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
   const catalogClass = compact
-    ? "rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold transition hover:bg-white/5"
-    : "rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold transition hover:bg-white/5";
+    ? "rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold transition-colors hover:border-primary/60 hover:bg-primary/10 active:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    : "rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold transition-colors hover:border-primary/60 hover:bg-primary/10 active:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
   return (
     <div className={compact ? "mt-3 flex flex-wrap gap-2" : "mt-8 flex flex-wrap gap-3"}>
       {deal.url ? (
@@ -90,25 +90,25 @@ function DealPrices({ deal, compact = false }: { deal: HomeDeal; compact?: boole
 
 function DealCard({ deal }: { deal: HomeDeal }) {
   return (
-    <article className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition hover:border-white/20 md:flex-col md:items-stretch">
+    <article className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 transition hover:border-white/20 sm:flex-row sm:items-center md:flex-col md:items-stretch">
       <GameCover
         from={deal.background_image ?? "#0f172a"}
         to="#0f172a"
         title={deal.name}
         compact
-        className="size-20 shrink-0 rounded-lg md:h-auto md:w-full md:aspect-video"
+        className="h-auto w-full shrink-0 rounded-lg aspect-video sm:size-20 md:h-auto md:w-full md:aspect-video"
       />
       <div className="min-w-0 flex-1">
         {deal.id ? (
           <Link
             to="/games/$gameId"
             params={{ gameId: String(deal.id) }}
-            className="block truncate text-base font-bold hover:text-primary"
+            className="block line-clamp-2 text-base font-bold hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             {deal.name}
           </Link>
         ) : (
-          <h4 className="truncate text-base font-bold">{deal.name}</h4>
+          <h4 className="line-clamp-2 text-base font-bold">{deal.name}</h4>
         )}
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {deal.released ? `Released ${deal.released}` : "Release date is not listed."}
@@ -158,7 +158,7 @@ export function DealsPage() {
       {popular.length ? (
         <section className="mb-10">
           <SectionHeader title="Popular on Steam" hint="Discounted bestsellers" />
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
             {popular.map((deal) => <DealCard deal={deal} key={`popular-${deal.id ?? deal.name}`} />)}
           </div>
         </section>
@@ -180,7 +180,7 @@ export function DealsPage() {
           </div>
           <SectionHeader title={activeSection.genre} hint={`${activeSection.results.length} current discounts`} />
           {activeSection.results.length ? (
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {activeSection.results.map((deal) => (
                 <DealCard deal={deal} key={`${activeSection.genre}-${deal.id ?? deal.name}`} />
               ))}

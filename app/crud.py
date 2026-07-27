@@ -63,6 +63,18 @@ def build_display_name(db, email: str) -> str:
     return candidate
 
 
+def build_public_nickname(db, preferred_name: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9_]+", "_", preferred_name or "").strip("_")[:32] or "player"
+    if len(stem) < 3:
+        stem = (stem + "player")[:32]
+    candidate, suffix = stem, 2
+    while db.query(User.id).filter(User.public_nickname.ilike(candidate)).first():
+        ending = f"_{suffix}"
+        candidate = f"{stem[:32 - len(ending)]}{ending}"
+        suffix += 1
+    return candidate
+
+
 def create_user(db, email: str, password_hash: str | None, **extra):
     normalized_email = email.strip().lower()
     user = User(

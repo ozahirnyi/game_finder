@@ -12,6 +12,8 @@ const api = vi.hoisted(() => ({
   clearToken: vi.fn(),
   getDashboard: vi.fn(),
   getGoogleLinkUrl: vi.fn(),
+  getLibraryOverview: vi.fn(),
+  resolveSteamLibraryGame: vi.fn(),
   getProfileSummary: vi.fn(),
   getSteamLinkUrl: vi.fn(),
   isAuthenticated: vi.fn(),
@@ -188,6 +190,7 @@ describe("live dashboard and profile data", () => {
     vi.clearAllMocks();
     api.getDashboard.mockResolvedValue(dashboard());
     api.getProfileSummary.mockResolvedValue(summary());
+    api.getLibraryOverview.mockResolvedValue({ games: [{ id: "saved-1", source: "manual", external_id: null, detail_game_id: "saved-1", title: "Hades II", cover_url: null, playtime_forever: 125 }], steam_available: false, steam_error: null });
     api.isAuthenticated.mockReturnValue(true);
     librarySearch.mockReturnValue({ tab: "library" });
   });
@@ -288,11 +291,10 @@ describe("live dashboard and profile data", () => {
     expect(navigate).toHaveBeenCalledWith({ to: "/" });
   });
 
-  it("shows a sign-in action when protected summary requests return 401", async () => {
-    api.getProfileSummary.mockRejectedValue({ status: 401 });
-    api.getDashboard.mockRejectedValue({ status: 401 });
+  it("shows an error when the protected library request fails", async () => {
+    api.getLibraryOverview.mockRejectedValue({ status: 401 });
     renderPage(<LibraryPage />);
-    expect(await screen.findByText("Sign in", { selector: "a" })).toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent("could not be loaded");
   });
 
   it("shows a Steam sign-in action when the dashboard request returns 401", async () => {
@@ -325,11 +327,10 @@ describe("live dashboard and profile data", () => {
     signInLinks.forEach((link) => expect(link).toHaveAttribute("to", "/login"));
   });
 
-  it("renders the library from its profile-summary block", async () => {
+  it("renders the library overview with All selected initially", async () => {
     renderPage(<LibraryPage />);
-    expect(await screen.findByText("1 games synced")).toBeVisible();
-    expect(screen.getAllByText("2h").length).toBeGreaterThan(0);
-    expect(screen.getByText("Hades II")).toBeVisible();
+    expect(await screen.findByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByText("Hades II")).toBeVisible();
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
   });
 
@@ -345,50 +346,18 @@ describe("live dashboard and profile data", () => {
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
   });
 
-  it("selects the Steam tab from the library URL search", async () => {
-    librarySearch.mockReturnValue({ tab: "steam" });
-
+  it("filters Steam games", async () => {
+    api.getLibraryOverview.mockResolvedValue({ games: [{ id: "s", source: "steam", external_id: "1", detail_game_id: null, title: "Steam game", cover_url: null, playtime_forever: 1 }, { id: "p", source: "psn", external_id: "p", detail_game_id: "p", title: "PSN game", cover_url: null, playtime_forever: null }], steam_available: true, steam_error: null });
     renderPage(<LibraryPage />);
-
-    expect(await screen.findByRole("tab", { name: "Steam" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByRole("tab", { name: "Library" })).toBeVisible();
-    expect(screen.getByRole("tab", { name: "PSN" })).toBeVisible();
-    expect(screen.getByText("Steam integration")).toBeVisible();
+    fireEvent.click(await screen.findByRole("button", { name: "Steam" }));
+    expect(screen.getByText("Steam game")).toBeVisible();
+    expect(screen.queryByText("PSN game")).not.toBeInTheDocument();
   });
 
-  it("selects the PSN tab from the library URL search", async () => {
-    librarySearch.mockReturnValue({ tab: "psn" });
-
+  it("shows a source-specific empty state", async () => {
     renderPage(<LibraryPage />);
-
-    expect(await screen.findByRole("tab", { name: "PSN" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByRole("tab", { name: "Library" })).toBeVisible();
-    expect(screen.getByRole("tab", { name: "Steam" })).toBeVisible();
-    expect(screen.getByText("PlayStation library")).toBeVisible();
-  });
-
-  it("falls back to the saved-games library for an unsupported tab", async () => {
-    librarySearch.mockReturnValue(
-      (
-        LibraryRoute as unknown as {
-          validateSearch: (search: Record<string, unknown>) => { tab: string };
-        }
-      ).validateSearch({ tab: "unsupported" }),
-    );
-
-    renderPage(<LibraryPage />);
-
-    expect(await screen.findByRole("tab", { name: "Library" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(await screen.findByText("Hades II")).toBeVisible();
+    fireEvent.click(await screen.findByRole("button", { name: "PSN" }));
+    expect(await screen.findByText("No PSN games are in your library yet.")).toBeVisible();
   });
 
   it("renders the reusable Steam library panel for a connected dashboard", async () => {
