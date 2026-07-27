@@ -100,18 +100,15 @@ describe("PlayFinder friends", () => {
 
   it("searches registered players and sends a confirmation-based friend request", async () => {
     api.getSocialPlayers.mockResolvedValue({
-      players: [
-        { public_id: "user-2-public", nickname: "Niko", avatar: null },
-      ],
+      players: [{ public_id: "user-2-public", nickname: "Niko", avatar: null }],
       next_cursor: null,
     });
     api.createFriendRequest.mockResolvedValue({ id: "request-1" });
     renderPage();
 
-    fireEvent.change(
-      await screen.findByPlaceholderText(/search nickname/i),
-      { target: { value: "Ni" } },
-    );
+    fireEvent.change(await screen.findByPlaceholderText(/search nickname/i), {
+      target: { value: "Ni" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /search players/i }));
     expect(await screen.findByText("Niko")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /add niko/i }));

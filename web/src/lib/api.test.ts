@@ -50,11 +50,16 @@ describe("API requests", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(getGenreDeals()).resolves.toEqual({ popular: [], sections: [] });
+    await expect(getGenreDeals()).resolves.toEqual({
+      popular: [],
+      sections: [],
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/prices/genre-deals",
       expect.objectContaining({
-        headers: expect.not.objectContaining({ Authorization: expect.anything() }),
+        headers: expect.not.objectContaining({
+          Authorization: expect.anything(),
+        }),
       }),
     );
   });

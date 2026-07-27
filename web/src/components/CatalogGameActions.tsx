@@ -17,7 +17,9 @@ import { lovableQueryKeys } from "@/lib/lovable-data";
 type CatalogActionGame = Pick<CatalogGame, "id" | "name">;
 
 function mutationMessage(error: unknown) {
-  return error instanceof ApiError ? error.message : "Could not save this game. Please try again.";
+  return error instanceof ApiError
+    ? error.message
+    : "Could not save this game. Please try again.";
 }
 
 export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
@@ -43,7 +45,9 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
     queryClient.invalidateQueries({ queryKey: lovableQueryKeys.favorites });
     queryClient.invalidateQueries({ queryKey: lovableQueryKeys.wishlist });
     queryClient.invalidateQueries({ queryKey: lovableQueryKeys.dashboard });
-    queryClient.invalidateQueries({ queryKey: lovableQueryKeys.profileSummary });
+    queryClient.invalidateQueries({
+      queryKey: lovableQueryKeys.profileSummary,
+    });
   };
   const libraryMutation = useMutation({
     mutationFn: () => saveCatalogGameToLibrary(game.id),
@@ -64,12 +68,14 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
 
   if (!authenticated) return null;
 
-  const inLibrary = savedGames.data?.some(
-    (saved) => saved.source === "catalog" && saved.external_id === `rawg:${game.id}`,
-  ) || libraryMutation.isSuccess;
-  const inWishlist = wishlist.data?.some(
-    (item) => item.catalog_game_id === game.id,
-  ) || wishlistMutation.isSuccess;
+  const inLibrary =
+    savedGames.data?.some(
+      (saved) =>
+        saved.source === "catalog" && saved.external_id === `rawg:${game.id}`,
+    ) || libraryMutation.isSuccess;
+  const inWishlist =
+    wishlist.data?.some((item) => item.catalog_game_id === game.id) ||
+    wishlistMutation.isSuccess;
   const inFavorites = removeFavoriteMutation.isSuccess
     ? false
     : favorites.data?.some((item) => item.catalog_game_id === game.id) ||
@@ -83,7 +89,11 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
         disabled={inLibrary || libraryMutation.isPending}
         className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground disabled:cursor-default disabled:opacity-70"
       >
-        {inLibrary ? "In library" : libraryMutation.isPending ? "Adding…" : "Add to library"}
+        {inLibrary
+          ? "In library"
+          : libraryMutation.isPending
+            ? "Adding…"
+            : "Add to library"}
       </button>
       <button
         type="button"
@@ -91,7 +101,11 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
         disabled={inWishlist || wishlistMutation.isPending}
         className="rounded-lg border border-border px-3 py-2 text-sm font-bold hover:bg-secondary disabled:cursor-default disabled:opacity-70"
       >
-        {inWishlist ? "In wishlist" : wishlistMutation.isPending ? "Adding…" : "Add to wishlist"}
+        {inWishlist
+          ? "In wishlist"
+          : wishlistMutation.isPending
+            ? "Adding…"
+            : "Add to wishlist"}
       </button>
       <button
         type="button"
@@ -100,7 +114,9 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
             ? removeFavoriteMutation.mutate()
             : favoriteMutation.mutate()
         }
-        disabled={favoriteMutation.isPending || removeFavoriteMutation.isPending}
+        disabled={
+          favoriteMutation.isPending || removeFavoriteMutation.isPending
+        }
         aria-label={
           favoriteMutation.isPending
             ? `Adding ${game.name} to favorites`
@@ -118,9 +134,17 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
           aria-hidden="true"
         />
       </button>
-      {(libraryMutation.error || wishlistMutation.error || favoriteMutation.error || removeFavoriteMutation.error) && (
+      {(libraryMutation.error ||
+        wishlistMutation.error ||
+        favoriteMutation.error ||
+        removeFavoriteMutation.error) && (
         <p className="w-full text-xs text-destructive" role="alert">
-          {mutationMessage(libraryMutation.error || wishlistMutation.error || favoriteMutation.error || removeFavoriteMutation.error)}
+          {mutationMessage(
+            libraryMutation.error ||
+              wishlistMutation.error ||
+              favoriteMutation.error ||
+              removeFavoriteMutation.error,
+          )}
         </p>
       )}
     </div>

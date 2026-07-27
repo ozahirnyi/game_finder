@@ -27,9 +27,14 @@ vi.mock("@tanstack/react-router", () => ({
 import { Route as CallbackRoute } from "@/routes/auth.callback";
 
 function renderCallback() {
-  const Component = (CallbackRoute as { component: React.ComponentType }).component;
+  const Component = (CallbackRoute as { component: React.ComponentType })
+    .component;
   return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
       <Component />
     </QueryClientProvider>,
   );
@@ -46,11 +51,16 @@ describe("OAuth callback route", () => {
       exchangeCode: "one-time-code",
       returnTo: "/profile",
     };
-    api.exchangeGoogleCode.mockResolvedValue({ access_token: "token", token_type: "bearer" });
+    api.exchangeGoogleCode.mockResolvedValue({
+      access_token: "token",
+      token_type: "bearer",
+    });
 
     renderCallback();
 
-    await waitFor(() => expect(api.exchangeGoogleCode).toHaveBeenCalledWith("one-time-code"));
+    await waitFor(() =>
+      expect(api.exchangeGoogleCode).toHaveBeenCalledWith("one-time-code"),
+    );
     expect(api.setToken).toHaveBeenCalledWith("token");
     expect(replace).toHaveBeenCalledWith("/profile");
   });
@@ -61,7 +71,9 @@ describe("OAuth callback route", () => {
 
     renderCallback();
 
-    expect(await screen.findByText("Sign-in expired. Please try again.")).toBeVisible();
+    expect(
+      await screen.findByText("Sign-in expired. Please try again."),
+    ).toBeVisible();
     expect(api.setToken).not.toHaveBeenCalled();
   });
 });

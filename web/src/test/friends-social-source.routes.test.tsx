@@ -72,10 +72,9 @@ describe("PublicProfileScreen", () => {
     render(<PublicProfileScreen publicId="alex/public" />);
 
     expect(api.getPublicProfile).toHaveBeenCalledWith("alex/public");
-    expect(await screen.findByRole("link", { name: /sign in to add friend/i })).toHaveAttribute(
-      "href",
-      "/login?returnTo=%2Fusers%2Falex%252Fpublic",
-    );
+    expect(
+      await screen.findByRole("link", { name: /sign in to add friend/i }),
+    ).toHaveAttribute("href", "/login?returnTo=%2Fusers%2Falex%252Fpublic");
   });
 
   it("shows only safe public fields and sends an explicit friend request", async () => {
@@ -120,10 +119,9 @@ describe("PublicProfileScreen", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Set a public nickname before sending friend requests",
     );
-    expect(screen.getByRole("link", { name: "Choose nickname" })).toHaveAttribute(
-      "href",
-      "/friends",
-    );
+    expect(
+      screen.getByRole("link", { name: "Choose nickname" }),
+    ).toHaveAttribute("href", "/friends");
   });
 
   it("can immediately cancel a newly-created request by its returned id", async () => {
@@ -263,7 +261,9 @@ describe("ConversationScreen", () => {
       "href",
       `/login?returnTo=${encodeURIComponent(returnTo)}`,
     );
-    expect(signIn.getAttribute("href")).not.toContain(encodeURIComponent(draft));
+    expect(signIn.getAttribute("href")).not.toContain(
+      encodeURIComponent(draft),
+    );
     signIn.addEventListener("click", (event) => event.preventDefault());
     fireEvent.click(signIn);
     signedOut.unmount();

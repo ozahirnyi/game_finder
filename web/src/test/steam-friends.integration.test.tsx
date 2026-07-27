@@ -144,11 +144,17 @@ describe("Steam and Friends routes", () => {
   });
 
   test("redirects legacy Steam callbacks to the Library Steam tab", () => {
-    const beforeLoad = (SteamRoute as {
-      beforeLoad: (context: { search: { linked?: "1"; error?: string } }) => void;
-    }).beforeLoad;
+    const beforeLoad = (
+      SteamRoute as {
+        beforeLoad: (context: {
+          search: { linked?: "1"; error?: string };
+        }) => void;
+      }
+    ).beforeLoad;
 
-    expect(() => beforeLoad({ search: { linked: "1", error: "example" } })).toThrow();
+    expect(() =>
+      beforeLoad({ search: { linked: "1", error: "example" } }),
+    ).toThrow();
     expect(redirect).toHaveBeenCalledWith({
       to: "/library",
       search: { tab: "steam", linked: "1", error: "example" },

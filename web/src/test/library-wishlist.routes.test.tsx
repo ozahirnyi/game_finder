@@ -176,7 +176,11 @@ describe("Library platform tabs", () => {
 
   it("loads the aggregated overview instead of the legacy saved-game endpoint", async () => {
     const { getLibraryOverview } = await import("@/lib/api");
-    vi.mocked(getLibraryOverview).mockResolvedValue({ games: [], steam_available: false, steam_error: null });
+    vi.mocked(getLibraryOverview).mockResolvedValue({
+      games: [],
+      steam_available: false,
+      steam_error: null,
+    });
 
     renderScreen(<LibraryPage />);
 
