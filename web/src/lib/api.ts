@@ -363,7 +363,12 @@ export type UserProfile = {
   bio: string | null;
   platforms: string[];
   favorite_genres: string[];
+  library_visibility?: Visibility;
+  favorites_visibility?: Visibility;
+  wishlist_visibility?: Visibility;
+  steam_visibility?: Visibility;
 };
+export type Visibility = "private" | "friends" | "public";
 export type DashboardResponse = {
   user: DataBlock<UserRead>;
   library: DataBlock<LibraryStats>;

@@ -64,10 +64,17 @@ class UserRead(BaseModel):
     google_linked: bool = False
 
 
+Visibility = Literal["private", "friends", "public"]
+
+
 class UserProfileRead(UserRead):
     bio: str | None = None
     platforms: list[str] = Field(default_factory=list)
     favorite_genres: list[str] = Field(default_factory=list)
+    library_visibility: Visibility = "public"
+    favorites_visibility: Visibility = "public"
+    wishlist_visibility: Visibility = "public"
+    steam_visibility: Visibility = "public"
 
 
 class UserProfileUpdate(BaseModel):
@@ -75,6 +82,10 @@ class UserProfileUpdate(BaseModel):
     bio: str | None = Field(default=None, max_length=1000)
     platforms: list[str] | None = Field(default=None, max_length=20)
     favorite_genres: list[str] | None = Field(default=None, max_length=20)
+    library_visibility: Visibility | None = None
+    favorites_visibility: Visibility | None = None
+    wishlist_visibility: Visibility | None = None
+    steam_visibility: Visibility | None = None
 
 
 class DataBlock(BaseModel):

@@ -153,6 +153,10 @@ def user_profile_response(user: User, google_linked: bool | None = None, db: Ses
         bio=getattr(user, "bio", None),
         platforms=platforms,
         favorite_genres=list(getattr(user, "favorite_genres", None) or []),
+        library_visibility=getattr(user, "library_visibility", "public"),
+        favorites_visibility=getattr(user, "favorites_visibility", "public"),
+        wishlist_visibility=getattr(user, "wishlist_visibility", "public"),
+        steam_visibility=getattr(user, "steam_visibility", "public"),
     )
 
 
@@ -622,6 +626,8 @@ def update_user_profile(
         if db.query(User.id).filter(User.display_name == display_name).first():
             raise HTTPException(status_code=409, detail="Display name is already taken")
     for field, value in updates.items():
+        if field.endswith("_visibility") and value is None:
+            continue
         setattr(current_user, field, value)
     db.commit()
     db.refresh(current_user)
