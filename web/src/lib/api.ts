@@ -665,7 +665,7 @@ export function getHomepageDeals(country = "US", pageSize = 6) {
 }
 
 export function getGenreDeals() {
-  return request<GenreDealResponse>("/prices/genre-deals", { auth: true });
+  return request<GenreDealResponse>("/prices/genre-deals");
 }
 
 export function listSavedGames() {

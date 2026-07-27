@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   getCurrentUser,
+  getGenreDeals,
   getGoogleStatus,
   saveCatalogGameToFavorites,
   setToken,
@@ -37,6 +38,23 @@ describe("API requests", () => {
         headers: expect.not.objectContaining({
           Authorization: expect.anything(),
         }),
+      }),
+    );
+  });
+
+  it("loads genre deals for guests without requiring a token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ popular: [], sections: [] }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getGenreDeals()).resolves.toEqual({ popular: [], sections: [] });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/prices/genre-deals",
+      expect.objectContaining({
+        headers: expect.not.objectContaining({ Authorization: expect.anything() }),
       }),
     );
   });
