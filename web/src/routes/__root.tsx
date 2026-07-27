@@ -83,15 +83,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       meta: [
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
-        { title: "GameFinder — Discover games. Play with friends." },
+        { title: "PlayFinder — Discover games. Play with friends." },
         {
           name: "description",
           content:
-            "GameFinder is a social game discovery platform. See what you and your friends both own, get AI recommendations, track deals, and jump into a session together.",
+            "PlayFinder is a social game discovery platform. See what you and your friends both own, get AI recommendations, track deals, and jump into a session together.",
         },
         {
           property: "og:title",
-          content: "GameFinder — Discover games. Play with friends.",
+          content: "PlayFinder — Discover games. Play with friends.",
         },
         {
           property: "og:description",

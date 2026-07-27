@@ -48,7 +48,7 @@ def parse_start_token(update: dict[str, Any]) -> tuple[str, str, str | None]:
 
     parts = text.split(maxsplit=1)
     if len(parts) != 2 or not parts[1].strip():
-        raise HTTPException(status_code=400, detail="Open Telegram from the Game Finder profile link")
+        raise HTTPException(status_code=400, detail="Open Telegram from the PlayFinder profile link")
 
     chat_id = chat.get("id")
     if chat_id is None:

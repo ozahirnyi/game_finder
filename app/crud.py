@@ -1,4 +1,5 @@
 import uuid
+import re
 from app.database import Game, User
 
 
@@ -50,8 +51,38 @@ def get_user_by_email(db, email: str):
     return db.query(User).filter(User.email == email.strip().lower()).first()
 
 
-def create_user(db, email: str, password_hash: str):
-    user = User(email=email.strip().lower(), password_hash=password_hash)
+def build_display_name(db, email: str) -> str:
+    stem = email.split("@", 1)[0].strip().lower()
+    stem = re.sub(r"[^a-z0-9_-]+", "-", stem).strip("-_") or "player"
+    stem = stem[:48]
+    candidate = stem
+    suffix = 2
+    while db.query(User.id).filter(User.display_name == candidate).first():
+        candidate = f"{stem[:59]}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+def build_public_nickname(db, preferred_name: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9_]+", "_", preferred_name or "").strip("_")[:32] or "player"
+    if len(stem) < 3:
+        stem = (stem + "player")[:32]
+    candidate, suffix = stem, 2
+    while db.query(User.id).filter(User.public_nickname.ilike(candidate)).first():
+        ending = f"_{suffix}"
+        candidate = f"{stem[:32 - len(ending)]}{ending}"
+        suffix += 1
+    return candidate
+
+
+def create_user(db, email: str, password_hash: str | None, **extra):
+    normalized_email = email.strip().lower()
+    user = User(
+        email=normalized_email,
+        password_hash=password_hash,
+        display_name=extra.pop("display_name", None) or build_display_name(db, normalized_email),
+        **extra,
+    )
     db.add(user)
     db.commit()
     db.refresh(user)

@@ -1,21 +1,17 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
-import { PersonalDashboard } from "@/features/home/PersonalDashboard";
-import { getSteamLibrary } from "@/lib/api";
 
 let pathname = "/";
-const getAuthSnapshot = vi.fn<() => boolean>();
+let authenticated = false;
+let notifyAuthChange: (() => void) | undefined;
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
-    to,
     children,
+    to,
     ...props
-  }: {
-    to: string;
-    children: React.ReactNode;
-  }) => (
+  }: React.ComponentProps<"a"> & { to: string }) => (
     <a href={to} {...props}>
       {children}
     </a>
@@ -26,56 +22,122 @@ vi.mock("@tanstack/react-router", () => ({
     select: (state: { location: { pathname: string } }) => string;
   }) => select({ location: { pathname } }),
 }));
-vi.mock("./ThemeSelector", () => ({ ThemeSelector: () => <div /> }));
+
 vi.mock("@/lib/api", () => ({
-  getAuthSnapshot: () => getAuthSnapshot(),
-  subscribeToAuthChanges: () => () => undefined,
-  getSteamLibrary: vi.fn(),
+  isAuthenticated: () => authenticated,
+  subscribeToAuthChanges: (callback: () => void) => {
+    notifyAuthChange = callback;
+    return () => {
+      notifyAuthChange = undefined;
+    };
+  },
+  listNotifications: () =>
+    Promise.resolve([
+      {
+        id: "n1",
+        type: "friend_request",
+        payload: { from: "Alex" },
+        read_at: null,
+        created_at: "2026-07-17T00:00:00Z",
+      },
+    ]),
+  markNotificationRead: () => Promise.resolve({}),
+  markAllNotificationsRead: () => Promise.resolve(),
 }));
 
-function mockAuth(authenticated: boolean) {
-  getAuthSnapshot.mockReturnValue(authenticated);
-}
-
-const linkedSteam = {
-  linked: true,
-  steam_id: "1",
-  persona_name: "Real Steam Name",
-  avatar: null,
-  country_code: null,
-  linked_at: null,
-};
+vi.mock("./ThemeSelector", () => ({
+  ThemeSelector: () => <div />,
+}));
 
 describe("AppShell", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     pathname = "/";
-    mockAuth(true);
-    vi.mocked(getSteamLibrary).mockResolvedValue({
-      steam: linkedSteam,
-      games: [],
-    });
+    authenticated = false;
+    notifyAuthChange = undefined;
   });
 
-  it("shows the linked Steam persona in the personal dashboard", async () => {
-    render(<PersonalDashboard steamAccount={linkedSteam} />);
-    expect(await screen.findByText("Real Steam Name")).toBeVisible();
-    expect(screen.queryByText("Marcus Chen")).not.toBeInTheDocument();
-  });
-
-  it("keeps unauthenticated navigation public", () => {
-    mockAuth(false);
+  it("shows login and registration links without a fake identity when signed out", () => {
     render(
       <AppShell>
-        <main>Guest home</main>
+        <main>Home</main>
       </AppShell>,
     );
+
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
       "href",
       "/login",
     );
     expect(
-      screen.queryByRole("link", { name: "Friends" }),
+      screen.getByRole("link", { name: "Create account" }),
+    ).toHaveAttribute("href", "/register");
+    expect(screen.queryByText("Steam · Synced")).not.toBeInTheDocument();
+    expect(screen.queryByText("updated 4m ago")).not.toBeInTheDocument();
+  });
+
+  it("keeps Library navigation while hiding standalone Steam and PSN links", () => {
+    render(
+      <AppShell>
+        <main>Home</main>
+      </AppShell>,
+    );
+
+    expect(screen.getAllByRole("link", { name: "Library" })).toHaveLength(2);
+    expect(screen.queryByRole("link", { name: "Steam" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "PSN" })).not.toBeInTheDocument();
+  });
+
+  it("gives navigation links hover and keyboard-focus feedback", () => {
+    render(
+      <AppShell>
+        <main>Home</main>
+      </AppShell>,
+    );
+
+    const libraryLink = screen.getAllByRole("link", { name: "Library" })[0];
+    expect(libraryLink.className).toContain("hover:");
+    expect(libraryLink.className).toContain("focus-visible:");
+  });
+
+  it("updates the sidebar after an auth change", () => {
+    const { rerender } = render(
+      <AppShell>
+        <main>Home</main>
+      </AppShell>,
+    );
+
+    authenticated = true;
+    act(() => notifyAuthChange?.());
+    rerender(
+      <AppShell>
+        <main>Home</main>
+      </AppShell>,
+    );
+
+    const profileLinks = screen.getAllByRole("link", { name: "Profile" });
+    expect(profileLinks).toHaveLength(2);
+    expect(profileLinks[0]).toHaveAttribute("href", "/profile");
+    expect(screen.queryByText("Signed in")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Sign in" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Create account" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the notification menu for authenticated users", async () => {
+    authenticated = true;
+    render(
+      <AppShell>
+        <main>Home</main>
+      </AppShell>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Notifications" }),
+    );
+    expect(
+      await screen.findByText("Alex sent you a friend request."),
+    ).toBeInTheDocument();
   });
 });

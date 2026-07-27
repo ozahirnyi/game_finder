@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GameCover } from "@/components/GameCover";
 import { StatePanel } from "@/components/ui";
@@ -44,9 +44,7 @@ function GameRegion({
           <GameCover title={game.name ?? "Game"} src={game.background_image} />
           <h3>{game.name ?? "Untitled game"}</h3>
           {game.id ? (
-            <Link to="/games/$gameId" params={{ gameId: String(game.id) }}>
-              View details
-            </Link>
+            <Link href={`/games/${game.id}`}>View details</Link>
           ) : null}
         </article>
       ))}
@@ -102,7 +100,7 @@ export function DiscoveryScreen() {
       <header className="section-header">
         <p className="eyebrow">Discover</p>
         <h1>Find your next game</h1>
-        <Link to="/search">Search the catalog</Link>
+        <Link href="/search">Search the catalog</Link>
       </header>
       <section>
         <h2>Trending now</h2>

@@ -3,7 +3,7 @@ services:
     build: .
     container_name: gamefinder-app
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
@@ -24,12 +24,20 @@ services:
       PRICE_ALERT_MIN_CUT: ${PRICE_ALERT_MIN_CUT:-1}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000}
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
+      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
     depends_on:
       - db
       - redis
+  web:
+    build: ./web
+    container_name: gamefinder-web
+    restart: always
+    ports:
+      - "127.0.0.1:3000:3000"
   db:
     image: postgres:15
     container_name: gamefinder-db
