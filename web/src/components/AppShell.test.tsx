@@ -114,7 +114,7 @@ describe("AppShell", () => {
     );
 
     const profileLinks = screen.getAllByRole("link", { name: "Profile" });
-    expect(profileLinks).toHaveLength(1);
+    expect(profileLinks).toHaveLength(2);
     expect(profileLinks[0]).toHaveAttribute("href", "/profile");
     expect(screen.queryByText("Signed in")).not.toBeInTheDocument();
     expect(
