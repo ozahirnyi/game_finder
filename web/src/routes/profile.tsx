@@ -9,7 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { Avatar } from "@/components/GameCover";
+import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
 import {
   clearToken,
@@ -319,12 +319,13 @@ export function ProfilePage() {
               <SectionHeader title="Favorite games" />
               {favorites.length ? (
                 favorites.map((g) => (
-                  <p
+                  <div
                     key={g.id}
-                    className="rounded-lg border border-border bg-surface p-3 font-bold"
+                    className="overflow-hidden rounded-lg border border-border bg-surface"
                   >
-                    {g.title}
-                  </p>
+                    <GameCover className="h-24" from={g.cover_url ?? "#0f766e"} to="#164e63" title={g.title} />
+                    <p className="p-3 font-bold">{g.title}</p>
+                  </div>
                 ))
               ) : (
                 <p>No favorite games yet.</p>
@@ -333,7 +334,7 @@ export function ProfilePage() {
             <div>
               <SectionHeader title="Active wishlist" />
               {wishlist.length ? (
-                wishlist.map((g) => <p key={g.id}>{g.title}</p>)
+                wishlist.map((g) => <div key={g.id} className="overflow-hidden rounded-lg border border-border bg-surface"><GameCover className="h-24" from={g.cover_url ?? "#7c3aed"} to="#312e81" title={g.title} /><p className="p-3 font-bold">{g.title}</p></div>)
               ) : (
                 <p>{s?.wishlist.message ?? "No wishlist games yet."}</p>
               )}

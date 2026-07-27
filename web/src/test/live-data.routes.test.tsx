@@ -259,6 +259,17 @@ describe("live dashboard and profile data", () => {
     );
   });
 
+  it("renders saved collection covers from the profile summary", async () => {
+    api.getProfileSummary.mockResolvedValue({
+      ...summary(),
+      favorites: ready([{ ...game, cover_url: "https://cdn.example/favorite.jpg" }]),
+      wishlist: ready([{ ...game, id: "wish-1", title: "Wishlist game", cover_url: "https://cdn.example/wishlist.jpg" }]),
+    });
+    renderPage(<ProfilePage />);
+    expect(await screen.findByRole("img", { name: "Hades II" })).toHaveAttribute("src", "https://cdn.example/favorite.jpg");
+    expect(screen.getByRole("img", { name: "Wishlist game" })).toHaveAttribute("src", "https://cdn.example/wishlist.jpg");
+  });
+
   it("updates only the selected library visibility", async () => {
     api.updateProfile.mockResolvedValue({
       bio: "Arcade fan",
