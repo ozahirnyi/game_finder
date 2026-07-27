@@ -70,7 +70,10 @@ describe("AppShell", () => {
         <main>Guest home</main>
       </AppShell>,
     );
-    expect(screen.getByRole("link", { name: "Sign in" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
     expect(
       screen.queryByRole("link", { name: "Friends" }),
     ).not.toBeInTheDocument();
