@@ -82,10 +82,15 @@
   --input: hsl(240 6% 88%);
 }
 
-
 @keyframes reveal {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-reveal {
@@ -93,12 +98,74 @@
 }
 
 @keyframes pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .animate-pulse-soft {
   animation: pulse-soft 2s ease-in-out infinite;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.page-enter {
+  animation: page-enter 360ms var(--ease-studio) both;
+}
+.stagger-enter {
+  animation: page-enter 360ms var(--ease-studio) both;
+  animation-delay: var(--stagger-delay, 70ms);
+}
+.card-interactive {
+  transition:
+    transform 180ms var(--ease-studio),
+    border-color 180ms var(--ease-studio);
+}
+.card-interactive:hover {
+  transform: translateY(-3px);
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--surface) 35%,
+    var(--surface-2) 50%,
+    var(--surface) 65%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
 }
 
 @layer base {

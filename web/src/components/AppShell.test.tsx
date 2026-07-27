@@ -8,8 +8,23 @@ let pathname = "/";
 const getAuthSnapshot = vi.fn<() => boolean>();
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ to, children, ...props }: { to: string; children: React.ReactNode }) => <a href={to} {...props}>{children}</a>,
-  useRouterState: ({ select }: { select: (state: { location: { pathname: string } }) => string }) => select({ location: { pathname } }),
+  Link: ({
+    to,
+    children,
+    ...props
+  }: {
+    to: string;
+    children: React.ReactNode;
+  }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
+  useRouterState: ({
+    select,
+  }: {
+    select: (state: { location: { pathname: string } }) => string;
+  }) => select({ location: { pathname } }),
 }));
 vi.mock("./ThemeSelector", () => ({ ThemeSelector: () => <div /> }));
 vi.mock("@/lib/api", () => ({
@@ -22,14 +37,24 @@ function mockAuth(authenticated: boolean) {
   getAuthSnapshot.mockReturnValue(authenticated);
 }
 
-const linkedSteam = { linked: true, steam_id: "1", persona_name: "Real Steam Name", avatar: null, country_code: null, linked_at: null };
+const linkedSteam = {
+  linked: true,
+  steam_id: "1",
+  persona_name: "Real Steam Name",
+  avatar: null,
+  country_code: null,
+  linked_at: null,
+};
 
 describe("AppShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pathname = "/";
     mockAuth(true);
-    vi.mocked(getSteamLibrary).mockResolvedValue({ steam: linkedSteam, games: [] });
+    vi.mocked(getSteamLibrary).mockResolvedValue({
+      steam: linkedSteam,
+      games: [],
+    });
   });
 
   it("shows the linked Steam persona in the personal dashboard", async () => {
@@ -40,8 +65,14 @@ describe("AppShell", () => {
 
   it("keeps unauthenticated navigation public", () => {
     mockAuth(false);
-    render(<AppShell><main>Guest home</main></AppShell>);
+    render(
+      <AppShell>
+        <main>Guest home</main>
+      </AppShell>,
+    );
     expect(screen.getByRole("link", { name: "Sign in" })).toBeVisible();
-    expect(screen.queryByRole("link", { name: "Friends" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Friends" }),
+    ).not.toBeInTheDocument();
   });
 });

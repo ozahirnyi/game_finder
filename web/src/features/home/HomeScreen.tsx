@@ -24,13 +24,28 @@ export function HomeScreen() {
     void getSteamAccount()
       .then((account) => active && setState({ status: "ready", account }))
       .catch(() => active && setState({ status: "error" }));
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [authenticated, retry]);
 
   if (!authenticated) return <GuestHome />;
-  if (state.status === "loading") return <div className="skeleton-shimmer" aria-label="Loading your personalized homepage" />;
+  if (state.status === "loading")
+    return (
+      <div
+        className="skeleton-shimmer"
+        aria-label="Loading your personalized homepage"
+      />
+    );
   if (state.status === "error") {
-    return <div className="stack"><SteamConnectPrompt /><button type="button" onClick={() => setRetry((value) => value + 1)}>Retry Steam connection</button></div>;
+    return (
+      <div className="stack">
+        <SteamConnectPrompt />
+        <button type="button" onClick={() => setRetry((value) => value + 1)}>
+          Retry Steam connection
+        </button>
+      </div>
+    );
   }
   if (!state.account.linked) return <SteamConnectPrompt />;
 

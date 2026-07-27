@@ -20,8 +20,15 @@ export function SteamConnectPrompt() {
     <section className="stack page-enter">
       <p className="eyebrow">Personalize GameFinder</p>
       <h1>Connect Steam to personalize GameFinder</h1>
-      <p>Import your library to see recommendations and game activity tailored to you.</p>
-      <button type="button" onClick={() => void connectSteam()} disabled={opening}>
+      <p>
+        Import your library to see recommendations and game activity tailored to
+        you.
+      </p>
+      <button
+        type="button"
+        onClick={() => void connectSteam()}
+        disabled={opening}
+      >
         {opening ? "Opening Steam…" : "Connect Steam"}
       </button>
     </section>
