@@ -1,16 +1,28 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthState } from "@/hooks/useAuthState";
 import { getHomepageDeals, getSteamAccount } from "@/lib/api";
+import { Dashboard } from "@/routes/index";
 import { GuestHome } from "./GuestHome";
 import { HomeScreen } from "./HomeScreen";
 
 const mockNavigate = vi.fn();
 
-vi.mock("@tanstack/react-router", () => ({ useNavigate: () => mockNavigate }));
+vi.mock("@tanstack/react-router", () => ({
+  createFileRoute: () => () => ({}),
+  Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+  useNavigate: () => mockNavigate,
+}));
+vi.mock("@/components/AppShell", () => ({
+  AppShell: ({ children }: { children: React.ReactNode }) => (
+    <main>{children}</main>
+  ),
+}));
 vi.mock("@/hooks/useAuthState", () => ({ useAuthState: vi.fn() }));
 vi.mock("@/lib/api", () => ({
   getHomepageDeals: vi.fn(),
+  getDashboard: vi.fn(),
   getSteamAccount: vi.fn(),
   getSteamLoginUrl: vi.fn(),
   searchGames: vi.fn(),
@@ -25,6 +37,21 @@ describe("homepage branches", () => {
   it("shows public search and public deals without calling Steam when signed out", () => {
     vi.mocked(useAuthState).mockReturnValue(false);
     render(<HomeScreen />);
+    expect(
+      screen.getByRole("heading", { name: /find your next game/i }),
+    ).toBeVisible();
+    expect(getSteamAccount).not.toHaveBeenCalled();
+  });
+
+  it("uses the public homepage from the root route when signed out", () => {
+    vi.mocked(useAuthState).mockReturnValue(false);
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <Dashboard />
+      </QueryClientProvider>,
+    );
+
     expect(
       screen.getByRole("heading", { name: /find your next game/i }),
     ).toBeVisible();

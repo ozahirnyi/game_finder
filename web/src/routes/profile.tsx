@@ -71,7 +71,9 @@ export function ProfilePage() {
   const [bio, setBio] = useState("");
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
-  const [visibilityChanges, setVisibilityChanges] = useState<Record<string, "private" | "friends" | "public">>({});
+  const [visibilityChanges, setVisibilityChanges] = useState<
+    Record<string, "private" | "friends" | "public">
+  >({});
   const save = useMutation({
     mutationFn: updateProfile,
     onSuccess: () => {
@@ -98,7 +100,10 @@ export function ProfilePage() {
   if (!authenticated)
     return (
       <AppShell>
-        <SectionHeader title="Profile" hint="Create an account or sign in to view your profile." />
+        <SectionHeader
+          title="Profile"
+          hint="Create an account or sign in to view your profile."
+        />
         <div className="flex gap-3">
           <Link to="/login">Sign in</Link>
           <Link to="/register">Create account</Link>
@@ -114,7 +119,10 @@ export function ProfilePage() {
   if (query.isError && (query.error as { status?: number }).status === 401)
     return (
       <AppShell>
-        <SectionHeader title="Profile" hint="Create an account or sign in to view your profile." />
+        <SectionHeader
+          title="Profile"
+          hint="Create an account or sign in to view your profile."
+        />
         <div className="flex gap-3">
           <Link to="/login">Sign in</Link>
           <Link to="/register">Create account</Link>
@@ -182,7 +190,10 @@ export function ProfilePage() {
           />
           <div className="flex-1">
             <h1 className="text-3xl font-extrabold">
-              {user?.public_nickname ?? user?.display_name ?? user?.email ?? "Your profile"}
+              {user?.public_nickname ??
+                user?.display_name ??
+                user?.email ??
+                "Your profile"}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {profile?.bio ||
@@ -276,15 +287,24 @@ export function ProfilePage() {
                 {label}
                 <select
                   aria-label={label}
-                  value={visibilityChanges[field] ?? profile?.[field as keyof typeof profile] ?? "public"}
-                  onChange={(event) => setVisibilityChanges((current) => ({
-                    ...current,
-                    [field]: event.target.value as "private" | "friends" | "public",
-                  }))}
+                  value={
+                    visibilityChanges[field] ??
+                    profile?.[field as keyof typeof profile] ??
+                    "public"
+                  }
+                  onChange={(event) =>
+                    setVisibilityChanges((current) => ({
+                      ...current,
+                      [field]: event.target.value as
+                        "private" | "friends" | "public",
+                    }))
+                  }
                   className="mt-2 w-full rounded border border-border bg-background p-2"
                 >
                   {VISIBILITY_OPTIONS.map(([optionValue, optionLabel]) => (
-                    <option key={optionValue} value={optionValue}>{optionLabel}</option>
+                    <option key={optionValue} value={optionValue}>
+                      {optionLabel}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -349,13 +369,23 @@ export function ProfilePage() {
               {stats?.games?.length ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {stats.games.map((g) => (
-                    <div key={g.id} className="overflow-hidden rounded-lg border border-border bg-surface">
-                      <GameCover className="h-24" from={g.img_icon_url ?? "#155e75"} to="#164e63" title={g.title} />
+                    <div
+                      key={g.id}
+                      className="overflow-hidden rounded-lg border border-border bg-surface"
+                    >
+                      <GameCover
+                        className="h-24"
+                        from={g.img_icon_url ?? "#155e75"}
+                        to="#164e63"
+                        title={g.title}
+                      />
                       <p className="p-3 font-bold">{g.title}</p>
                     </div>
                   ))}
                 </div>
-              ) : <p>No library games yet.</p>}
+              ) : (
+                <p>No library games yet.</p>
+              )}
             </div>
             <div>
               <SectionHeader title="Favorite games" />
@@ -365,7 +395,12 @@ export function ProfilePage() {
                     key={g.id}
                     className="overflow-hidden rounded-lg border border-border bg-surface"
                   >
-                    <GameCover className="h-24" from={g.cover_url ?? "#0f766e"} to="#164e63" title={g.title} />
+                    <GameCover
+                      className="h-24"
+                      from={g.cover_url ?? "#0f766e"}
+                      to="#164e63"
+                      title={g.title}
+                    />
                     <p className="p-3 font-bold">{g.title}</p>
                   </div>
                 ))
@@ -376,7 +411,20 @@ export function ProfilePage() {
             <div>
               <SectionHeader title="Active wishlist" />
               {wishlist.length ? (
-                wishlist.map((g) => <div key={g.id} className="overflow-hidden rounded-lg border border-border bg-surface"><GameCover className="h-24" from={g.cover_url ?? "#7c3aed"} to="#312e81" title={g.title} /><p className="p-3 font-bold">{g.title}</p></div>)
+                wishlist.map((g) => (
+                  <div
+                    key={g.id}
+                    className="overflow-hidden rounded-lg border border-border bg-surface"
+                  >
+                    <GameCover
+                      className="h-24"
+                      from={g.cover_url ?? "#7c3aed"}
+                      to="#312e81"
+                      title={g.title}
+                    />
+                    <p className="p-3 font-bold">{g.title}</p>
+                  </div>
+                ))
               ) : (
                 <p>{s?.wishlist.message ?? "No wishlist games yet."}</p>
               )}
@@ -407,21 +455,19 @@ export function ProfilePage() {
                 >
                   Connect
                 </Link>
+              ) : r.n === "Google" ? (
+                <button
+                  type="button"
+                  onClick={() => linkGoogle.mutate()}
+                  disabled={linkGoogle.isPending}
+                  className="rounded border border-border px-2 py-1 text-xs font-bold disabled:opacity-60"
+                >
+                  {linkGoogle.isPending ? "Opening Google…" : "Connect"}
+                </button>
               ) : (
-                r.n === "Google" ? (
-                  <button
-                    type="button"
-                    onClick={() => linkGoogle.mutate()}
-                    disabled={linkGoogle.isPending}
-                    className="rounded border border-border px-2 py-1 text-xs font-bold disabled:opacity-60"
-                  >
-                    {linkGoogle.isPending ? "Opening Google…" : "Connect"}
-                  </button>
-                ) : (
-                  <span className="text-xs text-muted-foreground">
-                    Not connected
-                  </span>
-                )
+                <span className="text-xs text-muted-foreground">
+                  Not connected
+                </span>
               )}
             </div>
           ))}

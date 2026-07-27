@@ -24,10 +24,18 @@ export const Route = createFileRoute("/deals")({
 function money(amount: number | undefined, currency: string | undefined) {
   return amount === undefined || !currency
     ? "Price not listed"
-    : new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
+    : new Intl.NumberFormat(undefined, { style: "currency", currency }).format(
+        amount,
+      );
 }
 
-function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolean }) {
+function DealLinks({
+  deal,
+  compact = false,
+}: {
+  deal: HomeDeal;
+  compact?: boolean;
+}) {
   const buttonClass = compact
     ? "rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     : "rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
@@ -35,7 +43,11 @@ function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolea
     ? "rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold transition-colors hover:border-primary/60 hover:bg-primary/10 active:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     : "rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold transition-colors hover:border-primary/60 hover:bg-primary/10 active:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
   return (
-    <div className={compact ? "mt-3 flex flex-wrap gap-2" : "mt-8 flex flex-wrap gap-3"}>
+    <div
+      className={
+        compact ? "mt-3 flex flex-wrap gap-2" : "mt-8 flex flex-wrap gap-3"
+      }
+    >
       {deal.url ? (
         <a
           href={deal.url}
@@ -46,7 +58,9 @@ function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolea
           Open deal
         </a>
       ) : (
-        <span className="px-1 text-xs text-muted-foreground">The store has not supplied a purchase link.</span>
+        <span className="px-1 text-xs text-muted-foreground">
+          The store has not supplied a purchase link.
+        </span>
       )}
       {deal.id ? (
         <Link
@@ -57,22 +71,42 @@ function DealLinks({ deal, compact = false }: { deal: HomeDeal; compact?: boolea
           Game details
         </Link>
       ) : (
-        <span className="px-1 text-xs text-muted-foreground">Catalog details are being matched.</span>
+        <span className="px-1 text-xs text-muted-foreground">
+          Catalog details are being matched.
+        </span>
       )}
     </div>
   );
 }
 
-function DealPrices({ deal, compact = false }: { deal: HomeDeal; compact?: boolean }) {
+function DealPrices({
+  deal,
+  compact = false,
+}: {
+  deal: HomeDeal;
+  compact?: boolean;
+}) {
   return (
-    <div className={compact ? "flex flex-wrap items-end gap-3" : "flex flex-wrap items-end gap-5"}>
+    <div
+      className={
+        compact
+          ? "flex flex-wrap items-end gap-3"
+          : "flex flex-wrap items-end gap-5"
+      }
+    >
       <div>
         {deal.current?.regular && (
           <p className="font-mono text-xs text-muted-foreground line-through">
             {money(deal.current.regular.amount, deal.current.regular.currency)}
           </p>
         )}
-        <p className={compact ? "font-mono text-xl font-black text-primary" : "font-mono text-3xl font-black text-primary"}>
+        <p
+          className={
+            compact
+              ? "font-mono text-xl font-black text-primary"
+              : "font-mono text-3xl font-black text-primary"
+          }
+        >
           {money(deal.current?.price?.amount, deal.current?.price?.currency)}
         </p>
       </div>
@@ -111,9 +145,13 @@ function DealCard({ deal }: { deal: HomeDeal }) {
           <h4 className="line-clamp-2 text-base font-bold">{deal.name}</h4>
         )}
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {deal.released ? `Released ${deal.released}` : "Release date is not listed."}
+          {deal.released
+            ? `Released ${deal.released}`
+            : "Release date is not listed."}
         </p>
-        <div className="mt-2"><DealPrices deal={deal} compact /></div>
+        <div className="mt-2">
+          <DealPrices deal={deal} compact />
+        </div>
         <DealLinks deal={deal} compact />
       </div>
     </article>
@@ -128,13 +166,18 @@ export function DealsPage() {
   });
   const popular = dealsQuery.data?.popular ?? [];
   const sections = dealsQuery.data?.sections ?? [];
-  const activeSection = sections.find((section) => section.genre === activeGenre) ?? sections[0];
+  const activeSection =
+    sections.find((section) => section.genre === activeGenre) ?? sections[0];
 
   return (
     <AppShell>
       <SectionHeader
         title="Deals"
-        hint={dealsQuery.isLoading ? "Loading current deals…" : `${popular.length} popular Steam deals`}
+        hint={
+          dealsQuery.isLoading
+            ? "Loading current deals…"
+            : `${popular.length} popular Steam deals`
+        }
       />
 
       {dealsQuery.isError && (
@@ -151,15 +194,21 @@ export function DealsPage() {
 
       {dealsQuery.isSuccess && !popular.length && !sections.length && (
         <div className="rounded-2xl border border-border bg-surface p-6 text-sm text-muted-foreground">
-          There are no featured price drops for this region yet. Check back soon.
+          There are no featured price drops for this region yet. Check back
+          soon.
         </div>
       )}
 
       {popular.length ? (
         <section className="mb-10">
-          <SectionHeader title="Popular on Steam" hint="Discounted bestsellers" />
+          <SectionHeader
+            title="Popular on Steam"
+            hint="Discounted bestsellers"
+          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
-            {popular.map((deal) => <DealCard deal={deal} key={`popular-${deal.id ?? deal.name}`} />)}
+            {popular.map((deal) => (
+              <DealCard deal={deal} key={`popular-${deal.id ?? deal.name}`} />
+            ))}
           </div>
         </section>
       ) : null}
@@ -178,11 +227,17 @@ export function DealsPage() {
               </button>
             ))}
           </div>
-          <SectionHeader title={activeSection.genre} hint={`${activeSection.results.length} current discounts`} />
+          <SectionHeader
+            title={activeSection.genre}
+            hint={`${activeSection.results.length} current discounts`}
+          />
           {activeSection.results.length ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {activeSection.results.map((deal) => (
-                <DealCard deal={deal} key={`${activeSection.genre}-${deal.id ?? deal.name}`} />
+                <DealCard
+                  deal={deal}
+                  key={`${activeSection.genre}-${deal.id ?? deal.name}`}
+                />
               ))}
             </div>
           ) : (

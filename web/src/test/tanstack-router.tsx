@@ -1,5 +1,9 @@
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 
+export function createFileRoute(_path: string) {
+  return <T extends object>(options: T) => ({ ...options, options });
+}
+
 export function Link({
   to,
   children,

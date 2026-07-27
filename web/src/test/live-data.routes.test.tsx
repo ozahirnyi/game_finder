@@ -12,11 +12,14 @@ const api = vi.hoisted(() => ({
   clearToken: vi.fn(),
   getDashboard: vi.fn(),
   getGoogleLinkUrl: vi.fn(),
+  getHomepageDeals: vi.fn(),
   getLibraryOverview: vi.fn(),
   resolveSteamLibraryGame: vi.fn(),
   getProfileSummary: vi.fn(),
   getSteamLinkUrl: vi.fn(),
+  getAuthSnapshot: vi.fn(),
   isAuthenticated: vi.fn(),
+  subscribeToAuthChanges: vi.fn(() => () => undefined),
   syncSteamLibrary: vi.fn(),
   updateProfile: vi.fn(),
 }));
@@ -168,7 +171,7 @@ function dashboard() {
       ],
     }),
     deals: empty("No price drops yet."),
-    steam: disconnected("Connect Steam to sync your library."),
+    steam: ready({ steam }),
     social: disconnected("Connect Steam to see friends."),
   };
 }
@@ -190,8 +193,23 @@ describe("live dashboard and profile data", () => {
     vi.clearAllMocks();
     api.getDashboard.mockResolvedValue(dashboard());
     api.getProfileSummary.mockResolvedValue(summary());
-    api.getLibraryOverview.mockResolvedValue({ games: [{ id: "saved-1", source: "manual", external_id: null, detail_game_id: "saved-1", title: "Hades II", cover_url: null, playtime_forever: 125 }], steam_available: false, steam_error: null });
+    api.getLibraryOverview.mockResolvedValue({
+      games: [
+        {
+          id: "saved-1",
+          source: "manual",
+          external_id: null,
+          detail_game_id: "saved-1",
+          title: "Hades II",
+          cover_url: null,
+          playtime_forever: 125,
+        },
+      ],
+      steam_available: false,
+      steam_error: null,
+    });
     api.isAuthenticated.mockReturnValue(true);
+    api.getAuthSnapshot.mockImplementation(() => api.isAuthenticated());
     librarySearch.mockReturnValue({ tab: "library" });
   });
 
@@ -211,7 +229,7 @@ describe("live dashboard and profile data", () => {
       "https://cdn.example/balatro.jpg",
     );
     expect(screen.getByText("No price drops yet.")).toBeVisible();
-    expect(screen.getAllByText("Connect Steam").length).toBeGreaterThan(0);
+    expect(screen.getByText("Steam connected")).toBeVisible();
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
   });
 
@@ -221,13 +239,30 @@ describe("live dashboard and profile data", () => {
       recommendations: {
         status: "error",
         data: [],
-        message: "Recommendations are temporarily unavailable. Please try again later.",
+        message:
+          "Recommendations are temporarily unavailable. Please try again later.",
       },
     });
     renderPage(<Dashboard />);
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Recommendations are temporarily unavailable. Please try again later.",
     );
+  });
+
+  it("shows Steam onboarding instead of a personal dashboard when unlinked", async () => {
+    api.getDashboard.mockResolvedValue({
+      ...dashboard(),
+      steam: disconnected("Connect Steam to sync your library."),
+    });
+
+    renderPage(<Dashboard />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Connect Steam to personalize GameFinder",
+      }),
+    ).toBeVisible();
+    expect(screen.queryByText("Balatro")).not.toBeInTheDocument();
   });
 
   it("renders profile and library values from the profile summary without demo cards", async () => {
@@ -270,12 +305,26 @@ describe("live dashboard and profile data", () => {
   it("renders saved collection covers from the profile summary", async () => {
     api.getProfileSummary.mockResolvedValue({
       ...summary(),
-      favorites: ready([{ ...game, cover_url: "https://cdn.example/favorite.jpg" }]),
-      wishlist: ready([{ ...game, id: "wish-1", title: "Wishlist game", cover_url: "https://cdn.example/wishlist.jpg" }]),
+      favorites: ready([
+        { ...game, cover_url: "https://cdn.example/favorite.jpg" },
+      ]),
+      wishlist: ready([
+        {
+          ...game,
+          id: "wish-1",
+          title: "Wishlist game",
+          cover_url: "https://cdn.example/wishlist.jpg",
+        },
+      ]),
     });
     renderPage(<ProfilePage />);
-    expect(await screen.findByRole("img", { name: "Hades II" })).toHaveAttribute("src", "https://cdn.example/favorite.jpg");
-    expect(screen.getByRole("img", { name: "Wishlist game" })).toHaveAttribute("src", "https://cdn.example/wishlist.jpg");
+    expect(
+      await screen.findByRole("img", { name: "Hades II" }),
+    ).toHaveAttribute("src", "https://cdn.example/favorite.jpg");
+    expect(screen.getByRole("img", { name: "Wishlist game" })).toHaveAttribute(
+      "src",
+      "https://cdn.example/wishlist.jpg",
+    );
   });
 
   it("renders manual library games with an intentional cover fallback", async () => {
@@ -283,7 +332,15 @@ describe("live dashboard and profile data", () => {
       ...summary(),
       library: ready({
         ...summary().library.data,
-        games: [{ ...game, id: "manual-1", title: "Manual game", source: "manual", img_icon_url: null }],
+        games: [
+          {
+            ...game,
+            id: "manual-1",
+            title: "Manual game",
+            source: "manual",
+            img_icon_url: null,
+          },
+        ],
       }),
     });
     renderPage(<ProfilePage />);
@@ -349,7 +406,9 @@ describe("live dashboard and profile data", () => {
   it("shows an error when the protected library request fails", async () => {
     api.getLibraryOverview.mockRejectedValue({ status: 401 });
     renderPage(<LibraryPage />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("could not be loaded");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "could not be loaded",
+    );
   });
 
   it("shows a Steam sign-in action when the dashboard request returns 401", async () => {
@@ -371,38 +430,65 @@ describe("live dashboard and profile data", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("labels the dashboard Steam entry as sign in for guests", async () => {
+  it("shows the public homepage for guests", async () => {
     api.isAuthenticated.mockReturnValue(false);
     renderPage(<Dashboard />);
 
-    const signInLinks = await screen.findAllByText("Sign in to connect Steam", {
-      selector: "a",
-    });
-    expect(signInLinks).toHaveLength(2);
-    signInLinks.forEach((link) => expect(link).toHaveAttribute("to", "/login"));
+    expect(
+      await screen.findByRole("heading", { name: "Find your next game" }),
+    ).toBeVisible();
+    expect(api.getDashboard).not.toHaveBeenCalled();
   });
 
   it("renders the library overview with All selected initially", async () => {
     renderPage(<LibraryPage />);
-    expect(await screen.findByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("button", { name: "All" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(await screen.findByText("Hades II")).toBeVisible();
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
   });
 
   it("uses the dashboard steam block for its not-connected state", async () => {
+    api.getDashboard.mockResolvedValue({
+      ...dashboard(),
+      steam: disconnected("Connect Steam to sync your library."),
+    });
     renderPage(<SteamLibraryPanel />);
     expect(
       (await screen.findAllByText("Connect Steam to sync your library."))
         .length,
     ).toBeGreaterThan(0);
-    expect(
-      screen.getByRole("button", { name: "Connect Steam" }),
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Connect Steam" })).toBeVisible();
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
   });
 
   it("filters Steam games", async () => {
-    api.getLibraryOverview.mockResolvedValue({ games: [{ id: "s", source: "steam", external_id: "1", detail_game_id: null, title: "Steam game", cover_url: null, playtime_forever: 1 }, { id: "p", source: "psn", external_id: "p", detail_game_id: "p", title: "PSN game", cover_url: null, playtime_forever: null }], steam_available: true, steam_error: null });
+    api.getLibraryOverview.mockResolvedValue({
+      games: [
+        {
+          id: "s",
+          source: "steam",
+          external_id: "1",
+          detail_game_id: null,
+          title: "Steam game",
+          cover_url: null,
+          playtime_forever: 1,
+        },
+        {
+          id: "p",
+          source: "psn",
+          external_id: "p",
+          detail_game_id: "p",
+          title: "PSN game",
+          cover_url: null,
+          playtime_forever: null,
+        },
+      ],
+      steam_available: true,
+      steam_error: null,
+    });
     renderPage(<LibraryPage />);
     fireEvent.click(await screen.findByRole("button", { name: "Steam" }));
     expect(screen.getByText("Steam game")).toBeVisible();
@@ -412,7 +498,9 @@ describe("live dashboard and profile data", () => {
   it("shows a source-specific empty state", async () => {
     renderPage(<LibraryPage />);
     fireEvent.click(await screen.findByRole("button", { name: "PSN" }));
-    expect(await screen.findByText("No PSN games are in your library yet.")).toBeVisible();
+    expect(
+      await screen.findByText("No PSN games are in your library yet."),
+    ).toBeVisible();
   });
 
   it("renders the reusable Steam library panel for a connected dashboard", async () => {

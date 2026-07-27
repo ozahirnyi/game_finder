@@ -159,10 +159,11 @@ describe("auth recovery routes", () => {
     expect(
       await screen.findByRole("link", { name: "Sign in" }),
     ).toHaveAttribute("href", "/login");
-    expect(screen.getByRole("link", { name: "Create account" })).toHaveAttribute(
-      "href",
-      "/register",
-    );
-    expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Create account" }),
+    ).toHaveAttribute("href", "/register");
+    expect(
+      screen.queryByRole("button", { name: "Sign out" }),
+    ).not.toBeInTheDocument();
   });
 });

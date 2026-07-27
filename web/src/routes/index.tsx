@@ -4,7 +4,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { getDashboard, isAuthenticated } from "@/lib/api";
+import { GuestHome } from "@/features/home/GuestHome";
+import { SteamConnectPrompt } from "@/features/home/SteamConnectPrompt";
+import { useAuthState } from "@/hooks/useAuthState";
+import { getDashboard } from "@/lib/api";
 import { lovableQueryKeys } from "@/lib/lovable-data";
 import { ArrowRight, Search, Sparkles } from "lucide-react";
 
@@ -13,10 +16,11 @@ const message = (value: { message?: string | null }, fallback: string) =>
   value.message || fallback;
 
 export function Dashboard() {
-  const authenticated = isAuthenticated();
+  const authenticated = useAuthState();
   const query = useQuery({
     queryKey: lovableQueryKeys.dashboard,
     queryFn: getDashboard,
+    enabled: authenticated,
   });
   const data = query.data;
   const cacheExpiresAt = data?.recommendations.data?.cache_expires_at;
@@ -39,6 +43,33 @@ export function Dashboard() {
     ("steam" in data.steam.data
       ? data.steam.data.steam.linked
       : data.steam.data.linked);
+
+  if (!authenticated) {
+    return (
+      <AppShell>
+        <GuestHome />
+      </AppShell>
+    );
+  }
+
+  if (query.isPending) {
+    return (
+      <AppShell>
+        <div
+          className="skeleton-shimmer"
+          aria-label="Loading your personalized homepage"
+        />
+      </AppShell>
+    );
+  }
+
+  if (!steamConnected) {
+    return (
+      <AppShell>
+        <SteamConnectPrompt />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
@@ -122,8 +153,14 @@ export function Dashboard() {
               }
             />
             {data?.recommendations.status === "error" ? (
-              <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive" role="alert">
-                {message(data.recommendations, "Recommendations are temporarily unavailable. Please try again later.")}
+              <p
+                className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+                role="alert"
+              >
+                {message(
+                  data.recommendations,
+                  "Recommendations are temporarily unavailable. Please try again later.",
+                )}
               </p>
             ) : recommendations.length ? (
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -131,15 +168,19 @@ export function Dashboard() {
                   <Link
                     key={item.title}
                     to={item.rawg_id ? "/games/$gameId" : "/search"}
-                    params={item.rawg_id ? { gameId: String(item.rawg_id) } : undefined}
+                    params={
+                      item.rawg_id
+                        ? { gameId: String(item.rawg_id) }
+                        : undefined
+                    }
                     className="overflow-hidden rounded-xl border border-border bg-surface transition hover:border-white/20"
-                    >
-                      <GameCover
-                        from={item.cover_url ?? "#334155"}
-                        to="#0f172a"
-                        title={item.title}
-                        className="aspect-[4/5] w-full"
-                      />
+                  >
+                    <GameCover
+                      from={item.cover_url ?? "#334155"}
+                      to="#0f172a"
+                      title={item.title}
+                      className="aspect-[4/5] w-full"
+                    />
                     <div className="p-4">
                       <div className="mb-2 flex items-center gap-1.5">
                         <Sparkles className="size-3 text-primary" />

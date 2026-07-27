@@ -205,7 +205,8 @@ export function ConversationScreen({
   if (!authenticated) {
     const directReturnTo = conversationPath(friendId, initialDraft);
     const useStoredDraft =
-      Boolean(initialDraft) && validateInternalReturnTo(directReturnTo) === null;
+      Boolean(initialDraft) &&
+      validateInternalReturnTo(directReturnTo) === null;
     const returnTo = useStoredDraft
       ? messageDraftResumePath(friendId)
       : directReturnTo;

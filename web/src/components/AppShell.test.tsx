@@ -82,7 +82,9 @@ describe("AppShell", () => {
     );
 
     expect(screen.getAllByRole("link", { name: "Library" })).toHaveLength(2);
-    expect(screen.queryByRole("link", { name: "Steam" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Steam" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "PSN" })).not.toBeInTheDocument();
   });
 
