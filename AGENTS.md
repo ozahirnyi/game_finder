@@ -88,3 +88,14 @@ npm.cmd test
 ```
 
 Use `npm.cmd` on Windows PowerShell if `npm` is blocked by execution policy.
+
+## GitHub And Delivery
+
+Apply these rules in every chat working on this project:
+
+- Create a separate `codex/<task-name>` branch before implementation. Do not work directly on shared phase branches.
+- Use `main` as the base branch for every pull request. Never create or use `phase-6` branches or pull requests.
+- Keep commits small and thematic. Before committing or publishing, inspect `git status` and the scoped diff, then run relevant tests followed by the full applicable test/build suite.
+- Preserve unrelated changes and never commit secrets, credentials, generated local artifacts, or old changes outside the task.
+- Push the task branch and create a pull request for review. Its description must summarize the changes and list verification commands.
+- Merge only after user approval or review. After merging, confirm that production deployed from `main` and run the applicable production health check.
