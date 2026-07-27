@@ -258,18 +258,30 @@ export type SocialPlayersPage = {
 };
 
 export type SocialRelationship =
-  | "self"
-  | "none"
-  | "outgoing_pending"
-  | "incoming_pending"
-  | "friends";
+  "self" | "none" | "outgoing_pending" | "incoming_pending" | "friends";
 
 export type SocialProfile = SocialPlayer & {
   relationship: SocialRelationship;
 };
-export type PublicSection<T> = { status: "ready" | "empty" | "hidden"; data: T; message?: string | null };
-export type PublicLibraryGame = { id: string; title: string; source: string; cover_url: string | null; playtime_forever: number | null; detail_game_id: string | null };
-export type PublicSteamAccount = { linked: boolean; persona_name: string | null; avatar: string | null; profile_url: string | null };
+export type PublicSection<T> = {
+  status: "ready" | "empty" | "hidden";
+  data: T;
+  message?: string | null;
+};
+export type PublicLibraryGame = {
+  id: string;
+  title: string;
+  source: string;
+  cover_url: string | null;
+  playtime_forever: number | null;
+  detail_game_id: string | null;
+};
+export type PublicSteamAccount = {
+  linked: boolean;
+  persona_name: string | null;
+  avatar: string | null;
+  profile_url: string | null;
+};
 export type PublicProfile = SocialProfile & {
   library: PublicSection<PublicLibraryGame[]>;
   favorites: PublicSection<CatalogCollectionItem[]>;
@@ -404,10 +416,7 @@ export type ProfileSummaryResponse = {
   recently_played: DataBlock<SteamGame[]>;
 };
 
-const API_URL = (
-  import.meta.env.VITE_API_URL ||
-  "/api"
-).replace(/\/+$/, "");
+const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
 
@@ -678,7 +687,8 @@ export function getLibraryOverview() {
 
 export function resolveSteamLibraryGame(appId: number) {
   return request<{ game_id: number }>(`/library/steam-games/${appId}/resolve`, {
-    method: "POST", auth: true,
+    method: "POST",
+    auth: true,
   });
 }
 
@@ -905,7 +915,10 @@ export function listIncomingFriendRequests() {
   return request<FriendRequest[]>("/friends/requests/incoming", { auth: true });
 }
 
-export function createLegacyFriendRequest(recipientId: string, message?: string) {
+export function createLegacyFriendRequest(
+  recipientId: string,
+  message?: string,
+) {
   return request<FriendRequest>("/friends/requests", {
     method: "POST",
     auth: true,

@@ -161,21 +161,21 @@ describe("catalog routes", () => {
     renderPage(<DealsPage />);
 
     expect((await screen.findAllByText("Hades II")).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /open deal/i })[0]).toHaveAttribute(
-      "href",
-      "https://store.steampowered.com/app/1145350",
-    );
-    expect(screen.getAllByRole("link", { name: /game details/i })[0]).toHaveAttribute(
-      "href",
-      "/games/274755",
-    );
+    expect(
+      screen.getAllByRole("link", { name: /open deal/i })[0],
+    ).toHaveAttribute("href", "https://store.steampowered.com/app/1145350");
+    expect(
+      screen.getAllByRole("link", { name: /game details/i })[0],
+    ).toHaveAttribute("href", "/games/274755");
     expect(screen.queryByText("Data unavailable")).not.toBeInTheDocument();
   });
 
   it("gives deal actions hover and keyboard-focus feedback", async () => {
     renderPage(<DealsPage />);
 
-    const action = (await screen.findAllByRole("link", { name: /open deal/i }))[0];
+    const action = (
+      await screen.findAllByRole("link", { name: /open deal/i })
+    )[0];
     expect(action.className).toContain("hover:");
     expect(action.className).toContain("focus-visible:");
   });
@@ -187,10 +187,9 @@ describe("catalog routes", () => {
     expect(screen.getByRole("button", { name: "Action" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Strategy" })).toBeVisible();
     expect(screen.getAllByText(/-33%/).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /open deal/i })[0]).toHaveAttribute(
-      "href",
-      "https://store.steampowered.com/app/1145350",
-    );
+    expect(
+      screen.getAllByRole("link", { name: /open deal/i })[0],
+    ).toHaveAttribute("href", "https://store.steampowered.com/app/1145350");
     expect(api.getGenreDeals).toHaveBeenCalledTimes(1);
     expect(api.getHomepageDeals).not.toHaveBeenCalled();
   });
@@ -236,22 +235,24 @@ describe("catalog routes", () => {
       "href",
       "https://store.steampowered.com/app/999",
     );
-    expect(screen.queryByRole("link", { name: /game details/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /game details/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("uses compact deal cards while retaining Steam and catalog links", async () => {
     renderPage(<DealsPage />);
 
     expect(await screen.findByText("Popular on Steam")).toBeVisible();
-    expect(screen.getAllByAltText("Hades II")[0].parentElement).toHaveClass("aspect-video");
-    expect(screen.getAllByRole("link", { name: /open deal/i })[0]).toHaveAttribute(
-      "href",
-      "https://store.steampowered.com/app/1145350",
+    expect(screen.getAllByAltText("Hades II")[0].parentElement).toHaveClass(
+      "aspect-video",
     );
-    expect(screen.getAllByRole("link", { name: /game details/i })[0]).toHaveAttribute(
-      "href",
-      "/games/274755",
-    );
+    expect(
+      screen.getAllByRole("link", { name: /open deal/i })[0],
+    ).toHaveAttribute("href", "https://store.steampowered.com/app/1145350");
+    expect(
+      screen.getAllByRole("link", { name: /game details/i })[0],
+    ).toHaveAttribute("href", "/games/274755");
   });
 
   it("renders real catalog metadata and price-low values without placeholder copy", async () => {
@@ -292,13 +293,13 @@ describe("catalog routes", () => {
     await screen.findByRole("button", { name: /show description/i });
     expect(screen.queryByTestId("game-description")).not.toBeInTheDocument();
     expect(api.searchGames).toHaveBeenCalledWith("Hades II");
-    fireEvent.click(
-      screen.getByRole("button", { name: /show description/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /show description/i }));
     expect(
       screen.getByRole("button", { name: /hide description/i }),
     ).toBeVisible();
-    expect(screen.getByTestId("game-description")).toHaveTextContent("Fight beyond the Underworld.");
+    expect(screen.getByTestId("game-description")).toHaveTextContent(
+      "Fight beyond the Underworld.",
+    );
   });
 
   it("hides catalog actions for guests", () => {
@@ -416,7 +417,9 @@ describe("catalog routes", () => {
       expect(api.saveCatalogGameToFavorites).toHaveBeenCalledWith(274755),
     );
     expect(
-      await screen.findByRole("button", { name: /remove hades ii from favorites/i }),
+      await screen.findByRole("button", {
+        name: /remove hades ii from favorites/i,
+      }),
     ).toBeVisible();
   });
 
@@ -429,10 +432,25 @@ describe("catalog routes", () => {
     ]);
     api.removeFavorite.mockResolvedValue(undefined);
 
-    renderPage(<CatalogGameActions game={{ id: 274755, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] }} />);
+    renderPage(
+      <CatalogGameActions
+        game={{
+          id: 274755,
+          name: "Hades II",
+          released: null,
+          background_image: null,
+          description_raw: null,
+          rating: null,
+          genres: [],
+          platforms: [],
+        }}
+      />,
+    );
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /remove hades ii from favorites/i }),
+      await screen.findByRole("button", {
+        name: /remove hades ii from favorites/i,
+      }),
     );
 
     await waitFor(() =>
@@ -451,16 +469,35 @@ describe("catalog routes", () => {
       }),
     );
 
-    renderPage(<CatalogGameActions game={{ id: 274755, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] }} />);
+    renderPage(
+      <CatalogGameActions
+        game={{
+          id: 274755,
+          name: "Hades II",
+          released: null,
+          background_image: null,
+          description_raw: null,
+          rating: null,
+          genres: [],
+          platforms: [],
+        }}
+      />,
+    );
 
-    fireEvent.click(await screen.findByRole("button", { name: /add hades ii to favorites/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /add hades ii to favorites/i }),
+    );
 
     expect(
-      await screen.findByRole("button", { name: /adding hades ii to favorites/i }),
+      await screen.findByRole("button", {
+        name: /adding hades ii to favorites/i,
+      }),
     ).toBeDisabled();
     resolveFavorite!({});
     expect(
-      await screen.findByRole("button", { name: /remove hades ii from favorites/i }),
+      await screen.findByRole("button", {
+        name: /remove hades ii from favorites/i,
+      }),
     ).toBeVisible();
   });
 
@@ -470,14 +507,31 @@ describe("catalog routes", () => {
     api.listWishlist.mockResolvedValue([]);
     api.saveCatalogGameToFavorites.mockRejectedValue(new Error("Unavailable"));
 
-    renderPage(<CatalogGameActions game={{ id: 274755, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] }} />);
+    renderPage(
+      <CatalogGameActions
+        game={{
+          id: 274755,
+          name: "Hades II",
+          released: null,
+          background_image: null,
+          description_raw: null,
+          rating: null,
+          genres: [],
+          platforms: [],
+        }}
+      />,
+    );
 
-    fireEvent.click(await screen.findByRole("button", { name: /add hades ii to favorites/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /add hades ii to favorites/i }),
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Could not save this game. Please try again.",
     );
-    expect(screen.getByRole("button", { name: /add hades ii to favorites/i })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /add hades ii to favorites/i }),
+    ).toBeEnabled();
   });
 
   it("adds from search without replacing the explicit details link", async () => {

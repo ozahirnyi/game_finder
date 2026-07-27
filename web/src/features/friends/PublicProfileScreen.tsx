@@ -64,11 +64,12 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
       .then(async (profileData) => {
         if (!active) return;
         setProfile(profileData);
-        if (authenticated && (
-          profileData.relationship === "incoming_pending" ||
-          profileData.relationship === "outgoing_pending" ||
-          profileData.relationship === "friends"
-        )) {
+        if (
+          authenticated &&
+          (profileData.relationship === "incoming_pending" ||
+            profileData.relationship === "outgoing_pending" ||
+            profileData.relationship === "friends")
+        ) {
           const socialData = await getSocialMe();
           if (active) {
             setSocial(socialData);
@@ -336,26 +337,81 @@ export function PublicProfileScreen({ publicId }: { publicId: string }) {
         </div>
       </div>
       <div className="mt-6">
-        {authenticated ? relationshipAction(profile.relationship) : (
-          <a className={primaryButtonClass} href={loginHref(publicProfilePath(publicId))}>Sign in to add friend</a>
+        {authenticated ? (
+          relationshipAction(profile.relationship)
+        ) : (
+          <a
+            className={primaryButtonClass}
+            href={loginHref(publicProfilePath(publicId))}
+          >
+            Sign in to add friend
+          </a>
         )}
       </div>
-      {[['Library', profile.library], ['Favorite games', profile.favorites], ['Active wishlist', profile.wishlist]].filter(([, block]) => block).map(([title, block]) => (
-        <section className="mt-6" key={title as string}>
-          <h2 className="font-bold">{title as string}</h2>
-          {(block as PublicProfile['library']).status === 'hidden' ? <p className="text-sm text-muted-foreground">This section is private.</p> :
-            (block as PublicProfile['library']).status === 'empty' ? <p className="text-sm text-muted-foreground">{(block as PublicProfile['library']).message}</p> :
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">{(block as PublicProfile['library']).data.map((item: { id: string; title: string; cover_url: string | null }) => <div className="rounded border border-border p-3" key={item.id}>{item.cover_url ? <img alt={item.title} className="mb-2 h-20 w-full object-cover" src={item.cover_url} /> : null}{item.title}</div>)}</div>}
-        </section>
-      ))}
-      {profile.steam?.status === 'ready' && profile.steam.data?.profile_url ? <a className={`${primaryButtonClass} mt-6 inline-flex`} href={profile.steam.data.profile_url} rel="noreferrer" target="_blank">View Steam profile</a> : null}
+      {[
+        ["Library", profile.library],
+        ["Favorite games", profile.favorites],
+        ["Active wishlist", profile.wishlist],
+      ]
+        .filter(([, block]) => block)
+        .map(([title, block]) => (
+          <section className="mt-6" key={title as string}>
+            <h2 className="font-bold">{title as string}</h2>
+            {(block as PublicProfile["library"]).status === "hidden" ? (
+              <p className="text-sm text-muted-foreground">
+                This section is private.
+              </p>
+            ) : (block as PublicProfile["library"]).status === "empty" ? (
+              <p className="text-sm text-muted-foreground">
+                {(block as PublicProfile["library"]).message}
+              </p>
+            ) : (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {(block as PublicProfile["library"]).data.map(
+                  (item: {
+                    id: string;
+                    title: string;
+                    cover_url: string | null;
+                  }) => (
+                    <div
+                      className="rounded border border-border p-3"
+                      key={item.id}
+                    >
+                      {item.cover_url ? (
+                        <img
+                          alt={item.title}
+                          className="mb-2 h-20 w-full object-cover"
+                          src={item.cover_url}
+                        />
+                      ) : null}
+                      {item.title}
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
+          </section>
+        ))}
+      {profile.steam?.status === "ready" && profile.steam.data?.profile_url ? (
+        <a
+          className={`${primaryButtonClass} mt-6 inline-flex`}
+          href={profile.steam.data.profile_url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          View Steam profile
+        </a>
+      ) : null}
       {error ? (
         <div className="mt-4">
           <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
           {requiresPublicNickname(error) ? (
-            <a className={`${primaryButtonClass} mt-3 inline-flex`} href="/friends">
+            <a
+              className={`${primaryButtonClass} mt-3 inline-flex`}
+              href="/friends"
+            >
               Choose nickname
             </a>
           ) : null}
