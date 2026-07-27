@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { Button, Panel, StatePanel } from "@/components/ui";
 import {
@@ -151,7 +152,9 @@ export function LibraryScreen() {
           {games.map((game) => (
             <Panel as="article" key={game.id} className="stack">
               <div className="section-header">
-                <h2>{game.title}</h2>
+                <h2>
+                  <Link href={`/favorites/${game.id}`}>{game.title}</Link>
+                </h2>
                 {game.notes ? <p>{game.notes}</p> : null}
               </div>
               <Button

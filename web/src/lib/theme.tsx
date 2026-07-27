@@ -100,7 +100,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch {
-      // Browser storage is optional for theme preferences.
+      // Ignore malformed or inaccessible persisted preferences.
     }
   }, []);
 
@@ -122,7 +122,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(KEY, JSON.stringify({ mode, accentId: accent.id }));
     } catch {
-      // Browser storage is optional for theme preferences.
+      // Ignore unavailable browser storage.
     }
   }, [mode, accent]);
 

@@ -3,6 +3,7 @@ export type UserRead = {
   email: string;
   created_at: string;
   google_linked: boolean;
+  public_nickname?: string | null;
 };
 
 export type GoogleStatus = { configured: boolean };
@@ -74,18 +75,42 @@ export type HomeDealResponse = {
   results: HomeDeal[];
 };
 
+export type GenreDealSection = {
+  genre: string;
+  results: HomeDeal[];
+};
+
+export type GenreDealResponse = {
+  popular: HomeDeal[];
+  sections: GenreDealSection[];
+};
+
 export type SavedGame = {
   id: string;
   title: string;
   notes: string | null;
   info: string | null;
-  source: "manual" | "steam" | "psn";
+  source: "manual" | "steam" | "psn" | "catalog";
   external_id: string | null;
   playtime_forever: number | null;
   playtime_2weeks: number | null;
   img_icon_url: string | null;
   synced_at: string | null;
   created_at: string;
+};
+export type LibraryGame = {
+  id: string;
+  source: "manual" | "psn" | "steam";
+  external_id: string | null;
+  detail_game_id: string | null;
+  title: string;
+  cover_url: string | null;
+  playtime_forever: number | null;
+};
+export type LibraryOverview = {
+  games: LibraryGame[];
+  steam_available: boolean;
+  steam_error: string | null;
 };
 
 export type PsnImportPreview = {
@@ -105,10 +130,13 @@ export type RecommendationItem = {
   title: string;
   reason: string;
   tags: string[];
+  rawg_id: number | null;
+  cover_url: string | null;
 };
 
 export type RecommendationResponse = {
   recommendations: RecommendationItem[];
+  cache_expires_at?: string | null;
 };
 
 export type SteamLoginUrl = {
@@ -154,6 +182,7 @@ export type SteamFriendGame = {
 
 export type SteamFriend = {
   steam_id: string;
+  public_id: string | null;
   persona_name: string | null;
   avatar: string | null;
   friend_since: number | null;
@@ -171,6 +200,8 @@ export type SteamSocial = {
   top_friend_games: SteamFriendGame[];
   public_libraries: number;
   private_libraries: number;
+  friends_total: number;
+  friends_has_more: boolean;
 };
 
 export type TelegramAccount = {
@@ -186,8 +217,197 @@ export type TelegramLink = {
   message: string | null;
 };
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "https://game-finder.up.railway.app";
+export type SocialPlayer = {
+  public_id: string;
+  nickname: string;
+  avatar: string | null;
+};
+
+export type SocialFriend = SocialPlayer & {
+  id: string;
+};
+
+export type SocialCommonGame = {
+  appid: number;
+  name: string;
+  img_icon_url: string | null;
+};
+
+export type SocialCommonGames = {
+  games: SocialCommonGame[];
+};
+
+export type SocialRequest = SocialPlayer & {
+  id: string;
+  status: string;
+  created_at: string;
+};
+
+export type SocialMe = {
+  public_id: string;
+  nickname: string | null;
+  avatar: string | null;
+  friends: SocialFriend[];
+  incoming_requests: SocialRequest[];
+  outgoing_requests: SocialRequest[];
+};
+
+export type SocialPlayersPage = {
+  players: SocialPlayer[];
+  next_cursor: string | null;
+};
+
+export type SocialRelationship =
+  | "self"
+  | "none"
+  | "outgoing_pending"
+  | "incoming_pending"
+  | "friends";
+
+export type SocialProfile = SocialPlayer & {
+  relationship: SocialRelationship;
+};
+export type PublicSection<T> = { status: "ready" | "empty" | "hidden"; data: T; message?: string | null };
+export type PublicLibraryGame = { id: string; title: string; source: string; cover_url: string | null; playtime_forever: number | null; detail_game_id: string | null };
+export type PublicSteamAccount = { linked: boolean; persona_name: string | null; avatar: string | null; profile_url: string | null };
+export type PublicProfile = SocialProfile & {
+  library: PublicSection<PublicLibraryGame[]>;
+  favorites: PublicSection<CatalogCollectionItem[]>;
+  wishlist: PublicSection<CatalogCollectionItem[]>;
+  steam: PublicSection<PublicSteamAccount | null>;
+};
+
+export type DirectMessage = {
+  id: string;
+  friendship_id: string;
+  author_id: string;
+  text: string;
+  created_at: string;
+};
+
+export type DirectMessagePage = {
+  messages: DirectMessage[];
+  next_cursor: string | null;
+};
+
+export type PublicUser = {
+  id: string;
+  display_name: string;
+  bio: string | null;
+  avatar: string | null;
+};
+export type FriendRequest = {
+  id: string;
+  sender: PublicUser;
+  recipient: PublicUser;
+  message: string | null;
+  created_at: string;
+};
+export type Friendship = { user: PublicUser; created_at: string };
+export type Conversation = {
+  id: string;
+  participant: PublicUser;
+  updated_at: string;
+  unread_count: number;
+  last_message: string | null;
+};
+export type ConversationMessage = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+};
+export type GameInvite = {
+  id: string;
+  sender: PublicUser;
+  recipient: PublicUser;
+  game_name: string;
+  game_id: number | null;
+  note: string | null;
+  status: "pending" | "accepted" | "declined";
+  created_at: string;
+  responded_at: string | null;
+};
+export type Notification = {
+  id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+};
+export type InviteLink = { url: string };
+export type CatalogCollectionItem = {
+  id: string;
+  catalog_game_id: number;
+  title: string;
+  cover_url: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+export type PriceAlert = {
+  id: string;
+  wishlist_catalog_game_id: number;
+  target_price: number | null;
+  target_discount: number | null;
+  delivery_channels: string[];
+  last_delivered_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BlockStatus = "ready" | "empty" | "not_connected" | "error";
+export type DataBlock<T> = {
+  status: BlockStatus;
+  data: T | null;
+  message?: string | null;
+};
+export type LibraryStats = {
+  games: SavedGame[];
+  total_games: number;
+  total_playtime_hours: number;
+  manual_games: number;
+  psn_games: number;
+};
+export type UserProfile = {
+  bio: string | null;
+  platforms: string[];
+  favorite_genres: string[];
+  library_visibility?: Visibility;
+  favorites_visibility?: Visibility;
+  wishlist_visibility?: Visibility;
+  steam_visibility?: Visibility;
+};
+export type Visibility = "private" | "friends" | "public";
+export type DashboardResponse = {
+  user: DataBlock<UserRead>;
+  library: DataBlock<LibraryStats>;
+  recommendations: DataBlock<RecommendationResponse>;
+  deals: DataBlock<HomeDealResponse>;
+  steam: DataBlock<SteamLibrary | SteamAccount>;
+  social: DataBlock<SteamSocial>;
+  activity?: DataBlock<unknown[]>;
+};
+export type ProfileSummaryResponse = {
+  account: DataBlock<UserRead | { user: UserRead }>;
+  profile: DataBlock<UserProfile>;
+  services: DataBlock<{
+    steam: SteamAccount;
+    telegram: TelegramAccount;
+    google: { linked: boolean };
+    psn_games: number;
+  }>;
+  library: DataBlock<LibraryStats>;
+  favorites: DataBlock<SavedGame[]>;
+  wishlist: DataBlock<SavedGame[]>;
+  recently_played: DataBlock<SteamGame[]>;
+};
+
+const API_URL = (
+  import.meta.env.VITE_API_URL ||
+  "/api"
+).replace(/\/+$/, "");
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
 
@@ -306,15 +526,17 @@ async function request<T>(
   }
 
   const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json")
-    ? await response.json()
-    : null;
 
   if (!response.ok) {
+    const payload = contentType.includes("application/json")
+      ? await response.json()
+      : null;
+    const responseText = payload === null ? await response.text() : "";
     const detail = payload?.detail;
     let message = Array.isArray(detail)
       ? detail.map((item) => item.msg ?? JSON.stringify(item)).join(", ")
-      : (detail ?? `Request failed with status ${response.status}`);
+      : (detail ??
+        (responseText || `Request failed with status ${response.status}`));
     if (options.auth && response.status === 401) {
       removeStoredToken();
       message = "Your session expired. Please log in again.";
@@ -322,7 +544,9 @@ async function request<T>(
     throw new ApiError(message, response.status);
   }
 
-  return payload as T;
+  return (
+    contentType.includes("application/json") ? await response.json() : null
+  ) as T;
 }
 
 export function registerUser(email: string, password: string) {
@@ -344,6 +568,22 @@ export function loginUser(email: string, password: string) {
 
 export function getCurrentUser() {
   return request<UserRead>("/auth/me", { auth: true });
+}
+
+export function getDashboard() {
+  return request<DashboardResponse>("/dashboard", { auth: true });
+}
+
+export function getProfileSummary() {
+  return request<ProfileSummaryResponse>("/profile/summary", { auth: true });
+}
+
+export function updateProfile(profile: UserProfile) {
+  return request<UserProfile>("/profile", {
+    method: "PATCH",
+    auth: true,
+    body: profile,
+  });
 }
 
 export function getGoogleStatus() {
@@ -370,6 +610,10 @@ export function exchangeGoogleCode(exchangeCode: string) {
 
 export function getSteamSignInUrl() {
   return request<OAuthLoginUrl>("/auth/steam/login-url");
+}
+
+export function getSteamLinkUrl() {
+  return request<SteamLoginUrl>("/steam/login-url", { auth: true });
 }
 
 export function exchangeSteamCode(exchangeCode: string) {
@@ -420,8 +664,22 @@ export function getHomepageDeals(country = "US", pageSize = 6) {
   );
 }
 
+export function getGenreDeals() {
+  return request<GenreDealResponse>("/prices/genre-deals");
+}
+
 export function listSavedGames() {
   return request<SavedGame[]>("/games", { auth: true });
+}
+
+export function getLibraryOverview() {
+  return request<LibraryOverview>("/library/overview", { auth: true });
+}
+
+export function resolveSteamLibraryGame(appId: number) {
+  return request<{ game_id: number }>(`/library/steam-games/${appId}/resolve`, {
+    method: "POST", auth: true,
+  });
 }
 
 export function getSavedGame(id: string) {
@@ -434,6 +692,13 @@ export function createSavedGame(title: string, info?: string, notes = "") {
     auth: true,
     body: { title, notes, info },
   });
+}
+
+export function saveCatalogGameToLibrary(rawgId: number) {
+  return request<SavedGame>(
+    `/library/catalog-games/${encodeURIComponent(rawgId)}`,
+    { method: "POST", auth: true },
+  );
 }
 
 export function updateSavedGame(id: string, notes: string) {
@@ -495,9 +760,9 @@ export function syncSteamLibrary() {
   });
 }
 
-export function getSteamSocial(friendsLimit = 12) {
+export function getSteamSocial(friendsLimit = 12, friendsOffset = 0) {
   return request<SteamSocial>(
-    `/steam/social?friends_limit=${encodeURIComponent(friendsLimit)}`,
+    `/steam/social?friends_limit=${encodeURIComponent(friendsLimit)}&friends_offset=${encodeURIComponent(friendsOffset)}`,
     { auth: true },
   );
 }
@@ -531,6 +796,327 @@ export function unlinkTelegramAccount() {
 export function sendTelegramTestAlert() {
   return request<{ status: string }>("/telegram/test-alert", {
     method: "POST",
+    auth: true,
+  });
+}
+
+export function getSocialMe() {
+  return request<SocialMe>("/social/me", { auth: true });
+}
+
+export function updateSocialMe(nickname: string) {
+  return request<SocialMe>("/social/me", {
+    method: "PATCH",
+    auth: true,
+    body: { nickname },
+  });
+}
+
+export function getSocialPlayers(query = "", cursor?: string) {
+  const search = [
+    query ? `q=${encodeURIComponent(query)}` : "",
+    cursor ? `cursor=${encodeURIComponent(cursor)}` : "",
+  ]
+    .filter(Boolean)
+    .join("&");
+  return request<SocialPlayersPage>(
+    `/social/players${search ? `?${search}` : ""}`,
+    { auth: true },
+  );
+}
+
+export function getSocialProfile(publicId: string) {
+  return request<SocialProfile>(
+    `/social/profiles/${encodeURIComponent(publicId)}`,
+    { auth: true },
+  );
+}
+
+export function getPublicProfile(publicId: string) {
+  return request<PublicProfile>(`/users/${encodeURIComponent(publicId)}`);
+}
+
+export function createFriendRequest(publicId: string) {
+  return request<SocialRequest>("/social/friend-requests", {
+    method: "POST",
+    auth: true,
+    body: { public_id: publicId },
+  });
+}
+
+export function cancelFriendRequest(requestId: string) {
+  return request<SocialRequest>(
+    `/social/friend-requests/${encodeURIComponent(requestId)}`,
+    { method: "DELETE", auth: true },
+  );
+}
+
+export function acceptFriendRequest(requestId: string) {
+  return request<SocialRequest>(
+    `/social/friend-requests/${encodeURIComponent(requestId)}/accept`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function declineFriendRequest(requestId: string) {
+  return request<SocialRequest>(
+    `/social/friend-requests/${encodeURIComponent(requestId)}/decline`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function getSocialFriendCommonGames(friendId: string) {
+  return request<SocialCommonGames>(
+    `/social/friends/${encodeURIComponent(friendId)}/common-games`,
+    { auth: true },
+  );
+}
+
+export function getDirectMessages(friendId: string, cursor?: string) {
+  const search = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  return request<DirectMessagePage>(
+    `/social/friends/${encodeURIComponent(friendId)}/messages${search}`,
+    { auth: true },
+  );
+}
+
+export function sendDirectMessage(friendId: string, text: string) {
+  return request<DirectMessage>(
+    `/social/friends/${encodeURIComponent(friendId)}/messages`,
+    {
+      method: "POST",
+      auth: true,
+      body: { text },
+    },
+  );
+}
+
+export function searchUsers(query: string) {
+  return request<PublicUser[]>(`/users/search?q=${encodeURIComponent(query)}`, {
+    auth: true,
+  });
+}
+
+export function listFriendRequests() {
+  return request<FriendRequest[]>("/friends/requests", { auth: true });
+}
+
+export function listIncomingFriendRequests() {
+  return request<FriendRequest[]>("/friends/requests/incoming", { auth: true });
+}
+
+export function createLegacyFriendRequest(recipientId: string, message?: string) {
+  return request<FriendRequest>("/friends/requests", {
+    method: "POST",
+    auth: true,
+    body: { recipient_id: recipientId, message },
+  });
+}
+
+export function acceptLegacyFriendRequest(requestId: string) {
+  return request<Friendship>(
+    `/friends/requests/${encodeURIComponent(requestId)}/accept`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function deleteFriendRequest(requestId: string) {
+  return request<void>(`/friends/requests/${encodeURIComponent(requestId)}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export function listFriends() {
+  return request<Friendship[]>("/friends", { auth: true });
+}
+
+export function deleteFriend(userId: string) {
+  return request<void>(`/friends/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export function listConversations() {
+  return request<Conversation[]>("/conversations", { auth: true });
+}
+
+export function createConversation(recipientId: string) {
+  return request<Conversation>("/conversations", {
+    method: "POST",
+    auth: true,
+    body: { recipient_id: recipientId },
+  });
+}
+
+export function listMessages(conversationId: string) {
+  return request<ConversationMessage[]>(
+    `/conversations/${encodeURIComponent(conversationId)}/messages`,
+    { auth: true },
+  );
+}
+
+export function createMessage(conversationId: string, body: string) {
+  return request<ConversationMessage>(
+    `/conversations/${encodeURIComponent(conversationId)}/messages`,
+    { method: "POST", auth: true, body: { body } },
+  );
+}
+
+export function listGameInvites() {
+  return request<GameInvite[]>("/game-invites", { auth: true });
+}
+
+export function createGameInvite(
+  recipientId: string,
+  gameName: string,
+  gameId?: number,
+  note?: string,
+) {
+  return request<GameInvite>("/game-invites", {
+    method: "POST",
+    auth: true,
+    body: {
+      recipient_id: recipientId,
+      game_name: gameName,
+      game_id: gameId,
+      note,
+    },
+  });
+}
+
+export function respondToGameInvite(
+  inviteId: string,
+  status: "accepted" | "declined",
+) {
+  return request<GameInvite>(
+    `/game-invites/${encodeURIComponent(inviteId)}/response`,
+    { method: "POST", auth: true, body: { status } },
+  );
+}
+
+export function listNotifications(unreadOnly = false) {
+  return request<Notification[]>(`/notifications?unread_only=${unreadOnly}`, {
+    auth: true,
+  });
+}
+
+export function markNotificationRead(notificationId: string) {
+  return request<Notification>(
+    `/notifications/${encodeURIComponent(notificationId)}/read`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function markAllNotificationsRead() {
+  return request<void>("/notifications/read-all", {
+    method: "POST",
+    auth: true,
+  });
+}
+
+export function getSocialInviteLink() {
+  return request<InviteLink>("/social/invite-link", { auth: true });
+}
+
+export function listFavorites() {
+  return request<CatalogCollectionItem[]>("/favorites", { auth: true });
+}
+
+export function addFavorite(
+  catalogGameId: number,
+  title: string,
+  coverUrl?: string | null,
+) {
+  return request<CatalogCollectionItem>("/favorites", {
+    method: "POST",
+    auth: true,
+    body: { catalog_game_id: catalogGameId, title, cover_url: coverUrl },
+  });
+}
+
+export function removeFavorite(catalogGameId: number) {
+  return request<void>(`/favorites/${catalogGameId}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export function saveCatalogGameToFavorites(rawgId: number) {
+  return request<CatalogCollectionItem>(
+    `/favorites/catalog-games/${encodeURIComponent(rawgId)}`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function listWishlist() {
+  return request<CatalogCollectionItem[]>("/wishlist", { auth: true });
+}
+
+export function addWishlistItem(
+  catalogGameId: number,
+  title: string,
+  coverUrl?: string | null,
+) {
+  return request<CatalogCollectionItem>("/wishlist", {
+    method: "POST",
+    auth: true,
+    body: { catalog_game_id: catalogGameId, title, cover_url: coverUrl },
+  });
+}
+
+export function saveCatalogGameToWishlist(rawgId: number) {
+  return request<CatalogCollectionItem>(
+    `/wishlist/catalog-games/${encodeURIComponent(rawgId)}`,
+    { method: "POST", auth: true },
+  );
+}
+
+export function updateWishlistItem(
+  catalogGameId: number,
+  title?: string,
+  coverUrl?: string | null,
+) {
+  return request<CatalogCollectionItem>(`/wishlist/${catalogGameId}`, {
+    method: "PATCH",
+    auth: true,
+    body: { title, cover_url: coverUrl },
+  });
+}
+
+export function removeWishlistItem(catalogGameId: number) {
+  return request<void>(`/wishlist/${catalogGameId}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export function listPriceAlerts() {
+  return request<PriceAlert[]>("/price-alerts", { auth: true });
+}
+
+export function createPriceAlert(
+  catalogGameId: number,
+  targetPrice?: number,
+  targetDiscount?: number,
+  deliveryChannels: string[] = ["in_app"],
+) {
+  return request<PriceAlert>("/price-alerts", {
+    method: "POST",
+    auth: true,
+    body: {
+      wishlist_catalog_game_id: catalogGameId,
+      target_price: targetPrice,
+      target_discount: targetDiscount,
+      delivery_channels: deliveryChannels,
+    },
+  });
+}
+
+export function deletePriceAlert(alertId: string) {
+  return request<void>(`/price-alerts/${encodeURIComponent(alertId)}`, {
+    method: "DELETE",
     auth: true,
   });
 }

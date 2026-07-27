@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
 
+export const primaryActionClass =
+  "rounded-lg bg-primary px-4 py-2 font-bold text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+
+export const secondaryActionClass =
+  "rounded-lg border border-border bg-surface px-4 py-2 font-bold transition-colors hover:border-primary/60 hover:bg-primary/10 active:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+
 export function SectionHeader({
   title,
   hint,

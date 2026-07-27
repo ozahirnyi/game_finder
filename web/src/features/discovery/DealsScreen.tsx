@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GameCover } from "@/components/GameCover";
 import { StatePanel } from "@/components/ui";
@@ -65,9 +65,7 @@ export function DealsScreen() {
             <h2>{deal.name}</h2>
             <p>{money(deal.current)}</p>
             {deal.id ? (
-              <Link to="/games/$gameId" params={{ gameId: String(deal.id) }}>
-                View details
-              </Link>
+              <Link href={`/games/${deal.id}`}>View details</Link>
             ) : null}
             {deal.url ? (
               <a href={deal.url} target="_blank" rel="noreferrer">

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Panel, StatePanel } from "@/components/ui";
 import { SavedGame, isAuthenticated, listSavedGames } from "@/lib/api";
@@ -67,7 +68,9 @@ export function WishlistScreen() {
       ) : (
         games.map((game) => (
           <Panel as="article" key={game.id}>
-            <h2>{game.title}</h2>
+            <h2>
+              <Link href={`/favorites/${game.id}`}>{game.title}</Link>
+            </h2>
             {game.notes ? <p>{game.notes}</p> : null}
           </Panel>
         ))

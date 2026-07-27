@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { GameCover } from "@/components/GameCover";
 import { StatePanel } from "@/components/ui";
@@ -91,9 +91,7 @@ export function SearchScreen({ initialQuery = "" }: { initialQuery?: string }) {
               <h2>{game.name ?? "Untitled game"}</h2>
               <p>{game.released ?? "Release date unknown"}</p>
               {game.id ? (
-                <Link to="/games/$gameId" params={{ gameId: String(game.id) }}>
-                  View details
-                </Link>
+                <Link href={`/games/${game.id}`}>View details</Link>
               ) : null}
             </article>
           ))}

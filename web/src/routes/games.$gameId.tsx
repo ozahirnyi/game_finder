@@ -1,106 +1,311 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { ArrowLeft, ExternalLink, Share2, Star } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { Avatar, GameCover } from "@/components/GameCover";
-import { Chip, PresenceDot, SectionHeader } from "@/components/ui-bits";
-import { friends, games, priceHistory, type Game } from "@/lib/mockData";
+import { GameCover } from "@/components/GameCover";
+import { Chip, SectionHeader } from "@/components/ui-bits";
+import { CatalogGameActions } from "@/components/CatalogGameActions";
 import {
-  ArrowLeft,
-  Bell,
-  Heart,
-  Plus,
-  Share2,
-  Sparkles,
-  Star,
-  Trophy,
-  Users,
-} from "lucide-react";
+  getCatalogGame,
+  getGamePriceHistory,
+  getSavedGame,
+  searchGames,
+  type PriceMoney,
+  type SavedGame,
+} from "@/lib/api";
+import { lovableQueryKeys } from "@/lib/lovable-data";
 
 export const Route = createFileRoute("/games/$gameId")({
-  loader: ({ params }) => {
-    const game = games.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
-  },
-  head: ({ loaderData }) => ({
-    meta: loaderData
-      ? [
-          { title: `${loaderData.game.title} — GameFinder` },
-          {
-            name: "description",
-            content: `${loaderData.game.title} · ${loaderData.game.genres.join(", ")} · ${loaderData.game.platforms.join(", ")}. Shared with your friends on GameFinder.`,
-          },
-        ]
-      : [
-          { title: "Game not found — GameFinder" },
-          { name: "robots", content: "noindex" },
-        ],
+  head: () => ({
+    meta: [
+      { title: "Game — PlayFinder" },
+      { name: "description", content: "Game details from the public catalog." },
+    ],
   }),
   component: GameDetail,
-  notFoundComponent: () => (
-    <AppShell>
-      <div className="mx-auto max-w-md py-24 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-primary">
-          404
-        </p>
-        <h1 className="mt-3 text-2xl font-bold">Game not in catalog</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          We couldn't find that title. It may have been delisted.
-        </p>
-        <Link
-          to="/search"
-          className="mt-6 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-        >
-          Back to search
-        </Link>
-      </div>
-    </AppShell>
-  ),
 });
 
-function Sparkline() {
-  const w = 320;
-  const h = 60;
-  const max = Math.max(...priceHistory.map((p) => p.price));
-  const min = Math.min(...priceHistory.map((p) => p.price));
-  const pts = priceHistory
-    .map((p, i) => {
-      const x = (i / (priceHistory.length - 1)) * w;
-      const y = h - ((p.price - min) / (max - min || 1)) * (h - 8) - 4;
-      return `${x},${y}`;
-    })
-    .join(" ");
+function formatMoney(money: PriceMoney | null | undefined) {
+  return money
+    ? new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: money.currency,
+      }).format(money.amount)
+    : "Price not listed";
+}
+
+function savedGameCover(game: SavedGame) {
+  if (game.source === "steam" && game.external_id && game.img_icon_url) {
+    return `https://media.steampowered.com/steamcommunity/public/images/apps/${game.external_id}/${game.img_icon_url}.jpg`;
+  }
+  return "#14b8a6";
+}
+
+function SavedGameDetail({ game }: { game: SavedGame }) {
+  const playtime = game.playtime_forever
+    ? `${Math.round(game.playtime_forever / 60)} hours played`
+    : "No playtime was imported";
   return (
-    <svg
-      width="100%"
-      height={h}
-      viewBox={`0 0 ${w} ${h}`}
-      className="text-primary"
-    >
-      <polyline
-        points={pts}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
+    <AppShell>
+      <Link
+        to="/library"
+        className="mb-6 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+      >
+        <ArrowLeft className="size-3.5" /> Back to library
+      </Link>
+      <section className="overflow-hidden rounded-3xl border border-border bg-surface">
+        <GameCover
+          from={savedGameCover(game)}
+          to="#0f172a"
+          title={game.title}
+          className="h-56 w-full sm:h-72"
+        />
+        <div className="p-6 sm:p-8">
+          <Chip tone="primary">{game.source}</Chip>
+          <h1 className="mt-3 text-4xl font-extrabold tracking-tight">
+            {game.title}
+          </h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {game.info || game.notes || "This game is saved in your library."}
+          </p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-border p-4">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Source
+              </p>
+              <p className="mt-1 font-bold capitalize">{game.source}</p>
+            </div>
+            <div className="rounded-xl border border-border p-4">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Playtime
+              </p>
+              <p className="mt-1 font-bold">{playtime}</p>
+            </div>
+            <div className="rounded-xl border border-border p-4">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Added
+              </p>
+              <p className="mt-1 font-bold">
+                {new Date(game.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+function PricePanel({ gameId }: { gameId: string }) {
+  const priceQuery = useQuery({
+    queryKey: lovableQueryKeys.gamePriceHistory(gameId, "US"),
+    queryFn: () => getGamePriceHistory(gameId, "US"),
+  });
+  const prices = priceQuery.data;
+  const primaryLink = prices?.current?.url ?? prices?.url;
+
+  return (
+    <section>
+      <SectionHeader
+        title="Prices"
+        hint="Current offers and historical lows from IsThereAnyDeal."
       />
-      {priceHistory.map((p, i) => {
-        const x = (i / (priceHistory.length - 1)) * w;
-        const y = h - ((p.price - min) / (max - min || 1)) * (h - 8) - 4;
-        return <circle key={i} cx={x} cy={y} r={2} fill="currentColor" />;
-      })}
-    </svg>
+      <div className="rounded-2xl border border-border bg-surface p-6">
+        {priceQuery.isLoading && (
+          <p className="text-sm text-muted-foreground">
+            Loading current prices…
+          </p>
+        )}
+        {priceQuery.isError && (
+          <p className="text-sm text-muted-foreground">
+            Price information is not available right now. You can retry by
+            refreshing this page.
+          </p>
+        )}
+        {prices && (
+          <>
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                {prices.current?.regular && (
+                  <p className="font-mono text-xs text-muted-foreground line-through">
+                    {formatMoney(prices.current.regular)}
+                  </p>
+                )}
+                <p className="font-mono text-3xl font-black text-primary">
+                  {formatMoney(prices.current?.price)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {prices.current?.shop
+                    ? `Available at ${prices.current.shop}`
+                    : "No current storefront offer was returned."}
+                </p>
+              </div>
+              {prices.current?.cut !== null &&
+                prices.current?.cut !== undefined && (
+                  <Chip tone="primary">-{prices.current.cut}%</Chip>
+                )}
+            </div>
+            {primaryLink && (
+              <a
+                href={primaryLink}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
+              >
+                Open at {prices.current?.shop ?? "store"}
+                <ExternalLink className="size-4" />
+              </a>
+            )}
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              {[
+                { label: "All-time low", value: prices.history_low_all },
+                { label: "1-year low", value: prices.history_low_1y },
+                { label: "3-month low", value: prices.history_low_3m },
+              ].map((low) => (
+                <div
+                  key={low.label}
+                  className="rounded-xl border border-border bg-secondary/40 p-3"
+                >
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {low.label}
+                  </p>
+                  <p className="mt-1 font-mono text-lg font-bold">
+                    {formatMoney(low.value)}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {prices.deals.length > 0 && (
+              <div className="mt-6 border-t border-border pt-5">
+                <p className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Other current offers
+                </p>
+                <div className="space-y-2">
+                  {prices.deals.slice(0, 5).map((deal, index) => (
+                    <div
+                      key={`${deal.shop ?? "store"}-${index}`}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
+                    >
+                      <span>{deal.shop ?? "Store"}</span>
+                      <span className="font-mono font-bold">
+                        {formatMoney(deal.price)}
+                      </span>
+                      {deal.url && (
+                        <a
+                          href={deal.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-bold text-primary hover:underline"
+                        >
+                          Open offer
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 
 function GameDetail() {
-  const { game } = Route.useLoaderData();
+  return <GameDetailPage gameId={Route.useParams().gameId} />;
+}
 
-  const owners = friends.slice(0, 4);
-  const similar = games
-    .filter(
-      (g: Game) =>
-        g.id !== game.id && g.genres.some((x) => game.genres.includes(x)),
-    )
-    .slice(0, 4);
+export function GameDetailPage({ gameId }: { gameId: string }) {
+  const isSavedGame =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      gameId,
+    );
+  const savedGameQuery = useQuery({
+    queryKey: ["saved-game", gameId],
+    queryFn: () => getSavedGame(gameId),
+    enabled: isSavedGame,
+  });
+  const catalogMatchQuery = useQuery({
+    queryKey: ["saved-game-catalog-match", savedGameQuery.data?.title],
+    queryFn: () => searchGames(savedGameQuery.data!.title),
+    enabled: Boolean(isSavedGame && savedGameQuery.data?.title),
+  });
+  const catalogGameId = isSavedGame
+    ? catalogMatchQuery.data?.results[0]?.id
+    : gameId;
+  const gameQuery = useQuery({
+    queryKey: lovableQueryKeys.catalogGame(String(catalogGameId ?? gameId)),
+    queryFn: () => getCatalogGame(String(catalogGameId)),
+    enabled: Boolean(!isSavedGame || catalogGameId),
+  });
+  const [shareState, setShareState] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
+  const [expandedDescription, setExpandedDescription] = useState(false);
+
+  if (isSavedGame && savedGameQuery.isLoading)
+    return (
+      <AppShell>
+        <p className="text-sm text-muted-foreground">
+          Loading your library game…
+        </p>
+      </AppShell>
+    );
+  if (isSavedGame && savedGameQuery.isError)
+    return (
+      <AppShell>
+        <Link to="/library" className="text-sm font-bold text-primary">
+          Back to library
+        </Link>
+        <p className="mt-4 text-sm text-muted-foreground">
+          This saved game could not be opened. It may have been removed from
+          your library.
+        </p>
+      </AppShell>
+    );
+  if (isSavedGame && catalogMatchQuery.isLoading)
+    return (
+      <AppShell>
+        <p className="text-sm text-muted-foreground">
+          Opening catalog details…
+        </p>
+      </AppShell>
+    );
+  if (isSavedGame && (!catalogGameId || catalogMatchQuery.isError))
+    return savedGameQuery.data ? (
+      <SavedGameDetail game={savedGameQuery.data} />
+    ) : null;
+  if (gameQuery.isLoading)
+    return (
+      <AppShell>
+        <p className="text-sm text-muted-foreground">Loading game details…</p>
+      </AppShell>
+    );
+  if (gameQuery.isError || !gameQuery.data)
+    return (
+      <AppShell>
+        <Link to="/search" className="text-sm font-bold text-primary">
+          Back to search
+        </Link>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Game details could not be loaded. Try searching for the game again.
+        </p>
+      </AppShell>
+    );
+
+  const game = gameQuery.data;
+  const share = async () => {
+    try {
+      const url = window.location.href;
+      if (navigator.share) await navigator.share({ title: game.name, url });
+      else await navigator.clipboard.writeText(url);
+      setShareState("copied");
+    } catch {
+      setShareState("failed");
+    }
+  };
 
   return (
     <AppShell>
@@ -110,233 +315,111 @@ function GameDetail() {
       >
         <ArrowLeft className="size-3.5" /> Back to search
       </Link>
-
-      {/* Hero */}
       <section className="relative mb-10 overflow-hidden rounded-3xl border border-border">
         <GameCover
-          from={game.coverFrom}
-          to={game.coverTo}
-          title={game.title}
+          from={game.background_image ?? "#0f172a"}
+          to="#0f172a"
+          title={game.name}
           className="h-72 w-full sm:h-96"
         />
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 sm:p-8">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            {game.coop && <Chip tone="primary">Co-op · 4p</Chip>}
-            {game.discount && <Chip tone="primary">-{game.discount}%</Chip>}
-            {game.status === "Playing with Friends" && (
-              <Chip tone="primary">Squad active</Chip>
-            )}
-            {game.genres.map((g: string) => (
-              <Chip key={g} tone="outline">
-                {g}
+            {game.genres.map((genre) => (
+              <Chip key={genre} tone="outline">
+                {genre}
               </Chip>
             ))}
           </div>
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-            {game.title}
+            {game.name}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            {game.platforms.join(" · ")} · {owners.length} friends own it ·{" "}
-            {game.rating > 0 ? `${game.rating} critic score` : "Unreleased"}
+            {[
+              game.platforms.join(" · "),
+              game.released ? `Released ${game.released}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Public catalog entry"}
           </p>
         </div>
       </section>
-
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
-        {/* Main */}
-        <div className="space-y-10 lg:col-span-8">
+        <main className="space-y-10 lg:col-span-8">
           <section>
             <SectionHeader title="About" />
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {game.title} is a {game.genres.join(" / ").toLowerCase()}{" "}
-              experience built for {game.platforms.join(" and ")}. GameFinder
-              ranks it against your library and your circle's shared titles to
-              surface the best moments to play together tonight.
-              Cross-referenced with 12 professional reviews and 4,821 friends'
-              playtime.
-            </p>
-          </section>
-
-          <section>
-            <SectionHeader title="Friends who own it" />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {owners.map((f) => (
-                <div
-                  key={f.id}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3"
+            {game.description_raw ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setExpandedDescription((value) => !value)}
+                  className="text-xs font-bold text-primary"
                 >
-                  <div className="relative shrink-0">
-                    <Avatar
-                      from={f.avatarFrom}
-                      to={f.avatarTo}
-                      name={f.name}
-                      className="size-11 rounded-full"
-                    />
-                    <span className="absolute -bottom-0.5 -right-0.5">
-                      <PresenceDot online={f.online} />
-                    </span>
+                  {expandedDescription ? "Hide description" : "Show description"}
+                </button>
+                {expandedDescription ? (
+                  <div
+                    data-testid="game-description"
+                    className="mt-3 text-sm leading-relaxed text-muted-foreground"
+                  >
+                    {game.description_raw}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">{f.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {f.online ? f.activity : "Offline"}
-                    </p>
-                  </div>
-                  <button className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold hover:bg-white/5">
-                    Invite
-                  </button>
-                </div>
-              ))}
-            </div>
+                ) : null}
+              </>
+            ) : null}
           </section>
-
-          <section>
-            <SectionHeader
-              title="Price history"
-              hint="6-month trend across storefronts."
-            />
-            <div className="rounded-2xl border border-border bg-surface p-6">
-              <div className="mb-4 flex items-end justify-between">
-                <div>
-                  {game.originalPrice && (
-                    <p className="font-mono text-xs text-muted-foreground line-through">
-                      ${game.originalPrice}
-                    </p>
-                  )}
-                  <p className="font-mono text-3xl font-black text-primary">
-                    ${game.price}
-                  </p>
-                </div>
-                {game.discount && (
-                  <div className="text-right font-mono text-[10px] uppercase tracking-widest text-primary">
-                    Lowest in 6 months
-                  </div>
-                )}
-              </div>
-              <Sparkline />
-              <div className="mt-3 flex justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                {priceHistory.map((p) => (
-                  <span key={p.date}>{p.date}</span>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <SectionHeader title="You might also like" />
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {similar.map((g) => (
-                <Link
-                  key={g.id}
-                  to="/games/$gameId"
-                  params={{ gameId: g.id }}
-                  className="group overflow-hidden rounded-xl border border-border bg-surface transition hover:border-white/20"
-                >
-                  <GameCover
-                    from={g.coverFrom}
-                    to={g.coverTo}
-                    title={g.title}
-                    className="aspect-[3/4] w-full"
-                  />
-                  <div className="p-3">
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <Sparkles className="size-3 text-primary" />
-                      <span className="font-mono text-[9px] uppercase tracking-widest text-primary">
-                        Similar
-                      </span>
-                    </div>
-                    <p className="truncate text-sm font-bold group-hover:text-primary">
-                      {g.title}
-                    </p>
-                    <p className="mt-1 font-mono text-xs">${g.price}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6 lg:col-span-4">
+          <PricePanel gameId={String(game.id)} />
+        </main>
+        <aside className="space-y-6 lg:col-span-4">
           <div className="rounded-2xl border border-border bg-surface p-6">
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Buy · Best price
-            </p>
-            <div className="flex items-end justify-between">
-              <p className="font-mono text-3xl font-black text-primary">
-                ${game.price}
-              </p>
-              {game.discount && <Chip tone="primary">-{game.discount}%</Chip>}
-            </div>
-            {game.originalPrice && (
-              <p className="mt-1 font-mono text-xs text-muted-foreground line-through">
-                was ${game.originalPrice}
-              </p>
-            )}
-            <button className="mt-4 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90">
-              Buy on Steam
-            </button>
-            <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-bold hover:bg-white/5">
-              <Users className="size-4" /> Invite friends to buy together
-            </button>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-white/5">
-                <Heart className="size-3.5" /> Wish
-              </button>
-              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-white/5">
-                <Bell className="size-3.5" /> Alert
-              </button>
-              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-white/5">
-                <Share2 className="size-3.5" /> Share
-              </button>
-            </div>
+            <CatalogGameActions game={game} />
           </div>
-
           <div className="rounded-2xl border border-border bg-surface p-6">
             <SectionHeader title="At a glance" />
             <dl className="space-y-3 text-sm">
-              {[
-                { l: "Platforms", v: game.platforms.join(", "), icon: Plus },
-                {
-                  l: "Genres",
-                  v: game.genres.join(", "),
-                  icon: Sparkles,
-                },
-                {
-                  l: "Critic score",
-                  v: game.rating > 0 ? `${game.rating} / 100` : "TBD",
-                  icon: Star,
-                },
-                {
-                  l: "Playtime avg.",
-                  v: `${game.playtime ?? 32}h`,
-                  icon: Trophy,
-                },
-              ].map((r) => (
-                <div
-                  key={r.l}
-                  className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
-                >
-                  <span className="text-muted-foreground">{r.l}</span>
-                  <span className="text-right font-bold">{r.v}</span>
-                </div>
-              ))}
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0">
+                <span className="text-muted-foreground">Platforms</span>
+                <span className="text-right font-bold">
+                  {game.platforms.join(", ") || "Not listed"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                <span className="text-muted-foreground">Genres</span>
+                <span className="text-right font-bold">
+                  {game.genres.join(", ") || "Not listed"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                <span className="text-muted-foreground">Critic score</span>
+                <span className="inline-flex items-center gap-1 text-right font-bold">
+                  {game.rating === null ? (
+                    "Not rated"
+                  ) : (
+                    <>
+                      <Star className="size-3.5 text-primary" />
+                      {game.rating}
+                    </>
+                  )}
+                </span>
+              </div>
             </dl>
           </div>
-
-          <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 to-transparent p-6">
-            <div className="mb-2 flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
-              <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
-                Why for your squad
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Marcus, Alex, and Sasha all own {game.title}. Their combined
-              playtime is 234h — a great candidate for tonight's session.
-            </p>
+          <div className="rounded-2xl border border-border bg-surface p-6">
+            <button
+              onClick={share}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-bold hover:bg-white/5"
+            >
+              <Share2 className="size-4" /> Share game
+            </button>
+            {shareState === "copied" && (
+              <p className="mt-3 text-xs text-muted-foreground">Link copied.</p>
+            )}
+            {shareState === "failed" && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                The link could not be shared from this browser.
+              </p>
+            )}
           </div>
-        </div>
+        </aside>
       </div>
     </AppShell>
   );
