@@ -59,13 +59,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               Manage profile
             </Link>
           ) : (
-            <Link
-              to="/"
+            <a
+              href="/login"
               aria-label="Sign in"
               className="block rounded-lg border border-border p-3 text-sm font-semibold"
             >
               Sign in to personalize
-            </Link>
+            </a>
           )}
         </div>
       </aside>
