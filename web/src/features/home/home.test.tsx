@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthState } from "@/hooks/useAuthState";
-import { getHomepageDeals, getSteamAccount } from "@/lib/api";
+import { getDashboard, getHomepageDeals, getSteamAccount } from "@/lib/api";
 import { Dashboard } from "@/routes/index";
 import { GuestHome } from "./GuestHome";
 import { HomeScreen } from "./HomeScreen";
@@ -56,6 +56,42 @@ describe("homepage branches", () => {
       screen.getByRole("heading", { name: /find your next game/i }),
     ).toBeVisible();
     expect(getSteamAccount).not.toHaveBeenCalled();
+  });
+
+  it("hands a dashboard search to the catalog route", async () => {
+    vi.mocked(useAuthState).mockReturnValue(true);
+    vi.mocked(getDashboard).mockResolvedValue({
+      recommendations: { status: "empty", data: null, message: null },
+      deals: { status: "empty", data: null, message: null },
+      library: {
+        status: "ready",
+        data: {
+          total_games: 1,
+          total_playtime_hours: 1,
+          manual_games: 0,
+          psn_games: 0,
+        },
+        message: null,
+      },
+      steam: { status: "ready", data: { linked: true }, message: null },
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <Dashboard />
+      </QueryClientProvider>,
+    );
+
+    const searchbox = await screen.findByRole("searchbox", {
+      name: "Search games",
+    });
+    fireEvent.change(searchbox, { target: { value: "Hades" } });
+    fireEvent.submit(searchbox.closest("form")!);
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/search",
+      search: { q: "Hades" },
+    });
   });
 
   it("shows connect Steam after a signed-in account is confirmed unlinked", async () => {
