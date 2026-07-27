@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
@@ -17,6 +17,8 @@ const message = (value: { message?: string | null }, fallback: string) =>
 
 export function Dashboard() {
   const authenticated = useAuthState();
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
   const query = useQuery({
     queryKey: lovableQueryKeys.dashboard,
     queryFn: getDashboard,
@@ -43,6 +45,12 @@ export function Dashboard() {
     ("steam" in data.steam.data
       ? data.steam.data.steam.linked
       : data.steam.data.linked);
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const q = searchTerm.trim();
+    if (q) void navigate({ to: "/search", search: { q } });
+  }
 
   if (!authenticated) {
     return (
@@ -97,13 +105,27 @@ export function Dashboard() {
                 : "Sign in to connect Steam"}
           </Link>
         </div>
-        <Link
-          to="/search"
-          className="mb-8 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-white/20"
+        <form
+          className="mb-8 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 transition-colors focus-within:border-primary"
+          onSubmit={submitSearch}
         >
           <Search className="size-4" />
-          Search the game catalog
-        </Link>
+          <input
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            type="search"
+            role="searchbox"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search the game catalog"
+            aria-label="Search games"
+          />
+          <button
+            className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground transition hover:opacity-90"
+            type="submit"
+          >
+            Search
+          </button>
+        </form>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
             ["Library", library?.total_games],
