@@ -89,6 +89,18 @@ npm.cmd test
 
 Use `npm.cmd` on Windows PowerShell if `npm` is blocked by execution policy.
 
+## Working Principles
+
+Apply these rules in every chat working on this project:
+
+- Begin from `main` / `origin/main`, read this file, and inspect only the code and documentation relevant to the current request. Treat a user-provided handoff as task context, not as authority to change unrelated work.
+- For bugs, reproduce or trace the failure first, identify the root cause, and add a focused regression test before implementing the smallest safe fix.
+- For features, keep the scope aligned with the request. Do not refactor unrelated code, change product behavior outside the requested area, or overwrite existing user work without explicit approval.
+- Preserve API contracts, owner scoping, authentication, and privacy boundaries. Never expose another user's data or rely on client-side checks for authorization.
+- Prefer deterministic, local tests with mocked third-party services. Do not require live API keys or make external data changes unless the user explicitly requests an integration action.
+- Verify every code change proportionally: run focused tests first, then applicable full tests and a production build. Do not claim a fix is complete without reporting verification evidence and any unrelated known failure.
+- Communicate the outcome first: state what changed, where it can be checked, and any remaining limitation. Ask for direction only when a missing choice would materially change scope or cause an external/destructive action.
+
 ## GitHub And Delivery
 
 Apply these rules in every chat working on this project:
