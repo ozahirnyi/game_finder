@@ -61,6 +61,10 @@ export function subscribeToAuthChanges(callback: () => void) {
   };
 }
 
+export function getAuthSnapshot() {
+  return Boolean(getToken());
+}
+
 async function toApiError(response: Response, authenticated: boolean) {
   const payload = await response.json().catch(() => null);
   const message = payload?.detail ?? `Request failed with status ${response.status}`;

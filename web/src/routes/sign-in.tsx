@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Panel } from "@/components/ui-bits";
 import { Mail, Lock, ArrowRight } from "lucide-react";
+import { ApiError, loginUser, setToken } from "@/lib/api";
 
 export const Route = createFileRoute("/sign-in")({
   head: () => ({
@@ -25,6 +27,29 @@ export const Route = createFileRoute("/sign-in")({
 });
 
 function SignInPage() {
+  const navigate = Route.useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      const token = await loginUser(email, password);
+      setToken(token.access_token);
+      await navigate({ to: "/account" });
+    } catch (reason) {
+      setError(
+        reason instanceof ApiError ? reason.message : "Unable to sign in. Please try again.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
     <AppShell>
       <div className="mx-auto max-w-md py-6">
@@ -35,13 +60,16 @@ function SignInPage() {
         </p>
 
         <Panel className="mt-8 p-6">
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-4" onSubmit={submit}>
             <label className="block">
               <span className="label-mono mb-2 block text-muted-foreground">Email</span>
               <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3">
                 <Mail className="size-4 text-muted-foreground" />
                 <input
                   type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
                   placeholder="you@example.com"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 />
@@ -53,13 +81,20 @@ function SignInPage() {
                 <Lock className="size-4 text-muted-foreground" />
                 <input
                   type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
                   placeholder="••••••••"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 />
               </div>
             </label>
-            <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition hover:opacity-90">
-              Sign in <ArrowRight className="size-4" />
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <button
+              disabled={pending}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {pending ? "Signing in…" : "Sign in"} <ArrowRight className="size-4" />
             </button>
           </form>
         </Panel>

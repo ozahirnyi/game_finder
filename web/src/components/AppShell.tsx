@@ -1,9 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { Home, Search, Library, Heart, Tag, Users, Palette } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
 import { Avatar } from "./GameCover";
-import { account, deals } from "@/lib/mockData";
+import { deals } from "@/lib/mockData";
+import { clearToken, getAuthSnapshot, subscribeToAuthChanges } from "@/lib/api";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -17,6 +18,7 @@ const nav = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [themeOpen, setThemeOpen] = useState(false);
+  const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -65,22 +67,27 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
           </div>
 
-          {account.signedIn ? (
-            <Link
-              to="/account"
-              className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:border-primary/50"
-            >
-              <Avatar
-                from={account.avatarFrom}
-                to={account.avatarTo}
-                name={account.name}
-                className="size-9 shrink-0 rounded-full"
-              />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{account.name}</p>
-                <p className="truncate text-xs text-muted-foreground">@{account.handle}</p>
-              </div>
-            </Link>
+          {signedIn ? (
+            <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <Link to="/account" className="flex min-w-0 flex-1 items-center gap-3">
+                <Avatar
+                  from="#e85d3a"
+                  to="#7c2d12"
+                  name="Your account"
+                  className="size-9 shrink-0 rounded-full"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">Your account</p>
+                  <p className="truncate text-xs text-muted-foreground">Manage profile</p>
+                </div>
+              </Link>
+              <button
+                onClick={clearToken}
+                className="text-xs font-bold text-muted-foreground hover:text-primary"
+              >
+                Sign out
+              </button>
+            </div>
           ) : (
             <div className="rounded-xl border border-border p-4">
               <p className="label-mono mb-2 text-muted-foreground">Your account</p>
@@ -123,12 +130,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Palette className="size-4" />
             </button>
-            {account.signedIn ? (
+            {signedIn ? (
               <Link to="/account" aria-label="Your profile">
                 <Avatar
-                  from={account.avatarFrom}
-                  to={account.avatarTo}
-                  name={account.name}
+                  from="#e85d3a"
+                  to="#7c2d12"
+                  name="Your account"
                   className="size-9 rounded-full ring-1 ring-border"
                 />
               </Link>
