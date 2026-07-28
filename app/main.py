@@ -65,7 +65,7 @@ from app.google_auth import (
 
 
 def get_allowed_origins() -> list[str]:
-    origins = {"http://localhost:3000"}
+    origins = {"http://localhost:3000", "http://localhost:5173"}
     for env_name in ("FRONTEND_ORIGIN", "FRONTEND_ORIGINS"):
         raw = os.getenv(env_name, "")
         for origin in raw.split(","):
