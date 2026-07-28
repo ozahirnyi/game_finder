@@ -2,7 +2,14 @@ import { Link } from "@tanstack/react-router";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, Panel, PresenceDot, SectionHeader, Stat } from "@/components/ui-bits";
 import { ThemeSelector } from "@/components/ThemeSelector";
-import type { Game } from "@/lib/mockData";
+type Game = {
+  id: string;
+  title: string;
+  coverFrom?: string;
+  coverTo?: string;
+  playtime?: number;
+  source?: string;
+};
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2 } from "lucide-react";
 
 export type ProfileData = {
@@ -166,8 +173,8 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
                 className="hover-lift overflow-hidden rounded-xl border border-border bg-surface-2 hover:border-primary/40"
               >
                 <GameCover
-                  from={g.coverFrom}
-                  to={g.coverTo}
+                  from={g.coverFrom ?? "#c75f28"}
+                  to={g.coverTo ?? "#22243a"}
                   title={g.title}
                   className="aspect-video w-full"
                 />
