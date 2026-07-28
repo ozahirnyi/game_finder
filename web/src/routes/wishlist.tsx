@@ -8,8 +8,11 @@ import { Bell, TrendingDown } from "lucide-react";
 export const Route = createFileRoute("/wishlist")({
   head: () => ({
     meta: [
-      { title: "Wishlist — GameFinder" },
-      { name: "description", content: "Track wishlist items with live price history and Telegram drop alerts." },
+      { title: "Wishlist — Playfinder" },
+      {
+        name: "description",
+        content: "Track wishlist items with live price history and Telegram drop alerts.",
+      },
     ],
   }),
   component: WishlistPage,
@@ -42,19 +45,19 @@ function WishlistPage() {
         title="Wishlist"
         hint="14 items · 4 currently on sale"
         action={
-          <button className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold hover:bg-white/5">
+          <button className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold hover:bg-foreground/5">
             <Bell className="size-3.5" /> Alerts via Telegram
           </button>
         }
       />
 
-      <div className="space-y-4">
+      <div className="stagger space-y-4">
         {wl.map((g) => {
           const drop = g.discount ? true : false;
           return (
             <div
               key={g.id}
-              className="grid grid-cols-1 gap-6 rounded-2xl border border-border bg-surface p-5 md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
+              className="hover-lift grid grid-cols-1 gap-6 rounded-2xl border border-border bg-surface p-5 hover:border-primary/40 md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
             >
               <GameCover
                 from={g.coverFrom}
@@ -93,9 +96,7 @@ function WishlistPage() {
                     ${g.originalPrice}
                   </p>
                 )}
-                <p className="font-mono text-2xl font-black text-primary">
-                  ${g.price}
-                </p>
+                <p className="font-mono text-2xl font-black text-primary">${g.price}</p>
                 <button className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
                   View deal
                 </button>

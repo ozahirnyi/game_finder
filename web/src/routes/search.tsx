@@ -5,12 +5,14 @@ import { Chip, SectionHeader } from "@/components/ui-bits";
 import { games } from "@/lib/mockData";
 import { Search, SlidersHorizontal, Plus, Heart, Users } from "lucide-react";
 
-
 export const Route = createFileRoute("/search")({
   head: () => ({
     meta: [
-      { title: "Search — GameFinder" },
-      { name: "description", content: "Search games by title, genre, platform, mood, and active deals." },
+      { title: "Search — Playfinder" },
+      {
+        name: "description",
+        content: "Search games by title, genre, platform, mood, and active deals.",
+      },
     ],
   }),
   component: SearchPage,
@@ -31,10 +33,7 @@ const filters = [
 function SearchPage() {
   return (
     <AppShell>
-      <SectionHeader
-        title="Search"
-        hint="42,184 games indexed across 8 storefronts."
-      />
+      <SectionHeader title="Search" hint="42,184 games indexed across 8 storefronts." />
 
       <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
         <Search className="size-4 text-muted-foreground" />
@@ -75,17 +74,13 @@ function SearchPage() {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
+      <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
         {games.map((g) => (
           <article
             key={g.id}
-            className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition hover:border-white/20"
+            className="hover-lift group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface hover:border-primary/40"
           >
-            <Link
-              to="/games/$gameId"
-              params={{ gameId: g.id }}
-              className="relative block"
-            >
+            <Link to="/games/$gameId" params={{ gameId: g.id }} className="relative block">
               <GameCover
                 from={g.coverFrom}
                 to={g.coverTo}
@@ -114,12 +109,8 @@ function SearchPage() {
               params={{ gameId: g.id }}
               className="flex flex-1 flex-col p-4"
             >
-              <h5 className="font-bold leading-tight group-hover:text-primary">
-                {g.title}
-              </h5>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {g.genres.join(" · ")}
-              </p>
+              <h5 className="font-bold leading-tight group-hover:text-primary">{g.title}</h5>
+              <p className="mt-1 text-xs text-muted-foreground">{g.genres.join(" · ")}</p>
               <div className="mt-2 flex flex-wrap gap-1">
                 {g.platforms.map((p) => (
                   <Chip key={p}>{p}</Chip>
@@ -145,7 +136,6 @@ function SearchPage() {
             </Link>
           </article>
         ))}
-
       </div>
     </AppShell>
   );

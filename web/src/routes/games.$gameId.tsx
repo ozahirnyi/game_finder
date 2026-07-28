@@ -3,17 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { friends, games, priceHistory, type Game } from "@/lib/mockData";
-import {
-  ArrowLeft,
-  Bell,
-  Heart,
-  Plus,
-  Share2,
-  Sparkles,
-  Star,
-  Trophy,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, Bell, Heart, Plus, Share2, Sparkles, Star, Trophy, Users } from "lucide-react";
 
 export const Route = createFileRoute("/games/$gameId")({
   loader: ({ params }) => {
@@ -24,13 +14,13 @@ export const Route = createFileRoute("/games/$gameId")({
   head: ({ loaderData }) => ({
     meta: loaderData
       ? [
-          { title: `${loaderData.game.title} — GameFinder` },
+          { title: `${loaderData.game.title} — Playfinder` },
           {
             name: "description",
-            content: `${loaderData.game.title} · ${loaderData.game.genres.join(", ")} · ${loaderData.game.platforms.join(", ")}. Shared with your friends on GameFinder.`,
+            content: `${loaderData.game.title} · ${loaderData.game.genres.join(", ")} · ${loaderData.game.platforms.join(", ")}. Shared with your friends on Playfinder.`,
           },
         ]
-      : [{ title: "Game not found — GameFinder" }, { name: "robots", content: "noindex" }],
+      : [{ title: "Game not found — Playfinder" }, { name: "robots", content: "noindex" }],
   }),
   component: GameDetail,
   notFoundComponent: () => (
@@ -80,7 +70,9 @@ function GameDetail() {
   const { game } = Route.useLoaderData();
 
   const owners = friends.slice(0, 4);
-  const similar = games.filter((g: Game) => g.id !== game.id && g.genres.some((x) => game.genres.includes(x))).slice(0, 4);
+  const similar = games
+    .filter((g: Game) => g.id !== game.id && g.genres.some((x) => game.genres.includes(x)))
+    .slice(0, 4);
 
   return (
     <AppShell>
@@ -103,19 +95,14 @@ function GameDetail() {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {game.coop && <Chip tone="primary">Co-op · 4p</Chip>}
             {game.discount && <Chip tone="primary">-{game.discount}%</Chip>}
-            {game.status === "Playing with Friends" && (
-              <Chip tone="primary">Squad active</Chip>
-            )}
+            {game.status === "Playing with Friends" && <Chip tone="primary">Squad active</Chip>}
             {game.genres.map((g: string) => (
               <Chip key={g} tone="outline">
                 {g}
               </Chip>
             ))}
-
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-            {game.title}
-          </h1>
+          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">{game.title}</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             {game.platforms.join(" · ")} · {owners.length} friends own it ·{" "}
             {game.rating > 0 ? `${game.rating} critic score` : "Unreleased"}
@@ -129,11 +116,10 @@ function GameDetail() {
           <section>
             <SectionHeader title="About" />
             <p className="text-sm leading-relaxed text-muted-foreground">
-              {game.title} is a {game.genres.join(" / ").toLowerCase()} experience built
-              for {game.platforms.join(" and ")}. GameFinder ranks it against your library
-              and your circle's shared titles to surface the best moments to play together
-              tonight. Cross-referenced with 12 professional reviews and 4,821 friends'
-              playtime.
+              {game.title} is a {game.genres.join(" / ").toLowerCase()} experience built for{" "}
+              {game.platforms.join(" and ")}. Playfinder ranks it against your library and your
+              circle's shared titles to surface the best moments to play together tonight.
+              Cross-referenced with 12 professional reviews and 4,821 friends' playtime.
             </p>
           </section>
 
@@ -162,7 +148,7 @@ function GameDetail() {
                       {f.online ? f.activity : "Offline"}
                     </p>
                   </div>
-                  <button className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold hover:bg-white/5">
+                  <button className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold hover:bg-foreground/5">
                     Invite
                   </button>
                 </div>
@@ -171,10 +157,7 @@ function GameDetail() {
           </section>
 
           <section>
-            <SectionHeader
-              title="Price history"
-              hint="6-month trend across storefronts."
-            />
+            <SectionHeader title="Price history" hint="6-month trend across storefronts." />
             <div className="rounded-2xl border border-border bg-surface p-6">
               <div className="mb-4 flex items-end justify-between">
                 <div>
@@ -183,9 +166,7 @@ function GameDetail() {
                       ${game.originalPrice}
                     </p>
                   )}
-                  <p className="font-mono text-3xl font-black text-primary">
-                    ${game.price}
-                  </p>
+                  <p className="font-mono text-3xl font-black text-primary">${game.price}</p>
                 </div>
                 {game.discount && (
                   <div className="text-right font-mono text-[10px] uppercase tracking-widest text-primary">
@@ -210,7 +191,7 @@ function GameDetail() {
                   key={g.id}
                   to="/games/$gameId"
                   params={{ gameId: g.id }}
-                  className="group overflow-hidden rounded-xl border border-border bg-surface transition hover:border-white/20"
+                  className="group overflow-hidden rounded-xl border border-border bg-surface transition hover:border-primary/40"
                 >
                   <GameCover
                     from={g.coverFrom}
@@ -225,9 +206,7 @@ function GameDetail() {
                         Similar
                       </span>
                     </div>
-                    <p className="truncate text-sm font-bold group-hover:text-primary">
-                      {g.title}
-                    </p>
+                    <p className="truncate text-sm font-bold group-hover:text-primary">{g.title}</p>
                     <p className="mt-1 font-mono text-xs">${g.price}</p>
                   </div>
                 </Link>
@@ -243,9 +222,7 @@ function GameDetail() {
               Buy · Best price
             </p>
             <div className="flex items-end justify-between">
-              <p className="font-mono text-3xl font-black text-primary">
-                ${game.price}
-              </p>
+              <p className="font-mono text-3xl font-black text-primary">${game.price}</p>
               {game.discount && <Chip tone="primary">-{game.discount}%</Chip>}
             </div>
             {game.originalPrice && (
@@ -256,17 +233,17 @@ function GameDetail() {
             <button className="mt-4 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90">
               Buy on Steam
             </button>
-            <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-bold hover:bg-white/5">
+            <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-bold hover:bg-foreground/5">
               <Users className="size-4" /> Invite friends to buy together
             </button>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-white/5">
+              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5">
                 <Heart className="size-3.5" /> Wish
               </button>
-              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-white/5">
+              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5">
                 <Bell className="size-3.5" /> Alert
               </button>
-              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-white/5">
+              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5">
                 <Share2 className="size-3.5" /> Share
               </button>
             </div>
@@ -293,7 +270,10 @@ function GameDetail() {
                   icon: Trophy,
                 },
               ].map((r) => (
-                <div key={r.l} className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0">
+                <div
+                  key={r.l}
+                  className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
+                >
                   <span className="text-muted-foreground">{r.l}</span>
                   <span className="text-right font-bold">{r.v}</span>
                 </div>
@@ -309,8 +289,8 @@ function GameDetail() {
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Marcus, Alex, and Sasha all own {game.title}. Their combined playtime is
-              234h — a great candidate for tonight's session.
+              Marcus, Alex, and Sasha all own {game.title}. Their combined playtime is 234h — a
+              great candidate for tonight's session.
             </p>
           </div>
         </div>
