@@ -16,6 +16,19 @@ describe("apiRequest", () => {
     vi.restoreAllMocks();
   });
 
+  it("uses the same-origin API proxy when no public API URL is configured", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({}), { headers: { "content-type": "application/json" } }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiRequest("/catalog/trending-games");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/catalog/trending-games", expect.any(Object));
+  });
+
   it("sends the JWT and clears it after an authenticated 401", async () => {
     setToken("token");
     const fetchMock = vi.fn().mockResolvedValue(
@@ -31,7 +44,7 @@ describe("apiRequest", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/games",
+      "/api/games",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
       }),
@@ -51,7 +64,7 @@ describe("apiRequest", () => {
       access_token: "new-token",
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/auth/login",
+      "/api/auth/login",
       expect.objectContaining({ method: "POST" }),
     );
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit).body?.toString()).toBe(
