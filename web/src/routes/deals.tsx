@@ -50,7 +50,9 @@ function DealsPage() {
                 <p className="font-mono text-xs text-muted-foreground line-through">
                   ${hero.current?.regular?.amount}
                 </p>
-                <p className="font-mono text-5xl font-black text-primary">${hero.current?.price?.amount}</p>
+                <p className="font-mono text-5xl font-black text-primary">
+                  ${hero.current?.price?.amount}
+                </p>
               </div>
               <Chip tone="primary">-{hero.current?.cut}%</Chip>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -92,7 +94,9 @@ function DealsPage() {
               <h4 className="truncate text-lg font-bold transition-colors group-hover:text-primary">
                 {g.name}
               </h4>
-              <p className="mt-0.5 text-xs text-muted-foreground">{g.current?.shop ?? "Store offer"}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {g.current?.shop ?? "Store offer"}
+              </p>
               <div className="mt-2 flex items-center gap-2">
                 {(g.current?.shop ? [g.current.shop] : []).map((p) => (
                   <Chip key={p}>{p}</Chip>
@@ -104,7 +108,9 @@ function DealsPage() {
               <p className="mt-1 font-mono text-[10px] text-muted-foreground line-through">
                 ${g.current?.regular?.amount}
               </p>
-              <p className="font-mono text-lg font-black text-primary">${g.current?.price?.amount}</p>
+              <p className="font-mono text-lg font-black text-primary">
+                ${g.current?.price?.amount}
+              </p>
             </div>
           </div>
         ))}

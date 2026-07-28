@@ -107,7 +107,9 @@ function LibraryPage() {
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 Playtime
               </p>
-              <p className="font-mono text-sm font-bold">{Math.round((g.playtime_forever ?? 0) / 60)}h</p>
+              <p className="font-mono text-sm font-bold">
+                {Math.round((g.playtime_forever ?? 0) / 60)}h
+              </p>
             </div>
           </Link>
         ))}
