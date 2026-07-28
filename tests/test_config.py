@@ -26,6 +26,7 @@ def test_get_allowed_origins_reads_comma_separated_frontend_origins(monkeypatch)
     origins = get_allowed_origins()
 
     assert "http://localhost:3000" in origins
+    assert "http://localhost:5173" in origins
     assert "https://web.example.com" in origins
 
 
