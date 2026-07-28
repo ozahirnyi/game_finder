@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiRequest, clearToken, getToken, loginUser, setToken } from "./api";
+import {
+  ApiError,
+  apiRequest,
+  clearToken,
+  getAuthSnapshot,
+  getToken,
+  loginUser,
+  setToken,
+} from "./api";
 
 describe("apiRequest", () => {
   afterEach(() => {
@@ -49,5 +57,11 @@ describe("apiRequest", () => {
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit).body?.toString()).toBe(
       "username=player%40example.com&password=password",
     );
+  });
+
+  it("reports authentication from the stored token", () => {
+    expect(getAuthSnapshot()).toBe(false);
+    setToken("token");
+    expect(getAuthSnapshot()).toBe(true);
   });
 });
