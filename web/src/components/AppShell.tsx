@@ -1,10 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { Home, Search, Library, Heart, Tag, Users, Palette } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
 import { Avatar } from "./GameCover";
-import { deals } from "@/lib/mockData";
-import { clearToken, getAuthSnapshot, subscribeToAuthChanges } from "@/lib/api";
+import { clearToken, getAuthSnapshot, getDeals, subscribeToAuthChanges } from "@/lib/api";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -19,6 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [themeOpen, setThemeOpen] = useState(false);
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
+  const dealsQuery = useQuery({ queryKey: ["deals", "US", "sidebar"], queryFn: () => getDeals("US") });
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -63,7 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="ember-glow grain relative overflow-hidden rounded-xl border border-border bg-surface-2 p-4">
             <p className="label-mono relative mb-1.5 text-primary">Live deals</p>
             <p className="relative text-xs text-muted-foreground">
-              {deals.length} price drops tracked · refreshed 4m ago
+              {dealsQuery.data?.results.length ?? 0} price drops tracked · refreshed 4m ago
             </p>
           </div>
 
