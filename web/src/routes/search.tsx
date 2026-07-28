@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { games } from "@/lib/mockData";
+import { searchGames } from "@/lib/api";
 import { Search, SlidersHorizontal, Plus, Heart, Users } from "lucide-react";
 
 export const Route = createFileRoute("/search")({
@@ -31,6 +33,14 @@ const filters = [
 ];
 
 function SearchPage() {
+  const [query, setQuery] = useState("");
+  const gamesQuery = useQuery({
+    queryKey: ["games", "search", query],
+    queryFn: () => searchGames(query),
+    enabled: query.trim().length >= 2,
+  });
+  const games = gamesQuery.data?.results ?? [];
+
   return (
     <AppShell>
       <SectionHeader title="Search" hint="42,184 games indexed across 8 storefronts." />
@@ -38,7 +48,8 @@ function SearchPage() {
       <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
         <Search className="size-4 text-muted-foreground" />
         <input
-          defaultValue="co-op roguelike"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           placeholder="Search by title, genre, mood…"
         />
@@ -75,23 +86,26 @@ function SearchPage() {
       </div>
 
       <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
+        {gamesQuery.isLoading && (
+          <p className="col-span-full text-sm text-muted-foreground">Searching catalogue…</p>
+        )}
+        {gamesQuery.isError && (
+          <p className="col-span-full text-sm text-destructive">
+            Unable to search games right now.
+          </p>
+        )}
         {games.map((g) => (
           <article
             key={g.id}
             className="hover-lift group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface hover:border-primary/40"
           >
-            <Link to="/games/$gameId" params={{ gameId: g.id }} className="relative block">
+            <Link to="/games/$gameId" params={{ gameId: String(g.id) }} className="relative block">
               <GameCover
-                from={g.coverFrom}
-                to={g.coverTo}
-                title={g.title}
+                from="#c75f28"
+                to="#22243a"
+                title={g.name}
                 className="aspect-[3/4] w-full"
               />
-              {g.discount && (
-                <span className="absolute left-3 top-3 rounded bg-primary px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-primary-foreground">
-                  -{g.discount}%
-                </span>
-              )}
               <div className="pointer-events-none absolute inset-x-0 bottom-0 flex translate-y-2 items-center gap-1.5 bg-gradient-to-t from-background/95 to-transparent p-3 opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
                 <span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
                   <Plus className="size-4" />
@@ -106,31 +120,28 @@ function SearchPage() {
             </Link>
             <Link
               to="/games/$gameId"
-              params={{ gameId: g.id }}
+              params={{ gameId: String(g.id) }}
               className="flex flex-1 flex-col p-4"
             >
-              <h5 className="font-bold leading-tight group-hover:text-primary">{g.title}</h5>
-              <p className="mt-1 text-xs text-muted-foreground">{g.genres.join(" · ")}</p>
+              <h5 className="font-bold leading-tight group-hover:text-primary">{g.name}</h5>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {g.released ?? "Release date unknown"}
+              </p>
               <div className="mt-2 flex flex-wrap gap-1">
-                {g.platforms.map((p) => (
+                {(g.platforms ?? []).map((p) => (
                   <Chip key={p}>{p}</Chip>
                 ))}
               </div>
               <div className="mt-auto flex items-end justify-between pt-4">
                 <div>
-                  {g.rating > 0 && (
+                  {g.rating && g.rating > 0 && (
                     <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                       {g.rating} · Score
                     </p>
                   )}
                 </div>
                 <div className="text-right">
-                  {g.originalPrice && (
-                    <p className="font-mono text-[10px] text-muted-foreground line-through">
-                      ${g.originalPrice}
-                    </p>
-                  )}
-                  <p className="font-mono text-sm font-bold">${g.price}</p>
+                  <p className="font-mono text-sm font-bold">View details</p>
                 </div>
               </div>
             </Link>

@@ -17,7 +17,63 @@ export type TokenResponse = {
 export type UserRead = {
   id: string;
   email: string;
+  display_name: string;
   created_at: string;
+};
+
+export type CatalogGame = {
+  id: number;
+  name: string;
+  released?: string | null;
+  background_image?: string | null;
+  description_raw?: string | null;
+  rating?: number | null;
+  genres?: string[];
+  platforms?: string[];
+};
+
+export type Deal = {
+  id?: number | null;
+  name: string;
+  background_image?: string | null;
+  url?: string | null;
+  current?: {
+    shop?: string | null;
+    price?: Money | null;
+    regular?: Money | null;
+    cut?: number | null;
+  } | null;
+};
+
+export type Money = { amount: number; currency: string };
+
+export type LibraryGame = {
+  id: string;
+  title: string;
+  notes?: string | null;
+  source: string;
+  playtime_forever?: number | null;
+  img_icon_url?: string | null;
+};
+
+export type CollectionGame = {
+  id: string;
+  catalog_game_id: number;
+  title: string;
+  cover_url?: string | null;
+};
+
+export type Friend = {
+  user: { id: string; display_name: string; bio?: string | null; avatar?: string | null };
+};
+
+export type Profile = {
+  id: string;
+  email: string;
+  display_name: string;
+  bio?: string | null;
+  platforms: string[];
+  favorite_genres: string[];
 };
 
 export class ApiError extends Error {
@@ -102,4 +158,58 @@ export function registerUser(email: string, password: string) {
 export function loginUser(email: string, password: string) {
   const formBody = new URLSearchParams({ username: email, password });
   return apiRequest<TokenResponse>("/auth/login", { method: "POST", formBody });
+}
+
+export function searchGames(query: string) {
+  return apiRequest<{ results: CatalogGame[] }>(`/search/games?q=${encodeURIComponent(query)}`);
+}
+
+export function getTrendingGames() {
+  return apiRequest<{ results: CatalogGame[] }>("/catalog/trending-games?page_size=12");
+}
+
+export function getCatalogGame(id: string | number) {
+  return apiRequest<CatalogGame>(`/catalog/games/${id}`);
+}
+
+export function getDeals(country: string) {
+  return apiRequest<{ results: Deal[] }>(
+    `/prices/deals?country=${encodeURIComponent(country)}&page_size=12`,
+  );
+}
+
+export function getPriceHistory(id: string | number, country = "US") {
+  return apiRequest<{
+    current?: Deal["current"];
+    deals: Deal["current"][];
+    history_low_all?: Money | null;
+  }>(`/prices/games/${id}?country=${encodeURIComponent(country)}`);
+}
+
+export function getProfile() {
+  return apiRequest<Profile>("/profile", { auth: true });
+}
+
+export function getLibrary() {
+  return apiRequest<LibraryGame[]>("/games", { auth: true });
+}
+
+export function getWishlist() {
+  return apiRequest<CollectionGame[]>("/wishlist", { auth: true });
+}
+
+export function addWishlist(game: CatalogGame) {
+  return apiRequest<CollectionGame>("/wishlist", {
+    auth: true,
+    method: "POST",
+    body: { catalog_game_id: game.id, title: game.name, cover_url: game.background_image ?? null },
+  });
+}
+
+export function removeWishlist(id: number) {
+  return apiRequest<void>(`/wishlist/${id}`, { auth: true, method: "DELETE" });
+}
+
+export function getFriends() {
+  return apiRequest<Friend[]>("/friends", { auth: true });
 }

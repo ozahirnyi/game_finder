@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { games } from "@/lib/mockData";
+import { getDeals } from "@/lib/api";
 import { Flame, Clock } from "lucide-react";
 
 export const Route = createFileRoute("/deals")({
@@ -20,7 +21,8 @@ export const Route = createFileRoute("/deals")({
 });
 
 function DealsPage() {
-  const deals = games.filter((g) => g.discount);
+  const dealsQuery = useQuery({ queryKey: ["deals", "US"], queryFn: () => getDeals("US") });
+  const deals = dealsQuery.data?.results ?? [];
   const hero = deals[0];
 
   return (
@@ -39,18 +41,18 @@ function DealsPage() {
                 Deal of the day
               </span>
             </div>
-            <h3 className="text-4xl font-extrabold tracking-tight">{hero.title}</h3>
+            <h3 className="text-4xl font-extrabold tracking-tight">{hero.name}</h3>
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
               Matches your wishlist and 3 friends already own it. Sale ends in 2 days.
             </p>
             <div className="mt-6 flex flex-wrap items-end gap-6">
               <div>
                 <p className="font-mono text-xs text-muted-foreground line-through">
-                  ${hero.originalPrice}
+                  ${hero.current?.regular?.amount}
                 </p>
-                <p className="font-mono text-5xl font-black text-primary">${hero.price}</p>
+                <p className="font-mono text-5xl font-black text-primary">${hero.current?.price?.amount}</p>
               </div>
-              <Chip tone="primary">-{hero.discount}%</Chip>
+              <Chip tone="primary">-{hero.current?.cut}%</Chip>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock className="size-3.5" /> Ends in 47:12:04
               </div>
@@ -67,7 +69,7 @@ function DealsPage() {
           <GameCover
             from={hero.coverFrom}
             to={hero.coverTo}
-            title={hero.title}
+            title={hero.name}
             className="aspect-video min-h-56 w-full rounded-2xl"
           />
         </div>
@@ -82,27 +84,27 @@ function DealsPage() {
             <GameCover
               from={g.coverFrom}
               to={g.coverTo}
-              title={g.title}
+              title={g.name}
               compact
               className="size-24 shrink-0 rounded-xl"
             />
             <div className="min-w-0 flex-1">
               <h4 className="truncate text-lg font-bold transition-colors group-hover:text-primary">
-                {g.title}
+                {g.name}
               </h4>
-              <p className="mt-0.5 text-xs text-muted-foreground">{g.genres.join(" · ")}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{g.current?.shop ?? "Store offer"}</p>
               <div className="mt-2 flex items-center gap-2">
-                {g.platforms.map((p) => (
+                {(g.current?.shop ? [g.current.shop] : []).map((p) => (
                   <Chip key={p}>{p}</Chip>
                 ))}
               </div>
             </div>
             <div className="text-right">
-              <Chip tone="primary">-{g.discount}%</Chip>
+              <Chip tone="primary">-{g.current?.cut}%</Chip>
               <p className="mt-1 font-mono text-[10px] text-muted-foreground line-through">
-                ${g.originalPrice}
+                ${g.current?.regular?.amount}
               </p>
-              <p className="font-mono text-lg font-black text-primary">${g.price}</p>
+              <p className="font-mono text-lg font-black text-primary">${g.current?.price?.amount}</p>
             </div>
           </div>
         ))}

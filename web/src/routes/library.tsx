@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { games } from "@/lib/mockData";
+import { getLibrary } from "@/lib/api";
 import { useState } from "react";
 
 export const Route = createFileRoute("/library")({
@@ -23,8 +24,10 @@ const tabs = ["All games", "Steam", "PlayStation"] as const;
 
 function LibraryPage() {
   const [tab, setTab] = useState<(typeof tabs)[number]>("All games");
-  const owned = games.filter((g) => g.source);
-  const visible = tab === "All games" ? owned : owned.filter((g) => g.source === tab);
+  const libraryQuery = useQuery({ queryKey: ["library"], queryFn: getLibrary });
+  const owned = libraryQuery.data ?? [];
+  const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
+  const visible = sourceForTab ? owned.filter((g) => g.source === sourceForTab) : owned;
   return (
     <AppShell>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -77,8 +80,8 @@ function LibraryPage() {
             className="hover-lift group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
           >
             <GameCover
-              from={g.coverFrom}
-              to={g.coverTo}
+              from="#c75f28"
+              to="#22243a"
               title={g.title}
               compact
               className="size-16 shrink-0 rounded-lg"
@@ -91,7 +94,7 @@ function LibraryPage() {
                 {g.status === "Playing with Friends" && <Chip tone="primary">Squad · 3</Chip>}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {g.genres.join(" · ")} · {g.platforms.join(", ")}
+                {g.notes ?? "No description available"} · {g.source}
               </p>
             </div>
             <div className="hidden text-right sm:block">
@@ -104,7 +107,7 @@ function LibraryPage() {
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 Playtime
               </p>
-              <p className="font-mono text-sm font-bold">{g.playtime ?? 0}h</p>
+              <p className="font-mono text-sm font-bold">{Math.round((g.playtime_forever ?? 0) / 60)}h</p>
             </div>
           </Link>
         ))}
