@@ -1,11 +1,12 @@
 import time
 import uuid
 import os
+import secrets
 from dotenv import load_dotenv
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import create_engine, String, DateTime, ForeignKey, Float, Integer, Index, JSON, text, UniqueConstraint
+from sqlalchemy import CheckConstraint, create_engine, String, DateTime, ForeignKey, Float, Integer, Index, JSON, Text, text, UniqueConstraint, func
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.exc import OperationalError
 
@@ -63,8 +64,17 @@ class Game(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index(
+            "uq_users_public_nickname_casefold",
+            func.lower(text("public_nickname")),
+            unique=True,
+            postgresql_where=text("public_nickname IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    public_id: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, default=lambda: secrets.token_urlsafe(12))
     email: Mapped[str] = mapped_column(String(255),nullable=False, unique=True)
     display_name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, default=lambda: f"player-{uuid.uuid4().hex[:8]}")
     password_hash: Mapped[Optional[str]] = mapped_column(String(255),nullable=True)
@@ -80,28 +90,47 @@ class User(Base):
     bio: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     platforms: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
     favorite_genres: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    public_nickname: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    library_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
+    favorites_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
+    wishlist_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
+    steam_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
 
 
 class FriendRequest(Base):
     __tablename__ = "friend_requests"
-    __table_args__ = (UniqueConstraint("sender_id", "recipient_id", name="uq_friend_request_pair"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'accepted', 'declined', 'cancelled')", name="ck_friend_requests_status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     sender_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     recipient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     message: Mapped[Optional[str]] = mapped_column(String(280), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", server_default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class Friendship(Base):
     __tablename__ = "friendships"
-    __table_args__ = (UniqueConstraint("user_low_id", "user_high_id", name="uq_friendship_pair"),)
+    __table_args__ = (
+        UniqueConstraint("user_low_id", "user_high_id", name="uq_friendship_pair"),
+        CheckConstraint("user_low_id < user_high_id", name="ck_friendships_canonical_pair"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_low_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     user_high_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    def __init__(self, **kwargs):
+        low_id = kwargs.get("user_low_id")
+        high_id = kwargs.get("user_high_id")
+        if low_id is not None and high_id is not None and str(low_id) > str(high_id):
+            kwargs["user_low_id"], kwargs["user_high_id"] = high_id, low_id
+        super().__init__(**kwargs)
 
 
 class Conversation(Base):
@@ -124,6 +153,16 @@ class Message(Base):
     body: Mapped[str] = mapped_column(String(2000), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DirectMessage(Base):
+    __tablename__ = "direct_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    friendship_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("friendships.id", ondelete="CASCADE"), nullable=False, index=True)
+    author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class GameInvite(Base):

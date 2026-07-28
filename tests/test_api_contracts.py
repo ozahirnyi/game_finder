@@ -3,11 +3,314 @@ from types import SimpleNamespace
 import uuid
 
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 import app.main as main
 
 
 client = TestClient(main.app)
+
+
+class CatalogGameDb:
+    def __init__(self):
+        self.games = []
+
+    def query(self, _model):
+        return CatalogGameQuery(self)
+
+    def add(self, game):
+        if game.id is None:
+            game.id = uuid.uuid4()
+        if game.created_at is None:
+            game.created_at = datetime.now(timezone.utc)
+        self.games.append(game)
+
+    def commit(self):
+        return None
+
+    def refresh(self, _game):
+        return None
+
+
+class CatalogGameQuery:
+    def __init__(self, db):
+        self.db = db
+        self.criteria = []
+
+    def filter(self, *criteria):
+        self.criteria.extend(criteria)
+        return self
+
+    def first(self):
+        expected = {
+            criterion.left.key: criterion.right.value
+            for criterion in self.criteria
+            if hasattr(criterion.left, "key") and hasattr(criterion.right, "value")
+        }
+        return next(
+            (game for game in self.db.games if all(getattr(game, field) == value for field, value in expected.items())),
+            None,
+        )
+
+
+def test_catalog_library_save_is_idempotent_and_server_authoritative(monkeypatch):
+    owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        assert rawg_id == 274755
+        return {"id": rawg_id, "name": "Hades II", "description_raw": "Fight beyond the Underworld."}
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        first = client.post("/library/catalog-games/274755")
+        again = client.post("/library/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert first.json()["title"] == "Hades II"
+    assert first.json()["info"] == "Fight beyond the Underworld."
+    assert first.json()["source"] == "catalog"
+    assert first.json()["external_id"] == "rawg:274755"
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
+    assert len(db.games) == 1
+
+
+def test_catalog_library_save_is_isolated_by_owner(monkeypatch):
+    first_owner_id = uuid.uuid4()
+    second_owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II", "description_raw": None}
+
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
+        first = client.post("/library/catalog-games/274755")
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=second_owner_id)
+        second = client.post("/library/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert len(db.games) == 2
+    assert {game.owner_id for game in db.games} == {first_owner_id, second_owner_id}
+
+
+def test_catalog_library_save_requires_authentication():
+    response = client.post("/library/catalog-games/274755")
+
+    assert response.status_code == 401
+
+
+def test_catalog_wishlist_save_is_idempotent_and_server_authoritative(monkeypatch):
+    owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        assert rawg_id == 274755
+        return {
+            "id": rawg_id,
+            "name": "Hades II",
+            "background_image": "https://example.com/hades-ii.jpg",
+        }
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        first = client.post("/wishlist/catalog-games/274755")
+        again = client.post("/wishlist/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert first.json()["catalog_game_id"] == 274755
+    assert first.json()["title"] == "Hades II"
+    assert first.json()["cover_url"] == "https://example.com/hades-ii.jpg"
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
+    assert len(db.games) == 1
+
+
+def test_catalog_wishlist_save_is_isolated_by_owner(monkeypatch):
+    first_owner_id = uuid.uuid4()
+    second_owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II", "background_image": None}
+
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
+        first = client.post("/wishlist/catalog-games/274755")
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=second_owner_id)
+        second = client.post("/wishlist/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert len(db.games) == 2
+    assert {game.user_id for game in db.games} == {first_owner_id, second_owner_id}
+
+
+def test_catalog_wishlist_save_requires_authentication():
+    response = client.post("/wishlist/catalog-games/274755")
+
+    assert response.status_code == 401
+
+
+def test_catalog_favorite_save_is_idempotent_and_server_authoritative(monkeypatch):
+    owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        assert rawg_id == 274755
+        return {
+            "id": rawg_id,
+            "name": "Hades II",
+            "background_image": "https://example.com/hades-ii.jpg",
+        }
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        first = client.post("/favorites/catalog-games/274755")
+        again = client.post("/favorites/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert first.json()["catalog_game_id"] == 274755
+    assert first.json()["title"] == "Hades II"
+    assert first.json()["cover_url"] == "https://example.com/hades-ii.jpg"
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
+    assert len(db.games) == 1
+
+
+def test_catalog_favorite_save_is_isolated_by_owner(monkeypatch):
+    first_owner_id = uuid.uuid4()
+    second_owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II", "background_image": None}
+
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
+        first = client.post("/favorites/catalog-games/274755")
+        main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=second_owner_id)
+        second = client.post("/favorites/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert len(db.games) == 2
+    assert {game.user_id for game in db.games} == {first_owner_id, second_owner_id}
+
+
+def test_catalog_favorite_save_requires_authentication():
+    response = client.post("/favorites/catalog-games/274755")
+
+    assert response.status_code == 401
+
+
+def test_catalog_favorite_save_rejects_invalid_rawg_id():
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=uuid.uuid4())
+    main.app.dependency_overrides[main.get_db] = lambda: CatalogGameDb()
+
+    try:
+        response = client.post("/favorites/catalog-games/0")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "rawg_id must be >= 1"
+
+
+def test_catalog_favorite_save_recovers_from_concurrent_duplicate(monkeypatch):
+    owner_id = uuid.uuid4()
+
+    class RaceFavoriteQuery:
+        def __init__(self, db):
+            self.db = db
+
+        def filter(self, *_criteria):
+            return self
+
+        def first(self):
+            return self.db.existing
+
+    class RaceFavoriteDb:
+        def __init__(self):
+            self.existing = None
+            self.rollback_called = False
+
+        def query(self, _model):
+            return RaceFavoriteQuery(self)
+
+        def add(self, _item):
+            return None
+
+        def commit(self):
+            self.existing = SimpleNamespace(
+                id=uuid.uuid4(),
+                catalog_game_id=274755,
+                title="Hades II",
+                cover_url="https://example.com/hades-ii.jpg",
+                created_at=datetime.now(timezone.utc),
+                updated_at=None,
+            )
+            raise IntegrityError("INSERT INTO favorites", {}, Exception("duplicate"))
+
+        def rollback(self):
+            self.rollback_called = True
+
+        def refresh(self, _item):
+            raise AssertionError("a racing duplicate must not be refreshed")
+
+    db = RaceFavoriteDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {
+            "id": rawg_id,
+            "name": "Hades II",
+            "background_image": "https://example.com/hades-ii.jpg",
+        }
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        response = client.post("/favorites/catalog-games/274755")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["catalog_game_id"] == 274755
+    assert db.rollback_called is True
 
 
 def test_catalog_game_detail_returns_normalized_rawg_data(monkeypatch):
@@ -155,6 +458,42 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
     assert response.json()["history_low_all"] == {"amount": 8.99, "currency": "USD"}
 
 
+def test_game_price_history_uses_steam_when_itad_is_unavailable(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_rawg_game_detail(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II"}
+
+    async def unavailable_itad(_title: str, country: str):
+        assert country == "US"
+        from fastapi import HTTPException
+        raise HTTPException(status_code=502, detail="IsThereAnyDeal rejected the API key")
+
+    async def steam_price(title: str, country: str):
+        assert (title, country) == ("Hades II", "US")
+        return {
+            "itad_id": "steam:1145350",
+            "title": title,
+            "url": "https://store.steampowered.com/app/1145350/",
+            "current": {"shop": "Steam", "price": {"amount": 29.99, "currency": "USD"}, "regular": None, "cut": 0, "url": "https://store.steampowered.com/app/1145350/", "timestamp": None},
+            "history_low_all": None,
+            "history_low_1y": None,
+            "history_low_3m": None,
+            "deals": [],
+        }
+
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch_rawg_game_detail)
+    monkeypatch.setattr(main, "fetch_game_price_history", unavailable_itad)
+    monkeypatch.setattr(main, "fetch_steam_store_game_price", steam_price)
+
+    response = client.get("/prices/games/274755")
+
+    assert response.status_code == 200
+    assert response.json()["current"]["shop"] == "Steam"
+
+
 def test_homepage_deals_returns_steam_store_deals(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
@@ -206,6 +545,161 @@ def test_homepage_deals_returns_steam_store_deals(monkeypatch):
     assert payload["results"][0]["name"] == "Palworld"
     assert payload["results"][0]["current"]["cut"] == 30
     assert payload["results"][0]["background_image"].startswith("https://shared.akamai.steamstatic.com/")
+
+
+def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_deal_candidates(country: str):
+        assert country == "US"
+        return {
+            "popular": [
+                {"steam_appid": 1, "name": "Hades", "background_image": "steam-hades", "url": "https://store.test/hades", "current": {"cut": 50}},
+                {"steam_appid": 2, "name": "Baldur's Gate 3", "background_image": "steam-bg3", "url": "https://store.test/bg3", "current": {"cut": 20}},
+                {"steam_appid": 3, "name": "Stardew Valley", "background_image": "steam-stardew", "url": "https://store.test/stardew", "current": {"cut": 40}},
+                {"steam_appid": 5, "name": "Cyberpunk 2077", "background_image": "steam-cyberpunk", "url": "https://store.test/cyberpunk", "current": {"cut": 55}},
+            ],
+            "candidates": [
+                {"steam_appid": 1, "name": "Hades", "background_image": "steam-hades", "url": "https://store.test/hades", "current": {"cut": 50}},
+                {"steam_appid": 4, "name": "Civilization VII", "background_image": "steam-civ", "url": "https://store.test/civ", "current": {"cut": 25}},
+            ],
+        }
+
+    async def fake_fetch_rawg_games(query: str, page: int):
+        assert page == 1
+        return {
+            "results": {
+                "Hades": [{"id": 1, "name": "Hades", "released": "2020-09-17", "background_image": "rawg-hades", "genres": ["Action", "RPG"]}],
+                "Civilization VII": [{"id": 2, "name": "Civilization VII", "released": "2025-02-11", "background_image": "rawg-civ", "genres": ["Strategy"]}],
+            }.get(query, [])
+        }
+
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: SimpleNamespace(
+        favorite_genres=[], steam_country_code=None
+    )
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+
+    try:
+        response = client.get("/prices/genre-deals")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["name"] for item in payload["popular"]] == ["Hades", "Baldur's Gate 3", "Stardew Valley", "Cyberpunk 2077"]
+    assert [section["genre"] for section in payload["sections"]] == ["Action", "RPG", "Strategy", "Adventure", "Indie"]
+    assert [item["name"] for item in payload["sections"][0]["results"]] == ["Hades"]
+    assert [item["name"] for item in payload["sections"][2]["results"]] == ["Civilization VII"]
+    assert payload["sections"][3]["results"] == []
+
+
+def test_genre_deals_are_available_without_an_account(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_deal_candidates(country: str):
+        assert country == "US"
+        return {"popular": [], "candidates": []}
+
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: None
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates)
+    try:
+        response = client.get("/prices/genre-deals")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["popular"] == []
+    assert [section["genre"] for section in payload["sections"]] == [
+        "Action", "RPG", "Adventure", "Strategy", "Indie"
+    ]
+
+
+def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
+    cache_keys = []
+    candidate_calls = 0
+
+    async def fake_cache(key, _ttl, fetch):
+        nonlocal candidate_calls
+        cache_keys.append(key)
+        if candidate_calls:
+            return {"popular": [], "sections": []}
+        candidate_calls += 1
+        return await fetch()
+
+    async def fake_fetch_deal_candidates(_country: str):
+        return {
+            "popular": [],
+            "candidates": [
+                {"steam_appid": appid, "name": f"Action {appid}", "background_image": None, "url": None, "current": None}
+                for appid in range(1, 8)
+            ],
+        }
+
+    async def fake_fetch_rawg_games(query: str, _page: int):
+        return {"results": [{"id": int(query.split()[-1]), "name": query, "released": None, "background_image": None, "genres": ["ACTION"]}]}
+
+    user = SimpleNamespace(favorite_genres=[" Action "], steam_country_code="us")
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: user
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+
+    try:
+        first = client.get("/prices/genre-deals")
+        second = client.get("/prices/genre-deals")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert first.status_code == 200
+    assert len(first.json()["sections"][0]["results"]) == 5
+    assert second.status_code == 200
+    assert cache_keys[0] == cache_keys[1]
+    assert cache_keys[0].startswith("steam_genre_deals_v2:")
+
+
+def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_deal_candidates(_country: str):
+        return {
+            "popular": [],
+            "candidates": [
+                {"steam_appid": 1, "name": "Action One", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 2, "name": "Action Two", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 3, "name": "Action Three", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 4, "name": "Adventure One", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 5, "name": "Adventure Two", "background_image": None, "url": None, "current": None},
+                {"steam_appid": 6, "name": "RPG One", "background_image": None, "url": None, "current": None},
+            ],
+        }
+
+    async def fake_fetch_rawg_games(query: str, _page: int):
+        genre = query.split()[0]
+        return {"results": [{"id": hash(query), "name": query, "released": None, "background_image": None, "genres": [genre]}]}
+
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: SimpleNamespace(
+        favorite_genres=["Sports"], steam_country_code="US"
+    )
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+
+    try:
+        response = client.get("/prices/genre-deals")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert [section["genre"] for section in response.json()["sections"]] == [
+        "Sports", "Action", "Adventure", "RPG", "Strategy"
+    ]
 
 
 def test_cors_allows_localhost_origin():
@@ -477,6 +971,74 @@ def test_steam_social_builds_friend_overlap():
     assert "img_icon_url" in payload["top_friend_games"][0]
 
 
+def test_steam_social_returns_requested_friend_page_and_metadata(monkeypatch):
+    linked_at = datetime.now(timezone.utc)
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
+        id=uuid.uuid4(),
+        steam_id="76561198000000000",
+        steam_persona_name="Steam Player",
+        steam_avatar=None,
+        steam_country_code="UA",
+        steam_linked_at=linked_at,
+    )
+
+    async def fake_fetch_owned_games(steam_id):
+        if steam_id == "76561198000000000":
+            return []
+        if steam_id == "friend-3":
+            return []
+        raise AssertionError(f"unexpected friend library request: {steam_id}")
+
+    async def fake_fetch_steam_friends(steam_id, *, limit, offset):
+        assert steam_id == "76561198000000000"
+        assert limit == 2
+        assert offset == 2
+        return (
+            [
+                {
+                    "steam_id": "friend-3",
+                    "persona_name": "Third",
+                    "avatar": None,
+                    "friend_since": 1,
+                },
+            ],
+            3,
+        )
+
+    monkeypatch.setattr(main, "fetch_owned_games", fake_fetch_owned_games)
+    monkeypatch.setattr(main, "fetch_steam_friends", fake_fetch_steam_friends)
+
+    try:
+        response = client.get("/steam/social?friends_limit=2&friends_offset=2")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [friend["steam_id"] for friend in payload["friends"]] == ["friend-3"]
+    assert payload["friends_total"] == 3
+    assert payload["friends_has_more"] is False
+
+
+def test_steam_social_rejects_invalid_friend_pagination():
+    linked_at = datetime.now(timezone.utc)
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
+        id=uuid.uuid4(),
+        steam_id="76561198000000000",
+        steam_persona_name="Steam Player",
+        steam_avatar=None,
+        steam_country_code="UA",
+        steam_linked_at=linked_at,
+    )
+
+    try:
+        assert client.get("/steam/social?friends_limit=0").status_code == 400
+        assert client.get("/steam/social?friends_limit=25").status_code == 400
+        assert client.get("/steam/social?friends_offset=-1").status_code == 400
+    finally:
+        main.app.dependency_overrides.clear()
+
+
 def test_steam_recommendations_require_linked_account():
     owner_id = uuid.uuid4()
     main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
@@ -527,11 +1089,10 @@ def test_steam_recommendations_use_most_played_games(monkeypatch):
             },
         ]
 
-    def fake_get_recommendation(prompt, liked_game_ids):
-        assert "Half-Life 2 - 20.0 hours played" in prompt
-        assert "Portal - 10.0 hours played" in prompt
-        assert "something with puzzles" in prompt
-        assert liked_game_ids == [20, 10]
+    async def fake_cached_recommendations(user_id, games, prompt):
+        assert user_id == owner_id
+        assert [game["appid"] for game in games] == [20, 10]
+        assert prompt == "something with puzzles"
         return {
             "recommendations": [
                 {
@@ -540,10 +1101,10 @@ def test_steam_recommendations_use_most_played_games(monkeypatch):
                     "tags": ["immersive", "sci-fi"],
                 }
             ]
-        }
+    }
 
     monkeypatch.setattr(main, "fetch_owned_games", fake_fetch_owned_games)
-    monkeypatch.setattr(main, "get_recommendation", fake_get_recommendation)
+    monkeypatch.setattr(main, "get_cached_steam_recommendations", fake_cached_recommendations)
 
     try:
         response = client.post("/steam/recommendations", json={"prompt": "something with puzzles"})
@@ -729,6 +1290,13 @@ def test_dashboard_reports_ready_and_error_deal_states(monkeypatch):
     assert failed.json()["deals"]["status"] == "error"
 
 
+def test_steam_library_cover_url_uses_the_steam_cdn():
+    assert main.steam_library_cover_url("10", "iconhash") == (
+        "https://media.steampowered.com/steamcommunity/public/images/apps/10/iconhash.jpg"
+    )
+    assert main.steam_library_cover_url("10", None) is None
+
+
 def test_dashboard_library_stats_and_linked_steam_library_contract(monkeypatch):
     user = SimpleNamespace(
         id=uuid.uuid4(), email="player@example.com", created_at=datetime.now(timezone.utc),
@@ -816,6 +1384,39 @@ def test_dashboard_keeps_steam_external_failure_as_error(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["steam"]["status"] == "error"
+
+
+def test_dashboard_generates_recommendations_for_linked_steam_games(monkeypatch):
+    user = SimpleNamespace(id=uuid.uuid4(), email="player@example.com", created_at=datetime.now(timezone.utc), steam_id="76561198000000000", steam_persona_name="Steam Player", steam_avatar=None, steam_country_code="US", steam_linked_at=datetime.now(timezone.utc), telegram_chat_id=None, telegram_username=None, telegram_linked_at=None, bio=None, platforms=[], favorite_genres=[])
+
+    class Query:
+        def filter(self, *_args): return self
+        def order_by(self, *_args): return self
+        def all(self): return []
+        def first(self): return None
+
+    async def steam_games(_steam_id):
+        return [{"appid": 10, "name": "Portal", "playtime_forever": 120, "playtime_2weeks": 30, "img_icon_url": None}]
+
+    async def cached(recommendation_user, saved_games, games):
+        assert recommendation_user.id == user.id
+        assert saved_games == []
+        assert games[0]["appid"] == 10
+        return {"recommendations": [{"title": "Hades", "reason": "Action", "tags": ["Action"]}]}
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: SimpleNamespace(query=lambda _model: Query())
+    monkeypatch.setattr(main, "fetch_owned_games", steam_games)
+    monkeypatch.setattr(main, "fetch_steam_store_deals", lambda **_kwargs: [])
+    monkeypatch.setattr(main, "get_personalized_recommendations", cached)
+    try:
+        response = client.get("/dashboard")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["recommendations"]["status"] == "ready"
+    assert response.json()["recommendations"]["data"]["recommendations"][0]["title"] == "Hades"
 
 
 def test_steam_library_sync_removes_legacy_imports_without_saving_steam_games(monkeypatch):

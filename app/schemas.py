@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from datetime import datetime
 from typing import Any, Literal, Optional
 import uuid
@@ -25,6 +25,26 @@ class GameRead(BaseModel):
     created_at: datetime
 
 
+class LibraryGameRead(BaseModel):
+    id: str
+    source: Literal["manual", "psn", "steam"]
+    external_id: str | None = None
+    detail_game_id: str | None = None
+    title: str
+    cover_url: str | None = None
+    playtime_forever: int | None = None
+
+
+class LibraryOverviewRead(BaseModel):
+    games: list[LibraryGameRead] = Field(default_factory=list)
+    steam_available: bool = False
+    steam_error: str | None = None
+
+
+class SteamLibraryResolveRead(BaseModel):
+    game_id: int
+
+
 class GameUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=255)
     notes: Optional[str] = Field(default=None, max_length=255)
@@ -42,12 +62,20 @@ class UserRead(BaseModel):
     display_name: str
     created_at: datetime
     google_linked: bool = False
+    public_nickname: str | None = None
+
+
+Visibility = Literal["private", "friends", "public"]
 
 
 class UserProfileRead(UserRead):
     bio: str | None = None
     platforms: list[str] = Field(default_factory=list)
     favorite_genres: list[str] = Field(default_factory=list)
+    library_visibility: Visibility = "public"
+    favorites_visibility: Visibility = "public"
+    wishlist_visibility: Visibility = "public"
+    steam_visibility: Visibility = "public"
 
 
 class UserProfileUpdate(BaseModel):
@@ -55,12 +83,49 @@ class UserProfileUpdate(BaseModel):
     bio: str | None = Field(default=None, max_length=1000)
     platforms: list[str] | None = Field(default=None, max_length=20)
     favorite_genres: list[str] | None = Field(default=None, max_length=20)
+    library_visibility: Visibility | None = None
+    favorites_visibility: Visibility | None = None
+    wishlist_visibility: Visibility | None = None
+    steam_visibility: Visibility | None = None
 
 
 class DataBlock(BaseModel):
     status: Literal["ready", "empty", "not_connected", "error"]
     data: Any = None
     message: str | None = None
+
+
+class PublicDataBlock(BaseModel):
+    status: Literal["ready", "empty", "hidden"]
+    data: Any = None
+    message: str | None = None
+
+
+class PublicLibraryGameRead(BaseModel):
+    id: uuid.UUID
+    title: str
+    source: str
+    cover_url: str | None = None
+    playtime_forever: int | None = None
+    detail_game_id: str | None = None
+
+
+class PublicSteamAccountRead(BaseModel):
+    linked: bool
+    persona_name: str | None = None
+    avatar: str | None = None
+    profile_url: str | None = None
+
+
+class PublicProfileRead(BaseModel):
+    public_id: str
+    nickname: str
+    avatar: str | None = None
+    relationship: str
+    library: PublicDataBlock
+    favorites: PublicDataBlock
+    wishlist: PublicDataBlock
+    steam: PublicDataBlock
 
 
 class DashboardRead(BaseModel):
@@ -88,6 +153,91 @@ class UserLogin(BaseModel):
     password: str
 
 
+class SocialProfileUpdate(BaseModel):
+    nickname: str = Field(
+        min_length=3,
+        max_length=32,
+        pattern=r"^[A-Za-z0-9_]+$",
+        description="3-32 ASCII letters, digits, or underscores",
+    )
+
+    @field_validator("nickname", mode="before")
+    @classmethod
+    def trim_nickname(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+
+class SocialPlayerRead(BaseModel):
+    public_id: str
+    nickname: str
+    avatar: str | None = None
+
+
+class SocialPlayersPageRead(BaseModel):
+    players: list[SocialPlayerRead] = Field(default_factory=list)
+    next_cursor: str | None = None
+
+
+class SocialFriendRead(SocialPlayerRead):
+    id: uuid.UUID
+
+
+class SocialRequestRead(SocialPlayerRead):
+    id: uuid.UUID
+    status: str
+    created_at: datetime
+
+
+class SocialProfileRead(SocialPlayerRead):
+    relationship: str
+
+
+class SocialMeRead(BaseModel):
+    public_id: str
+    nickname: str | None = None
+    avatar: str | None = None
+    friends: list[SocialFriendRead] = Field(default_factory=list)
+    incoming_requests: list[SocialRequestRead] = Field(default_factory=list)
+    outgoing_requests: list[SocialRequestRead] = Field(default_factory=list)
+
+
+class SocialCommonGameRead(BaseModel):
+    appid: int
+    name: str
+    img_icon_url: str | None = None
+
+
+class SocialCommonGamesRead(BaseModel):
+    games: list[SocialCommonGameRead] = Field(default_factory=list)
+
+
+class SocialFriendRequestCreate(BaseModel):
+    public_id: str = Field(min_length=1, max_length=32)
+
+
+class DirectMessageCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def trim_and_require_text(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+
+class DirectMessageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    friendship_id: uuid.UUID
+    author_id: uuid.UUID
+    text: str
+    created_at: datetime
+
+
+class DirectMessagePageRead(BaseModel):
+    messages: list[DirectMessageRead] = Field(default_factory=list)
+    next_cursor: uuid.UUID | None = None
+
+
 class GoogleStatusRead(BaseModel):
     configured: bool
 
@@ -109,10 +259,13 @@ class RecommendationItem(BaseModel):
     title: str
     reason: str
     tags: list[str] = Field(default_factory=list)
+    rawg_id: int | None = None
+    cover_url: str | None = None
 
 
 class RecommendationResponse(BaseModel):
     recommendations: list[RecommendationItem] = Field(default_factory=list)
+    cache_expires_at: datetime | None = None
 
 
 class GameSearchItem(BaseModel):
@@ -180,6 +333,7 @@ class SteamFriendGameRead(BaseModel):
 
 class SteamFriendRead(BaseModel):
     steam_id: str
+    public_id: str | None = None
     persona_name: str | None = None
     avatar: str | None = None
     friend_since: int | None = None
@@ -194,6 +348,8 @@ class SteamFriendRead(BaseModel):
 class SteamSocialRead(BaseModel):
     steam: SteamAccountRead
     friends: list[SteamFriendRead] = Field(default_factory=list)
+    friends_total: int = 0
+    friends_has_more: bool = False
     top_friend_games: list[SteamFriendGameRead] = Field(default_factory=list)
     public_libraries: int = 0
     private_libraries: int = 0
@@ -270,6 +426,16 @@ class HomeDealItem(BaseModel):
 
 class HomeDealResponse(BaseModel):
     results: list[HomeDealItem] = Field(default_factory=list)
+
+
+class GenreDealSection(BaseModel):
+    genre: str
+    results: list[HomeDealItem] = Field(default_factory=list)
+
+
+class GenreDealResponse(BaseModel):
+    popular: list[HomeDealItem] = Field(default_factory=list)
+    sections: list[GenreDealSection] = Field(default_factory=list)
 
 
 class PublicUserRead(BaseModel):
