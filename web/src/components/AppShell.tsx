@@ -1,24 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
-import {
-  Home,
-  Search,
-  Library,
-  Heart,
-  Tag,
-  Users,
-  User,
-  Bell,
-} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { Home, Search, Library, Heart, Tag, Users, Palette } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
-import {
-  isAuthenticated,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  subscribeToAuthChanges,
-  type Notification,
-} from "@/lib/api";
+import { Avatar } from "./GameCover";
+import { clearToken, getAuthSnapshot, getDeals, subscribeToAuthChanges } from "@/lib/api";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -28,143 +14,47 @@ const nav = [
   { to: "/deals", label: "Deals", icon: Tag },
   { to: "/friends", label: "Friends", icon: Users },
 ] as const;
-const mobileNav = [
-  { to: "/", label: "Home", icon: Home },
-  { to: "/library", label: "Library", icon: Library },
-  { to: "/deals", label: "Deals", icon: Tag },
-  { to: "/friends", label: "Friends", icon: Users },
-  { to: "/profile", label: "Profile", icon: User },
-] as const;
-
-function notificationText(notification: Notification) {
-  if (notification.type === "friend_request")
-    return `${notification.payload.from ?? "A player"} sent you a friend request.`;
-  if (notification.type === "friend_request_accepted")
-    return `${notification.payload.by ?? "A player"} accepted your friend request.`;
-  if (notification.type === "message")
-    return `${notification.payload.from ?? "A friend"} sent you a message.`;
-  if (notification.type === "game_invite")
-    return `${notification.payload.from ?? "A friend"} invited you to play ${notification.payload.game_name ?? "a game"}.`;
-  return "You have a new PlayFinder notification.";
-}
-
-function NotificationMenu({
-  authenticated,
-  mobile = false,
-}: {
-  authenticated: boolean;
-  mobile?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<Notification[]>([]);
-  const unread = items.filter((item) => !item.read_at).length;
-  const refresh = () =>
-    authenticated &&
-    listNotifications()
-      .then(setItems)
-      .catch(() => setItems([]));
-  useEffect(() => {
-    refresh();
-  }, [authenticated]);
-  const read = async (item: Notification) => {
-    if (!item.read_at) await markNotificationRead(item.id);
-    refresh();
-  };
-  const readAll = async () => {
-    await markAllNotificationsRead();
-    refresh();
-  };
-  return (
-    <div className="relative">
-      <button
-        aria-label={mobile ? "Mobile notifications" : "Notifications"}
-        onClick={() => setOpen((value) => !value)}
-        className="relative grid size-9 place-items-center rounded-md border border-border transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-      >
-        <Bell className="size-4" />
-        {authenticated && unread > 0 ? (
-          <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-            {unread > 9 ? "9+" : unread}
-          </span>
-        ) : null}
-      </button>
-      {open ? (
-        <div
-          className={`absolute z-50 w-80 rounded-xl border border-border bg-surface p-3 shadow-xl ${mobile ? "right-0 mt-2" : "bottom-full left-0 mb-2"}`}
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-bold">Notifications</p>
-            {unread ? (
-              <button onClick={readAll} className="text-xs text-primary">
-                Mark all read
-              </button>
-            ) : null}
-          </div>
-          {!authenticated ? (
-            <p className="p-2 text-sm text-muted-foreground">
-              Sign in to see notifications.
-            </p>
-          ) : items.length ? (
-            <div className="max-h-80 space-y-1 overflow-y-auto">
-              {items.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => read(item)}
-                  className={`w-full rounded-lg p-2 text-left text-sm ${item.read_at ? "text-muted-foreground" : "bg-primary/10"}`}
-                >
-                  {notificationText(item)}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="p-2 text-sm text-muted-foreground">
-              You are all caught up.
-            </p>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [authenticated, setAuthenticated] = useState(isAuthenticated);
-
-  useEffect(
-    () => subscribeToAuthChanges(() => setAuthenticated(isAuthenticated())),
-    [],
-  );
+  const [themeOpen, setThemeOpen] = useState(false);
+  const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
+  const dealsQuery = useQuery({
+    queryKey: ["deals", "US", "sidebar"],
+    queryFn: () => getDeals("US"),
+  });
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Desktop sidebar */}
-      <aside className="fixed left-0 top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface p-6 lg:flex z-40">
+      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface p-6 lg:flex">
         <Link to="/" className="mb-10 flex items-center gap-3 px-2">
-          <div className="grid size-8 place-items-center rounded-lg bg-primary">
-            <div className="size-4 rounded-sm bg-background" />
+          <div className="grid size-8 place-items-center rounded-lg bg-primary shadow-[0_8px_24px_-10px_var(--primary)]">
+            <div className="size-3.5 rounded-sm bg-primary-foreground" />
           </div>
-          <span className="text-xl font-bold uppercase tracking-tight">
-            PlayFinder
+          <span className="font-display text-lg font-bold uppercase tracking-tight">
+            Playfinder
           </span>
         </Link>
 
-        <nav className="space-y-1">
+        <nav className="space-y-0.5">
           {nav.map((item) => {
-            const active =
-              item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+            const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-[var(--ease-studio)] ${
                   active
-                    ? "bg-white/5 text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:translate-x-0.5 hover:bg-surface-2 hover:text-foreground"
                 }`}
               >
-                <Icon className="size-4" />
+                {active && (
+                  <span className="animate-pop absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+                )}
+                <Icon className="size-4 transition-transform duration-200 ease-[var(--ease-studio)] group-hover:scale-110" />
                 {item.label}
               </Link>
             );
@@ -172,79 +62,134 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="mt-auto space-y-4 pt-6">
-          <NotificationMenu authenticated={authenticated} />
           <ThemeSelector />
-          {!authenticated ? (
-            <div className="relative overflow-hidden rounded-xl border border-border bg-surface-2 p-4">
-              <div className="absolute -right-6 -bottom-6 size-24 rounded-full bg-primary/10 blur-3xl" />
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-primary">
-                Your account
-              </p>
-              <div className="relative flex gap-2 text-sm">
+
+          <div className="ember-glow grain relative overflow-hidden rounded-xl border border-border bg-surface-2 p-4">
+            <p className="label-mono relative mb-1.5 text-primary">Live deals</p>
+            <p className="relative text-xs text-muted-foreground">
+              {dealsQuery.data?.results.length ?? 0} price drops tracked · refreshed 4m ago
+            </p>
+          </div>
+
+          {signedIn ? (
+            <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <Link to="/account" className="flex min-w-0 flex-1 items-center gap-3">
+                <Avatar
+                  from="#e85d3a"
+                  to="#7c2d12"
+                  name="Your account"
+                  className="size-9 shrink-0 rounded-full"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">Your account</p>
+                  <p className="truncate text-xs text-muted-foreground">Manage profile</p>
+                </div>
+              </Link>
+              <button
+                onClick={clearToken}
+                className="text-xs font-bold text-muted-foreground hover:text-primary"
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border p-4">
+              <p className="label-mono mb-2 text-muted-foreground">Your account</p>
+              <div className="flex items-center gap-2">
                 <Link
-                  to="/login"
-                  className="font-semibold text-primary hover:underline"
+                  to="/sign-in"
+                  className="flex-1 rounded-lg border border-border px-3 py-2 text-center text-xs font-bold transition hover:border-primary/50"
                 >
                   Sign in
                 </Link>
                 <Link
-                  to="/register"
-                  className="font-semibold text-primary hover:underline"
+                  to="/sign-up"
+                  className="flex-1 rounded-lg bg-primary px-3 py-2 text-center text-xs font-bold text-primary-foreground transition hover:opacity-90"
                 >
-                  Create account
+                  Create
                 </Link>
               </div>
             </div>
-          ) : (
-            <Link
-              to="/profile"
-              className="flex items-center gap-3 rounded-lg border border-transparent p-2 hover:border-border"
-            >
-              <User className="size-10 shrink-0 rounded-full border border-border p-2 text-muted-foreground" />
-              <span className="truncate text-sm font-semibold">Profile</span>
-            </Link>
           )}
         </div>
       </aside>
 
       {/* Top bar (mobile) */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 px-4 py-3 backdrop-blur lg:hidden">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="grid size-7 place-items-center rounded-md bg-primary">
-            <div className="size-3.5 rounded-sm bg-background" />
+      <header className="sticky top-0 z-30 border-b border-border bg-background/80 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="grid size-7 place-items-center rounded-md bg-primary">
+              <div className="size-3.5 rounded-sm bg-primary-foreground" />
+            </div>
+            <span className="font-bold uppercase tracking-tight">Playfinder</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              aria-label="Theme settings"
+              aria-expanded={themeOpen}
+              onClick={() => setThemeOpen((v) => !v)}
+              className={`grid size-9 place-items-center rounded-md border transition ${
+                themeOpen ? "border-primary/60 text-primary" : "border-border text-muted-foreground"
+              }`}
+            >
+              <Palette className="size-4" />
+            </button>
+            {signedIn ? (
+              <Link to="/account" aria-label="Your profile">
+                <Avatar
+                  from="#e85d3a"
+                  to="#7c2d12"
+                  name="Your account"
+                  className="size-9 rounded-full ring-1 ring-border"
+                />
+              </Link>
+            ) : (
+              <Link
+                to="/sign-in"
+                className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
+              >
+                Sign in
+              </Link>
+            )}
           </div>
-          <span className="font-bold uppercase tracking-tight">PlayFinder</span>
-        </Link>
-        <NotificationMenu authenticated={authenticated} mobile />
+        </div>
+        {themeOpen && (
+          <div className="animate-reveal mt-3">
+            <ThemeSelector />
+          </div>
+        )}
       </header>
 
       <main className="lg:pl-64">
-        <div className="mx-auto max-w-7xl px-5 py-8 pb-28 lg:px-10 lg:py-10">
-          <div
-            key={pathname}
-            data-testid="route-content"
-            className="animate-reveal"
-          >
-            {children}
-          </div>
+        <div
+          key={pathname}
+          className="animate-reveal mx-auto max-w-7xl px-5 py-8 pb-28 lg:px-10 lg:py-10"
+        >
+          {children}
         </div>
       </main>
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-surface/90 px-2 py-2 backdrop-blur lg:hidden">
-        {mobileNav.map((item) => {
-          const active =
-            item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+        {nav.map((item) => {
+          const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
           const Icon = item.icon;
           return (
             <Link
               key={item.to}
               to={item.to}
-              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-1 py-1.5 transition-colors duration-200 active:scale-95 ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <Icon className="size-4" />
+              {active && (
+                <span className="animate-pop absolute -top-0.5 h-0.5 w-6 rounded-full bg-primary" />
+              )}
+              <Icon
+                className={`size-4 transition-transform duration-300 ease-[var(--ease-studio)] ${
+                  active ? "scale-110" : ""
+                }`}
+              />
               <span className="text-[10px] font-semibold uppercase tracking-tight">
                 {item.label}
               </span>
