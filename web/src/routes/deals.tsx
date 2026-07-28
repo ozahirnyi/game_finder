@@ -8,8 +8,12 @@ import { Flame, Clock } from "lucide-react";
 export const Route = createFileRoute("/deals")({
   head: () => ({
     meta: [
-      { title: "Deals — GameFinder" },
-      { name: "description", content: "Live discounts across storefronts, prioritized by your wishlist and friend overlap." },
+      { title: "Deals — Playfinder" },
+      {
+        name: "description",
+        content:
+          "Live discounts across storefronts, prioritized by your wishlist and friend overlap.",
+      },
     ],
   }),
   component: DealsPage,
@@ -35,9 +39,7 @@ function DealsPage() {
                 Deal of the day
               </span>
             </div>
-            <h3 className="text-4xl font-extrabold tracking-tight">
-              {hero.title}
-            </h3>
+            <h3 className="text-4xl font-extrabold tracking-tight">{hero.title}</h3>
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
               Matches your wishlist and 3 friends already own it. Sale ends in 2 days.
             </p>
@@ -46,9 +48,7 @@ function DealsPage() {
                 <p className="font-mono text-xs text-muted-foreground line-through">
                   ${hero.originalPrice}
                 </p>
-                <p className="font-mono text-5xl font-black text-primary">
-                  ${hero.price}
-                </p>
+                <p className="font-mono text-5xl font-black text-primary">${hero.price}</p>
               </div>
               <Chip tone="primary">-{hero.discount}%</Chip>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -59,7 +59,7 @@ function DealsPage() {
               <button className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">
                 View deal
               </button>
-              <button className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-white/5">
+              <button className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-foreground/5">
                 Invite friends to buy together
               </button>
             </div>
@@ -73,11 +73,11 @@ function DealsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2">
         {deals.slice(1).map((g) => (
           <div
             key={g.id}
-            className="group flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 transition hover:border-white/20"
+            className="hover-lift group flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
           >
             <GameCover
               from={g.coverFrom}
@@ -87,10 +87,10 @@ function DealsPage() {
               className="size-24 shrink-0 rounded-xl"
             />
             <div className="min-w-0 flex-1">
-              <h4 className="truncate text-lg font-bold">{g.title}</h4>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {g.genres.join(" · ")}
-              </p>
+              <h4 className="truncate text-lg font-bold transition-colors group-hover:text-primary">
+                {g.title}
+              </h4>
+              <p className="mt-0.5 text-xs text-muted-foreground">{g.genres.join(" · ")}</p>
               <div className="mt-2 flex items-center gap-2">
                 {g.platforms.map((p) => (
                   <Chip key={p}>{p}</Chip>
@@ -102,9 +102,7 @@ function DealsPage() {
               <p className="mt-1 font-mono text-[10px] text-muted-foreground line-through">
                 ${g.originalPrice}
               </p>
-              <p className="font-mono text-lg font-black text-primary">
-                ${g.price}
-              </p>
+              <p className="font-mono text-lg font-black text-primary">${g.price}</p>
             </div>
           </div>
         ))}

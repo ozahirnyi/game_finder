@@ -9,50 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WishlistRouteImport } from './routes/wishlist'
-import { Route as SteamRouteImport } from './routes/steam'
-import { Route as SearchRouteImport } from './routes/search'
-import { Route as PsnRouteImport } from './routes/psn'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as LibraryRouteImport } from './routes/library'
-import { Route as FriendsRouteImport } from './routes/friends'
-import { Route as DealsRouteImport } from './routes/deals'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountRouteImport } from './routes/account'
+import { Route as DealsRouteImport } from './routes/deals'
+import { Route as LibraryRouteImport } from './routes/library'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as WishlistRouteImport } from './routes/wishlist'
+import { Route as FriendsIndexRouteImport } from './routes/friends.index'
+import { Route as FriendsFriendIdRouteImport } from './routes/friends.$friendId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 
-const WishlistRoute = WishlistRouteImport.update({
-  id: '/wishlist',
-  path: '/wishlist',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SteamRoute = SteamRouteImport.update({
-  id: '/steam',
-  path: '/steam',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SearchRoute = SearchRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PsnRoute = PsnRouteImport.update({
-  id: '/psn',
-  path: '/psn',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LibraryRoute = LibraryRouteImport.update({
-  id: '/library',
-  path: '/library',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FriendsRoute = FriendsRouteImport.update({
-  id: '/friends',
-  path: '/friends',
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DealsRoute = DealsRouteImport.update({
@@ -60,9 +36,39 @@ const DealsRoute = DealsRouteImport.update({
   path: '/deals',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignUpRoute = SignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WishlistRoute = WishlistRouteImport.update({
+  id: '/wishlist',
+  path: '/wishlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FriendsIndexRoute = FriendsIndexRouteImport.update({
+  id: '/friends/',
+  path: '/friends/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FriendsFriendIdRoute = FriendsFriendIdRouteImport.update({
+  id: '/friends/$friendId',
+  path: '/friends/$friendId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
@@ -73,142 +79,114 @@ const GamesGameIdRoute = GamesGameIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/deals': typeof DealsRoute
-  '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
-  '/profile': typeof ProfileRoute
-  '/psn': typeof PsnRoute
   '/search': typeof SearchRoute
-  '/steam': typeof SteamRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
   '/wishlist': typeof WishlistRoute
+  '/friends/$friendId': typeof FriendsFriendIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/friends/': typeof FriendsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/deals': typeof DealsRoute
-  '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
-  '/profile': typeof ProfileRoute
-  '/psn': typeof PsnRoute
   '/search': typeof SearchRoute
-  '/steam': typeof SteamRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
   '/wishlist': typeof WishlistRoute
+  '/friends/$friendId': typeof FriendsFriendIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/friends': typeof FriendsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/deals': typeof DealsRoute
-  '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
-  '/profile': typeof ProfileRoute
-  '/psn': typeof PsnRoute
   '/search': typeof SearchRoute
-  '/steam': typeof SteamRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
   '/wishlist': typeof WishlistRoute
+  '/friends/$friendId': typeof FriendsFriendIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/friends/': typeof FriendsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account'
     | '/deals'
-    | '/friends'
     | '/library'
-    | '/profile'
-    | '/psn'
     | '/search'
-    | '/steam'
+    | '/sign-in'
+    | '/sign-up'
     | '/wishlist'
+    | '/friends/$friendId'
     | '/games/$gameId'
+    | '/friends/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account'
     | '/deals'
-    | '/friends'
     | '/library'
-    | '/profile'
-    | '/psn'
     | '/search'
-    | '/steam'
+    | '/sign-in'
+    | '/sign-up'
     | '/wishlist'
+    | '/friends/$friendId'
     | '/games/$gameId'
+    | '/friends'
   id:
     | '__root__'
     | '/'
+    | '/account'
     | '/deals'
-    | '/friends'
     | '/library'
-    | '/profile'
-    | '/psn'
     | '/search'
-    | '/steam'
+    | '/sign-in'
+    | '/sign-up'
     | '/wishlist'
+    | '/friends/$friendId'
     | '/games/$gameId'
+    | '/friends/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRoute
   DealsRoute: typeof DealsRoute
-  FriendsRoute: typeof FriendsRoute
   LibraryRoute: typeof LibraryRoute
-  ProfileRoute: typeof ProfileRoute
-  PsnRoute: typeof PsnRoute
   SearchRoute: typeof SearchRoute
-  SteamRoute: typeof SteamRoute
+  SignInRoute: typeof SignInRoute
+  SignUpRoute: typeof SignUpRoute
   WishlistRoute: typeof WishlistRoute
+  FriendsFriendIdRoute: typeof FriendsFriendIdRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
+  FriendsIndexRoute: typeof FriendsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/wishlist': {
-      id: '/wishlist'
-      path: '/wishlist'
-      fullPath: '/wishlist'
-      preLoaderRoute: typeof WishlistRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/steam': {
-      id: '/steam'
-      path: '/steam'
-      fullPath: '/steam'
-      preLoaderRoute: typeof SteamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/search': {
-      id: '/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof SearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/psn': {
-      id: '/psn'
-      path: '/psn'
-      fullPath: '/psn'
-      preLoaderRoute: typeof PsnRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/library': {
-      id: '/library'
-      path: '/library'
-      fullPath: '/library'
-      preLoaderRoute: typeof LibraryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/friends': {
-      id: '/friends'
-      path: '/friends'
-      fullPath: '/friends'
-      preLoaderRoute: typeof FriendsRouteImport
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deals': {
@@ -218,11 +196,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DealsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-up': {
+      id: '/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wishlist': {
+      id: '/wishlist'
+      path: '/wishlist'
+      fullPath: '/wishlist'
+      preLoaderRoute: typeof WishlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/friends/': {
+      id: '/friends/'
+      path: '/friends'
+      fullPath: '/friends/'
+      preLoaderRoute: typeof FriendsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/friends/$friendId': {
+      id: '/friends/$friendId'
+      path: '/friends/$friendId'
+      fullPath: '/friends/$friendId'
+      preLoaderRoute: typeof FriendsFriendIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/games/$gameId': {
@@ -237,15 +257,16 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRoute,
   DealsRoute: DealsRoute,
-  FriendsRoute: FriendsRoute,
   LibraryRoute: LibraryRoute,
-  ProfileRoute: ProfileRoute,
-  PsnRoute: PsnRoute,
   SearchRoute: SearchRoute,
-  SteamRoute: SteamRoute,
+  SignInRoute: SignInRoute,
+  SignUpRoute: SignUpRoute,
   WishlistRoute: WishlistRoute,
+  FriendsFriendIdRoute: FriendsFriendIdRoute,
   GamesGameIdRoute: GamesGameIdRoute,
+  FriendsIndexRoute: FriendsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

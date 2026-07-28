@@ -13,7 +13,6 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ThemeProvider } from "../lib/theme";
 
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -77,17 +76,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "GameFinder — Discover games. Play with friends." },
+      { title: "Playfinder — Discover games. Play with friends." },
       {
         name: "description",
         content:
-          "GameFinder is a social game discovery platform. See what you and your friends both own, get AI recommendations, track deals, and jump into a session together.",
+          "Playfinder is a social game discovery platform. See what you and your friends both own, get AI recommendations, track deals, and jump into a session together.",
       },
-      { property: "og:title", content: "GameFinder — Discover games. Play with friends." },
+      { property: "og:title", content: "Playfinder — Discover games. Play with friends." },
       {
         property: "og:description",
         content:
-          "Social game discovery: shared libraries, AI recs, wishlist deals, Steam sync, and quick co-op matchmaking with your friends.",
+          "Search games across stores, track live price drops by region, and find friends to play with.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -98,8 +97,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap",
       },
+
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
@@ -134,4 +134,3 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
-
