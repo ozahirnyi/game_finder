@@ -5,6 +5,7 @@ from fastapi import HTTPException
 
 
 STEAM_STORE_BASE_URL = "https://store.steampowered.com"
+EXPECTED_CURRENCY_BY_COUNTRY = {"UA": "UAH"}
 
 
 def _money_from_steam_cents(cents: int | None, currency: str | None) -> dict[str, Any] | None:
@@ -40,6 +41,13 @@ def _steam_deal(item: dict[str, Any]) -> dict[str, Any] | None:
         "current": current,
         "history_low_all": None,
     }
+
+
+def _has_expected_currency(deal: dict[str, Any], country: str) -> bool:
+    expected_currency = EXPECTED_CURRENCY_BY_COUNTRY.get(country.upper())
+    if expected_currency is None:
+        return True
+    return deal["current"]["price"]["currency"] == expected_currency
 
 
 async def fetch_steam_store_deals(country: str = "US", page_size: int = 12) -> list[dict[str, Any]]:
@@ -115,19 +123,25 @@ async def fetch_steam_store_deal_candidates(country: str = "US", page_size: int 
     popular_seen: set[int] = set()
     for item in [*top_sellers, *((data.get("specials") or {}).get("items", []))]:
         deal = _steam_deal(item)
-        if deal and deal["steam_appid"] not in popular_seen:
+        if deal and _has_expected_currency(deal, country) and deal["steam_appid"] not in popular_seen:
             popular.append(deal)
             popular_seen.add(deal["steam_appid"])
         if len(popular) == 4:
             break
     seen: set[int] = set()
     deals = []
+    rejected_currency_count = 0
     for item in candidates:
         deal = _steam_deal(item)
         if not deal or deal["steam_appid"] in seen:
             continue
         seen.add(deal["steam_appid"])
+        if not _has_expected_currency(deal, country):
+            rejected_currency_count += 1
+            continue
         deals.append(deal)
         if len(deals) >= page_size:
             break
+    if country.upper() == "UA" and rejected_currency_count and not deals:
+        raise HTTPException(status_code=502, detail="Steam Store did not return Ukrainian prices")
     return {"popular": popular, "candidates": deals}
