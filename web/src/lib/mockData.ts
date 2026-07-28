@@ -10,13 +10,10 @@ export type Game = {
   coverFrom: string;
   coverTo: string;
   coop?: boolean;
-  status?:
-    | "Playing"
-    | "Completed"
-    | "Paused"
-    | "Want to Play"
-    | "Playing with Friends";
+  status?: "Playing" | "Completed" | "Paused" | "Want to Play" | "Playing with Friends";
   playtime?: number;
+  /** Which connected store the game was synced from. */
+  source?: "Steam" | "PlayStation";
 };
 
 export type Friend = {
@@ -37,6 +34,7 @@ export type Friend = {
 export const games: Game[] = [
   {
     id: "helldivers2",
+    source: "PlayStation",
     title: "Helldivers 2",
     genres: ["Shooter", "Co-op"],
     platforms: ["PC", "PS5"],
@@ -50,6 +48,7 @@ export const games: Game[] = [
   },
   {
     id: "hades2",
+    source: "Steam",
     title: "Hades II",
     genres: ["Roguelike", "Action"],
     platforms: ["PC"],
@@ -62,6 +61,7 @@ export const games: Game[] = [
   },
   {
     id: "bg3",
+    source: "Steam",
     title: "Baldur's Gate 3",
     genres: ["RPG", "Co-op"],
     platforms: ["PC", "PS5", "Xbox"],
@@ -75,6 +75,7 @@ export const games: Game[] = [
   },
   {
     id: "eldenring",
+    source: "PlayStation",
     title: "Elden Ring",
     genres: ["RPG", "Souls-like"],
     platforms: ["PC", "PS5", "Xbox"],
@@ -89,6 +90,7 @@ export const games: Game[] = [
   },
   {
     id: "drg",
+    source: "Steam",
     title: "Deep Rock Galactic",
     genres: ["Co-op", "Shooter"],
     platforms: ["PC", "Xbox"],
@@ -128,6 +130,7 @@ export const games: Game[] = [
   },
   {
     id: "stardew",
+    source: "Steam",
     title: "Stardew Valley",
     genres: ["Sim", "Co-op"],
     platforms: ["PC", "Switch"],
@@ -163,6 +166,7 @@ export const games: Game[] = [
   },
   {
     id: "factorio",
+    source: "Steam",
     title: "Factorio",
     genres: ["Sim", "Co-op"],
     platforms: ["PC"],
@@ -273,14 +277,7 @@ export const friends: Friend[] = [
 ];
 
 export const activity = [
-  {
-    id: 1,
-    who: "sasha",
-    verb: "added",
-    target: "Hades II",
-    tag: "to wishlist",
-    time: "2m ago",
-  },
+  { id: 1, who: "sasha", verb: "added", target: "Hades II", tag: "to wishlist", time: "2m ago" },
   {
     id: 2,
     who: "marcus",
@@ -289,14 +286,7 @@ export const activity = [
     tag: "teammates (2 slots)",
     time: "14m ago",
   },
-  {
-    id: 3,
-    who: "maria",
-    verb: "completed",
-    target: "Elden Ring",
-    tag: "in 156h",
-    time: "1h ago",
-  },
+  { id: 3, who: "maria", verb: "completed", target: "Elden Ring", tag: "in 156h", time: "1h ago" },
   {
     id: 4,
     who: "alex",
@@ -316,18 +306,12 @@ export const activity = [
 ];
 
 export const aiRecommendations = [
-  {
-    gameId: "hades2",
-    reason: "Based on your 200h in Hades and Sasha's recent activity.",
-  },
+  { gameId: "hades2", reason: "Based on your 200h in Hades and Sasha's recent activity." },
   {
     gameId: "monsterhunter",
     reason: "Marcus, Alex and Maria all own this — perfect for a 4-stack.",
   },
-  {
-    gameId: "factorio",
-    reason: "You loved Deep Rock. Try slower, deeper co-op.",
-  },
+  { gameId: "factorio", reason: "You loved Deep Rock. Try slower, deeper co-op." },
 ];
 
 export const priceHistory = [
@@ -340,14 +324,143 @@ export const priceHistory = [
   { date: "Jul", price: 29.99 },
 ];
 
-export const currentUser = {
-  name: "Alex Vance",
-  handle: "alex.vance",
-  bio: "Co-op maxi. Roguelikes, tactical shooters, immersive sims.",
-  avatarFrom: "#22c55e",
-  avatarTo: "#0f766e",
-  stats: { library: 342, friends: 47, shared: 118, playtime: 2140 },
-  favoriteGenres: ["Roguelike", "Co-op", "RPG", "Sim"],
-  platforms: ["PC", "PS5"],
-  integrations: { steam: true, telegram: true, google: false, psn: true },
+/** Signed-out guest state — matches the live product: accounts are optional. */
+export const account = {
+  signedIn: true,
+  name: "Alex Reyes",
+  handle: "alexreyes",
+  avatarFrom: "#f97316",
+  avatarTo: "#1c1917",
+  region: "US",
+};
+
+export const regions = ["US", "EU", "UK", "TR", "AR", "KZ"] as const;
+
+export type Deal = {
+  id: string;
+  title: string;
+  store: "Steam";
+  price: number;
+  originalPrice: number;
+  discount: number;
+  currency: "USD";
+  coverFrom: string;
+  coverTo: string;
+  storeUrl: string;
+};
+
+/** Live price drops — the core of the signed-out home screen. */
+export const deals: Deal[] = [
+  {
+    id: "orc-problem",
+    title: "Sir, We Have an Orc Problem",
+    store: "Steam",
+    price: 8.99,
+    originalPrice: 9.99,
+    discount: 10,
+    currency: "USD",
+    coverFrom: "#65a30d",
+    coverTo: "#1c1917",
+    storeUrl: "https://store.steampowered.com/app/4594150/",
+  },
+  {
+    id: "lemans-us",
+    title: "Le Mans Ultimate — US Track Pass",
+    store: "Steam",
+    price: 40.49,
+    originalPrice: 44.99,
+    discount: 10,
+    currency: "USD",
+    coverFrom: "#2563eb",
+    coverTo: "#0f172a",
+    storeUrl: "https://store.steampowered.com/app/4906890/",
+  },
+  {
+    id: "cyberpunk",
+    title: "Cyberpunk 2077",
+    store: "Steam",
+    price: 17.99,
+    originalPrice: 59.99,
+    discount: 70,
+    currency: "USD",
+    coverFrom: "#eab308",
+    coverTo: "#450a0a",
+    storeUrl: "https://store.steampowered.com/app/1091500/",
+  },
+  {
+    id: "phantom-liberty",
+    title: "Cyberpunk 2077: Phantom Liberty",
+    store: "Steam",
+    price: 17.99,
+    originalPrice: 29.99,
+    discount: 40,
+    currency: "USD",
+    coverFrom: "#dc2626",
+    coverTo: "#1c1917",
+    storeUrl: "https://store.steampowered.com/app/2138330/",
+  },
+  {
+    id: "mgs-delta",
+    title: "Metal Gear Solid Δ: Snake Eater",
+    store: "Steam",
+    price: 47.99,
+    originalPrice: 69.99,
+    discount: 31,
+    currency: "USD",
+    coverFrom: "#3f6212",
+    coverTo: "#0c0a09",
+    storeUrl: "https://store.steampowered.com/",
+  },
+  {
+    id: "shift-midnight",
+    title: "Shift at Midnight",
+    store: "Steam",
+    price: 6.79,
+    originalPrice: 7.99,
+    discount: 15,
+    currency: "USD",
+    coverFrom: "#b91c1c",
+    coverTo: "#111827",
+    storeUrl: "https://store.steampowered.com/",
+  },
+  {
+    id: "eldenring-deal",
+    title: "Elden Ring",
+    store: "Steam",
+    price: 29.99,
+    originalPrice: 59.99,
+    discount: 50,
+    currency: "USD",
+    coverFrom: "#ca8a04",
+    coverTo: "#1c1917",
+    storeUrl: "https://store.steampowered.com/",
+  },
+  {
+    id: "drg-deal",
+    title: "Deep Rock Galactic",
+    store: "Steam",
+    price: 11.99,
+    originalPrice: 29.99,
+    discount: 60,
+    currency: "USD",
+    coverFrom: "#f59e0b",
+    coverTo: "#111827",
+    storeUrl: "https://store.steampowered.com/",
+  },
+];
+
+/** Deterministic mock profile payload for a friend. */
+export function friendGames(friendId: string) {
+  const owned = games.filter((g) => g.source);
+  const seed = friendId.length;
+  return owned.filter((_, i) => (i + seed) % 4 !== 0);
+}
+
+export const friendBios: Record<string, string> = {
+  sasha: "Roguelike completionist. Always down for a late-night Hades run.",
+  marcus: "Squad shooter main. Organises the weekly 4-stack.",
+  maria: "Sim and shooter mix — usually hosting LFG lobbies.",
+  alex: "Co-op only. Deep Rock veteran, Rock and Stone.",
+  leo: "Slow-burn RPGs and metroidvanias, mostly on Switch.",
+  maya: "Souls-like grinder on PS5. Trophy hunter.",
 };

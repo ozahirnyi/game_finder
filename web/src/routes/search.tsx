@@ -1,225 +1,153 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { Search, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { CatalogGameActions } from "@/components/CatalogGameActions";
-import {
-  getRecommendations,
-  searchGames,
-  type RecommendationItem,
-} from "@/lib/api";
-import { lovableQueryKeys, toGameCard } from "@/lib/lovable-data";
+import { searchGames } from "@/lib/api";
+import { Search, SlidersHorizontal, Plus, Heart, Users } from "lucide-react";
 
 export const Route = createFileRoute("/search")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    q: typeof search.q === "string" ? search.q.trim() : "",
+  head: () => ({
+    meta: [
+      { title: "Search — Playfinder" },
+      {
+        name: "description",
+        content: "Search games by title, genre, platform, mood, and active deals.",
+      },
+    ],
   }),
   component: SearchPage,
 });
 
-function normalized(value: string | null) {
-  return value?.trim().toLocaleLowerCase() ?? "";
-}
+const filters = [
+  { label: "All", active: true },
+  { label: "Co-op" },
+  { label: "PC" },
+  { label: "PS5" },
+  { label: "Under $30" },
+  { label: "On sale" },
+  { label: "Roguelike" },
+  { label: "RPG" },
+  { label: "Multiplayer" },
+];
 
-function AiRecommendationCard({ item }: { item: RecommendationItem }) {
-  const matchQuery = useQuery({
-    queryKey: ["ai-search-catalog-match", item.title],
-    queryFn: () => searchGames(item.title),
-  });
-  const match =
-    matchQuery.data?.results.find(
-      (game) => normalized(game.name) === normalized(item.title),
-    ) ?? matchQuery.data?.results[0];
-
-  return (
-    <article className="rounded-xl border border-border bg-surface p-5">
-      <Sparkles className="mb-3 size-4 text-primary" />
-      <h3 className="font-bold">{item.title}</h3>
-      <p className="mt-2 text-sm text-muted-foreground">{item.reason}</p>
-      {item.tags.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {item.tags.map((tag) => (
-            <Chip key={tag}>{tag}</Chip>
-          ))}
-        </div>
-      )}
-      {match?.id ? (
-        <Link
-          to="/games/$gameId"
-          params={{ gameId: String(match.id) }}
-          aria-label={`View game details for ${item.title}`}
-          className="mt-4 inline-block text-sm font-bold text-primary hover:underline"
-        >
-          View game details
-        </Link>
-      ) : matchQuery.isSuccess ? (
-        <p className="mt-4 text-xs text-muted-foreground">
-          A catalog match is not available yet.
-        </p>
-      ) : (
-        <p className="mt-4 text-xs text-muted-foreground">
-          Finding the catalog entry…
-        </p>
-      )}
-    </article>
-  );
-}
-
-export function SearchPage() {
-  const { q } = Route.useSearch();
-  const [mode, setMode] = useState<"catalog" | "ai">("catalog");
-  const [query, setQuery] = useState(q);
-  const [submitted, setSubmitted] = useState("");
-  useEffect(() => {
-    setMode("catalog");
-    setQuery(q);
-    setSubmitted("");
-  }, [q]);
-  const catalog = useQuery({
-    queryKey: lovableQueryKeys.search(query),
+function SearchPage() {
+  const [query, setQuery] = useState("");
+  const gamesQuery = useQuery({
+    queryKey: ["games", "search", query],
     queryFn: () => searchGames(query),
-    enabled: mode === "catalog" && query.trim().length > 1,
+    enabled: query.trim().length >= 2,
   });
-  const ai = useQuery({
-    queryKey: ["ai-search", submitted],
-    queryFn: () => getRecommendations(submitted),
-    enabled: mode === "ai" && Boolean(submitted),
-  });
-  const games = catalog.data?.results.map(toGameCard) ?? [];
-  const catalogGames = catalog.data?.results ?? [];
-  const ask = () => setSubmitted(query.trim());
+  const games = gamesQuery.data?.results ?? [];
 
   return (
     <AppShell>
-      <SectionHeader
-        title="Search"
-        hint={
-          mode === "ai"
-            ? "Describe a game, mood, budget, or who you want to play with."
-            : "Search the public game catalog by title."
-        }
-      />
-      <div className="mb-6 flex gap-2">
-        <button
-          onClick={() => setMode("catalog")}
-          className={`rounded-lg px-4 py-2 text-sm font-bold ${mode === "catalog" ? "bg-primary text-primary-foreground" : "border border-border"}`}
-        >
-          Title search
-        </button>
-        <button
-          onClick={() => setMode("ai")}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold ${mode === "ai" ? "bg-primary text-primary-foreground" : "border border-border"}`}
-        >
-          <Sparkles className="size-4" />
-          AI Search
-        </button>
-      </div>
-      <div className="mb-8 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+      <SectionHeader title="Search" hint="42,184 games indexed across 8 storefronts." />
+
+      <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
         <Search className="size-4 text-muted-foreground" />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && mode === "ai") ask();
-          }}
-          className="flex-1 bg-transparent text-sm outline-none"
-          placeholder={
-            mode === "ai"
-              ? "Describe what you want to play…"
-              : "Search by title…"
-          }
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          placeholder="Search by title, genre, mood…"
         />
-        {mode === "ai" && (
-          <button
-            onClick={ask}
-            disabled={!query.trim()}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
-          >
-            Ask AI
-          </button>
-        )}
+        <button className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground">
+          <SlidersHorizontal className="size-3.5" /> Filters
+        </button>
       </div>
-      {mode === "ai" ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {!submitted && (
-            <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-              Tell AI what you want to play to get recommendations.
-            </p>
-          )}
-          {ai.isLoading && (
-            <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-              Finding recommendations…
-            </p>
-          )}
-          {ai.isError && (
-            <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-              AI search is not available right now. Please try again.
-            </p>
-          )}
-          {ai.data?.recommendations.length === 0 && (
-            <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-              No recommendations matched that description. Try mentioning a
-              genre, platform, or mood.
-            </p>
-          )}
-          {ai.data?.recommendations.map((item) => (
-            <AiRecommendationCard key={item.title} item={item} />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
-          {query.trim().length < 2 && (
-            <p className="col-span-full rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-              Enter at least two characters to search the catalog.
-            </p>
-          )}
-          {catalog.isLoading && (
-            <p className="col-span-full rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-              Searching the catalog…
-            </p>
-          )}
-          {catalog.isError && (
-            <p className="col-span-full rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-              Catalog search is not available right now. Try again shortly.
-            </p>
-          )}
-          {catalog.isSuccess && games.length === 0 && (
-            <p className="col-span-full rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-              No catalog games matched “{query}”.
-            </p>
-          )}
-          {catalogGames.map((game) => {
-            if (!game.id || !game.name) return null;
-            return (
-              <article
-                key={game.id}
-                className="overflow-hidden rounded-xl border border-border bg-surface"
-              >
-                <Link
-                  to="/games/$gameId"
-                  params={{ gameId: String(game.id) }}
-                  aria-label={`View details for ${game.name}`}
-                  className="block"
-                >
-                  <GameCover
-                    from={game.background_image ?? "#1f2937"}
-                    to="#111827"
-                    title={game.name}
-                    className="aspect-[3/4] w-full"
-                  />
-                  <p className="p-3 font-bold">{game.name}</p>
-                </Link>
-                <div className="px-3 pb-3">
-                  <CatalogGameActions game={{ id: game.id, name: game.name }} />
+
+      <div className="mb-8 flex flex-wrap gap-2">
+        {filters.map((f) => (
+          <button
+            key={f.label}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              f.active
+                ? "border-primary bg-primary/15 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mb-4 flex items-center justify-between">
+        <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+          {games.length} results · sorted by relevance
+        </p>
+        <select className="rounded-md border border-border bg-surface px-2 py-1 text-xs">
+          <option>Relevance</option>
+          <option>Price ↑</option>
+          <option>Discount</option>
+          <option>Rating</option>
+        </select>
+      </div>
+
+      <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
+        {gamesQuery.isLoading && (
+          <p className="col-span-full text-sm text-muted-foreground">Searching catalogue…</p>
+        )}
+        {gamesQuery.isError && (
+          <p className="col-span-full text-sm text-destructive">
+            Unable to search games right now.
+          </p>
+        )}
+        {games.map((g) => (
+          <article
+            key={g.id}
+            className="hover-lift group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface hover:border-primary/40"
+          >
+            <Link to="/games/$gameId" params={{ gameId: String(g.id) }} className="relative block">
+              <GameCover
+                from="#c75f28"
+                to="#22243a"
+                title={g.name}
+                className="aspect-[3/4] w-full"
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex translate-y-2 items-center gap-1.5 bg-gradient-to-t from-background/95 to-transparent p-3 opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
+                <span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
+                  <Plus className="size-4" />
+                </span>
+                <span className="grid size-8 place-items-center rounded-md border border-border bg-background/80 backdrop-blur">
+                  <Heart className="size-4" />
+                </span>
+                <span className="grid size-8 place-items-center rounded-md border border-border bg-background/80 backdrop-blur">
+                  <Users className="size-4" />
+                </span>
+              </div>
+            </Link>
+            <Link
+              to="/games/$gameId"
+              params={{ gameId: String(g.id) }}
+              className="flex flex-1 flex-col p-4"
+            >
+              <h5 className="font-bold leading-tight group-hover:text-primary">{g.name}</h5>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {g.released ?? "Release date unknown"}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {(g.platforms ?? []).map((p) => (
+                  <Chip key={p}>{p}</Chip>
+                ))}
+              </div>
+              <div className="mt-auto flex items-end justify-between pt-4">
+                <div>
+                  {g.rating && g.rating > 0 && (
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {g.rating} · Score
+                    </p>
+                  )}
                 </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                <div className="text-right">
+                  <p className="font-mono text-sm font-bold">View details</p>
+                </div>
+              </div>
+            </Link>
+          </article>
+        ))}
+      </div>
     </AppShell>
   );
 }

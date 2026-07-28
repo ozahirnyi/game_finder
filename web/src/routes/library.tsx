@@ -1,192 +1,119 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { PsnLibraryPanel } from "@/features/library/PsnLibraryPanel";
-import { SteamLibraryPanel } from "@/features/library/SteamLibraryPanel";
-import {
-  getLibraryOverview,
-  resolveSteamLibraryGame,
-  type LibraryGame,
-} from "@/lib/api";
+import { getLibrary } from "@/lib/api";
+import { useState } from "react";
 
-type LibraryFilter = "all" | "playfinder" | "steam" | "psn";
-const filters: { value: LibraryFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "playfinder", label: "PlayFinder" },
-  { value: "steam", label: "Steam" },
-  { value: "psn", label: "PSN" },
-];
+export const Route = createFileRoute("/library")({
+  head: () => ({
+    meta: [
+      { title: "Library — Playfinder" },
+      {
+        name: "description",
+        content:
+          "Your synced library across storefronts, with statuses and shared-with-friends visibility.",
+      },
+    ],
+  }),
+  component: LibraryPage,
+});
 
-export const Route = createFileRoute("/library")({ component: LibraryPage });
+const tabs = ["All games", "Steam", "PlayStation"] as const;
 
-function LibraryGameRow({ game }: { game: LibraryGame }) {
-  const navigate = useNavigate();
-  const [error, setError] = useState("");
-  const [resolving, setResolving] = useState(false);
-  const body = (
-    <>
-      <GameCover
-        from={game.cover_url ?? "#14b8a6"}
-        to="#0f172a"
-        title={game.title}
-        compact
-        className="size-16 shrink-0 rounded-lg"
-      />
-      <div className="min-w-0">
-        <h4 className="truncate font-bold">{game.title}</h4>
-        <p className="text-xs text-muted-foreground">
-          {game.playtime_forever
-            ? `${Math.round(game.playtime_forever / 60)}h played`
-            : "Saved in your library"}
-        </p>
-      </div>
-      <Chip tone="primary">
-        {game.source === "manual" ? "PlayFinder" : game.source}
-      </Chip>
-    </>
-  );
-  const className =
-    "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
-  if (game.detail_game_id)
-    return (
-      <Link
-        to="/games/$gameId"
-        params={{ gameId: game.detail_game_id }}
-        className={className}
-      >
-        {body}
-      </Link>
-    );
-  return (
-    <div>
-      <button
-        type="button"
-        className={`${className} w-full text-left`}
-        disabled={resolving}
-        onClick={async () => {
-          try {
-            setResolving(true);
-            setError("");
-            const value = await resolveSteamLibraryGame(
-              Number(game.external_id),
-            );
-            navigate({
-              to: "/games/$gameId",
-              params: { gameId: String(value.game_id) },
-            });
-          } catch (cause) {
-            setError(
-              cause instanceof Error
-                ? cause.message
-                : "Could not open this Steam game.",
-            );
-          } finally {
-            setResolving(false);
-          }
-        }}
-      >
-        {body}
-      </button>
-      {error ? (
-        <p role="alert" className="mt-2 text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-export function LibraryPage() {
-  const [filter, setFilter] = useState<LibraryFilter>("all");
-  const [showConnections, setShowConnections] = useState(false);
-  const query = useQuery({
-    queryKey: ["library-overview"],
-    queryFn: getLibraryOverview,
-  });
-  const games = query.data?.games ?? [];
-  const visibleGames = games.filter((game) =>
-    filter === "all"
-      ? true
-      : filter === "playfinder"
-        ? game.source === "manual"
-        : game.source === filter,
-  );
-  const sourceLabel =
-    filters.find((item) => item.value === filter)?.label ?? "Library";
+function LibraryPage() {
+  const [tab, setTab] = useState<(typeof tabs)[number]>("All games");
+  const libraryQuery = useQuery({ queryKey: ["library"], queryFn: getLibrary });
+  const owned = libraryQuery.data ?? [];
+  const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
+  const visible = sourceForTab ? owned.filter((g) => g.source === sourceForTab) : owned;
   return (
     <AppShell>
-      <SectionHeader
-        title="Library"
-        hint={
-          query.isPending
-            ? "Loading your games…"
-            : `${games.length} games across your connected libraries`
-        }
-        action={
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <SectionHeader
+            title="Library"
+            hint={`${owned.length} games synced from Steam and PlayStation`}
+          />
+        </div>
+        <div className="flex items-center gap-6 font-mono">
+          {[
+            { l: "Games", v: owned.length },
+            { l: "Steam", v: owned.filter((g) => g.source === "Steam").length },
+            {
+              l: "PlayStation",
+              v: owned.filter((g) => g.source === "PlayStation").length,
+            },
+            { l: "Hours", v: "2,140" },
+          ].map((s) => (
+            <div key={s.l}>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.l}</p>
+              <p className="text-xl font-bold">{s.v}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4">
+        {tabs.map((t) => (
           <button
-            type="button"
-            className="text-sm font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            onClick={() => setShowConnections((shown) => !shown)}
+            key={t}
+            onClick={() => setTab(t)}
+            className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+              t === tab
+                ? "bg-foreground/5 text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
           >
-            {showConnections ? "Hide connections" : "Manage connections"}
-          </button>
-        }
-      />
-      <div
-        role="group"
-        aria-label="Library platform"
-        className="mb-8 flex flex-wrap gap-2"
-      >
-        {filters.map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            aria-pressed={filter === item.value}
-            onClick={() => setFilter(item.value)}
-            className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${filter === item.value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface hover:border-primary/60 hover:bg-primary/10"}`}
-          >
-            {item.label}
+            {t}
           </button>
         ))}
       </div>
-      {query.isError ? (
-        <p
-          role="alert"
-          className="rounded-xl border border-border bg-surface p-6 text-sm text-muted-foreground"
-        >
-          Your library could not be loaded. Please try again.
-        </p>
-      ) : visibleGames.length ? (
-        <div className="space-y-3">
-          {visibleGames.map((game) => (
-            <LibraryGameRow key={`${game.source}-${game.id}`} game={game} />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted-foreground">
-          <p>No {sourceLabel} games are in your library yet.</p>
+
+      <div key={tab} className="stagger space-y-3">
+        {visible.map((g) => (
           <Link
-            to="/search"
-            className="mt-4 inline-block font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            key={g.id}
+            to="/games/$gameId"
+            params={{ gameId: g.id }}
+            className="hover-lift group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
           >
-            Find games
+            <GameCover
+              from="#c75f28"
+              to="#22243a"
+              title={g.title}
+              compact
+              className="size-16 shrink-0 rounded-lg"
+            />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="truncate font-bold transition-colors group-hover:text-primary">
+                  {g.title}
+                </h4>
+                {g.status === "Playing with Friends" && <Chip tone="primary">Squad · 3</Chip>}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {g.notes ?? "No description available"} · {g.source}
+              </p>
+            </div>
+            <div className="hidden text-right sm:block">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Source
+              </p>
+              <p className="text-sm font-bold">{g.source}</p>
+            </div>
+            <div className="text-right">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Playtime
+              </p>
+              <p className="font-mono text-sm font-bold">
+                {Math.round((g.playtime_forever ?? 0) / 60)}h
+              </p>
+            </div>
           </Link>
-        </div>
-      )}
-      {query.data?.steam_error ? (
-        <p role="alert" className="mt-4 text-sm text-muted-foreground">
-          {query.data.steam_error}
-        </p>
-      ) : null}
-      {showConnections ? (
-        <div className="mt-10 space-y-8">
-          <SteamLibraryPanel linked={undefined} error={undefined} />
-          <PsnLibraryPanel />
-        </div>
-      ) : null}
+        ))}
+      </div>
     </AppShell>
   );
 }

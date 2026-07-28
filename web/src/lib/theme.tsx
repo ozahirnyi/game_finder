@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type Mode = "dark" | "light";
 export type Accent = {
@@ -36,18 +30,25 @@ export const accents: Accent[] = [
     lightPrimaryForeground: "hsl(0 0% 100%)",
   },
   {
+    id: "ember",
+    name: "Ember",
+    swatch: "#e85d3a",
+    primary: "hsl(14 79% 57%)",
+    primaryForeground: "hsl(0 0% 8%)",
+  },
+  {
     id: "emerald",
     name: "Emerald",
     swatch: "#22c55e",
     primary: "hsl(142 76% 45%)",
-    primaryForeground: "hsl(240 10% 4%)",
+    primaryForeground: "hsl(0 0% 8%)",
   },
   {
     id: "cyan",
     name: "Cyan",
     swatch: "#06b6d4",
     primary: "hsl(189 94% 43%)",
-    primaryForeground: "hsl(240 10% 4%)",
+    primaryForeground: "hsl(0 0% 8%)",
   },
   {
     id: "violet",
@@ -57,11 +58,11 @@ export const accents: Accent[] = [
     primaryForeground: "hsl(0 0% 100%)",
   },
   {
-    id: "orange",
-    name: "Orange",
-    swatch: "#f97316",
-    primary: "hsl(24 95% 55%)",
-    primaryForeground: "hsl(240 10% 4%)",
+    id: "amber",
+    name: "Amber",
+    swatch: "#f0b429",
+    primary: "hsl(41 88% 55%)",
+    primaryForeground: "hsl(0 0% 8%)",
   },
   {
     id: "rose",
@@ -100,7 +101,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch {
-      // Ignore malformed or inaccessible persisted preferences.
+      // Theme persistence is optional (for example, private browsing can block it).
     }
   }, []);
 
@@ -109,20 +110,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const html = document.documentElement;
     html.classList.toggle("dark", mode === "dark");
     html.classList.toggle("light", mode === "light");
-    const primary =
-      (mode === "dark" ? accent.darkPrimary : accent.lightPrimary) ??
-      accent.primary;
+    const primary = (mode === "dark" ? accent.darkPrimary : accent.lightPrimary) ?? accent.primary;
     const primaryForeground =
-      (mode === "dark"
-        ? accent.darkPrimaryForeground
-        : accent.lightPrimaryForeground) ?? accent.primaryForeground;
+      (mode === "dark" ? accent.darkPrimaryForeground : accent.lightPrimaryForeground) ??
+      accent.primaryForeground;
     html.style.setProperty("--primary", primary);
     html.style.setProperty("--ring", primary);
     html.style.setProperty("--primary-foreground", primaryForeground);
     try {
       localStorage.setItem(KEY, JSON.stringify({ mode, accentId: accent.id }));
     } catch {
-      // Ignore unavailable browser storage.
+      // Theme persistence is optional (for example, private browsing can block it).
     }
   }, [mode, accent]);
 

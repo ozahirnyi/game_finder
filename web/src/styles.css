@@ -31,55 +31,121 @@
   --color-ring: var(--ring);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --ease-studio: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: hsl(240 10% 3.5%);
-  --foreground: hsl(240 5% 96%);
-  --muted: hsl(240 5% 14%);
-  --muted-foreground: hsl(240 5% 60%);
-  --surface: hsl(240 5% 7%);
-  --surface-2: hsl(240 5% 10%);
-  --card: hsl(240 5% 10%);
-  --card-foreground: hsl(240 5% 96%);
-  --popover: hsl(240 5% 8%);
-  --popover-foreground: hsl(240 5% 96%);
-  --primary: hsl(142 76% 45%);
-  --primary-foreground: hsl(240 10% 3.5%);
-  --secondary: hsl(240 5% 12%);
-  --secondary-foreground: hsl(240 5% 96%);
-  --accent: hsl(240 5% 14%);
-  --accent-foreground: hsl(240 5% 96%);
+  --radius: 0.875rem;
+  /* Charcoal & Ember */
+  --background: hsl(0 0% 6%);
+  --foreground: hsl(30 8% 96%);
+  --muted: hsl(0 0% 14%);
+  --muted-foreground: hsl(30 4% 62%);
+  --surface: hsl(0 0% 10%);
+  --surface-2: hsl(0 0% 13%);
+  --card: hsl(0 0% 10%);
+  --card-foreground: hsl(30 8% 96%);
+  --popover: hsl(0 0% 9%);
+  --popover-foreground: hsl(30 8% 96%);
+  --primary: hsl(14 79% 57%);
+  --primary-foreground: hsl(0 0% 8%);
+  --secondary: hsl(0 0% 15%);
+  --secondary-foreground: hsl(30 8% 96%);
+  --accent: hsl(0 0% 16%);
+  --accent-foreground: hsl(30 8% 96%);
   --destructive: hsl(0 72% 51%);
-  --destructive-foreground: hsl(240 5% 96%);
-  --border: hsl(240 5% 15%);
-  --input: hsl(240 5% 15%);
-  --ring: hsl(142 76% 45%);
+  --destructive-foreground: hsl(30 8% 96%);
+  --border: hsl(0 0% 18%);
+  --input: hsl(0 0% 18%);
+  --ring: hsl(14 79% 57%);
+  --hairline: rgba(255, 255, 255, 0.06);
+  --sheen: rgba(255, 255, 255, 0.04);
 }
 
 .light {
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(240 10% 8%);
-  --muted: hsl(240 5% 92%);
-  --muted-foreground: hsl(240 5% 40%);
-  --surface: hsl(240 6% 97%);
-  --surface-2: hsl(240 6% 94%);
+  --background: hsl(30 12% 97%);
+  --foreground: hsl(0 0% 9%);
+  --muted: hsl(30 8% 91%);
+  --muted-foreground: hsl(0 0% 42%);
+  --surface: hsl(30 10% 99%);
+  --surface-2: hsl(30 9% 94%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(240 10% 8%);
+  --card-foreground: hsl(0 0% 9%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(240 10% 8%);
-  --secondary: hsl(240 6% 94%);
-  --secondary-foreground: hsl(240 10% 8%);
-  --accent: hsl(240 6% 92%);
-  --accent-foreground: hsl(240 10% 8%);
+  --popover-foreground: hsl(0 0% 9%);
+  --secondary: hsl(30 9% 93%);
+  --secondary-foreground: hsl(0 0% 9%);
+  --accent: hsl(30 9% 91%);
+  --accent-foreground: hsl(0 0% 9%);
   --destructive: hsl(0 72% 51%);
   --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(240 6% 88%);
-  --input: hsl(240 6% 88%);
+  --border: hsl(30 8% 86%);
+  --input: hsl(30 8% 86%);
+  --hairline: rgba(0, 0, 0, 0.07);
+  --sheen: rgba(0, 0, 0, 0.03);
+}
+
+/* --- craft utilities --- */
+
+@utility panel {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 0 var(--sheen),
+    0 1px 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+@utility panel-hover {
+  transition:
+    border-color 220ms var(--ease-studio),
+    transform 220ms var(--ease-studio),
+    box-shadow 220ms var(--ease-studio);
+  &:hover {
+    border-color: color-mix(in oklab, var(--primary) 45%, transparent);
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 0 var(--sheen),
+      0 14px 34px -18px color-mix(in oklab, var(--primary) 55%, transparent);
+  }
+}
+
+@utility ember-glow {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: auto -20% -60% auto;
+    width: 18rem;
+    height: 18rem;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--primary) 28%, transparent);
+    filter: blur(70px);
+    pointer-events: none;
+  }
+}
+
+@utility grain {
+  position: relative;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.28;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+}
+
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
 }
 
 @keyframes reveal {
@@ -111,65 +177,6 @@
   animation: pulse-soft 2s ease-in-out infinite;
 }
 
-@keyframes page-enter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes skeleton-shimmer {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: -100% 0;
-  }
-}
-
-.page-enter {
-  animation: page-enter 360ms var(--ease-studio) both;
-}
-.stagger-enter {
-  animation: page-enter 360ms var(--ease-studio) both;
-  animation-delay: var(--stagger-delay, 70ms);
-}
-.card-interactive {
-  transition:
-    transform 180ms var(--ease-studio),
-    border-color 180ms var(--ease-studio);
-}
-.card-interactive:hover {
-  transform: translateY(-3px);
-}
-.skeleton-shimmer {
-  background: linear-gradient(
-    100deg,
-    var(--surface) 35%,
-    var(--surface-2) 50%,
-    var(--surface) 65%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    animation-delay: 0ms !important;
-    scroll-behavior: auto !important;
-    transition: none !important;
-    transform: none !important;
-  }
-}
-
 @layer base {
   * {
     border-color: var(--color-border);
@@ -178,10 +185,167 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
   .font-mono {
     font-family: var(--font-mono);
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 35%, transparent);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
+    border: 3px solid var(--background);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+}
+
+/* --- motion layer --- */
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes sheen-sweep {
+  from {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+.animate-pop {
+  animation: pop-in 420ms var(--ease-studio) both;
+}
+.animate-float {
+  animation: float-soft 6s ease-in-out infinite;
+}
+
+/* Staggered entrance for lists and grids */
+.stagger > * {
+  animation: reveal 560ms var(--ease-studio) both;
+}
+.stagger > *:nth-child(1) {
+  animation-delay: 30ms;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 70ms;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 110ms;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 150ms;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 190ms;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 230ms;
+}
+.stagger > *:nth-child(7) {
+  animation-delay: 270ms;
+}
+.stagger > *:nth-child(8) {
+  animation-delay: 310ms;
+}
+.stagger > *:nth-child(n + 9) {
+  animation-delay: 350ms;
+}
+
+@utility hover-lift {
+  transition:
+    transform 240ms var(--ease-studio),
+    border-color 240ms var(--ease-studio),
+    box-shadow 240ms var(--ease-studio);
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 38px -24px color-mix(in oklab, var(--primary) 70%, transparent);
+  }
+  &:active {
+    transform: translateY(-1px) scale(0.995);
+  }
+}
+
+/* Sweeping highlight for hero / primary surfaces */
+@utility sheen {
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 35%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--foreground) 8%, transparent),
+      transparent
+    );
+    pointer-events: none;
+    animation: sheen-sweep 5.5s var(--ease-studio) infinite;
+  }
+}
+
+@layer base {
+  button,
+  [role="button"] {
+    transition:
+      transform 160ms var(--ease-studio),
+      opacity 160ms var(--ease-studio),
+      background-color 200ms var(--ease-studio),
+      border-color 200ms var(--ease-studio),
+      color 200ms var(--ease-studio);
+  }
+  button:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }

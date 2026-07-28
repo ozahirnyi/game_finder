@@ -4,6 +4,8 @@ type Props = {
   title: string;
   className?: string;
   compact?: boolean;
+  /** Hide the large title — use when the surrounding card already shows it. */
+  bare?: boolean;
 };
 
 export function GameCover({
@@ -12,23 +14,35 @@ export function GameCover({
   title,
   className = "",
   compact = false,
+  bare = false,
 }: Props) {
-  const imageUrl = /^https?:\/\//i.test(from) ? from : null;
+  const initials = title
+    .split(/\s|:/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("");
   return (
     <div
-      className={`relative overflow-hidden ${className}`}
+      className={`grain relative overflow-hidden ${className}`}
       style={{
-        background: `radial-gradient(120% 90% at 15% 10%, ${from}55 0%, transparent 55%), linear-gradient(135deg, ${to} 0%, ${from}22 100%), ${to}`,
+        background: `radial-gradient(130% 100% at 12% 4%, ${from}66 0%, transparent 58%), linear-gradient(150deg, ${to} 0%, #0f0f0f 100%)`,
       }}
     >
-      {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={title}
-          className="absolute inset-0 size-full object-cover"
-          loading="lazy"
-        />
-      ) : null}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_92%,rgba(255,255,255,0.10),transparent_52%)]" />
+      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/75 to-transparent" />
+      <div className="absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/10" />
+      <div className="absolute inset-0 flex flex-col justify-end p-3">
+        {bare ? null : compact ? (
+          <span className="font-display text-2xl font-bold leading-none tracking-tight text-white/90">
+            {initials}
+          </span>
+        ) : (
+          <span className="font-display text-[1.6rem] font-bold leading-[0.95] tracking-tight text-white text-balance drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
+            {title}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -37,13 +51,11 @@ export function Avatar({
   from,
   to,
   name,
-  imageUrl,
   className = "",
 }: {
   from: string;
   to: string;
   name: string;
-  imageUrl?: string | null;
   className?: string;
 }) {
   const initials = name
@@ -54,19 +66,10 @@ export function Avatar({
     .join("");
   return (
     <div
-      className={`grid place-items-center font-bold text-white/95 ${className}`}
-      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+      className={`grid place-items-center font-display font-bold text-white/95 ring-1 ring-inset ring-white/15 ${className}`}
+      style={{ background: `linear-gradient(140deg, ${from}, ${to})` }}
     >
-      {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={name}
-          className="size-full object-cover"
-          loading="lazy"
-        />
-      ) : (
-        <span className="text-xs">{initials}</span>
-      )}
+      <span className="text-xs tracking-tight">{initials}</span>
     </div>
   );
 }
