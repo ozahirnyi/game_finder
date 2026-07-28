@@ -19,7 +19,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [themeOpen, setThemeOpen] = useState(false);
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
-  const dealsQuery = useQuery({ queryKey: ["deals", "US", "sidebar"], queryFn: () => getDeals("US") });
+  const dealsQuery = useQuery({
+    queryKey: ["deals", "US", "sidebar"],
+    queryFn: () => getDeals("US"),
+  });
 
   return (
     <div className="min-h-screen bg-background text-foreground">
