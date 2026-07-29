@@ -26,7 +26,7 @@
 
 **Files:**
 - Modify: `web/src/routes/account.tsx:1-70`
-- Create: `web/src/routes/account.test.tsx`
+- Create: `web/src/routes/-account.test.tsx`
 
 **Interfaces:**
 - Consumes: `getLibraryOverview(): Promise<LibraryOverview>`, where `LibraryOverview.games` is `LibraryOverviewGame[]` and each game has `source: "manual" | "psn" | "steam"` and optional `playtime_forever: number | null`.
@@ -34,7 +34,7 @@
 
 - [ ] **Step 1: Write the failing account-route test**
 
-Create `web/src/routes/account.test.tsx` with mocks that isolate the data transformation:
+Create `web/src/routes/-account.test.tsx` with mocks that isolate the data transformation. The `-` prefix keeps TanStack's route generator from treating the test as a production route:
 
 ```tsx
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -82,7 +82,7 @@ describe("AccountPage", () => {
 
 - [ ] **Step 2: Run the new test and verify RED**
 
-Run: `rtk npm test -- src/routes/account.test.tsx`
+Run: `rtk npm test -- src/routes/-account.test.tsx`
 
 Expected: FAIL because `AccountPage` is not exported and the route still imports `getLibrary` instead of `getLibraryOverview`.
 
@@ -104,7 +104,7 @@ Keep the existing `ProfileView` mapper unchanged below `const owned`, including 
 
 - [ ] **Step 4: Run the focused test and production build**
 
-Run: `rtk npm test -- src/routes/account.test.tsx`
+Run: `rtk npm test -- src/routes/-account.test.tsx`
 
 Expected: PASS.
 
@@ -115,7 +115,7 @@ Expected: exit code 0.
 - [ ] **Step 5: Commit the route and regression test**
 
 ```powershell
-rtk git add web/src/routes/account.tsx web/src/routes/account.test.tsx
+rtk git add web/src/routes/account.tsx web/src/routes/-account.test.tsx
 rtk git commit -m "fix: show Steam overview on account"
 ```
 
