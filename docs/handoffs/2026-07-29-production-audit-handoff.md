@@ -18,9 +18,9 @@ There is an additional unmerged branch `codex/fix-live-game-steam-profile` with 
 
 ## Production audit blocker
 
-The historical frontend/API Railway URL `https://game-finder.up.railway.app/` was opened in the browser on 2026-07-29 and returned Railway's **404 Not Found / The train has not arrived at the station** page. It cannot be used to validate the live user session.
+Railway is retired and must not be used for production checks. Its old URL was only an obsolete configuration reference and its 404 response is not a product finding.
 
-The canonical production hostname is redacted as `https://example.com` in repository documentation and Nginx configuration. Before any live UI claim, obtain the real public hostname or restore the deployment/domain, then verify `/`, `/api/health`, and the deployment workflow for the merged SHA.
+The current deployment path is **Lightsail over SSH** (see `.github/workflows/deploy-lightsail-ssh.yml` and `infra/lightsail/`). The canonical production hostname is redacted as `https://example.com` in repository documentation and Nginx configuration, so the next chat needs the real Lightsail domain (or an already-open production browser tab) to perform authenticated browser QA. Then verify `/`, `/api/health`, and the Lightsail deployment workflow for the merged SHA.
 
 ## Confirmed remaining work
 
