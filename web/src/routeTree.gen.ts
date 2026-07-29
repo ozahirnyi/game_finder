@@ -13,10 +13,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as PsnImportRouteImport } from './routes/psn-import'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as WishlistRouteImport } from './routes/wishlist'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as FriendsIndexRouteImport } from './routes/friends.index'
 import { Route as FriendsFriendIdRouteImport } from './routes/friends.$friendId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
@@ -41,6 +43,11 @@ const LibraryRoute = LibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PsnImportRoute = PsnImportRouteImport.update({
+  id: '/psn-import',
+  path: '/psn-import',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -59,6 +66,11 @@ const SignUpRoute = SignUpRouteImport.update({
 const WishlistRoute = WishlistRouteImport.update({
   id: '/wishlist',
   path: '/wishlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FriendsIndexRoute = FriendsIndexRouteImport.update({
@@ -82,10 +94,12 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/deals': typeof DealsRoute
   '/library': typeof LibraryRoute
+  '/psn-import': typeof PsnImportRoute
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/friends/$friendId': typeof FriendsFriendIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/friends/': typeof FriendsIndexRoute
@@ -95,10 +109,12 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/deals': typeof DealsRoute
   '/library': typeof LibraryRoute
+  '/psn-import': typeof PsnImportRoute
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/friends/$friendId': typeof FriendsFriendIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/friends': typeof FriendsIndexRoute
@@ -109,10 +125,12 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/deals': typeof DealsRoute
   '/library': typeof LibraryRoute
+  '/psn-import': typeof PsnImportRoute
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/wishlist': typeof WishlistRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/friends/$friendId': typeof FriendsFriendIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/friends/': typeof FriendsIndexRoute
@@ -124,10 +142,12 @@ export interface FileRouteTypes {
     | '/account'
     | '/deals'
     | '/library'
+    | '/psn-import'
     | '/search'
     | '/sign-in'
     | '/sign-up'
     | '/wishlist'
+    | '/auth/callback'
     | '/friends/$friendId'
     | '/games/$gameId'
     | '/friends/'
@@ -137,10 +157,12 @@ export interface FileRouteTypes {
     | '/account'
     | '/deals'
     | '/library'
+    | '/psn-import'
     | '/search'
     | '/sign-in'
     | '/sign-up'
     | '/wishlist'
+    | '/auth/callback'
     | '/friends/$friendId'
     | '/games/$gameId'
     | '/friends'
@@ -150,10 +172,12 @@ export interface FileRouteTypes {
     | '/account'
     | '/deals'
     | '/library'
+    | '/psn-import'
     | '/search'
     | '/sign-in'
     | '/sign-up'
     | '/wishlist'
+    | '/auth/callback'
     | '/friends/$friendId'
     | '/games/$gameId'
     | '/friends/'
@@ -164,10 +188,12 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   DealsRoute: typeof DealsRoute
   LibraryRoute: typeof LibraryRoute
+  PsnImportRoute: typeof PsnImportRoute
   SearchRoute: typeof SearchRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   WishlistRoute: typeof WishlistRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   FriendsFriendIdRoute: typeof FriendsFriendIdRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
   FriendsIndexRoute: typeof FriendsIndexRoute
@@ -203,6 +229,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/psn-import': {
+      id: '/psn-import'
+      path: '/psn-import'
+      fullPath: '/psn-import'
+      preLoaderRoute: typeof PsnImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/search': {
       id: '/search'
       path: '/search'
@@ -229,6 +262,13 @@ declare module '@tanstack/react-router' {
       path: '/wishlist'
       fullPath: '/wishlist'
       preLoaderRoute: typeof WishlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/friends/': {
@@ -260,10 +300,12 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   DealsRoute: DealsRoute,
   LibraryRoute: LibraryRoute,
+  PsnImportRoute: PsnImportRoute,
   SearchRoute: SearchRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   WishlistRoute: WishlistRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   FriendsFriendIdRoute: FriendsFriendIdRoute,
   GamesGameIdRoute: GamesGameIdRoute,
   FriendsIndexRoute: FriendsIndexRoute,

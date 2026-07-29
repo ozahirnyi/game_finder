@@ -40,12 +40,17 @@ function LibraryPage() {
         <div className="flex items-center gap-6 font-mono">
           {[
             { l: "Games", v: owned.length },
-            { l: "Steam", v: owned.filter((g) => g.source === "Steam").length },
+            { l: "Steam", v: owned.filter((g) => g.source === "steam").length },
             {
               l: "PlayStation",
-              v: owned.filter((g) => g.source === "PlayStation").length,
+              v: owned.filter((g) => g.source === "psn").length,
             },
-            { l: "Hours", v: "2,140" },
+            {
+              l: "Hours",
+              v: Math.round(
+                owned.reduce((total, game) => total + (game.playtime_forever ?? 0), 0) / 60,
+              ),
+            },
           ].map((s) => (
             <div key={s.l}>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.l}</p>
@@ -82,6 +87,7 @@ function LibraryPage() {
             <GameCover
               from="#c75f28"
               to="#22243a"
+              image={g.cover_url}
               title={g.title}
               compact
               className="size-16 shrink-0 rounded-lg"

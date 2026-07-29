@@ -5,7 +5,7 @@ const AUTH_EVENT = "game-finder-auth";
 type RequestOptions = {
   auth?: boolean;
   body?: unknown;
-  formBody?: URLSearchParams;
+  formBody?: BodyInit;
   method?: string;
 };
 
@@ -39,6 +39,7 @@ export type Deal = {
   url?: string | null;
   current?: {
     shop?: string | null;
+    url?: string | null;
     price?: Money | null;
     regular?: Money | null;
     cut?: number | null;
@@ -54,6 +55,7 @@ export type LibraryGame = {
   source: string;
   playtime_forever?: number | null;
   img_icon_url?: string | null;
+  cover_url?: string | null;
 };
 
 export type CollectionGame = {
@@ -74,6 +76,34 @@ export type Profile = {
   bio?: string | null;
   platforms: string[];
   favorite_genres: string[];
+};
+
+export type OAuthLoginUrl = { url: string };
+export type SteamAccount = {
+  linked: boolean;
+  steam_id?: string | null;
+  persona_name?: string | null;
+  avatar?: string | null;
+  linked_at?: string | null;
+};
+export type SteamLibrarySync = SteamAccount & {
+  games?: LibraryGame[];
+  synced_at?: string | null;
+  created?: number;
+  updated?: number;
+};
+export type PsnImportPreview = {
+  games: string[];
+  total: number;
+  message?: string | null;
+};
+export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
+export type Notification = {
+  id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  read_at?: string | null;
+  created_at: string;
 };
 
 export class ApiError extends Error {
@@ -131,17 +161,19 @@ async function toApiError(response: Response, authenticated: boolean) {
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {
   const token = options.auth ? getToken() : null;
   if (options.auth && !token) throw new ApiError("Please sign in first.", 401);
+  const contentType =
+    options.formBody instanceof URLSearchParams
+      ? "application/x-www-form-urlencoded"
+      : options.formBody instanceof FormData
+        ? null
+        : options.body !== undefined
+          ? "application/json"
+          : null;
 
   const response = await fetch(`${API_URL}${path}`, {
     method: options.method ?? "GET",
     headers: {
-      ...(options.body === undefined && options.formBody === undefined
-        ? {}
-        : {
-            "Content-Type": options.formBody
-              ? "application/x-www-form-urlencoded"
-              : "application/json",
-          }),
+      ...(contentType ? { "Content-Type": contentType } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body:
@@ -158,6 +190,66 @@ export function registerUser(email: string, password: string) {
 export function loginUser(email: string, password: string) {
   const formBody = new URLSearchParams({ username: email, password });
   return apiRequest<TokenResponse>("/auth/login", { method: "POST", formBody });
+}
+
+export function getGoogleLoginUrl() {
+  return apiRequest<OAuthLoginUrl>("/auth/google/login-url");
+}
+
+export function getGoogleLinkUrl() {
+  return apiRequest<OAuthLoginUrl>("/auth/google/link-url", { auth: true, method: "POST" });
+}
+
+export function exchangeGoogleCode(exchange_code: string) {
+  return apiRequest<TokenResponse>("/auth/google/exchange", {
+    method: "POST",
+    body: { exchange_code },
+  });
+}
+
+export function getSteamSignInUrl() {
+  return apiRequest<OAuthLoginUrl>("/auth/steam/login-url");
+}
+
+export function exchangeSteamCode(exchange_code: string) {
+  return apiRequest<TokenResponse>("/auth/steam/exchange", {
+    method: "POST",
+    body: { exchange_code },
+  });
+}
+
+export function getSteamLinkUrl() {
+  return apiRequest<OAuthLoginUrl>("/steam/login-url", { auth: true });
+}
+
+export function getSteamAccount() {
+  return apiRequest<SteamAccount>("/steam/me", { auth: true });
+}
+
+export function syncSteamLibrary() {
+  return apiRequest<SteamLibrarySync>("/steam/library/sync", { auth: true, method: "POST" });
+}
+
+export function unlinkSteamAccount() {
+  return apiRequest<SteamAccount>("/steam/me", { auth: true, method: "DELETE" });
+}
+
+export function previewPsnImport(file: File) {
+  const form = new FormData();
+  form.set("file", file);
+  return apiRequest<PsnImportPreview>("/psn/import/preview", {
+    auth: true,
+    method: "POST",
+    formBody: form,
+  });
+}
+
+export function confirmPsnImport(games: string[]) {
+  return apiRequest<PsnImportResult>("/psn/import/confirm", {
+    auth: true,
+    method: "POST",
+    body: { games },
+  });
 }
 
 export function searchGames(query: string) {
@@ -212,4 +304,16 @@ export function removeWishlist(id: number) {
 
 export function getFriends() {
   return apiRequest<Friend[]>("/friends", { auth: true });
+}
+
+export function getNotifications() {
+  return apiRequest<Notification[]>("/notifications", { auth: true });
+}
+
+export function markNotificationRead(id: string) {
+  return apiRequest<Notification>(`/notifications/${id}/read`, { auth: true, method: "POST" });
+}
+
+export function markAllNotificationsRead() {
+  return apiRequest<void>("/notifications/read-all", { auth: true, method: "POST" });
 }
