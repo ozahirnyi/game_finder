@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, PresenceDot, SectionHeader } from "@/components/ui-bits";
-import { friends, games, activity } from "@/lib/mockData";
+import { getFriends } from "@/lib/api";
 import { Search, UserPlus, Gamepad2, MessageCircle, Users } from "lucide-react";
 
 export const Route = createFileRoute("/friends/")({
@@ -27,11 +28,26 @@ export const Route = createFileRoute("/friends/")({
 });
 
 function FriendsPage() {
+  const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
+  const friends = (friendsQuery.data ?? []).map(({ user }) => ({
+    id: user.id,
+    name: user.display_name,
+    handle: user.display_name,
+    avatarFrom: "#7c3aed",
+    avatarTo: "#111827",
+    avatarUrl: user.avatar ?? undefined,
+    online: false,
+    lft: false,
+    compatibility: undefined as number | undefined,
+    sharedGames: undefined as number | undefined,
+    activity: undefined as string | undefined,
+    genres: [],
+    platforms: [],
+  }));
   const list = friends;
   const focus = list[0];
-  const sharedGames = games.filter((g) =>
-    ["helldivers2", "bg3", "drg", "hades2", "eldenring", "stardew"].includes(g.id),
-  );
+  const sharedGames: never[] = [];
+  const activity: never[] = [];
 
   return (
     <AppShell>

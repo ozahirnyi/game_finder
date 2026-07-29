@@ -36,9 +36,7 @@ export function Chip({
           ? "border border-border text-muted-foreground"
           : "bg-foreground/5 text-muted-foreground ring-1 ring-inset ring-[var(--hairline)]";
   return (
-    <span
-      className={`label-mono inline-flex items-center rounded-md px-1.5 py-1 ${styles}`}
-    >
+    <span className={`label-mono inline-flex items-center rounded-md px-1.5 py-1 ${styles}`}>
       {children}
     </span>
   );
@@ -111,10 +109,7 @@ export function CardSkeletonGrid({
   return (
     <div className={className} role="status" aria-label="Loading games">
       {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="overflow-hidden rounded-xl border border-border bg-surface"
-        >
+        <div key={i} className="overflow-hidden rounded-xl border border-border bg-surface">
           <Skeleton className={`${aspect} w-full rounded-none`} />
           <div className="space-y-2 p-4">
             <Skeleton className="h-3.5 w-3/4" />

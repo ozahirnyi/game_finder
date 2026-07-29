@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel, SectionHeader, EmptyState, Chip } from "@/components/ui-bits";
-import { notifications, notificationSettings } from "@/lib/mockData";
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/api";
 import { Bell, Gamepad2, Tag, Users, Settings2, Check } from "lucide-react";
 
 const iconFor = {
@@ -12,10 +13,23 @@ const iconFor = {
 
 export function NotificationsPanel({ className = "" }: { className?: string }) {
   const [showSettings, setShowSettings] = useState(false);
-  const [prefs, setPrefs] = useState(notificationSettings);
-  const [read, setRead] = useState<string[]>([]);
+  const [prefs, setPrefs] = useState([
+    { id: "price", label: "Price drops", enabled: true },
+    { id: "friends", label: "Friend activity", enabled: true },
+  ]);
+  const queryClient = useQueryClient();
+  const notificationsQuery = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
+  const markRead = useMutation({
+    mutationFn: markNotificationRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+  const markAllRead = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+  const notifications = notificationsQuery.data ?? [];
 
-  const unread = notifications.filter((n) => n.unread && !read.includes(n.id)).length;
+  const unread = notifications.filter((n) => !n.read_at).length;
 
   return (
     <Panel className={`p-6 ${className}`}>
@@ -26,7 +40,7 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
           <div className="flex items-center gap-2">
             {unread > 0 && (
               <button
-                onClick={() => setRead(notifications.map((n) => n.id))}
+                onClick={() => markAllRead.mutate()}
                 className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted-foreground transition hover:text-foreground"
               >
                 <Check className="mr-1 inline size-3.5" /> Mark all read
@@ -85,15 +99,14 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
       ) : (
         <div className="stagger space-y-2">
           {notifications.map((n) => {
-            const Icon = iconFor[n.kind];
-            const isUnread = n.unread && !read.includes(n.id);
+            const Icon = iconFor[n.type as keyof typeof iconFor] ?? Bell;
+            const isUnread = !n.read_at;
             return (
               <div
                 key={n.id}
+                onClick={() => isUnread && markRead.mutate(n.id)}
                 className={`flex items-start gap-3 rounded-xl border p-3 transition ${
-                  isUnread
-                    ? "border-primary/30 bg-primary/5"
-                    : "border-border bg-surface-2"
+                  isUnread ? "border-primary/30 bg-primary/5" : "border-border bg-surface-2"
                 }`}
               >
                 <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-muted-foreground">
@@ -101,12 +114,16 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-bold">{n.title}</p>
+                    <p className="truncate text-sm font-bold">{n.type}</p>
                     {isUnread && <Chip tone="primary">New</Chip>}
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{n.body}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {String(n.payload.message ?? "New Playfinder notification")}
+                  </p>
                 </div>
-                <span className="label-mono shrink-0 text-muted-foreground">{n.time}</span>
+                <span className="label-mono shrink-0 text-muted-foreground">
+                  {new Date(n.created_at).toLocaleDateString()}
+                </span>
               </div>
             );
           })}

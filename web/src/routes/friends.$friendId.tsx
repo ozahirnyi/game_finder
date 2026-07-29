@@ -1,22 +1,27 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView } from "@/components/ProfileView";
-import { activity, friendBios, friendGames, friends } from "@/lib/mockData";
+import { getFriends } from "@/lib/api";
 import { ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/friends/$friendId")({
-  loader: ({ params }) => {
-    const friend = friends.find((f) => f.id === params.friendId);
+  loader: async ({ params }) => {
+    const friend = (await getFriends()).find(({ user }) => user.id === params.friendId)?.user;
     if (!friend) throw notFound();
-    return { friend };
+    return {
+      friend: {
+        id: friend.id,
+        name: friend.display_name,
+        handle: friend.display_name,
+        avatarFrom: "#7c3aed",
+        avatarTo: "#111827",
+      },
+    };
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
       return {
-        meta: [
-          { title: "Player not found — Playfinder" },
-          { name: "robots", content: "noindex" },
-        ],
+        meta: [{ title: "Player not found — Playfinder" }, { name: "robots", content: "noindex" }],
       };
     }
     const { friend } = loaderData;
@@ -58,7 +63,7 @@ function FriendNotFound() {
 
 function FriendProfilePage() {
   const { friend } = Route.useLoaderData();
-  const owned = friendGames(friend.id);
+  const owned: never[] = [];
 
   return (
     <AppShell>
@@ -75,31 +80,23 @@ function FriendProfilePage() {
           handle: friend.handle,
           avatarFrom: friend.avatarFrom,
           avatarTo: friend.avatarTo,
-          region: friend.platforms.includes("PS5") ? "EU" : "US",
-          online: friend.online,
-          bio: friendBios[friend.id],
-          compatibility: friend.compatibility,
-          hours: `${friend.sharedGames * 27}`,
+          region: "US",
+          online: false,
+          hours: "—",
           games: owned,
           stores: [
             {
               name: "Steam",
               count: owned.filter((g) => g.source === "Steam").length,
-              note: friend.online ? "Online now" : "Last synced today",
+              note: "Library details unavailable",
             },
             {
               name: "PlayStation",
               count: owned.filter((g) => g.source === "PlayStation").length,
-              note: "Synced yesterday",
+              note: "Library details unavailable",
             },
           ],
-          activity: activity
-            .filter((a) => a.who === friend.id)
-            .map((a) => ({
-              id: a.id,
-              text: `${a.verb} ${a.target} ${a.tag}`,
-              time: a.time,
-            })),
+          activity: [],
         }}
       />
     </AppShell>

@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
-import { EmptyState, PriceBlock, SectionHeader } from "@/components/ui-bits";
-import { games } from "@/lib/mockData";
+import { EmptyState, SectionHeader } from "@/components/ui-bits";
+import { getWishlist, removeWishlist } from "@/lib/api";
+import { wishlistPriceLabel } from "@/lib/collectionPresentation";
 import { Bell, Heart, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/wishlist")({
@@ -28,10 +29,14 @@ export const Route = createFileRoute("/wishlist")({
 });
 
 function WishlistPage() {
-  const [removed, setRemoved] = useState<string[]>([]);
+  const queryClient = useQueryClient();
+  const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist });
+  const removeMutation = useMutation({
+    mutationFn: removeWishlist,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
+  });
 
-  const all = games.filter((g) => g.status === "Want to Play" || g.discount);
-  const wl = all.filter((g) => !removed.includes(g.id));
+  const wl = wishlistQuery.data ?? [];
 
   return (
     <AppShell>
@@ -72,10 +77,10 @@ function WishlistPage() {
             >
               <Link to="/games/$gameId" params={{ gameId: g.id }}>
                 <GameCover
-                  from={g.coverFrom}
-                  to={g.coverTo}
+                  from="#7c3aed"
+                  to="#111827"
                   title={g.title}
-                  image={g.coverUrl}
+                  image={g.cover_url ?? undefined}
                   compact
                   bare
                   className="size-20 rounded-lg"
@@ -89,17 +94,11 @@ function WishlistPage() {
                 >
                   {g.title}
                 </Link>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {g.genres.join(" · ")} · {g.platforms.join(", ")}
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Saved game</p>
               </div>
-              <PriceBlock
-                price={g.price}
-                originalPrice={g.originalPrice}
-                discount={g.discount}
-                currency={g.currency}
-                store={g.store}
-              />
+              <p className="text-right text-xs font-bold text-muted-foreground">
+                {wishlistPriceLabel()}
+              </p>
               <div className="flex items-center justify-end gap-2">
                 <Link
                   to="/games/$gameId"
@@ -110,7 +109,8 @@ function WishlistPage() {
                 </Link>
                 <button
                   aria-label={`Remove ${g.title} from wishlist`}
-                  onClick={() => setRemoved((r) => [...r, g.id])}
+                  onClick={() => removeMutation.mutate(Number(g.id))}
+                  disabled={removeMutation.isPending}
                   className="grid size-9 place-items-center rounded-lg border border-border text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
                 >
                   <Trash2 className="size-4" />

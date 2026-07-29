@@ -10,22 +10,37 @@ import {
   PriceBlock,
   SectionHeader,
 } from "@/components/ui-bits";
-import { friends, games, priceHistory, type Game } from "@/lib/mockData";
-import {
-  ArrowLeft,
-  Bell,
-  ExternalLink,
-  Heart,
-  Share2,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import { getCatalogGame } from "@/lib/api";
+import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
 export const Route = createFileRoute("/games/$gameId")({
-  loader: ({ params }) => {
-    const game = games.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
+  loader: async ({ params }) => {
+    try {
+      const catalog = await getCatalogGame(params.gameId);
+      return {
+        game: {
+          id: String(catalog.id),
+          title: catalog.name,
+          coverFrom: "#1d4ed8",
+          coverTo: "#111827",
+          coverUrl: catalog.background_image ?? undefined,
+          genres: catalog.genres ?? [],
+          platforms: catalog.platforms ?? [],
+          releaseDate: catalog.released ?? undefined,
+          rating: catalog.rating ?? 0,
+          description: catalog.description_raw ?? undefined,
+          price: null,
+          originalPrice: null,
+          discount: null,
+          currency: undefined,
+          store: undefined,
+          storeUrl: undefined,
+          coop: false,
+        },
+      };
+    } catch {
+      throw notFound();
+    }
   },
   head: ({ loaderData }) => ({
     meta: loaderData
@@ -74,6 +89,7 @@ export const Route = createFileRoute("/games/$gameId")({
 });
 
 function Sparkline() {
+  const priceHistory: { price: number; date: string }[] = [];
   const w = 320;
   const h = 60;
   const max = Math.max(...priceHistory.map((p) => p.price));
@@ -100,10 +116,8 @@ function Sparkline() {
 function GameDetail() {
   const { game } = Route.useLoaderData();
 
-  const owners = friends.slice(0, 4);
-  const similar = games
-    .filter((g: Game) => g.id !== game.id && g.genres.some((x) => game.genres.includes(x)))
-    .slice(0, 4);
+  const owners: never[] = [];
+  const similar: never[] = [];
   const priceUnavailable = game.price == null;
 
   return (
@@ -135,9 +149,7 @@ function GameDetail() {
               </Chip>
             ))}
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-            {game.title}
-          </h1>
+          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">{game.title}</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             {game.platforms.join(" · ")}
             {game.releaseDate ? ` · ${game.releaseDate}` : ""}
@@ -152,9 +164,7 @@ function GameDetail() {
           <section>
             <SectionHeader title="About" />
             {game.description ? (
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {game.description}
-              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">{game.description}</p>
             ) : (
               <EmptyState
                 title="No description yet"

@@ -47,7 +47,7 @@ export function GameCover({
       {showImage && (
         <img
           src={image}
-          alt=""
+          alt={title}
           loading="lazy"
           decoding="async"
           onLoad={() => setLoaded(true)}

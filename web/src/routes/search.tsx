@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
-import { games } from "@/lib/mockData";
+import { searchGames } from "@/lib/api";
 import { Search, SlidersHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/search")({
@@ -32,9 +33,12 @@ function SearchPage() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState("All");
 
-  const results = games.filter((g) =>
-    query.trim() ? g.title.toLowerCase().includes(query.trim().toLowerCase()) : true,
-  );
+  const searchQuery = useQuery({
+    queryKey: ["search", query],
+    queryFn: () => searchGames(query),
+    enabled: query.trim().length >= 2,
+  });
+  const results = searchQuery.data?.results ?? [];
 
   return (
     <AppShell>
@@ -77,9 +81,7 @@ function SearchPage() {
 
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="label-mono text-muted-foreground">
-          {query.trim() === ""
-            ? "Start typing to search"
-            : `${results.length} results`}
+          {query.trim() === "" ? "Start typing to search" : `${results.length} results`}
         </p>
         <div className="flex items-center gap-2">
           <select className="rounded-md border border-border bg-surface px-2 py-1 text-xs">
@@ -106,18 +108,11 @@ function SearchPage() {
               key={g.id}
               aspect="aspect-[3/4]"
               game={{
-                gameId: g.id,
-                title: g.title,
-                coverUrl: g.coverUrl,
-                coverFrom: g.coverFrom,
-                coverTo: g.coverTo,
+                gameId: String(g.id),
+                title: g.name,
+                coverUrl: g.background_image,
                 genres: g.genres,
                 platforms: g.platforms,
-                price: g.price,
-                originalPrice: g.originalPrice,
-                discount: g.discount,
-                currency: g.currency,
-                store: g.store,
               }}
             />
           ))}

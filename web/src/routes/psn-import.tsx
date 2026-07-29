@@ -83,8 +83,24 @@ function PsnImportPage() {
   const client = useQueryClient();
   const [rows, setRows] = useState<{ id: string; title: string; matched: boolean }[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const preview = useMutation({ mutationFn: previewPsnImport, onSuccess: (data) => { const next = data.games.map((title) => ({ id: title, title, matched: true })); setRows(next); setSelected(next.map((game) => game.id)); setPhase("idle"); setStep("preview"); }, onError: () => setPhase("error") });
-  const confirm = useMutation({ mutationFn: confirmPsnImport, onSuccess: () => { client.invalidateQueries({ queryKey: ["library"] }); setStep("result"); } });
+  const preview = useMutation({
+    mutationFn: previewPsnImport,
+    onSuccess: (data) => {
+      const next = data.games.map((title) => ({ id: title, title, matched: true }));
+      setRows(next);
+      setSelected(next.map((game) => game.id));
+      setPhase("idle");
+      setStep("preview");
+    },
+    onError: () => setPhase("error"),
+  });
+  const confirm = useMutation({
+    mutationFn: confirmPsnImport,
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["library"] });
+      setStep("result");
+    },
+  });
   const inputRef = useRef<HTMLInputElement>(null);
 
   const visibleRows = emptyPreview ? [] : rows;
