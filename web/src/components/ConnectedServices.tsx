@@ -4,11 +4,16 @@ import { Avatar } from "@/components/GameCover";
 import { Chip, InlineError, Panel, SectionHeader } from "@/components/ui-bits";
 import {
   getGoogleLinkUrl,
+  getTelegramAccount,
+  getTelegramLinkUrl,
   getSteamAccount,
   getSteamLinkUrl,
   syncSteamLibrary,
   type OAuthLoginUrl,
   type SteamAccount,
+  type TelegramAccount,
+  type TelegramLink,
+  unlinkTelegramAccount,
   unlinkSteamAccount,
 } from "@/lib/api";
 import { Check, Gamepad2, Loader2, RefreshCw, Unlink, Upload } from "lucide-react";
@@ -58,6 +63,7 @@ const btnPrimary =
 export function ConnectedServices() {
   const client = useQueryClient();
   const steamQuery = useQuery({ queryKey: ["steam-account"], queryFn: getSteamAccount });
+  const telegramQuery = useQuery({ queryKey: ["telegram-account"], queryFn: getTelegramAccount });
   const action = useMutation<
     OAuthLoginUrl | SteamAccount,
     Error,
@@ -78,7 +84,15 @@ export function ConnectedServices() {
       client.invalidateQueries({ queryKey: ["library-overview"] });
     },
   });
+  const telegramAction = useMutation<TelegramLink | TelegramAccount, Error, "link" | "unlink">({
+    mutationFn: (kind) => (kind === "link" ? getTelegramLinkUrl() : unlinkTelegramAccount()),
+    onSuccess: (result) => {
+      if ("url" in result && result.url) window.location.assign(result.url);
+      client.invalidateQueries({ queryKey: ["telegram-account"] });
+    },
+  });
   const steam = steamQuery.data;
+  const telegram = telegramQuery.data;
   return (
     <Panel className="p-6">
       <SectionHeader title="Connected services" hint="Sign-in methods and library sources" />
@@ -134,6 +148,28 @@ export function ConnectedServices() {
           ) : (
             <button className={btnPrimary} onClick={() => action.mutate("link")}>
               Connect Steam
+            </button>
+          )}
+        </ServiceRow>
+        <ServiceRow
+          icon={<span className="font-display text-sm font-bold">TG</span>}
+          name="Telegram"
+          connected={!!telegram?.linked}
+          status={
+            !telegram?.configured
+              ? "Telegram bot is not configured"
+              : telegram?.linked
+                ? `Connected${telegram.username ? ` as @${telegram.username}` : ""}`
+                : "Connect Telegram to receive price alerts"
+          }
+        >
+          {telegram?.linked ? (
+            <button className={btn} disabled={telegramAction.isPending} onClick={() => telegramAction.mutate("unlink")}>
+              <Unlink className="size-3.5" /> Disconnect
+            </button>
+          ) : (
+            <button className={btnPrimary} disabled={!telegram?.configured || telegramAction.isPending} onClick={() => telegramAction.mutate("link")}>
+              Connect Telegram
             </button>
           )}
         </ServiceRow>

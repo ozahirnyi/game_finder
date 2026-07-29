@@ -24,6 +24,9 @@ export const Route = createFileRoute("/games/$gameId")({
       let catalog;
       try {
         catalog = await getCatalogGame(params.gameId);
+        if (deps.title && !exactCatalogMatch([catalog], deps.title)) {
+          throw new Error("Catalog ID does not match library title");
+        }
       } catch {
         if (!deps.title) throw new Error("Catalog title unavailable");
         const results = await searchGames(deps.title);
