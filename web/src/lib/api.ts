@@ -39,6 +39,7 @@ export type Deal = {
   url?: string | null;
   current?: {
     shop?: string | null;
+    url?: string | null;
     price?: Money | null;
     regular?: Money | null;
     cut?: number | null;
@@ -54,6 +55,7 @@ export type LibraryGame = {
   source: string;
   playtime_forever?: number | null;
   img_icon_url?: string | null;
+  cover_url?: string | null;
 };
 
 export type CollectionGame = {

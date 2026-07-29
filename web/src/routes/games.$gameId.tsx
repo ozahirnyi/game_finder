@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Heart, Star } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
-import { Chip, Panel, SectionHeader } from "@/components/ui-bits";
+import { Chip, Panel, PriceBlock, SectionHeader } from "@/components/ui-bits";
 import { addWishlist, getCatalogGame, getPriceHistory } from "@/lib/api";
 
 export const Route = createFileRoute("/games/$gameId")({ component: GameDetail });
@@ -38,6 +38,7 @@ function GameDetail() {
             <GameCover
               from="#c75f28"
               to="#22243a"
+              image={game.background_image}
               title={game.name}
               className="h-72 w-full sm:h-96"
             />
@@ -62,12 +63,23 @@ function GameDetail() {
             </Panel>
             <Panel className="p-6">
               <SectionHeader title="Live price" />
-              <p className="text-3xl font-black text-primary">
-                {price?.price ? `${price.price.amount} ${price.price.currency}` : "Unavailable"}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {price?.shop ?? "No store quote available"}
-              </p>
+              <PriceBlock
+                price={price?.price?.amount}
+                originalPrice={price?.regular?.amount}
+                discount={price?.cut}
+                currency={price?.price?.currency}
+                store={price?.shop}
+              />
+              {price?.url && (
+                <a
+                  className="mt-4 inline-block text-sm font-bold text-primary hover:underline"
+                  href={price.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open store offer
+                </a>
+              )}
               <button
                 onClick={() => wishlistMutation.mutate(game)}
                 disabled={wishlistMutation.isPending}

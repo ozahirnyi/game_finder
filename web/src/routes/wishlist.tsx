@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
@@ -44,13 +44,16 @@ function WishlistPage() {
         {wl.map((g) => {
           const drop = false;
           return (
-            <div
+            <Link
               key={g.id}
+              to="/games/$gameId"
+              params={{ gameId: String(g.catalog_game_id) }}
               className="hover-lift grid grid-cols-1 gap-6 rounded-2xl border border-border bg-surface p-5 hover:border-primary/40 md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
             >
               <GameCover
                 from="#c75f28"
                 to="#22243a"
+                image={g.cover_url}
                 title={g.title}
                 compact
                 className="size-20 rounded-lg"
@@ -79,11 +82,11 @@ function WishlistPage() {
               </div>
               <div className="text-right">
                 <p className="font-mono text-2xl font-black text-primary">Track price</p>
-                <button className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
-                  View deal
-                </button>
+                <span className="mt-2 inline-block rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
+                  View details
+                </span>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
