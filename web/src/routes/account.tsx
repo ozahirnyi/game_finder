@@ -1,10 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView } from "@/components/ProfileView";
-import { ConnectedServices } from "@/components/ConnectedServices";
-import { NotificationsPanel } from "@/components/NotificationsPanel";
-import { getLibrary, getProfile } from "@/lib/api";
+import { account, games } from "@/lib/mockData";
 
 export const Route = createFileRoute("/account")({
   head: () => ({
@@ -28,54 +25,34 @@ export const Route = createFileRoute("/account")({
 });
 
 function AccountPage() {
-  const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
-  const libraryQuery = useQuery({ queryKey: ["library"], queryFn: getLibrary });
-  const profile = profileQuery.data;
-  const owned = libraryQuery.data ?? [];
-
-  if (!profile) {
-    return (
-      <AppShell>
-        <p className="text-sm text-muted-foreground">Loading your profile…</p>
-      </AppShell>
-    );
-  }
+  const owned = games.filter((g) => g.source);
 
   return (
     <AppShell>
       <ProfileView
         isSelf
         profile={{
-          name: profile.display_name,
-          handle: profile.display_name,
-          avatarFrom: "#e85d3a",
-          avatarTo: "#7c2d12",
-          region: profile.platforms[0] ?? "Global",
-          bio: profile.bio ?? undefined,
-          hours: Math.round(
-            owned.reduce((total, game) => total + (game.playtime_forever ?? 0), 0) / 60,
-          ),
-          games: owned as never,
+          name: account.name,
+          handle: account.handle,
+          avatarFrom: account.avatarFrom,
+          avatarTo: account.avatarTo,
+          region: account.region,
+          hours: "2,140",
+          games: owned,
           stores: [
             {
               name: "Steam",
-              count: owned.filter((g) => g.source === "steam").length,
-              note: "Library source",
+              count: owned.filter((g) => g.source === "Steam").length,
+              note: "Synced 4m ago",
             },
             {
               name: "PlayStation",
-              count: owned.filter((g) => g.source === "psn").length,
-              note: "Imported library source",
+              count: owned.filter((g) => g.source === "PlayStation").length,
+              note: "Synced 1h ago",
             },
           ],
         }}
       />
-      <div className="mt-6">
-        <ConnectedServices />
-      </div>
-      <div className="mt-6">
-        <NotificationsPanel />
-      </div>
     </AppShell>
   );
 }
