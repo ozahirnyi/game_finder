@@ -20,7 +20,14 @@ There is an additional unmerged branch `codex/fix-live-game-steam-profile` with 
 
 Railway is retired and must not be used for production checks. Its old URL was only an obsolete configuration reference and its 404 response is not a product finding.
 
-The current deployment path is **Lightsail over SSH** (see `.github/workflows/deploy-lightsail-ssh.yml` and `infra/lightsail/`). The canonical production hostname is redacted as `https://example.com` in repository documentation and Nginx configuration, so the next chat needs the real Lightsail domain (or an already-open production browser tab) to perform authenticated browser QA. Then verify `/`, `/api/health`, and the Lightsail deployment workflow for the merged SHA.
+The current deployment path is **Lightsail over SSH** (see `.github/workflows/deploy-lightsail-ssh.yml` and `infra/lightsail/`). The real production hostname is `https://playfinder.cc`. Verify `/`, `/api/health`, and the Lightsail deployment workflow for the merged SHA before treating a merge as live.
+
+## Confirmed production findings (guest session, 2026-07-29)
+
+- `https://playfinder.cc/` loads successfully with no browser console errors in a guest session.
+- Homepage search for `Portal` renders results, including a link labelled `Portal` to `/games/13536`.
+- Opening `https://playfinder.cc/games/13536` renders **Game not in catalog**. This is a reproducible data-contract bug: search IDs are not accepted by the catalog detail endpoint used by the detail route. It explains the user's report that searching for a game leads to a broken game page.
+- The homepage has live deal cards, but their ID integrity was not yet exhaustively tested. Use the same title/link/detail-title comparison as the Portal check.
 
 ## Confirmed remaining work
 
@@ -56,9 +63,15 @@ The friend route currently derives a profile from `getFriends()` in `web/src/rou
 - wire Invite to Play to a defined invite API; or
 - until those flows are implemented, render disabled explanatory controls rather than clickable no-ops.
 
-### 4. Search journey must be tested on production
+### 4. Fix the search-to-detail ID contract — highest priority
 
-The user reported: entering `Portal` from the homepage led to a broken game detail page. The direct detail crash is fixed, but re-test this exact path after deployment:
+The user reported: entering `Portal` from the homepage led to a broken game detail page. This is confirmed on production:
+
+`/search/games?q=Portal` (via the homepage) -> link `/games/13536` -> route loader calls `/catalog/games/13536` -> catalog responds not found -> UI renders `Game not in catalog`.
+
+Fix the contract at one boundary, with an automated integration test: either make search return the catalog-detail identifier or make the detail endpoint understand the search provider's ID. Do not silently redirect to a random title and do not merely change the 404 copy.
+
+Re-test after deployment:
 
 1. type `Portal` on `/`;
 2. choose a result and ensure its displayed title, card link ID, and detail title match;
