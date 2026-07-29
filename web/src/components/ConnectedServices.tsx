@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Avatar } from "@/components/GameCover";
 import { Chip, InlineError, Panel, SectionHeader } from "@/components/ui-bits";
-import { connectedServices } from "@/lib/mockData";
+import {
+  getGoogleLinkUrl,
+  getSteamAccount,
+  getSteamLinkUrl,
+  syncSteamLibrary,
+  unlinkSteamAccount,
+} from "@/lib/api";
 import { Check, Gamepad2, Loader2, RefreshCw, Unlink, Upload } from "lucide-react";
 
 function ServiceRow({
@@ -42,18 +48,30 @@ function ServiceRow({
     </div>
   );
 }
-
 const btn =
   "inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold transition hover:border-primary/50 disabled:opacity-60";
 const btnPrimary =
   "inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-60";
 
-/** Identity + store connections. Purely presentational — wired up by the backend later. */
 export function ConnectedServices() {
-  const { google, steam, playstation } = connectedServices;
-  const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
-
+  const client = useQueryClient();
+  const steamQuery = useQuery({ queryKey: ["steam-account"], queryFn: getSteamAccount });
+  const action = useMutation({
+    mutationFn: (kind: "google" | "link" | "sync" | "unlink") =>
+      kind === "google"
+        ? getGoogleLinkUrl()
+        : kind === "link"
+          ? getSteamLinkUrl()
+          : kind === "sync"
+            ? syncSteamLibrary()
+            : unlinkSteamAccount(),
+    onSuccess: (result) => {
+      if ("url" in result) window.location.assign(result.url);
+      client.invalidateQueries({ queryKey: ["steam-account"] });
+      client.invalidateQueries({ queryKey: ["library"] });
+    },
+  });
+  const steam = steamQuery.data;
   return (
     <Panel className="p-6">
       <SectionHeader title="Connected services" hint="Sign-in methods and library sources" />
@@ -61,88 +79,71 @@ export function ConnectedServices() {
         <ServiceRow
           icon={<span className="font-display text-sm font-bold">G</span>}
           name="Google"
-          connected={google.state === "connected"}
-          status={google.email ?? "Use Google to sign in faster"}
+          connected={false}
+          status="Use Google to sign in faster"
         >
-          {google.state === "connected" ? (
-            <button className={btn}>
-              <Unlink className="size-3.5" /> Disconnect
-            </button>
-          ) : (
-            <button className={btnPrimary}>Connect</button>
-          )}
+          <button className={btnPrimary} onClick={() => action.mutate("google")}>
+            Connect
+          </button>
         </ServiceRow>
-
         <ServiceRow
           icon={<Gamepad2 className="size-4" />}
           name="Steam"
-          connected={steam.state === "connected"}
+          connected={!!steam?.linked}
           status={
-            steam.state === "connected" ? (
-              <span className="flex flex-wrap items-center gap-2">
+            steam?.linked ? (
+              <span className="flex items-center gap-2">
                 <Avatar
-                  from={steam.avatarFrom}
-                  to={steam.avatarTo}
-                  name={steam.personaName ?? "Steam"}
+                  from="#c75f28"
+                  to="#22243a"
+                  name={steam.persona_name ?? "Steam"}
                   className="size-5 rounded-full"
                 />
-                <span className="text-foreground">{steam.personaName}</span>
-                <span>· {steam.gameCount ?? 0} games</span>
-                <span>· Last sync {steam.lastSyncedAt ?? "—"}</span>
+                <span className="text-foreground">{steam.persona_name ?? "Steam"}</span>
               </span>
             ) : (
               "Connect Steam to sync your owned games automatically"
             )
           }
         >
-          {steam.state === "connected" ? (
+          {steam?.linked ? (
             <>
               <button
                 className={btn}
-                disabled={syncing}
-                onClick={() => {
-                  setSyncError(null);
-                  setSyncing(true);
-                  window.setTimeout(() => {
-                    setSyncing(false);
-                    setSyncError("Sync isn't wired up yet.");
-                  }, 900);
-                }}
+                disabled={action.isPending}
+                onClick={() => action.mutate("sync")}
               >
-                {syncing ? (
+                {action.isPending ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : (
                   <RefreshCw className="size-3.5" />
                 )}
-                {syncing ? "Syncing…" : "Sync now"}
+                Sync now
               </button>
-              <button className={btn}>
+              <button className={btn} onClick={() => action.mutate("unlink")}>
                 <Unlink className="size-3.5" /> Disconnect
               </button>
             </>
           ) : (
-            <button className={btnPrimary}>Connect Steam</button>
+            <button className={btnPrimary} onClick={() => action.mutate("link")}>
+              Connect Steam
+            </button>
           )}
         </ServiceRow>
-        {syncError && (
+        {action.error && (
           <div className="pl-1">
-            <InlineError>{syncError}</InlineError>
+            <InlineError>Unable to update connected services.</InlineError>
           </div>
         )}
-
         <ServiceRow
           icon={<span className="font-display text-sm font-bold">PS</span>}
           name="PlayStation"
-          connected={playstation.imported}
-          status={
-            playstation.imported
-              ? `${playstation.gameCount ?? 0} imported games · imported ${playstation.importedAt ?? "—"}`
-              : "Import your PlayStation library from an export file"
-          }
+          connected={false}
+          status="Import your PlayStation library from an export file"
         >
-          <Link to="/psn-import" className={playstation.imported ? btn : btnPrimary}>
+          <Link to="/psn-import" className={btnPrimary}>
             <Upload className="size-3.5" />
-            {playstation.imported ? "Re-import" : "Import library"}
+            Import library
           </Link>
         </ServiceRow>
       </div>
