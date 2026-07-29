@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { InlineError } from "@/components/ui-bits";
+import { getGoogleLoginUrl, getSteamSignInUrl } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 
 type Provider = "google" | "steam";
@@ -49,13 +50,16 @@ export function SocialAuthButtons({ mode }: { mode: "sign-in" | "sign-up" }) {
   function start(provider: Provider) {
     setErrors((e) => ({ ...e, [provider]: undefined }));
     setPending(provider);
-    window.setTimeout(() => {
-      setPending(null);
-      setErrors((e) => ({
-        ...e,
-        [provider]: `${provider === "google" ? "Google" : "Steam"} sign-in isn't connected yet.`,
-      }));
-    }, 1000);
+    const request = provider === "google" ? getGoogleLoginUrl : getSteamSignInUrl;
+    request()
+      .then(({ url }) => window.location.assign(url))
+      .catch(() => {
+        setPending(null);
+        setErrors((e) => ({
+          ...e,
+          [provider]: `Unable to start ${provider === "google" ? "Google" : "Steam"} sign-in.`,
+        }));
+      });
   }
 
   const verb = mode === "sign-up" ? "Sign up" : "Continue";
