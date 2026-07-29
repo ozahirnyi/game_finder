@@ -1,28 +1,31 @@
 import { Link } from "@tanstack/react-router";
 import { Avatar, GameCover } from "@/components/GameCover";
-import { Chip, Panel, PresenceDot, SectionHeader, Stat } from "@/components/ui-bits";
-type Game = {
-  id: string;
-  title: string;
-  coverFrom?: string;
-  coverTo?: string;
-  playtime?: number;
-  source?: string;
-};
-import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2 } from "lucide-react";
+import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
+import { ConnectedServices } from "@/components/ConnectedServices";
+import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
 export type ProfileData = {
   name: string;
   handle: string;
   avatarFrom: string;
   avatarTo: string;
+  avatarUrl?: string;
   region: string;
   online?: boolean;
   bio?: string;
   compatibility?: number;
   hours: string | number;
   stores: { name: string; count: number; note: string }[];
-  games: Game[];
+  games: {
+    id: string;
+    title: string;
+    coverFrom: string;
+    coverTo: string;
+    coverUrl?: string;
+    playtime?: number | null;
+    source?: string;
+  }[];
   activity?: { id: number | string; text: string; time: string }[];
 };
 
@@ -38,6 +41,7 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
             from={profile.avatarFrom}
             to={profile.avatarTo}
             name={profile.name}
+            image={profile.avatarUrl}
             className="relative size-16 rounded-2xl"
           />
           {!isSelf && (
@@ -83,73 +87,71 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
         </div>
       </Panel>
 
+      <div className="mb-8 flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl border border-border bg-surface-2 px-5 py-4">
+        {[
+          { l: "Games", v: profile.games.length },
+          { l: "Steam", v: steam },
+          { l: "PlayStation", v: psn },
+          { l: "Hours", v: profile.hours },
+        ].map((s) => (
+          <div key={s.l} className="min-w-[72px]">
+            <p className="label-mono text-muted-foreground">{s.l}</p>
+            <p className="font-mono text-lg font-bold leading-tight">{s.v}</p>
+          </div>
+        ))}
+        {profile.bio && (
+          <p className="min-w-[200px] flex-1 text-sm text-muted-foreground">{profile.bio}</p>
+        )}
+      </div>
+
       <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <Panel className="p-6 lg:col-span-7">
-          <SectionHeader title="Overview" hint="Across connected stores" />
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Stat label="Games" value={profile.games.length} />
-            <Stat label="Steam" value={steam} />
-            <Stat label="PlayStation" value={psn} />
-            <Stat label="Hours" value={profile.hours} />
-          </div>
-          {profile.bio && <p className="mt-5 text-sm text-muted-foreground">{profile.bio}</p>}
-        </Panel>
-
-        <Panel className={isSelf ? "p-6 lg:col-span-7" : "p-6 lg:col-span-5"}>
-          <SectionHeader title="Connected stores" hint="Sources of the library" />
-          <div className="space-y-3">
-            {profile.stores.map((s) => (
-              <div
-                key={s.name}
-                className="hover-lift flex items-center justify-between rounded-xl border border-border bg-surface-2 p-4"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold">{s.name}</p>
-                  <p className="label-mono mt-1.5 text-muted-foreground">{s.note}</p>
-                </div>
-                <Chip tone="primary">{s.count} games</Chip>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
         {isSelf ? (
-          <Panel className="p-6 lg:col-span-5">
-            <SectionHeader title="Notifications" hint="What we ping you about" />
-            <div className="space-y-3">
-              {[
-                { label: "Price-drop alerts", value: "On · wishlist only" },
-                { label: "Friend activity", value: "On" },
-                { label: "Weekly deals digest", value: "Off" },
-              ].map((n) => (
-                <div
-                  key={n.label}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3"
-                >
-                  <span className="text-sm font-semibold">{n.label}</span>
-                  <span className="label-mono text-muted-foreground">{n.value}</span>
-                </div>
-              ))}
+          <>
+            <NotificationsPanel className="lg:col-span-7" />
+
+            <div className="lg:col-span-5">
+              <ConnectedServices />
             </div>
-          </Panel>
+          </>
         ) : (
-          profile.activity &&
-          profile.activity.length > 0 && (
-            <Panel className="p-6 lg:col-span-7">
-              <SectionHeader title="Recent activity" />
+          <>
+            <Panel className="p-6 lg:col-span-5">
+              <SectionHeader title="Connected stores" hint="Sources of the library" />
               <div className="space-y-3">
-                {profile.activity.map((a) => (
+                {profile.stores.map((s) => (
                   <div
-                    key={a.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3"
+                    key={s.name}
+                    className="hover-lift flex items-center justify-between rounded-xl border border-border bg-surface-2 p-4"
                   >
-                    <span className="min-w-0 truncate text-sm">{a.text}</span>
-                    <span className="label-mono shrink-0 text-muted-foreground">{a.time}</span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">{s.name}</p>
+                      <p className="label-mono mt-1.5 text-muted-foreground">{s.note}</p>
+                    </div>
+                    <Chip tone="primary">{s.count} games</Chip>
                   </div>
                 ))}
               </div>
             </Panel>
-          )
+
+            <Panel className="p-6 lg:col-span-12">
+              <SectionHeader title="Recent activity" />
+              {profile.activity && profile.activity.length > 0 ? (
+                <div className="space-y-3">
+                  {profile.activity.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3"
+                    >
+                      <span className="min-w-0 truncate text-sm">{a.text}</span>
+                      <span className="label-mono shrink-0 text-muted-foreground">{a.time}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title="No recent activity" description="Nothing to show yet." />
+              )}
+            </Panel>
+          </>
         )}
 
         <Panel className="p-6 lg:col-span-12">
@@ -157,30 +159,54 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
             title={isSelf ? "Your library" : "Their library"}
             hint={`${profile.games.length} games`}
           />
-          <div className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {profile.games.map((g) => (
-              <Link
-                key={g.id}
-                to="/games/$gameId"
-                params={{ gameId: g.id }}
-                className="hover-lift overflow-hidden rounded-xl border border-border bg-surface-2 hover:border-primary/40"
-              >
-                <GameCover
-                  from={g.coverFrom ?? "#c75f28"}
-                  to={g.coverTo ?? "#22243a"}
-                  title={g.title}
-                  className="aspect-video w-full"
-                />
-                <div className="p-3">
-                  <p className="truncate text-sm font-bold">{g.title}</p>
-                  <p className="label-mono mt-1.5 flex items-center gap-1.5 text-muted-foreground">
-                    <Gamepad2 className="size-3" />
-                    {g.playtime ? `${g.playtime}h` : (g.source ?? "Owned")}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
+          {profile.games.length === 0 ? (
+            <EmptyState
+              icon={<Library className="size-5" />}
+              title="No games yet"
+              description={
+                isSelf
+                  ? "Connect Steam or import your PlayStation library to fill this in."
+                  : "This player hasn't shared any games."
+              }
+              action={
+                isSelf ? (
+                  <Link
+                    to="/psn-import"
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+                  >
+                    Import PlayStation library
+                  </Link>
+                ) : undefined
+              }
+            />
+          ) : (
+            <div className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {profile.games.map((g) => (
+                <Link
+                  key={g.id}
+                  to="/games/$gameId"
+                  params={{ gameId: g.id }}
+                  className="hover-lift overflow-hidden rounded-xl border border-border bg-surface-2 hover:border-primary/40"
+                >
+                  <GameCover
+                    from={g.coverFrom}
+                    to={g.coverTo}
+                    title={g.title}
+                    image={g.coverUrl}
+                    bare
+                    className="aspect-video w-full"
+                  />
+                  <div className="p-3">
+                    <p className="truncate text-sm font-bold">{g.title}</p>
+                    <p className="label-mono mt-1.5 flex items-center gap-1.5 text-muted-foreground">
+                      <Gamepad2 className="size-3" />
+                      {g.playtime ? `${g.playtime}h` : (g.source ?? "Owned")}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </Panel>
       </div>
     </>

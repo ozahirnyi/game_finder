@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
-import { Chip, PriceBlock, SectionHeader } from "@/components/ui-bits";
+import { Chip, SectionHeader } from "@/components/ui-bits";
 import { getDeals } from "@/lib/api";
 import { Flame, Clock } from "lucide-react";
 
@@ -43,39 +43,40 @@ function DealsPage() {
             </div>
             <h3 className="text-4xl font-extrabold tracking-tight">{hero.name}</h3>
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
-              Live store pricing from the Playfinder catalogue.
+              Matches your wishlist and 3 friends already own it. Sale ends in 2 days.
             </p>
             <div className="mt-6 flex flex-wrap items-end gap-6">
               <div>
                 <p className="font-mono text-xs text-muted-foreground line-through">
-                  ${hero.current?.regular?.amount}
+                  {hero.current?.regular
+                    ? `${hero.current.regular.currency} ${hero.current.regular.amount}`
+                    : "—"}
                 </p>
                 <p className="font-mono text-5xl font-black text-primary">
-                  ${hero.current?.price?.amount}
+                  {hero.current?.price
+                    ? `${hero.current.price.currency} ${hero.current.price.amount}`
+                    : "Price unavailable"}
                 </p>
               </div>
-              <Chip tone="primary">-{hero.current?.cut}%</Chip>
+              {hero.current?.cut != null && <Chip tone="primary">-{hero.current.cut}%</Chip>}
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="size-3.5" /> Live offer
+                <Clock className="size-3.5" /> Ends in 47:12:04
               </div>
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
-              {hero.id != null && (
-                <Link
-                  to="/games/$gameId"
-                  params={{ gameId: String(hero.id) }}
-                  className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                >
-                  View deal
-                </Link>
-              )}
+              <button className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">
+                View deal
+              </button>
+              <button className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-foreground/5">
+                Invite friends to buy together
+              </button>
             </div>
           </div>
           <GameCover
-            from="#c75f28"
-            to="#22243a"
-            image={hero.background_image}
+            from="#dc2626"
+            to="#111827"
             title={hero.name}
+            image={hero.background_image ?? undefined}
             className="aspect-video min-h-56 w-full rounded-2xl"
           />
         </div>
@@ -83,17 +84,15 @@ function DealsPage() {
 
       <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2">
         {deals.slice(1).map((g) => (
-          <Link
+          <div
             key={g.id}
-            to="/games/$gameId"
-            params={{ gameId: String(g.id) }}
             className="hover-lift group flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
           >
             <GameCover
-              from="#c75f28"
-              to="#22243a"
-              image={g.background_image}
+              from="#dc2626"
+              to="#111827"
               title={g.name}
+              image={g.background_image ?? undefined}
               compact
               className="size-24 shrink-0 rounded-xl"
             />
@@ -105,21 +104,21 @@ function DealsPage() {
                 {g.current?.shop ?? "Store offer"}
               </p>
               <div className="mt-2 flex items-center gap-2">
-                {(g.current?.shop ? [g.current.shop] : []).map((p) => (
-                  <Chip key={p}>{p}</Chip>
-                ))}
+                <Chip>{g.current?.shop ?? "Store"}</Chip>
               </div>
             </div>
             <div className="text-right">
-              <PriceBlock
-                price={g.current?.price?.amount}
-                originalPrice={g.current?.regular?.amount}
-                discount={g.current?.cut}
-                currency={g.current?.price?.currency}
-                store={g.current?.shop}
-              />
+              {g.current?.cut != null && <Chip tone="primary">-{g.current.cut}%</Chip>}
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground line-through">
+                {g.current?.regular
+                  ? `${g.current.regular.currency} ${g.current.regular.amount}`
+                  : "—"}
+              </p>
+              <p className="font-mono text-lg font-black text-primary">
+                {g.current?.price ? `${g.current.price.currency} ${g.current.price.amount}` : "—"}
+              </p>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
     </AppShell>

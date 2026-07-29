@@ -1,54 +1,134 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../lib/api";
-import { Panel, SectionHeader } from "./ui-bits";
+import { Panel, SectionHeader, EmptyState, Chip } from "@/components/ui-bits";
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/api";
+import { Bell, Gamepad2, Tag, Users, Settings2, Check } from "lucide-react";
 
-export function NotificationsPanel() {
-  const client = useQueryClient();
-  const notifications = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
-  const refresh = () => client.invalidateQueries({ queryKey: ["notifications"] });
-  const readOne = useMutation({ mutationFn: markNotificationRead, onSuccess: refresh });
-  const readAll = useMutation({ mutationFn: markAllNotificationsRead, onSuccess: refresh });
-  const items = notifications.data ?? [];
+const iconFor = {
+  invite: Gamepad2,
+  price: Tag,
+  friend: Users,
+  system: Bell,
+} as const;
+
+export function NotificationsPanel({ className = "" }: { className?: string }) {
+  const [showSettings, setShowSettings] = useState(false);
+  const [prefs, setPrefs] = useState([
+    { id: "price", label: "Price drops", enabled: true },
+    { id: "friends", label: "Friend activity", enabled: true },
+  ]);
+  const queryClient = useQueryClient();
+  const notificationsQuery = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
+  const markRead = useMutation({
+    mutationFn: markNotificationRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+  const markAllRead = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+  const notifications = notificationsQuery.data ?? [];
+
+  const unread = notifications.filter((n) => !n.read_at).length;
+
   return (
-    <Panel className="p-6 lg:col-span-5">
+    <Panel className={`p-6 ${className}`}>
       <SectionHeader
         title="Notifications"
-        hint="Price alerts, friends, and invitations"
+        hint={unread > 0 ? `${unread} unread` : "You're all caught up"}
         action={
-          items.some((item) => !item.read_at) ? (
-            <button className="text-xs font-bold text-primary" onClick={() => readAll.mutate()}>
-              Mark all read
+          <div className="flex items-center gap-2">
+            {unread > 0 && (
+              <button
+                onClick={() => markAllRead.mutate()}
+                className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted-foreground transition hover:text-foreground"
+              >
+                <Check className="mr-1 inline size-3.5" /> Mark all read
+              </button>
+            )}
+            <button
+              aria-label="Notification settings"
+              onClick={() => setShowSettings((s) => !s)}
+              className={`grid size-9 place-items-center rounded-lg border transition ${
+                showSettings
+                  ? "border-primary/60 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Settings2 className="size-4" />
             </button>
-          ) : undefined
+          </div>
         }
       />
-      <div className="space-y-3">
-        {notifications.isLoading && (
-          <p className="text-sm text-muted-foreground">Loading notifications…</p>
-        )}
-        {notifications.isError && (
-          <p className="text-sm text-destructive">Unable to load notifications.</p>
-        )}
-        {!notifications.isLoading && items.length === 0 && (
-          <p className="text-sm text-muted-foreground">No notifications yet.</p>
-        )}
-        {items.slice(0, 6).map((item) => (
-          <button
-            key={item.id}
-            className={`block w-full rounded-xl border border-border px-4 py-3 text-left ${item.read_at ? "bg-surface-2" : "bg-primary/5"}`}
-            onClick={() => !item.read_at && readOne.mutate(item.id)}
-          >
-            <span className="block text-sm font-semibold">
-              {String(item.payload.title ?? item.type.replaceAll("_", " "))}
-            </span>
-            {item.payload.message && (
-              <span className="mt-1 block text-xs text-muted-foreground">
-                {String(item.payload.message)}
+
+      {showSettings && (
+        <div className="pop-in mb-5 space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+          {prefs.map((p) => (
+            <button
+              key={p.id}
+              onClick={() =>
+                setPrefs((list) =>
+                  list.map((x) => (x.id === p.id ? { ...x, enabled: !x.enabled } : x)),
+                )
+              }
+              className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-foreground/5"
+            >
+              <span className="text-sm font-semibold">{p.label}</span>
+              <span
+                className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                  p.enabled ? "bg-primary" : "bg-foreground/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 size-4 rounded-full bg-background transition-all ${
+                    p.enabled ? "left-[1.125rem]" : "left-0.5"
+                  }`}
+                />
               </span>
-            )}
-          </button>
-        ))}
-      </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {notifications.length === 0 ? (
+        <EmptyState
+          icon={<Bell className="size-5" />}
+          title="No notifications yet"
+          description="Invites, price drops and friend activity will show up here."
+        />
+      ) : (
+        <div className="stagger space-y-2">
+          {notifications.map((n) => {
+            const Icon = iconFor[n.type as keyof typeof iconFor] ?? Bell;
+            const isUnread = !n.read_at;
+            return (
+              <div
+                key={n.id}
+                onClick={() => isUnread && markRead.mutate(n.id)}
+                className={`flex items-start gap-3 rounded-xl border p-3 transition ${
+                  isUnread ? "border-primary/30 bg-primary/5" : "border-border bg-surface-2"
+                }`}
+              >
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-muted-foreground">
+                  <Icon className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-bold">{n.type}</p>
+                    {isUnread && <Chip tone="primary">New</Chip>}
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {String(n.payload.message ?? "New Playfinder notification")}
+                  </p>
+                </div>
+                <span className="label-mono shrink-0 text-muted-foreground">
+                  {new Date(n.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </Panel>
   );
 }

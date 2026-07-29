@@ -1,10 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Home, Search, Library, Heart, Tag, Users, Palette } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
 import { Avatar } from "./GameCover";
-import { clearToken, getAuthSnapshot, getDeals, subscribeToAuthChanges } from "@/lib/api";
+import { getAuthSnapshot, getDeals, getProfile, subscribeToAuthChanges } from "@/lib/api";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -23,6 +23,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     queryKey: ["deals", "US", "sidebar"],
     queryFn: () => getDeals("US"),
   });
+  const deals = dealsQuery.data?.results ?? [];
+  const profileQuery = useQuery({
+    queryKey: ["profile", "shell"],
+    queryFn: getProfile,
+    enabled: signedIn,
+  });
+  const profile = profileQuery.data;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -67,31 +74,26 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="ember-glow grain relative overflow-hidden rounded-xl border border-border bg-surface-2 p-4">
             <p className="label-mono relative mb-1.5 text-primary">Live deals</p>
             <p className="relative text-xs text-muted-foreground">
-              {dealsQuery.data?.results.length ?? 0} price drops tracked · refreshed 4m ago
+              {deals.length} price drops tracked · refreshed 4m ago
             </p>
           </div>
 
-          {signedIn ? (
-            <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-              <Link to="/account" className="flex min-w-0 flex-1 items-center gap-3">
-                <Avatar
-                  from="#e85d3a"
-                  to="#7c2d12"
-                  name="Your account"
-                  className="size-9 shrink-0 rounded-full"
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">Your account</p>
-                  <p className="truncate text-xs text-muted-foreground">Manage profile</p>
-                </div>
-              </Link>
-              <button
-                onClick={clearToken}
-                className="text-xs font-bold text-muted-foreground hover:text-primary"
-              >
-                Sign out
-              </button>
-            </div>
+          {signedIn && profile ? (
+            <Link
+              to="/account"
+              className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:border-primary/50"
+            >
+              <Avatar
+                from="#e85d3a"
+                to="#7c2d12"
+                name={profile.display_name}
+                className="size-9 shrink-0 rounded-full"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{profile.display_name}</p>
+                <p className="truncate text-xs text-muted-foreground">@{account.handle}</p>
+              </div>
+            </Link>
           ) : (
             <div className="rounded-xl border border-border p-4">
               <p className="label-mono mb-2 text-muted-foreground">Your account</p>
@@ -134,12 +136,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Palette className="size-4" />
             </button>
-            {signedIn ? (
+            {signedIn && profile ? (
               <Link to="/account" aria-label="Your profile">
                 <Avatar
                   from="#e85d3a"
                   to="#7c2d12"
-                  name="Your account"
+                  name={profile.display_name}
                   className="size-9 rounded-full ring-1 ring-border"
                 />
               </Link>

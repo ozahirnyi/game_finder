@@ -101,7 +101,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch {
-      // Theme persistence is optional (for example, private browsing can block it).
+      // Theme persistence is optional (e.g. storage may be unavailable).
     }
   }, []);
 
@@ -120,7 +120,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(KEY, JSON.stringify({ mode, accentId: accent.id }));
     } catch {
-      // Theme persistence is optional (for example, private browsing can block it).
+      // Keep the selected theme for this session if storage is unavailable.
     }
   }, [mode, accent]);
 
