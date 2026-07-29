@@ -178,6 +178,7 @@ def public_user_response(user: User) -> PublicUserRead:
     return PublicUserRead(
         id=user.id,
         display_name=getattr(user, "display_name", None) or user.email.split("@", 1)[0],
+        steam_persona_name=getattr(user, "steam_persona_name", None),
         bio=getattr(user, "bio", None),
         avatar=getattr(user, "steam_avatar", None),
     )
