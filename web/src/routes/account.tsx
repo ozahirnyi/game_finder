@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView } from "@/components/ProfileView";
 import { ConnectedServices } from "@/components/ConnectedServices";
+import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { getLibrary, getProfile } from "@/lib/api";
 
 export const Route = createFileRoute("/account")({
@@ -71,6 +72,9 @@ function AccountPage() {
       />
       <div className="mt-6">
         <ConnectedServices />
+      </div>
+      <div className="mt-6">
+        <NotificationsPanel />
       </div>
     </AppShell>
   );
