@@ -110,7 +110,9 @@ function SearchPage() {
               game={{
                 gameId: String(g.id),
                 title: g.name,
-                coverUrl: g.background_image,
+                coverFrom: "#312e81",
+                coverTo: "#111827",
+                coverUrl: g.background_image ?? undefined,
                 genres: g.genres,
                 platforms: g.platforms,
               }}

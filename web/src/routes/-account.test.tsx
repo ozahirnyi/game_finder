@@ -29,7 +29,7 @@ const { getProfile, getLibraryOverview, profileView } = vi.hoisted(() => ({
       },
     ],
   }),
-  profileView: vi.fn(() => null),
+  profileView: vi.fn((_props: unknown) => null),
 }));
 
 vi.mock("@/lib/api", () => ({ getProfile, getLibraryOverview }));

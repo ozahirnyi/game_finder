@@ -45,7 +45,7 @@ describe("apiRequest", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(apiRequest("/games", { auth: true })).rejects.toMatchObject<ApiError>({
+    await expect(apiRequest("/games", { auth: true })).rejects.toMatchObject({
       status: 401,
     });
 
