@@ -99,9 +99,7 @@ function LibraryPage() {
                 </h4>
                 {g.source === "steam" && <Chip tone="primary">Steam</Chip>}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {g.source}
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{g.source}</p>
             </div>
             <div className="hidden text-right sm:block">
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
