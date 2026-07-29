@@ -59,12 +59,12 @@ function AccountPage() {
             {
               name: "Steam",
               count: owned.filter((g) => g.source === "steam").length,
-              note: "Synced 4m ago",
+              note: "Library source",
             },
             {
               name: "PlayStation",
               count: owned.filter((g) => g.source === "psn").length,
-              note: "Synced 1h ago",
+              note: "Imported library source",
             },
           ],
         }}
