@@ -437,14 +437,14 @@ async def library_overview_route(
     games: list[LibraryGameRead] = []
     seen: set[tuple[str, str]] = set()
     for game in list_games(db, current_user.id):
-        source = "psn" if game.source == "psn" else "manual"
+        source = game.source if game.source in {"steam", "psn"} else "manual"
         external_id = game.external_id or str(game.id)
         key = (source, external_id)
         if key not in seen:
             seen.add(key)
             games.append(LibraryGameRead(
                 id=str(game.id), source=source, external_id=game.external_id,
-                detail_game_id=str(game.id), title=game.title,
+                detail_game_id=(game.external_id if source == "steam" else str(game.id)), title=game.title,
                 cover_url=(
                     steam_library_cover_url(game.external_id, game.img_icon_url)
                     if game.source == "steam"

@@ -46,4 +46,33 @@ describe("GameCard", () => {
       "/games/42?title=Live+game",
     );
   });
+
+  it("opens the verified store URL when no internal catalog identity exists", async () => {
+    const rootRoute = createRootRoute({ component: Outlet });
+    const indexRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: () => (
+        <GameCard
+          game={{
+            title: "Unmatched deal",
+            coverFrom: "#111111",
+            coverTo: "#222222",
+            externalUrl: "https://store.steampowered.com/app/123/",
+          }}
+        />
+      ),
+    });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([indexRoute]),
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    });
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByRole("link", { name: /unmatched deal/i })).toHaveAttribute(
+      "href",
+      "https://store.steampowered.com/app/123/",
+    );
+  });
 });
