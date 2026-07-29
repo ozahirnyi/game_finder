@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView } from "@/components/ProfileView";
-import { getLibrary, getProfile } from "@/lib/api";
+import { getLibraryOverview, getProfile } from "@/lib/api";
 
 export const Route = createFileRoute("/account")({
   head: () => ({
@@ -25,11 +25,11 @@ export const Route = createFileRoute("/account")({
   component: AccountPage,
 });
 
-function AccountPage() {
+export function AccountPage() {
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
-  const libraryQuery = useQuery({ queryKey: ["library"], queryFn: getLibrary });
+  const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview });
   const profile = profileQuery.data;
-  const owned = libraryQuery.data ?? [];
+  const owned = libraryQuery.data?.games ?? [];
 
   return (
     <AppShell>
