@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
-import { getLibrary } from "@/lib/api";
+import { getLibraryOverview, type LibraryOverviewGame } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
-import { useState } from "react";
-import { Library as LibraryIcon, Gamepad2 } from "lucide-react";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -14,14 +14,10 @@ export const Route = createFileRoute("/library")({
       { title: "Library — Playfinder" },
       {
         name: "description",
-        content:
-          "Your synced library across storefronts: everything you own from Steam and PlayStation in one place.",
+        content: "Your synced library across storefronts: everything you own from Steam and PlayStation in one place.",
       },
       { property: "og:title", content: "Library — Playfinder" },
-      {
-        property: "og:description",
-        content: "All the games you own from Steam and PlayStation, in one library.",
-      },
+      { property: "og:description", content: "All the games you own from Steam and PlayStation, in one library." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -34,11 +30,10 @@ type Tab = (typeof tabs)[number];
 
 function LibraryPage() {
   const [tab, setTab] = useState<Tab>("All games");
-  const libraryQuery = useQuery({ queryKey: ["library"], queryFn: getLibrary });
-
-  const owned = libraryQuery.data ?? [];
-  const visible =
-    tab === "All games" ? owned : owned.filter((g) => librarySource(g.source) === tab);
+  const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview });
+  const owned = libraryQuery.data?.games ?? [];
+  const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
+  const visible = sourceForTab ? owned.filter((game) => game.source === sourceForTab) : owned;
 
   return (
     <AppShell>
@@ -46,119 +41,47 @@ function LibraryPage() {
         <SectionHeader title="Library" hint="Everything you own, across connected stores" />
         <div className="flex items-center gap-6 font-mono">
           {[
-            { l: "Games", v: owned.length },
-            { l: "Steam", v: owned.filter((g) => librarySource(g.source) === "Steam").length },
-            {
-              l: "PlayStation",
-              v: owned.filter((g) => librarySource(g.source) === "PlayStation").length,
-            },
-          ].map((s) => (
-            <div key={s.l}>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.l}</p>
-              <p className="text-xl font-bold">{s.v}</p>
+            { label: "Games", value: owned.length },
+            { label: "Steam", value: owned.filter((game) => game.source === "steam").length },
+            { label: "PlayStation", value: owned.filter((game) => game.source === "psn").length },
+          ].map((stat) => (
+            <div key={stat.label}>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{stat.label}</p>
+              <p className="text-xl font-bold">{stat.value}</p>
             </div>
           ))}
         </div>
       </div>
 
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-              t === tab
-                ? "bg-foreground/5 text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t}
+        {tabs.map((item) => (
+          <button key={item} onClick={() => setTab(item)} className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${item === tab ? "bg-foreground/5 text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            {item}
           </button>
         ))}
       </div>
 
-      {visible.length === 0 && (
+      {libraryQuery.isLoading && <p className="text-sm text-muted-foreground">Loading your library…</p>}
+      {!libraryQuery.isLoading && visible.length === 0 && (
         <EmptyState
           icon={<LibraryIcon className="size-5" />}
-          title={
-            tab === "Steam"
-              ? "Connect Steam to see your games"
-              : tab === "PlayStation"
-                ? "Import your PlayStation library"
-                : "Your library is empty"
-          }
-          description={
-            tab === "Steam"
-              ? "Link your Steam account and we'll sync everything you own automatically."
-              : tab === "PlayStation"
-                ? "Upload a PlayStation export and we'll match your games to the catalog."
-                : "Connect Steam or import PlayStation to fill your library."
-          }
-          action={
-            <>
-              {tab !== "PlayStation" && (
-                <Link
-                  to="/account"
-                  className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-                >
-                  Connect Steam
-                </Link>
-              )}
-              {tab !== "Steam" && (
-                <Link
-                  to="/psn-import"
-                  className="rounded-xl border border-border bg-surface px-4 py-2 text-sm font-bold"
-                >
-                  Import PlayStation
-                </Link>
-              )}
-            </>
-          }
+          title={tab === "Steam" ? "Connect Steam to see your games" : tab === "PlayStation" ? "Import your PlayStation library" : "Your library is empty"}
+          description={tab === "Steam" ? "Link your Steam account and we'll sync everything you own automatically." : tab === "PlayStation" ? "Upload a PlayStation export and we'll match your games to the catalog." : "Connect Steam or import PlayStation to fill your library."}
+          action={<>{tab !== "PlayStation" && <Link to="/account" className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Connect Steam</Link>}{tab !== "Steam" && <Link to="/psn-import" className="rounded-xl border border-border bg-surface px-4 py-2 text-sm font-bold">Import PlayStation</Link>}</>}
         />
       )}
-
-      {visible.length > 0 && (
-        <div key={tab} className="stagger space-y-3">
-          {visible.map((g) => (
-            <div
-              key={g.id}
-              className="hover-lift group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
-            >
-              <GameCover
-                from="#1d4ed8"
-                to="#111827"
-                title={g.title}
-                image={g.cover_url ?? undefined}
-                compact
-                bare
-                className="size-16 shrink-0 rounded-lg"
-              />
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="truncate font-bold transition-colors group-hover:text-primary">
-                    {g.title}
-                  </h4>
-                  <Chip tone="primary">Owned</Chip>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {g.notes || "Synced from your connected library"}
-                </p>
-              </div>
-              <div className="hidden text-right sm:block">
-                <p className="label-mono text-muted-foreground">Source</p>
-                <p className="text-sm font-bold">{librarySource(g.source)}</p>
-              </div>
-              <div className="text-right">
-                <p className="label-mono text-muted-foreground">Playtime</p>
-                <p className="flex items-center justify-end gap-1.5 font-mono text-sm font-bold">
-                  <Gamepad2 className="size-3.5 text-muted-foreground" />
-                  {libraryPlaytime(g.playtime_forever)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {visible.length > 0 && <div key={tab} className="stagger space-y-3">{visible.map((game) => <LibraryCard key={game.id} game={game} />)}</div>}
     </AppShell>
   );
+}
+
+function LibraryCard({ game }: { game: LibraryOverviewGame }) {
+  const contents = <>
+    <GameCover from="#1d4ed8" to="#111827" title={game.title} image={game.cover_url ?? undefined} compact bare className="size-16 shrink-0 rounded-lg" />
+    <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h4 className="truncate font-bold transition-colors group-hover:text-primary">{game.title}</h4><Chip tone="primary">Owned</Chip></div><p className="mt-1 text-xs text-muted-foreground">Synced from your connected library</p></div>
+    <div className="hidden text-right sm:block"><p className="label-mono text-muted-foreground">Source</p><p className="text-sm font-bold">{librarySource(game.source)}</p></div>
+    <div className="text-right"><p className="label-mono text-muted-foreground">Playtime</p><p className="flex items-center justify-end gap-1.5 font-mono text-sm font-bold"><Gamepad2 className="size-3.5 text-muted-foreground" />{libraryPlaytime(game.playtime_forever)}</p></div>
+  </>;
+  const className = "hover-lift group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]";
+  return game.detail_game_id ? <Link to="/games/$gameId" params={{ gameId: game.detail_game_id }} className={className}>{contents}</Link> : <div className={className}>{contents}</div>;
 }
