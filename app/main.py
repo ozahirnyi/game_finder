@@ -339,9 +339,9 @@ def public_library_game_response(game: Game) -> PublicLibraryGameRead:
 
 
 def steam_library_cover_url(appid: str | int | None, icon_hash: str | None) -> str | None:
-    if not appid or not icon_hash:
+    if not appid:
         return None
-    return f"https://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{icon_hash}.jpg"
+    return f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg"
 
 
 def public_collection_block(items: list[Favorite] | list[WishlistItem], empty_message: str) -> PublicDataBlock:
