@@ -86,10 +86,10 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
             </>
           ) : (
             <>
-              <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90">
+              <button disabled title="Invites are coming soon" className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground opacity-50">
                 <UserPlus className="size-4" /> Invite to play
               </button>
-              <button className="grid size-11 place-items-center rounded-xl border border-border transition hover:border-primary/50">
+              <button disabled aria-label="Messaging is coming soon" title="Messaging is coming soon" className="grid size-11 cursor-not-allowed place-items-center rounded-xl border border-border opacity-50">
                 <MessageCircle className="size-4" />
               </button>
             </>
