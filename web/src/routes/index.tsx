@@ -4,6 +4,7 @@ import { ArrowRight, Search, Tag, Users } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
+import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, Panel, PriceBlock, SectionHeader, Stat } from "@/components/ui-bits";
 import {
   getAuthSnapshot,
@@ -269,7 +270,14 @@ function FeaturedDeal({
 }) {
   return (
     <Panel interactive className="h-full">
-      <div className="aspect-[16/9] w-full bg-gradient-to-br from-primary/60 to-surface-2" />
+      <GameCover
+        from="#c75f28"
+        to="#22243a"
+        title={deal.name}
+        image={deal.background_image ?? undefined}
+        bare
+        className="aspect-[16/9] w-full"
+      />
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 pt-16">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Chip tone="solid">-{deal.current?.cut ?? 0}%</Chip>

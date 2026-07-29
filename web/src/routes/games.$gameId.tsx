@@ -89,8 +89,7 @@ export const Route = createFileRoute("/games/$gameId")({
   ),
 });
 
-function Sparkline() {
-  const priceHistory: { price: number; date: string }[] = [];
+function Sparkline({ priceHistory }: { priceHistory: { price: number; date: string }[] }) {
   const w = 320;
   const h = 60;
   const max = Math.max(...priceHistory.map((p) => p.price));
@@ -139,6 +138,12 @@ function GameDetail() {
   const owners: never[] = [];
   const similar: never[] = [];
   const priceUnavailable = game.price == null;
+  const priceHistory = (priceQuery.data?.deals ?? [])
+    .map((deal, index) => ({
+      price: deal?.price?.amount,
+      date: `Offer ${index + 1}`,
+    }))
+    .filter((point): point is { price: number; date: string } => typeof point.price === "number");
 
   return (
     <AppShell>
@@ -273,7 +278,7 @@ function GameDetail() {
                       align="left"
                     />
                   </div>
-                  <Sparkline />
+                  <Sparkline priceHistory={priceHistory} />
                   <div className="mt-3 flex justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                     {priceHistory.map((p) => (
                       <span key={p.date}>{p.date}</span>
