@@ -6,9 +6,9 @@ export const Route = createFileRoute("/auth/callback")({ component: AuthCallback
 
 function AuthCallback() {
   const navigate = Route.useNavigate();
-  const search = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
     const provider = search.get("provider");
     const exchangeCode = search.get("exchange_code");
     const providerError = search.get("error");
@@ -22,7 +22,7 @@ function AuthCallback() {
         return navigate({ to: "/account" });
       })
       .catch((reason) => setError(reason instanceof ApiError ? reason.message : "Sign-in failed."));
-  }, [navigate, search]);
+  }, [navigate]);
   return (
     <main className="grid min-h-screen place-items-center p-6">
       <p className={error ? "text-destructive" : "text-muted-foreground"}>
