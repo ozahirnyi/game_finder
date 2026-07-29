@@ -6,6 +6,8 @@ type Props = {
   title: string;
   /** Real cover art. Falls back to the gradient when missing or broken. */
   image?: string;
+  /** Optional alternate cover when the primary provider asset is unavailable. */
+  fallbackImage?: string;
   className?: string;
   compact?: boolean;
   /** Hide the large title — use when the surrounding card already shows it. */
@@ -17,19 +19,23 @@ export function GameCover({
   to,
   title,
   image,
+  fallbackImage,
   className = "",
   compact = false,
   bare = false,
 }: Props) {
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   useEffect(() => {
     setBroken(false);
     setLoaded(false);
-  }, [image]);
+    setUsingFallback(false);
+  }, [image, fallbackImage]);
 
-  const showImage = !!image && !broken;
+  const activeImage = usingFallback ? fallbackImage : image;
+  const showImage = !!activeImage && !broken;
 
   const initials = title
     .split(/\s|:/)
@@ -46,12 +52,19 @@ export function GameCover({
     >
       {showImage && (
         <img
-          src={image}
+          src={activeImage}
           alt={title}
           loading="lazy"
           decoding="async"
           onLoad={() => setLoaded(true)}
-          onError={() => setBroken(true)}
+          onError={() => {
+            if (!usingFallback && fallbackImage) {
+              setLoaded(false);
+              setUsingFallback(true);
+            } else {
+              setBroken(true);
+            }
+          }}
           className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${
             loaded ? "opacity-100" : "opacity-0"
           }`}
