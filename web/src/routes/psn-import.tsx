@@ -81,7 +81,14 @@ function PsnImportPage() {
   const [fileError, setFileError] = useState<string | null>(null);
   const [emptyPreview, setEmptyPreview] = useState(false);
   const client = useQueryClient();
-  const [rows, setRows] = useState<{ id: string; title: string; matched: boolean }[]>([]);
+  const [rows, setRows] = useState<
+    {
+      id: string;
+      title: string;
+      matched: boolean;
+      platform?: string;
+    }[]
+  >([]);
   const [selected, setSelected] = useState<string[]>([]);
   const preview = useMutation({
     mutationFn: previewPsnImport,
@@ -98,6 +105,7 @@ function PsnImportPage() {
     mutationFn: confirmPsnImport,
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["library"] });
+      client.invalidateQueries({ queryKey: ["library-overview"] });
       setStep("result");
     },
   });
@@ -141,7 +149,7 @@ function PsnImportPage() {
         {/* Step 1 — upload */}
         {step === "upload" && (
           <Panel className="p-6">
-            <SectionHeader title="Upload export" hint="CSV or JSON, up to 10 MB" />
+            <SectionHeader title="Upload export" hint="XLSX, CSV or JSON, up to 10 MB" />
             {phase === "error" ? (
               <ErrorState
                 title="We couldn't read that file"
@@ -171,13 +179,13 @@ function PsnImportPage() {
                 <input
                   ref={inputRef}
                   type="file"
-                  accept=".csv,.json"
+                  accept=".xlsx,.csv,.json"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    if (!/\.(csv|json)$/i.test(f.name)) {
-                      setFileError("Only .csv and .json exports are supported.");
+                    if (!/\.(xlsx|csv|json)$/i.test(f.name)) {
+                      setFileError("Only .xlsx, .csv and .json exports are supported.");
                       return;
                     }
                     parseFile(f);
@@ -190,7 +198,13 @@ function PsnImportPage() {
                 )}
                 <div className="mt-5 flex flex-wrap gap-2">
                   <button
-                    onClick={() => parseFile("psn-library.csv")}
+                    onClick={() =>
+                      parseFile(
+                        new File(["Game Name\nExample Game"], "psn-library.csv", {
+                          type: "text/csv",
+                        }),
+                      )
+                    }
                     className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:opacity-90"
                   >
                     Use sample export
@@ -198,7 +212,9 @@ function PsnImportPage() {
                   <button
                     onClick={() => {
                       setEmptyPreview(true);
-                      parseFile("empty-export.csv");
+                      parseFile(
+                        new File(["Game Name\n"], "empty-export.csv", { type: "text/csv" }),
+                      );
                     }}
                     className="rounded-xl border border-border px-4 py-2 text-sm font-bold transition hover:border-primary/50"
                   >

@@ -22,49 +22,271 @@ function Home() {
   const [region, setRegion] = useState("US");
   const [query, setQuery] = useState("");
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile, enabled: signedIn });
-  const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview, enabled: signedIn });
+  const libraryQuery = useQuery({
+    queryKey: ["library-overview"],
+    queryFn: getLibraryOverview,
+    enabled: signedIn,
+  });
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends, enabled: signedIn });
-  const searchQuery = useQuery({ queryKey: ["home-search", query], queryFn: () => searchGames(query), enabled: query.trim().length >= 2 });
+  const searchQuery = useQuery({
+    queryKey: ["home-search", query],
+    queryFn: () => searchGames(query),
+    enabled: query.trim().length >= 2,
+  });
   const dealsQuery = useQuery({ queryKey: ["deals", region], queryFn: () => getDeals(region) });
   const deals = dealsQuery.data?.results ?? [];
   const results = searchQuery.data?.results ?? [];
   const best = deals[0];
   const rest = deals.slice(1);
 
-  return <AppShell>
-    <section className="animate-reveal ember-glow grain sheen relative mb-8 overflow-hidden rounded-3xl border border-border bg-surface p-6 sm:p-10">
-      <p className="label-mono relative mb-3 text-primary">{signedIn ? "Tonight" : "Playfinder"}</p>
-      <h1 className="relative max-w-2xl text-[2.5rem] font-bold leading-[0.95] tracking-[-0.035em] text-balance sm:text-6xl">{signedIn ? "Play with friends tonight" : "Find your next game"}</h1>
-      <p className="relative mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
-        {signedIn ? `${profileQuery.data?.display_name ?? "Your dashboard"} · ${libraryQuery.data?.games.length ?? 0} games in your library · ${friendsQuery.data?.length ?? 0} friends connected` : "Search games, discover new favourites, and catch live price drops — before you even sign in."}
-      </p>
-      <form className="relative mt-7 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => event.preventDefault()}>
-        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border bg-background/70 px-5 py-4 backdrop-blur focus-within:border-primary/60">
-          <Search className="size-4 text-muted-foreground" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search games by title" className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+  return (
+    <AppShell>
+      <section className="animate-reveal ember-glow grain sheen relative mb-8 overflow-hidden rounded-3xl border border-border bg-surface p-6 sm:p-10">
+        <p className="label-mono relative mb-3 text-primary">
+          {signedIn ? "Tonight" : "Playfinder"}
+        </p>
+        <h1 className="relative max-w-2xl text-[2.5rem] font-bold leading-[0.95] tracking-[-0.035em] text-balance sm:text-6xl">
+          {signedIn ? "Play with friends tonight" : "Find your next game"}
+        </h1>
+        <p className="relative mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
+          {signedIn
+            ? `${profileQuery.data?.display_name ?? "Your dashboard"} · ${libraryQuery.data?.games.length ?? 0} games in your library · ${friendsQuery.data?.length ?? 0} friends connected`
+            : "Search games, discover new favourites, and catch live price drops — before you even sign in."}
+        </p>
+        <form
+          className="relative mt-7 flex flex-col gap-3 sm:flex-row"
+          onSubmit={(event) => event.preventDefault()}
+        >
+          <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border bg-background/70 px-5 py-4 backdrop-blur focus-within:border-primary/60">
+            <Search className="size-4 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search games by title"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <Link
+            to="/search"
+            className="grid shrink-0 place-items-center rounded-2xl bg-primary px-7 py-4 text-sm font-bold text-primary-foreground shadow-[0_14px_40px_-16px_var(--primary)] transition hover:opacity-90"
+          >
+            Search games
+          </Link>
+        </form>
+        {query.trim() !== "" && (
+          <div className="animate-pop relative mt-4 overflow-hidden rounded-2xl border border-border bg-background/80 backdrop-blur">
+            {results.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-muted-foreground">
+                No matches for “{query}”. Try a shorter title.
+              </p>
+            ) : (
+              results.map((game) => (
+                <Link
+                  key={game.id}
+                  to="/games/$gameId"
+                  params={{ gameId: String(game.id) }}
+                  className="flex items-center gap-3 border-b border-border px-4 py-3 text-sm font-semibold transition-colors last:border-b-0 hover:bg-surface-2"
+                >
+                  {game.name}
+                  <span className="ml-auto label-mono text-muted-foreground">View details</span>
+                </Link>
+              ))
+            )}
+          </div>
+        )}
+      </section>
+
+      {signedIn && (
+        <section className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2">
+          <Panel className="p-6">
+            <SectionHeader
+              title="Your library"
+              hint={libraryQuery.data?.steam_error ?? "Steam and PlayStation games"}
+            />
+            <p className="mt-3 text-sm text-muted-foreground">
+              {libraryQuery.data?.games.length
+                ? `${libraryQuery.data.games.length} games ready to explore.`
+                : "Sync Steam or import PlayStation games to fill your library."}
+            </p>
+            <Link
+              to="/library"
+              className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+            >
+              Open library
+            </Link>
+          </Panel>
+          <Panel className="p-6">
+            <SectionHeader title="Friends online" hint="Your gaming circle" />
+            <p className="mt-3 text-sm text-muted-foreground">
+              {friendsQuery.data?.length
+                ? `${friendsQuery.data.length} friends connected.`
+                : "Add friends to see shared games and activity."}
+            </p>
+            <Link
+              to="/friends"
+              className="mt-4 inline-flex rounded-lg border border-border px-4 py-2 text-sm font-bold"
+            >
+              Open friends
+            </Link>
+          </Panel>
+        </section>
+      )}
+
+      <section className="animate-reveal mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="label-mono mb-2 flex items-center gap-2 text-primary">
+            <Tag className="size-3" /> Live deals
+          </p>
+          <h2 className="text-3xl font-bold tracking-[-0.03em]">Price drops</h2>
         </div>
-        <Link to="/search" className="grid shrink-0 place-items-center rounded-2xl bg-primary px-7 py-4 text-sm font-bold text-primary-foreground shadow-[0_14px_40px_-16px_var(--primary)] transition hover:opacity-90">Search games</Link>
-      </form>
-      {query.trim() !== "" && <div className="animate-pop relative mt-4 overflow-hidden rounded-2xl border border-border bg-background/80 backdrop-blur">
-        {results.length === 0 ? <p className="px-5 py-6 text-sm text-muted-foreground">No matches for “{query}”. Try a shorter title.</p> : results.map((game) => <Link key={game.id} to="/games/$gameId" params={{ gameId: String(game.id) }} className="flex items-center gap-3 border-b border-border px-4 py-3 text-sm font-semibold transition-colors last:border-b-0 hover:bg-surface-2">{game.name}<span className="ml-auto label-mono text-muted-foreground">View details</span></Link>)}
-      </div>}
-    </section>
-
-    {signedIn && <section className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2">
-      <Panel className="p-6"><SectionHeader title="Your library" hint={libraryQuery.data?.steam_error ?? "Steam and PlayStation games"} /><p className="mt-3 text-sm text-muted-foreground">{libraryQuery.data?.games.length ? `${libraryQuery.data.games.length} games ready to explore.` : "Sync Steam or import PlayStation games to fill your library."}</p><Link to="/library" className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Open library</Link></Panel>
-      <Panel className="p-6"><SectionHeader title="Friends online" hint="Your gaming circle" /><p className="mt-3 text-sm text-muted-foreground">{friendsQuery.data?.length ? `${friendsQuery.data.length} friends connected.` : "Add friends to see shared games and activity."}</p><Link to="/friends" className="mt-4 inline-flex rounded-lg border border-border px-4 py-2 text-sm font-bold">Open friends</Link></Panel>
-    </section>}
-
-    <section className="animate-reveal mb-6 flex flex-wrap items-end justify-between gap-4"><div><p className="label-mono mb-2 flex items-center gap-2 text-primary"><Tag className="size-3" /> Live deals</p><h2 className="text-3xl font-bold tracking-[-0.03em]">Price drops</h2></div><div className="flex items-center gap-2"><span className="label-mono text-muted-foreground">Region</span><select aria-label="Region" value={region} onChange={(event) => setRegion(event.target.value)} className="rounded-xl border border-border bg-surface px-3 py-2 text-sm font-semibold outline-none focus:border-primary/60">{["US", "UA", "GB", "EU"].map((item) => <option key={item} value={item}>{item}</option>)}</select></div></section>
-    {best && <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
-      <div className="animate-reveal group lg:col-span-7">{best.id != null ? <Link to="/games/$gameId" params={{ gameId: String(best.id) }} className="block h-full"><FeaturedDeal deal={best} /></Link> : <FeaturedDeal deal={best} />}</div>
-      <div className="animate-reveal flex flex-col gap-5 lg:col-span-5"><Panel className="ember-glow grain p-5"><div className="relative grid grid-cols-2 gap-4"><Stat label="Deals" value={deals.length} /><Stat label="Region" value={region} /></div></Panel><Panel className="flex-1 p-6"><div className="mb-4 flex items-center justify-between"><h3 className="flex items-center gap-2 text-lg font-bold"><Users className="size-4 text-primary" /> Friends online</h3><Link to="/friends" className="label-mono text-primary">All</Link></div>{signedIn ? <p className="text-sm text-muted-foreground">{friendsQuery.data?.length ? `${friendsQuery.data.length} friends are connected.` : "Add friends to see shared games and activity."}</p> : <EmptyState title="Sign in to see friends" description="Your friends and their activity appear here." />}</Panel></div>
-      {rest.map((deal, index) => <div key={deal.id ?? deal.name} className="animate-reveal lg:col-span-3" style={{ animationDelay: `${60 + index * 40}ms` }}><GameCard game={{ gameId: deal.id == null ? undefined : String(deal.id), title: deal.name, coverUrl: deal.background_image, price: deal.current?.price?.amount, originalPrice: deal.current?.regular?.amount, discount: deal.current?.cut, currency: deal.current?.price?.currency, store: deal.current?.shop }} /></div>)}
-      {!signedIn && <div className="animate-reveal lg:col-span-12"><Panel className="ember-glow grain flex flex-col items-start justify-between gap-5 p-6 sm:flex-row sm:items-center"><div className="relative"><h3 className="text-xl font-bold tracking-tight">Save games and get price-drop alerts</h3><p className="mt-1.5 text-sm text-muted-foreground">Browsing is free. An account adds wishlist alerts, your library, and friends.</p></div><div className="relative flex shrink-0 flex-wrap gap-2"><Link to="/sign-in" className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground transition hover:border-primary/50 hover:text-foreground">Sign in</Link><Link to="/sign-up" className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90">Create account <ArrowRight className="size-3.5" /></Link></div></Panel></div>}
-    </div>}
-  </AppShell>;
+        <div className="flex items-center gap-2">
+          <span className="label-mono text-muted-foreground">Region</span>
+          <select
+            aria-label="Region"
+            value={region}
+            onChange={(event) => setRegion(event.target.value)}
+            className="rounded-xl border border-border bg-surface px-3 py-2 text-sm font-semibold outline-none focus:border-primary/60"
+          >
+            {["US", "UA", "GB", "EU"].map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+      {best && (
+        <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
+          <div className="animate-reveal group lg:col-span-7">
+            {best.id != null ? (
+              <Link
+                to="/games/$gameId"
+                params={{ gameId: String(best.id) }}
+                className="block h-full"
+              >
+                <FeaturedDeal deal={best} />
+              </Link>
+            ) : (
+              <FeaturedDeal deal={best} />
+            )}
+          </div>
+          <div className="animate-reveal flex flex-col gap-5 lg:col-span-5">
+            <Panel className="ember-glow grain p-5">
+              <div className="relative grid grid-cols-2 gap-4">
+                <Stat label="Deals" value={deals.length} />
+                <Stat label="Region" value={region} />
+              </div>
+            </Panel>
+            <Panel className="flex-1 p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-lg font-bold">
+                  <Users className="size-4 text-primary" /> Friends online
+                </h3>
+                <Link to="/friends" className="label-mono text-primary">
+                  All
+                </Link>
+              </div>
+              {signedIn ? (
+                <p className="text-sm text-muted-foreground">
+                  {friendsQuery.data?.length
+                    ? `${friendsQuery.data.length} friends are connected.`
+                    : "Add friends to see shared games and activity."}
+                </p>
+              ) : (
+                <EmptyState
+                  title="Sign in to see friends"
+                  description="Your friends and their activity appear here."
+                />
+              )}
+            </Panel>
+          </div>
+          {rest.map((deal, index) => (
+            <div
+              key={deal.id ?? deal.name}
+              className="animate-reveal lg:col-span-3"
+              style={{ animationDelay: `${60 + index * 40}ms` }}
+            >
+              <GameCard
+                game={{
+                  gameId: deal.id == null ? undefined : String(deal.id),
+                  title: deal.name,
+                  coverUrl: deal.background_image ?? undefined,
+                  coverFrom: "#c75f28",
+                  coverTo: "#22243a",
+                  price: deal.current?.price?.amount ?? undefined,
+                  originalPrice: deal.current?.regular?.amount ?? undefined,
+                  discount: deal.current?.cut,
+                  currency: deal.current?.price?.currency ?? undefined,
+                  store: deal.current?.shop ?? undefined,
+                }}
+              />
+            </div>
+          ))}
+          {!signedIn && (
+            <div className="animate-reveal lg:col-span-12">
+              <Panel className="ember-glow grain flex flex-col items-start justify-between gap-5 p-6 sm:flex-row sm:items-center">
+                <div className="relative">
+                  <h3 className="text-xl font-bold tracking-tight">
+                    Save games and get price-drop alerts
+                  </h3>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    Browsing is free. An account adds wishlist alerts, your library, and friends.
+                  </p>
+                </div>
+                <div className="relative flex shrink-0 flex-wrap gap-2">
+                  <Link
+                    to="/sign-in"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    to="/sign-up"
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
+                  >
+                    Create account <ArrowRight className="size-3.5" />
+                  </Link>
+                </div>
+              </Panel>
+            </div>
+          )}
+        </div>
+      )}
+    </AppShell>
+  );
 }
 
-function FeaturedDeal({ deal }: { deal: NonNullable<ReturnType<typeof getDeals> extends Promise<infer Result> ? Result extends { results: (infer Deal)[] } ? Deal : never : never> }) {
-  return <Panel interactive className="h-full"><div className="aspect-[16/9] w-full bg-gradient-to-br from-primary/60 to-surface-2" /><div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 pt-16"><div className="mb-3 flex flex-wrap items-center gap-2"><Chip tone="solid">-{deal.current?.cut ?? 0}%</Chip><Chip tone="primary">{deal.current?.shop ?? "Store"}</Chip></div><h3 className="text-3xl font-bold tracking-tight">{deal.name}</h3><div className="mt-3"><PriceBlock price={deal.current?.price?.amount} originalPrice={deal.current?.regular?.amount} discount={deal.current?.cut} currency={deal.current?.price?.currency} store={deal.current?.shop} align="left" /></div></div></Panel>;
+function FeaturedDeal({
+  deal,
+}: {
+  deal: NonNullable<
+    ReturnType<typeof getDeals> extends Promise<infer Result>
+      ? Result extends { results: (infer Deal)[] }
+        ? Deal
+        : never
+      : never
+  >;
+}) {
+  return (
+    <Panel interactive className="h-full">
+      <div className="aspect-[16/9] w-full bg-gradient-to-br from-primary/60 to-surface-2" />
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 pt-16">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Chip tone="solid">-{deal.current?.cut ?? 0}%</Chip>
+          <Chip tone="primary">{deal.current?.shop ?? "Store"}</Chip>
+        </div>
+        <h3 className="text-3xl font-bold tracking-tight">{deal.name}</h3>
+        <div className="mt-3">
+          <PriceBlock
+            price={deal.current?.price?.amount}
+            originalPrice={deal.current?.regular?.amount}
+            discount={deal.current?.cut}
+            currency={deal.current?.price?.currency}
+            store={deal.current?.shop ?? undefined}
+            align="left"
+          />
+        </div>
+      </div>
+    </Panel>
+  );
 }

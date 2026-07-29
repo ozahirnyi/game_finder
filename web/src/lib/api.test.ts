@@ -121,7 +121,9 @@ describe("apiRequest", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/library/overview",
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer token" }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
     );
   });
 
