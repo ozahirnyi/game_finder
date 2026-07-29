@@ -14,4 +14,17 @@ describe("exactCatalogMatch", () => {
       ),
     ).toMatchObject({ id: 123 });
   });
+
+  it("accepts an official catalog subtitle but rejects similarly named games", () => {
+    expect(
+      exactCatalogMatch(
+        [
+          { id: 326292, name: "Fall Guys: Ultimate Knockout" },
+          { id: 915700, name: "Fall Guys 2.0" },
+          { id: 705384, name: "Fall Guys: Begger's Edition" },
+        ],
+        "Fall Guys",
+      ),
+    ).toMatchObject({ id: 326292 });
+  });
 });
