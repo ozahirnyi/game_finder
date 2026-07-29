@@ -45,7 +45,12 @@ function LibraryPage() {
               l: "PlayStation",
               v: owned.filter((g) => g.source === "psn").length,
             },
-            { l: "Hours", v: "2,140" },
+            {
+              l: "Hours",
+              v: Math.round(
+                owned.reduce((total, game) => total + (game.playtime_forever ?? 0), 0) / 60,
+              ),
+            },
           ].map((s) => (
             <div key={s.l}>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.l}</p>

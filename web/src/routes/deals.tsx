@@ -43,7 +43,7 @@ function DealsPage() {
             </div>
             <h3 className="text-4xl font-extrabold tracking-tight">{hero.name}</h3>
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
-              Matches your wishlist and 3 friends already own it. Sale ends in 2 days.
+              Live store pricing from the Playfinder catalogue.
             </p>
             <div className="mt-6 flex flex-wrap items-end gap-6">
               <div>
@@ -56,7 +56,7 @@ function DealsPage() {
               </div>
               <Chip tone="primary">-{hero.current?.cut}%</Chip>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="size-3.5" /> Ends in 47:12:04
+                <Clock className="size-3.5" /> Live offer
               </div>
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
