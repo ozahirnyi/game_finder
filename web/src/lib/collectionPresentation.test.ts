@@ -8,8 +8,9 @@ describe("collection presentation", () => {
     expect(librarySource("psn")).toBe("PlayStation");
   });
 
-  it("formats API playtime minutes without inventing a value", () => {
-    expect(libraryPlaytime(125)).toBe("2.1h");
+  it("formats API playtime as whole hours without decimals", () => {
+    expect(libraryPlaytime(125)).toBe("2h");
+    expect(libraryPlaytime(120630)).toBe("2010h");
     expect(libraryPlaytime(null)).toBe("—");
   });
 

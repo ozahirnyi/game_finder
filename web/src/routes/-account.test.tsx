@@ -57,7 +57,7 @@ describe("AccountPage", () => {
         expect.objectContaining({
           isSelf: true,
           profile: expect.objectContaining({
-            hours: 4,
+            hours: "4h",
             games: expect.arrayContaining([
               expect.objectContaining({ id: "steam:620", source: "steam", playtime: 3 }),
             ]),

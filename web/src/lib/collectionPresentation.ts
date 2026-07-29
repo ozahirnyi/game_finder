@@ -6,7 +6,7 @@ export function librarySource(source: string) {
 }
 
 export function libraryPlaytime(minutes: number | null | undefined) {
-  return minutes == null ? "—" : `${(minutes / 60).toFixed(1)}h`;
+  return minutes == null ? "—" : `${Math.floor(minutes / 60)}h`;
 }
 
 export function wishlistPriceLabel() {
