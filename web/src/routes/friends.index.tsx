@@ -137,10 +137,10 @@ function FriendsPage() {
                       </p>
                     </div>
                     <div className="flex flex-col gap-2" onClick={(e) => e.preventDefault()}>
-                      <button className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
+                      <button disabled title="Invites are coming soon" className="cursor-not-allowed rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground opacity-50">
                         Invite to play
                       </button>
-                      <button className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold">
+                      <button disabled title="Messaging is coming soon" className="cursor-not-allowed rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold opacity-50">
                         Message
                       </button>
                     </div>
@@ -235,10 +235,10 @@ function FriendsPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">
+                <button disabled title="Invites are coming soon" className="flex-1 cursor-not-allowed rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground opacity-50">
                   Invite to play
                 </button>
-                <button className="grid size-10 place-items-center rounded-lg border border-border">
+                <button disabled aria-label="Messaging is coming soon" title="Messaging is coming soon" className="grid size-10 cursor-not-allowed place-items-center rounded-lg border border-border opacity-50">
                   <MessageCircle className="size-4" />
                 </button>
               </div>
