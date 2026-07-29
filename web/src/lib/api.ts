@@ -98,6 +98,13 @@ export type PsnImportPreview = {
   message?: string | null;
 };
 export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
+export type Notification = {
+  id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  read_at?: string | null;
+  created_at: string;
+};
 
 export class ApiError extends Error {
   constructor(
@@ -297,4 +304,16 @@ export function removeWishlist(id: number) {
 
 export function getFriends() {
   return apiRequest<Friend[]>("/friends", { auth: true });
+}
+
+export function getNotifications() {
+  return apiRequest<Notification[]>("/notifications", { auth: true });
+}
+
+export function markNotificationRead(id: string) {
+  return apiRequest<Notification>(`/notifications/${id}/read`, { auth: true, method: "POST" });
+}
+
+export function markAllNotificationsRead() {
+  return apiRequest<void>("/notifications/read-all", { auth: true, method: "POST" });
 }
