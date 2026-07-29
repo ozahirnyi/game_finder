@@ -1,10 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Home, Search, Library, Heart, Tag, Users, Palette } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
 import { Avatar } from "./GameCover";
-import { clearToken, getAuthSnapshot, getDeals, subscribeToAuthChanges } from "@/lib/api";
+import { account, deals } from "@/lib/mockData";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -18,11 +17,7 @@ const nav = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [themeOpen, setThemeOpen] = useState(false);
-  const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
-  const dealsQuery = useQuery({
-    queryKey: ["deals", "US", "sidebar"],
-    queryFn: () => getDeals("US"),
-  });
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -39,7 +34,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <nav className="space-y-0.5">
           {nav.map((item) => {
-            const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+            const active =
+              item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
             return (
               <Link
@@ -57,6 +53,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Icon className="size-4 transition-transform duration-200 ease-[var(--ease-studio)] group-hover:scale-110" />
                 {item.label}
               </Link>
+
             );
           })}
         </nav>
@@ -67,31 +64,28 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="ember-glow grain relative overflow-hidden rounded-xl border border-border bg-surface-2 p-4">
             <p className="label-mono relative mb-1.5 text-primary">Live deals</p>
             <p className="relative text-xs text-muted-foreground">
-              {dealsQuery.data?.results.length ?? 0} price drops tracked · refreshed 4m ago
+              {deals.length} price drops tracked · refreshed 4m ago
             </p>
           </div>
 
-          {signedIn ? (
-            <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-              <Link to="/account" className="flex min-w-0 flex-1 items-center gap-3">
-                <Avatar
-                  from="#e85d3a"
-                  to="#7c2d12"
-                  name="Your account"
-                  className="size-9 shrink-0 rounded-full"
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">Your account</p>
-                  <p className="truncate text-xs text-muted-foreground">Manage profile</p>
-                </div>
-              </Link>
-              <button
-                onClick={clearToken}
-                className="text-xs font-bold text-muted-foreground hover:text-primary"
-              >
-                Sign out
-              </button>
-            </div>
+          {account.signedIn ? (
+            <Link
+              to="/account"
+              className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:border-primary/50"
+            >
+              <Avatar
+                from={account.avatarFrom}
+                to={account.avatarTo}
+                name={account.name}
+                className="size-9 shrink-0 rounded-full"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{account.name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  @{account.handle}
+                </p>
+              </div>
+            </Link>
           ) : (
             <div className="rounded-xl border border-border p-4">
               <p className="label-mono mb-2 text-muted-foreground">Your account</p>
@@ -129,17 +123,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-expanded={themeOpen}
               onClick={() => setThemeOpen((v) => !v)}
               className={`grid size-9 place-items-center rounded-md border transition ${
-                themeOpen ? "border-primary/60 text-primary" : "border-border text-muted-foreground"
+                themeOpen
+                  ? "border-primary/60 text-primary"
+                  : "border-border text-muted-foreground"
               }`}
             >
               <Palette className="size-4" />
             </button>
-            {signedIn ? (
+            {account.signedIn ? (
               <Link to="/account" aria-label="Your profile">
                 <Avatar
-                  from="#e85d3a"
-                  to="#7c2d12"
-                  name="Your account"
+                  from={account.avatarFrom}
+                  to={account.avatarTo}
+                  name={account.name}
                   className="size-9 rounded-full ring-1 ring-border"
                 />
               </Link>
@@ -160,6 +156,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       </header>
 
+
       <main className="lg:pl-64">
         <div
           key={pathname}
@@ -172,7 +169,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-surface/90 px-2 py-2 backdrop-blur lg:hidden">
         {nav.map((item) => {
-          const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+          const active =
+            item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
           const Icon = item.icon;
           return (
             <Link
@@ -194,6 +192,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {item.label}
               </span>
             </Link>
+
           );
         })}
       </nav>

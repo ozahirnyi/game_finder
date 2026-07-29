@@ -1,28 +1,22 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
-import { Chip, PriceBlock, SectionHeader } from "@/components/ui-bits";
-import { getDeals } from "@/lib/api";
+import { Chip, SectionHeader } from "@/components/ui-bits";
+import { games } from "@/lib/mockData";
 import { Flame, Clock } from "lucide-react";
 
 export const Route = createFileRoute("/deals")({
   head: () => ({
     meta: [
       { title: "Deals — Playfinder" },
-      {
-        name: "description",
-        content:
-          "Live discounts across storefronts, prioritized by your wishlist and friend overlap.",
-      },
+      { name: "description", content: "Live discounts across storefronts, prioritized by your wishlist and friend overlap." },
     ],
   }),
   component: DealsPage,
 });
 
 function DealsPage() {
-  const dealsQuery = useQuery({ queryKey: ["deals", "US"], queryFn: () => getDeals("US") });
-  const deals = dealsQuery.data?.results ?? [];
+  const deals = games.filter((g) => g.discount);
   const hero = deals[0];
 
   return (
@@ -41,41 +35,39 @@ function DealsPage() {
                 Deal of the day
               </span>
             </div>
-            <h3 className="text-4xl font-extrabold tracking-tight">{hero.name}</h3>
+            <h3 className="text-4xl font-extrabold tracking-tight">
+              {hero.title}
+            </h3>
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
-              Live store pricing from the Playfinder catalogue.
+              Matches your wishlist and 3 friends already own it. Sale ends in 2 days.
             </p>
             <div className="mt-6 flex flex-wrap items-end gap-6">
               <div>
                 <p className="font-mono text-xs text-muted-foreground line-through">
-                  ${hero.current?.regular?.amount}
+                  ${hero.originalPrice}
                 </p>
                 <p className="font-mono text-5xl font-black text-primary">
-                  ${hero.current?.price?.amount}
+                  ${hero.price}
                 </p>
               </div>
-              <Chip tone="primary">-{hero.current?.cut}%</Chip>
+              <Chip tone="primary">-{hero.discount}%</Chip>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="size-3.5" /> Live offer
+                <Clock className="size-3.5" /> Ends in 47:12:04
               </div>
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
-              {hero.id != null && (
-                <Link
-                  to="/games/$gameId"
-                  params={{ gameId: String(hero.id) }}
-                  className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground"
-                >
-                  View deal
-                </Link>
-              )}
+              <button className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">
+                View deal
+              </button>
+              <button className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-foreground/5">
+                Invite friends to buy together
+              </button>
             </div>
           </div>
           <GameCover
-            from="#c75f28"
-            to="#22243a"
-            image={hero.background_image}
-            title={hero.name}
+            from={hero.coverFrom}
+            to={hero.coverTo}
+            title={hero.title}
             className="aspect-video min-h-56 w-full rounded-2xl"
           />
         </div>
@@ -83,43 +75,38 @@ function DealsPage() {
 
       <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2">
         {deals.slice(1).map((g) => (
-          <Link
+          <div
             key={g.id}
-            to="/games/$gameId"
-            params={{ gameId: String(g.id) }}
             className="hover-lift group flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
           >
             <GameCover
-              from="#c75f28"
-              to="#22243a"
-              image={g.background_image}
-              title={g.name}
+              from={g.coverFrom}
+              to={g.coverTo}
+              title={g.title}
               compact
               className="size-24 shrink-0 rounded-xl"
             />
             <div className="min-w-0 flex-1">
-              <h4 className="truncate text-lg font-bold transition-colors group-hover:text-primary">
-                {g.name}
-              </h4>
+              <h4 className="truncate text-lg font-bold transition-colors group-hover:text-primary">{g.title}</h4>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {g.current?.shop ?? "Store offer"}
+                {g.genres.join(" · ")}
               </p>
               <div className="mt-2 flex items-center gap-2">
-                {(g.current?.shop ? [g.current.shop] : []).map((p) => (
+                {g.platforms.map((p) => (
                   <Chip key={p}>{p}</Chip>
                 ))}
               </div>
             </div>
             <div className="text-right">
-              <PriceBlock
-                price={g.current?.price?.amount}
-                originalPrice={g.current?.regular?.amount}
-                discount={g.current?.cut}
-                currency={g.current?.price?.currency}
-                store={g.current?.shop}
-              />
+              <Chip tone="primary">-{g.discount}%</Chip>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground line-through">
+                ${g.originalPrice}
+              </p>
+              <p className="font-mono text-lg font-black text-primary">
+                ${g.price}
+              </p>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
     </AppShell>

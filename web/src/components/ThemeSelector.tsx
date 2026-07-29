@@ -6,7 +6,9 @@ export function ThemeSelector({ compact = false }: { compact?: boolean }) {
 
   return (
     <div
-      className={`rounded-xl border border-border bg-surface-2 p-3 ${compact ? "" : "space-y-3"}`}
+      className={`rounded-xl border border-border bg-surface-2 p-3 ${
+        compact ? "" : "space-y-3"
+      }`}
     >
       <div className="flex items-center justify-between gap-3">
         <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -54,6 +56,7 @@ export function ThemeSelector({ compact = false }: { compact?: boolean }) {
             }}
           />
         ))}
+
       </div>
     </div>
   );
