@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { Avatar, GameCover } from "@/components/GameCover";
+import { GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
-import { Chip, EmptyState, Panel, PresenceDot, PriceBlock, Stat } from "@/components/ui-bits";
-import { deals, friends, games, regions } from "@/lib/mockData";
+import { Chip, EmptyState, Panel, PriceBlock, Stat } from "@/components/ui-bits";
+import { getDeals, getTrendingGames, searchGames } from "@/lib/api";
 import { Search, ArrowRight, Tag, Users } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -33,15 +34,13 @@ function Home() {
   const [region, setRegion] = useState<string>("US");
   const [query, setQuery] = useState("");
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return games.filter((g) => g.title.toLowerCase().includes(q)).slice(0, 4);
-  }, [query]);
-
-  const online = friends.filter((f) => f.online);
-  const best = deals[2];
-  const rest = deals.filter((d) => d.id !== best?.id);
+  const searchQuery = useQuery({ queryKey: ["home-search", query], queryFn: () => searchGames(query), enabled: query.trim().length >= 2 });
+  const dealsQuery = useQuery({ queryKey: ["deals", region], queryFn: () => getDeals(region) });
+  const trendingQuery = useQuery({ queryKey: ["trending-games"], queryFn: getTrendingGames });
+  const results = searchQuery.data?.results ?? [];
+  const deals = dealsQuery.data?.results ?? [];
+  const best = deals[0];
+  const rest = deals.slice(1);
 
   return (
     <AppShell>
@@ -89,23 +88,23 @@ function Home() {
                 <Link
                   key={g.id}
                   to="/games/$gameId"
-                  params={{ gameId: g.id }}
+                  params={{ gameId: String(g.id) }}
                   className="flex items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-b-0 hover:bg-surface-2"
                 >
                   <GameCover
                     from={g.coverFrom}
                     to={g.coverTo}
-                    title={g.title}
-                    image={g.coverUrl}
+                    title={g.name}
+                    image={g.background_image}
                     compact
                     bare
                     className="size-10 shrink-0 rounded-md"
                   />
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                    {g.title}
+                    {g.name}
                   </span>
                   <span className="label-mono text-muted-foreground">
-                    {g.price.toFixed(2)} {g.currency ?? "USD"}
+                    View details
                   </span>
                 </Link>
               ))
@@ -130,7 +129,7 @@ function Home() {
             onChange={(e) => setRegion(e.target.value)}
             className="rounded-xl border border-border bg-surface px-3 py-2 text-sm font-semibold outline-none focus:border-primary/60"
           >
-            {regions.map((r) => (
+            {["US", "UA", "GB", "EU"].map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>
@@ -143,8 +142,8 @@ function Home() {
         <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
           {/* Featured deal — internal link to the game page */}
           <div className="animate-reveal group lg:col-span-7">
-            {best.gameId ? (
-              <Link to="/games/$gameId" params={{ gameId: best.gameId }} className="block h-full">
+            {best.id != null ? (
+              <Link to="/games/$gameId" params={{ gameId: String(best.id) }} className="block h-full">
                 <FeaturedDeal deal={best} />
               </Link>
             ) : (
@@ -170,38 +169,7 @@ function Home() {
                   All
                 </Link>
               </div>
-              {online.length === 0 ? (
-                <EmptyState title="Nobody online" description="Your friends are offline right now." />
-              ) : (
-                <div className="space-y-1">
-                  {online.slice(0, 3).map((f) => (
-                    <Link
-                      key={f.id}
-                      to="/friends/$friendId"
-                      params={{ friendId: f.id }}
-                      className="flex items-center gap-3 rounded-xl border border-transparent p-2.5 transition-all duration-200 hover:translate-x-0.5 hover:border-border hover:bg-surface-2"
-                    >
-                      <div className="relative shrink-0">
-                        <Avatar
-                          from={f.avatarFrom}
-                          to={f.avatarTo}
-                          name={f.name}
-                          className="size-9 rounded-full"
-                        />
-                        <span className="absolute -bottom-0.5 -right-0.5">
-                          <PresenceDot online={f.online} />
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">{f.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {f.activity}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
+              <EmptyState title="Sign in to see friends" description="Your friends and their activity appear here." />
             </Panel>
           </div>
 
@@ -214,16 +182,9 @@ function Home() {
             >
               <GameCard
                 game={{
-                  gameId: d.gameId,
-                  title: d.title,
-                  coverUrl: d.coverUrl,
-                  coverFrom: d.coverFrom,
-                  coverTo: d.coverTo,
-                  price: d.price,
-                  originalPrice: d.originalPrice,
-                  discount: d.discount,
-                  currency: d.currency,
-                  store: d.store,
+                  gameId: d.id == null ? undefined : String(d.id), title: d.name, coverUrl: d.background_image,
+                  price: d.current?.price?.amount, originalPrice: d.current?.regular?.amount,
+                  discount: d.current?.cut, currency: d.current?.price?.currency, store: d.current?.shop,
                 }}
               />
             </div>
@@ -263,30 +224,30 @@ function Home() {
   );
 }
 
-function FeaturedDeal({ deal }: { deal: (typeof deals)[number] }) {
+function FeaturedDeal({ deal }: { deal: NonNullable<ReturnType<typeof getDeals> extends Promise<infer R> ? R extends { results: (infer D)[] } ? D : never : never> }) {
   return (
     <Panel interactive className="h-full">
       <GameCover
-        from={deal.coverFrom}
-        to={deal.coverTo}
-        title={deal.title}
-        image={deal.coverUrl}
+        from="#c75f28"
+        to="#22243a"
+        title={deal.name}
+        image={deal.background_image}
         bare
         className="aspect-[16/9] w-full transition-transform duration-500 ease-[var(--ease-studio)] group-hover:scale-[1.03]"
       />
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 pt-16">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Chip tone="solid">-{deal.discount}%</Chip>
-          <Chip tone="primary">{deal.store}</Chip>
+          <Chip tone="solid">-{deal.current?.cut ?? 0}%</Chip>
+          <Chip tone="primary">{deal.current?.shop ?? "Store"}</Chip>
         </div>
-        <h3 className="text-3xl font-bold tracking-tight">{deal.title}</h3>
+        <h3 className="text-3xl font-bold tracking-tight">{deal.name}</h3>
         <div className="mt-3">
           <PriceBlock
-            price={deal.price}
-            originalPrice={deal.originalPrice}
-            discount={deal.discount}
-            currency={deal.currency}
-            store={deal.store}
+            price={deal.current?.price?.amount}
+            originalPrice={deal.current?.regular?.amount}
+            discount={deal.current?.cut}
+            currency={deal.current?.price?.currency}
+            store={deal.current?.shop}
             align="left"
           />
         </div>
