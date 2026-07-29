@@ -2486,7 +2486,14 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
         async def attach_rawg_id(deal: dict):
             try:
                 rawg = await fetch_rawg_games(deal["name"], page=1)
-                match = next((game for game in rawg.get("results", []) if game.get("id")), None)
+                match = next(
+                    (
+                        game
+                        for game in rawg.get("results", [])
+                        if game.get("id") and game.get("name", "").casefold() == deal["name"].casefold()
+                    ),
+                    None,
+                )
             except RAWGError:
                 match = None
             return {

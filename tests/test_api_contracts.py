@@ -547,6 +547,27 @@ def test_homepage_deals_returns_steam_store_deals(monkeypatch):
     assert payload["results"][0]["background_image"].startswith("https://shared.akamai.steamstatic.com/")
 
 
+def test_homepage_deals_does_not_attach_a_different_rawg_game(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_steam_store_deals(**_kwargs):
+        return [{"name": "Company of Heroes 3: Final Stand", "url": "https://store.test/final-stand"}]
+
+    async def fake_fetch_rawg_games(_query: str, page: int):
+        assert page == 1
+        return {"results": [{"id": 635275, "name": "Company of Heroes 3 - Pre-Alpha Preview"}]}
+
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deals", fake_fetch_steam_store_deals)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+
+    response = client.get("/prices/deals?page_size=1")
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["id"] is None
+
+
 def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
