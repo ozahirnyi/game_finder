@@ -82,3 +82,42 @@ export function Panel({
     </div>
   );
 }
+
+export function PriceBlock({
+  price,
+  originalPrice,
+  discount,
+  currency = "USD",
+  store,
+  size = "md",
+}: {
+  price?: number | null;
+  originalPrice?: number | null;
+  discount?: number | null;
+  currency?: string;
+  store?: string | null;
+  size?: "sm" | "md";
+}) {
+  if (price == null) return <p className="text-sm text-muted-foreground">Price unavailable</p>;
+  const money = new Intl.NumberFormat(undefined, { style: "currency", currency });
+  return (
+    <div className="flex items-end justify-between gap-3">
+      <div>
+        {originalPrice != null && originalPrice > price && (
+          <p className="font-mono text-xs text-muted-foreground line-through">
+            {money.format(originalPrice)}
+          </p>
+        )}
+        <p
+          className={`font-mono font-black text-primary ${size === "sm" ? "text-lg" : "text-3xl"}`}
+        >
+          {money.format(price)}
+        </p>
+      </div>
+      <div className="text-right">
+        {discount != null && discount > 0 && <Chip tone="primary">-{discount}%</Chip>}
+        {store && <p className="mt-1 text-xs text-muted-foreground">{store}</p>}
+      </div>
+    </div>
+  );
+}
