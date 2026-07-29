@@ -34,7 +34,11 @@ function Home() {
   const [region, setRegion] = useState<string>("US");
   const [query, setQuery] = useState("");
 
-  const searchQuery = useQuery({ queryKey: ["home-search", query], queryFn: () => searchGames(query), enabled: query.trim().length >= 2 });
+  const searchQuery = useQuery({
+    queryKey: ["home-search", query],
+    queryFn: () => searchGames(query),
+    enabled: query.trim().length >= 2,
+  });
   const dealsQuery = useQuery({ queryKey: ["deals", region], queryFn: () => getDeals(region) });
   const trendingQuery = useQuery({ queryKey: ["trending-games"], queryFn: getTrendingGames });
   const results = searchQuery.data?.results ?? [];
@@ -51,8 +55,8 @@ function Home() {
           Find your next game
         </h1>
         <p className="relative mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
-          Search games, discover new favourites, and catch live price drops — before you
-          even sign in.
+          Search games, discover new favourites, and catch live price drops — before you even sign
+          in.
         </p>
 
         <form
@@ -100,12 +104,8 @@ function Home() {
                     bare
                     className="size-10 shrink-0 rounded-md"
                   />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                    {g.name}
-                  </span>
-                  <span className="label-mono text-muted-foreground">
-                    View details
-                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.name}</span>
+                  <span className="label-mono text-muted-foreground">View details</span>
                 </Link>
               ))
             )}
@@ -143,7 +143,11 @@ function Home() {
           {/* Featured deal — internal link to the game page */}
           <div className="animate-reveal group lg:col-span-7">
             {best.id != null ? (
-              <Link to="/games/$gameId" params={{ gameId: String(best.id) }} className="block h-full">
+              <Link
+                to="/games/$gameId"
+                params={{ gameId: String(best.id) }}
+                className="block h-full"
+              >
                 <FeaturedDeal deal={best} />
               </Link>
             ) : (
@@ -169,7 +173,10 @@ function Home() {
                   All
                 </Link>
               </div>
-              <EmptyState title="Sign in to see friends" description="Your friends and their activity appear here." />
+              <EmptyState
+                title="Sign in to see friends"
+                description="Your friends and their activity appear here."
+              />
             </Panel>
           </div>
 
@@ -182,9 +189,14 @@ function Home() {
             >
               <GameCard
                 game={{
-                  gameId: d.id == null ? undefined : String(d.id), title: d.name, coverUrl: d.background_image,
-                  price: d.current?.price?.amount, originalPrice: d.current?.regular?.amount,
-                  discount: d.current?.cut, currency: d.current?.price?.currency, store: d.current?.shop,
+                  gameId: d.id == null ? undefined : String(d.id),
+                  title: d.name,
+                  coverUrl: d.background_image,
+                  price: d.current?.price?.amount,
+                  originalPrice: d.current?.regular?.amount,
+                  discount: d.current?.cut,
+                  currency: d.current?.price?.currency,
+                  store: d.current?.shop,
                 }}
               />
             </div>
@@ -198,8 +210,7 @@ function Home() {
                   Save games and get price-drop alerts
                 </h3>
                 <p className="mt-1.5 text-sm text-muted-foreground">
-                  Browsing is free. An account adds wishlist alerts, your library, and
-                  friends.
+                  Browsing is free. An account adds wishlist alerts, your library, and friends.
                 </p>
               </div>
               <div className="relative flex shrink-0 flex-wrap gap-2">
@@ -224,7 +235,17 @@ function Home() {
   );
 }
 
-function FeaturedDeal({ deal }: { deal: NonNullable<ReturnType<typeof getDeals> extends Promise<infer R> ? R extends { results: (infer D)[] } ? D : never : never> }) {
+function FeaturedDeal({
+  deal,
+}: {
+  deal: NonNullable<
+    ReturnType<typeof getDeals> extends Promise<infer R>
+      ? R extends { results: (infer D)[] }
+        ? D
+        : never
+      : never
+  >;
+}) {
   return (
     <Panel interactive className="h-full">
       <GameCover

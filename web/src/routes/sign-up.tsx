@@ -39,7 +39,6 @@ function SignUpPage() {
         <Panel className="mt-8 p-6">
           <SocialAuthButtons mode="sign-up" />
           <form className="mt-5 space-y-4" onSubmit={(e) => e.preventDefault()}>
-
             <label className="block">
               <span className="label-mono mb-2 block text-muted-foreground">Username</span>
               <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3">

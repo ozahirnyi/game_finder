@@ -1,15 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { Avatar, GameCover } from "@/components/GameCover";
-import {
-  Chip,
-  EmptyState,
-  Panel,
-  PresenceDot,
-  SectionHeader,
-} from "@/components/ui-bits";
+import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { ConnectedServices } from "@/components/ConnectedServices";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
-import type { Game } from "@/lib/mockData";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
 export type ProfileData = {
@@ -24,17 +17,19 @@ export type ProfileData = {
   compatibility?: number;
   hours: string | number;
   stores: { name: string; count: number; note: string }[];
-  games: Game[];
+  games: {
+    id: string;
+    title: string;
+    coverFrom: string;
+    coverTo: string;
+    coverUrl?: string;
+    playtime?: number | null;
+    source?: string;
+  }[];
   activity?: { id: number | string; text: string; time: string }[];
 };
 
-export function ProfileView({
-  profile,
-  isSelf,
-}: {
-  profile: ProfileData;
-  isSelf: boolean;
-}) {
+export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf: boolean }) {
   const steam = profile.stores.find((s) => s.name === "Steam")?.count ?? 0;
   const psn = profile.stores.find((s) => s.name === "PlayStation")?.count ?? 0;
 
@@ -56,9 +51,7 @@ export function ProfileView({
           )}
         </div>
         <div className="relative min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-bold tracking-[-0.02em]">
-            {profile.name}
-          </h1>
+          <h1 className="truncate text-2xl font-bold tracking-[-0.02em]">{profile.name}</h1>
           <p className="truncate text-sm text-muted-foreground">@{profile.handle}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Chip tone="primary">Region · {profile.region}</Chip>
@@ -121,7 +114,6 @@ export function ProfileView({
             </div>
           </>
         ) : (
-
           <>
             <Panel className="p-6 lg:col-span-5">
               <SectionHeader title="Connected stores" hint="Sources of the library" />
@@ -151,9 +143,7 @@ export function ProfileView({
                       className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3"
                     >
                       <span className="min-w-0 truncate text-sm">{a.text}</span>
-                      <span className="label-mono shrink-0 text-muted-foreground">
-                        {a.time}
-                      </span>
+                      <span className="label-mono shrink-0 text-muted-foreground">{a.time}</span>
                     </div>
                   ))}
                 </div>

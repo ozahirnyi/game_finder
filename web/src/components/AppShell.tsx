@@ -19,11 +19,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [themeOpen, setThemeOpen] = useState(false);
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
-  const dealsQuery = useQuery({ queryKey: ["deals", "US", "sidebar"], queryFn: () => getDeals("US") });
+  const dealsQuery = useQuery({
+    queryKey: ["deals", "US", "sidebar"],
+    queryFn: () => getDeals("US"),
+  });
   const deals = dealsQuery.data?.results ?? [];
-  const profileQuery = useQuery({ queryKey: ["profile", "shell"], queryFn: getProfile, enabled: signedIn });
+  const profileQuery = useQuery({
+    queryKey: ["profile", "shell"],
+    queryFn: getProfile,
+    enabled: signedIn,
+  });
   const profile = profileQuery.data;
-
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -40,8 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <nav className="space-y-0.5">
           {nav.map((item) => {
-            const active =
-              item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+            const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
             return (
               <Link
@@ -59,7 +64,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Icon className="size-4 transition-transform duration-200 ease-[var(--ease-studio)] group-hover:scale-110" />
                 {item.label}
               </Link>
-
             );
           })}
         </nav>
@@ -87,9 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{profile.display_name}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  @{account.handle}
-                </p>
+                <p className="truncate text-xs text-muted-foreground">@{account.handle}</p>
               </div>
             </Link>
           ) : (
@@ -129,9 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-expanded={themeOpen}
               onClick={() => setThemeOpen((v) => !v)}
               className={`grid size-9 place-items-center rounded-md border transition ${
-                themeOpen
-                  ? "border-primary/60 text-primary"
-                  : "border-border text-muted-foreground"
+                themeOpen ? "border-primary/60 text-primary" : "border-border text-muted-foreground"
               }`}
             >
               <Palette className="size-4" />
@@ -162,7 +162,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       </header>
 
-
       <main className="lg:pl-64">
         <div
           key={pathname}
@@ -175,8 +174,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-surface/90 px-2 py-2 backdrop-blur lg:hidden">
         {nav.map((item) => {
-          const active =
-            item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+          const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
           const Icon = item.icon;
           return (
             <Link
@@ -198,7 +196,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {item.label}
               </span>
             </Link>
-
           );
         })}
       </nav>
