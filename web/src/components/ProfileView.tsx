@@ -59,6 +59,16 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
             {!isSelf && profile.compatibility != null && (
               <Chip tone="primary">{profile.compatibility}% compatible</Chip>
             )}
+            {!isSelf && (
+              <>
+                <Chip tone={steam > 0 ? "primary" : "outline"}>
+                  Steam {steam > 0 ? "connected" : "not connected"}
+                </Chip>
+                <Chip tone={psn > 0 ? "primary" : "outline"}>
+                  PSN {psn > 0 ? "connected" : "not connected"}
+                </Chip>
+              </>
+            )}
           </div>
         </div>
         <div className="relative flex shrink-0 gap-2">
@@ -115,24 +125,6 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
           </>
         ) : (
           <>
-            <Panel className="p-6 lg:col-span-5">
-              <SectionHeader title="Connected stores" hint="Sources of the library" />
-              <div className="space-y-3">
-                {profile.stores.map((s) => (
-                  <div
-                    key={s.name}
-                    className="hover-lift flex items-center justify-between rounded-xl border border-border bg-surface-2 p-4"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold">{s.name}</p>
-                      <p className="label-mono mt-1.5 text-muted-foreground">{s.note}</p>
-                    </div>
-                    <Chip tone="primary">{s.count} games</Chip>
-                  </div>
-                ))}
-              </div>
-            </Panel>
-
             <Panel className="p-6 lg:col-span-12">
               <SectionHeader title="Recent activity" />
               {profile.activity && profile.activity.length > 0 ? (
