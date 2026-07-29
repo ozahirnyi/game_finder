@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
@@ -10,7 +11,7 @@ import {
   PriceBlock,
   SectionHeader,
 } from "@/components/ui-bits";
-import { getCatalogGame } from "@/lib/api";
+import { addWishlist, getCatalogGame, getPriceHistory } from "@/lib/api";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
 export const Route = createFileRoute("/games/$gameId")({
@@ -114,7 +115,20 @@ function Sparkline() {
 }
 
 function GameDetail() {
-  const { game } = Route.useLoaderData();
+  const { game: catalogGame } = Route.useLoaderData();
+  const priceQuery = useQuery({ queryKey: ["price-history", catalogGame.id], queryFn: () => getPriceHistory(catalogGame.id) });
+  const queryClient = useQueryClient();
+  const wishlistMutation = useMutation({ mutationFn: addWishlist, onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }) });
+  const current = priceQuery.data?.current;
+  const game = {
+    ...catalogGame,
+    price: current?.price?.amount ?? null,
+    originalPrice: current?.regular?.amount ?? null,
+    discount: current?.cut ?? null,
+    currency: current?.price?.currency,
+    store: current?.shop ?? undefined,
+    storeUrl: current?.url ?? undefined,
+  };
 
   const owners: never[] = [];
   const similar: never[] = [];
@@ -305,7 +319,7 @@ function GameDetail() {
               unavailable={priceUnavailable}
             />
 
-            <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90">
+            <button onClick={() => wishlistMutation.mutate({ id: Number(game.id), name: game.title, background_image: game.coverUrl ?? null })} disabled={wishlistMutation.isPending} className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90">
               <Heart className="size-4" /> Add to wishlist
             </button>
 
