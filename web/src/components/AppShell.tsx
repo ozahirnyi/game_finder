@@ -91,7 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{profile.display_name}</p>
-                <p className="truncate text-xs text-muted-foreground">@{account.handle}</p>
+                <p className="truncate text-xs text-muted-foreground">Manage profile</p>
               </div>
             </Link>
           ) : (
