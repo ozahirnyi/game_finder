@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, SectionHeader } from "@/components/ui-bits";
-import { getLibrary } from "@/lib/api";
+import { getLibraryOverview } from "@/lib/api";
 import { useState } from "react";
 
 export const Route = createFileRoute("/library")({
@@ -24,8 +24,8 @@ const tabs = ["All games", "Steam", "PlayStation"] as const;
 
 function LibraryPage() {
   const [tab, setTab] = useState<(typeof tabs)[number]>("All games");
-  const libraryQuery = useQuery({ queryKey: ["library"], queryFn: getLibrary });
-  const owned = libraryQuery.data ?? [];
+  const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview });
+  const owned = libraryQuery.data?.games ?? [];
   const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
   const visible = sourceForTab ? owned.filter((g) => g.source === sourceForTab) : owned;
   return (
@@ -81,7 +81,7 @@ function LibraryPage() {
           <Link
             key={g.id}
             to="/games/$gameId"
-            params={{ gameId: g.id }}
+            params={{ gameId: g.detail_game_id ?? g.id }}
             className="hover-lift group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
           >
             <GameCover
@@ -97,10 +97,10 @@ function LibraryPage() {
                 <h4 className="truncate font-bold transition-colors group-hover:text-primary">
                   {g.title}
                 </h4>
-                {g.status === "Playing with Friends" && <Chip tone="primary">Squad · 3</Chip>}
+                {g.source === "steam" && <Chip tone="primary">Steam</Chip>}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {g.notes ?? "No description available"} · {g.source}
+                {g.source}
               </p>
             </div>
             <div className="hidden text-right sm:block">
