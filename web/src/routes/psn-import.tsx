@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import {
   Chip,
@@ -10,16 +11,8 @@ import {
   RowSkeletonList,
   SectionHeader,
 } from "@/components/ui-bits";
-import { psnImportPreview } from "@/lib/mockData";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  FileUp,
-  Loader2,
-  RotateCcw,
-  Upload,
-} from "lucide-react";
+import { confirmPsnImport, previewPsnImport } from "@/lib/api";
+import { ArrowLeft, ArrowRight, Check, FileUp, Loader2, RotateCcw, Upload } from "lucide-react";
 
 export const Route = createFileRoute("/psn-import")({
   head: () => ({
@@ -73,9 +66,7 @@ function Stepper({ current }: { current: Step }) {
               {done ? <Check className="size-3" /> : <span>{i + 1}</span>}
               {s.label}
             </span>
-            {i < steps.length - 1 && (
-              <span className="h-px w-4 bg-border sm:w-8" aria-hidden />
-            )}
+            {i < steps.length - 1 && <span className="h-px w-4 bg-border sm:w-8" aria-hidden />}
           </li>
         );
       })}
@@ -89,21 +80,21 @@ function PsnImportPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [emptyPreview, setEmptyPreview] = useState(false);
-  const [selected, setSelected] = useState<string[]>(
-    psnImportPreview.filter((g) => g.matched).map((g) => g.id),
-  );
+  const client = useQueryClient();
+  const [rows, setRows] = useState<{ id: string; title: string; matched: boolean }[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const preview = useMutation({ mutationFn: previewPsnImport, onSuccess: (data) => { const next = data.games.map((title) => ({ id: title, title, matched: true })); setRows(next); setSelected(next.map((game) => game.id)); setPhase("idle"); setStep("preview"); }, onError: () => setPhase("error") });
+  const confirm = useMutation({ mutationFn: confirmPsnImport, onSuccess: () => { client.invalidateQueries({ queryKey: ["library"] }); setStep("result"); } });
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const rows = emptyPreview ? [] : psnImportPreview;
+  const visibleRows = emptyPreview ? [] : rows;
 
-  function parseFile(name: string) {
+  function parseFile(file: File) {
+    const name = file.name;
     setFileName(name);
     setFileError(null);
     setPhase("loading");
-    window.setTimeout(() => {
-      setPhase("idle");
-      setStep("preview");
-    }, 900);
+    preview.mutate(file);
   }
 
   function toggle(id: string) {
@@ -123,8 +114,8 @@ function PsnImportPage() {
         <p className="label-mono mb-3 text-primary">PlayStation</p>
         <h1 className="text-4xl font-bold tracking-[-0.03em]">Import your library</h1>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          PlayStation has no public library API, so Playfinder imports from an export
-          file you download from your PlayStation account.
+          PlayStation has no public library API, so Playfinder imports from an export file you
+          download from your PlayStation account.
         </p>
 
         <div className="mt-8">
@@ -141,7 +132,7 @@ function PsnImportPage() {
                 description="The export looks corrupted or is in an unsupported format."
                 onRetry={() => setPhase("idle")}
               />
-            ) : phase === "loading" ? (
+            ) : phase === "loading" || confirm.isPending ? (
               <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-surface-2 py-14">
                 <Loader2 className="size-5 animate-spin text-primary" />
                 <p className="text-sm font-semibold">Reading {fileName}…</p>
@@ -173,7 +164,7 @@ function PsnImportPage() {
                       setFileError("Only .csv and .json exports are supported.");
                       return;
                     }
-                    parseFile(f.name);
+                    parseFile(f);
                   }}
                 />
                 {fileError && (
@@ -252,9 +243,7 @@ function PsnImportPage() {
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-bold">{g.title}</p>
-                        <p className="label-mono mt-1 text-muted-foreground">
-                          {g.platform}
-                        </p>
+                        <p className="label-mono mt-1 text-muted-foreground">{g.platform}</p>
                       </div>
                       {g.matched ? (
                         <Chip tone="primary">Matched</Chip>
@@ -313,9 +302,7 @@ function PsnImportPage() {
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                     <div>
                       <p className="label-mono text-muted-foreground">To import</p>
-                      <p className="mt-1.5 font-display text-2xl font-bold">
-                        {selected.length}
-                      </p>
+                      <p className="mt-1.5 font-display text-2xl font-bold">{selected.length}</p>
                     </div>
                     <div>
                       <p className="label-mono text-muted-foreground">Skipped</p>
@@ -325,9 +312,7 @@ function PsnImportPage() {
                     </div>
                     <div>
                       <p className="label-mono text-muted-foreground">Source</p>
-                      <p className="mt-1.5 truncate font-display text-2xl font-bold">
-                        PlayStation
-                      </p>
+                      <p className="mt-1.5 truncate font-display text-2xl font-bold">PlayStation</p>
                     </div>
                   </div>
                 </div>
@@ -339,13 +324,7 @@ function PsnImportPage() {
                     Back
                   </button>
                   <button
-                    onClick={() => {
-                      setPhase("loading");
-                      window.setTimeout(() => {
-                        setPhase("idle");
-                        setStep("result");
-                      }, 1000);
-                    }}
+                    onClick={() => confirm.mutate(selected)}
                     className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:opacity-90"
                   >
                     Import {selected.length} games
@@ -365,8 +344,8 @@ function PsnImportPage() {
               </span>
               <h2 className="mt-4 text-2xl font-bold tracking-tight">Import complete</h2>
               <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                {selected.length} PlayStation games were added to your library. You can
-                re-run the import any time to pick up new titles.
+                {selected.length} PlayStation games were added to your library. You can re-run the
+                import any time to pick up new titles.
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-2">
                 <Link
