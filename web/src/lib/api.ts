@@ -82,7 +82,13 @@ export type CollectionGame = {
 };
 
 export type Friend = {
-  user: { id: string; display_name: string; bio?: string | null; avatar?: string | null };
+  user: {
+    id: string;
+    display_name: string;
+    steam_persona_name?: string | null;
+    bio?: string | null;
+    avatar?: string | null;
+  };
 };
 
 export type Profile = {

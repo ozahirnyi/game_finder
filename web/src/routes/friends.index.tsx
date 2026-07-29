@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { getFriends } from "@/lib/api";
+import { friendDisplayName } from "@/lib/friendIdentity";
 import { Search, UserPlus, Gamepad2, MessageCircle, Users } from "lucide-react";
 
 export const Route = createFileRoute("/friends/")({
@@ -31,8 +32,8 @@ function FriendsPage() {
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
   const friends = (friendsQuery.data ?? []).map(({ user }) => ({
     id: user.id,
-    name: user.display_name,
-    handle: user.display_name,
+    name: friendDisplayName(user),
+    handle: friendDisplayName(user),
     avatarFrom: "#7c3aed",
     avatarTo: "#111827",
     avatarUrl: user.avatar ?? undefined,
