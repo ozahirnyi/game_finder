@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, Panel, PresenceDot, SectionHeader, Stat } from "@/components/ui-bits";
-import { ThemeSelector } from "@/components/ThemeSelector";
 type Game = {
   id: string;
   title: string;
@@ -95,12 +94,6 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
           </div>
           {profile.bio && <p className="mt-5 text-sm text-muted-foreground">{profile.bio}</p>}
         </Panel>
-
-        {isSelf && (
-          <div className="hidden lg:col-span-5 lg:block">
-            <ThemeSelector />
-          </div>
-        )}
 
         <Panel className={isSelf ? "p-6 lg:col-span-7" : "p-6 lg:col-span-5"}>
           <SectionHeader title="Connected stores" hint="Sources of the library" />

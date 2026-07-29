@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
-import { Chip, SectionHeader } from "@/components/ui-bits";
+import { Chip, PriceBlock, SectionHeader } from "@/components/ui-bits";
 import { getDeals } from "@/lib/api";
 import { Flame, Clock } from "lucide-react";
 
@@ -43,7 +43,7 @@ function DealsPage() {
             </div>
             <h3 className="text-4xl font-extrabold tracking-tight">{hero.name}</h3>
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
-              Matches your wishlist and 3 friends already own it. Sale ends in 2 days.
+              Live store pricing from the Playfinder catalogue.
             </p>
             <div className="mt-6 flex flex-wrap items-end gap-6">
               <div>
@@ -56,21 +56,25 @@ function DealsPage() {
               </div>
               <Chip tone="primary">-{hero.current?.cut}%</Chip>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="size-3.5" /> Ends in 47:12:04
+                <Clock className="size-3.5" /> Live offer
               </div>
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
-              <button className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">
-                View deal
-              </button>
-              <button className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-foreground/5">
-                Invite friends to buy together
-              </button>
+              {hero.id != null && (
+                <Link
+                  to="/games/$gameId"
+                  params={{ gameId: String(hero.id) }}
+                  className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                >
+                  View deal
+                </Link>
+              )}
             </div>
           </div>
           <GameCover
-            from={hero.coverFrom}
-            to={hero.coverTo}
+            from="#c75f28"
+            to="#22243a"
+            image={hero.background_image}
             title={hero.name}
             className="aspect-video min-h-56 w-full rounded-2xl"
           />
@@ -79,13 +83,16 @@ function DealsPage() {
 
       <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2">
         {deals.slice(1).map((g) => (
-          <div
+          <Link
             key={g.id}
+            to="/games/$gameId"
+            params={{ gameId: String(g.id) }}
             className="hover-lift group flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
           >
             <GameCover
-              from={g.coverFrom}
-              to={g.coverTo}
+              from="#c75f28"
+              to="#22243a"
+              image={g.background_image}
               title={g.name}
               compact
               className="size-24 shrink-0 rounded-xl"
@@ -104,15 +111,15 @@ function DealsPage() {
               </div>
             </div>
             <div className="text-right">
-              <Chip tone="primary">-{g.current?.cut}%</Chip>
-              <p className="mt-1 font-mono text-[10px] text-muted-foreground line-through">
-                ${g.current?.regular?.amount}
-              </p>
-              <p className="font-mono text-lg font-black text-primary">
-                ${g.current?.price?.amount}
-              </p>
+              <PriceBlock
+                price={g.current?.price?.amount}
+                originalPrice={g.current?.regular?.amount}
+                discount={g.current?.cut}
+                currency={g.current?.price?.currency}
+                store={g.current?.shop}
+              />
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </AppShell>

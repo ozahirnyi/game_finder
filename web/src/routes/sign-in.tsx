@@ -4,6 +4,8 @@ import { AppShell } from "@/components/AppShell";
 import { Panel } from "@/components/ui-bits";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 import { ApiError, loginUser, setToken } from "@/lib/api";
+import { getGoogleLoginUrl, getSteamSignInUrl } from "@/lib/api";
+import { SocialAuthButtons, type SocialProvider } from "@/components/SocialAuthButtons";
 
 export const Route = createFileRoute("/sign-in")({
   head: () => ({
@@ -32,6 +34,7 @@ function SignInPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [oauthPending, setOauthPending] = useState<SocialProvider | null>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,6 +53,18 @@ function SignInPage() {
     }
   }
 
+  async function startOAuth(provider: SocialProvider) {
+    setError(null);
+    setOauthPending(provider);
+    try {
+      const { url } = await (provider === "google" ? getGoogleLoginUrl() : getSteamSignInUrl());
+      window.location.assign(url);
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : "Unable to start sign-in.");
+      setOauthPending(null);
+    }
+  }
+
   return (
     <AppShell>
       <div className="mx-auto max-w-md py-6">
@@ -60,6 +75,7 @@ function SignInPage() {
         </p>
 
         <Panel className="mt-8 p-6">
+          <SocialAuthButtons pending={oauthPending} error={null} onStart={startOAuth} />
           <form className="space-y-4" onSubmit={submit}>
             <label className="block">
               <span className="label-mono mb-2 block text-muted-foreground">Email</span>

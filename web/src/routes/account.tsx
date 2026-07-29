@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView } from "@/components/ProfileView";
+import { ConnectedServices } from "@/components/ConnectedServices";
+import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { getLibrary, getProfile } from "@/lib/api";
 
 export const Route = createFileRoute("/account")({
@@ -58,16 +60,22 @@ function AccountPage() {
             {
               name: "Steam",
               count: owned.filter((g) => g.source === "steam").length,
-              note: "Synced 4m ago",
+              note: "Library source",
             },
             {
               name: "PlayStation",
               count: owned.filter((g) => g.source === "psn").length,
-              note: "Synced 1h ago",
+              note: "Imported library source",
             },
           ],
         }}
       />
+      <div className="mt-6">
+        <ConnectedServices />
+      </div>
+      <div className="mt-6">
+        <NotificationsPanel />
+      </div>
     </AppShell>
   );
 }

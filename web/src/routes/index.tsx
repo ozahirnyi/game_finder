@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Search, Tag } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { GameCover } from "@/components/GameCover";
-import { Chip, Panel, SectionHeader } from "@/components/ui-bits";
+import { GameCard } from "@/components/GameCard";
+import { SectionHeader } from "@/components/ui-bits";
 import { getDeals, getTrendingGames, searchGames } from "@/lib/api";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -48,52 +48,35 @@ function Home() {
       <SectionHeader title="Price drops" hint="Live store prices" />
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
         {deals.map((deal) => (
-          <a
+          <GameCard
             key={deal.id ?? deal.name}
-            href={deal.url ?? undefined}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Panel interactive className="h-full">
-              <GameCover
-                from="#c75f28"
-                to="#22243a"
-                title={deal.name}
-                bare
-                className="aspect-video w-full"
-              />
-              <div className="p-4">
-                <div className="mb-2 flex gap-2">
-                  <Chip tone="primary">
-                    <Tag className="mr-1 size-3" />
-                    {deal.current?.cut ? `-${deal.current.cut}%` : "Deal"}
-                  </Chip>
-                </div>
-                <h2 className="font-bold">{deal.name}</h2>
-                <p className="mt-2 font-mono text-primary">
-                  {deal.current?.price
-                    ? `${deal.current.price.amount} ${deal.current.price.currency}`
-                    : "View offer"}
-                </p>
-              </div>
-            </Panel>
-          </a>
+            aspect="aspect-video"
+            game={{
+              gameId: deal.id == null ? undefined : String(deal.id),
+              title: deal.name,
+              coverUrl: deal.background_image,
+              price: deal.current?.price?.amount,
+              originalPrice: deal.current?.regular?.amount,
+              discount: deal.current?.cut,
+              currency: deal.current?.price?.currency,
+              store: deal.current?.shop,
+            }}
+          />
         ))}
       </div>
       <SectionHeader title="Trending" hint="Live catalogue" />
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {(trendingQuery.data?.results ?? []).map((game) => (
-          <Link key={game.id} to="/games/$gameId" params={{ gameId: String(game.id) }}>
-            <Panel interactive>
-              <GameCover
-                from="#c75f28"
-                to="#22243a"
-                title={game.name}
-                className="aspect-[3/4] w-full"
-              />
-              <p className="p-3 text-sm font-bold">{game.name}</p>
-            </Panel>
-          </Link>
+          <GameCard
+            key={game.id}
+            game={{
+              gameId: String(game.id),
+              title: game.name,
+              coverUrl: game.background_image,
+              genres: game.genres,
+              platforms: game.platforms,
+            }}
+          />
         ))}
       </div>
     </AppShell>

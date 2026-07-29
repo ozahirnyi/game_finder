@@ -103,6 +103,7 @@ function SearchPage() {
               <GameCover
                 from="#c75f28"
                 to="#22243a"
+                image={g.background_image}
                 title={g.name}
                 className="aspect-[3/4] w-full"
               />
