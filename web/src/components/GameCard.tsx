@@ -87,7 +87,7 @@ export function GameCard({
   }
 
   return (
-    <Link to="/games/$gameId" params={{ gameId: game.gameId }} className={className}>
+    <Link to="/games/$gameId" params={{ gameId: game.gameId }} search={{ title: game.title }} className={className}>
       {inner}
     </Link>
   );

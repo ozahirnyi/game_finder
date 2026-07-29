@@ -43,7 +43,7 @@ describe("GameCard", () => {
 
     expect(await screen.findByRole("link", { name: /live game/i })).toHaveAttribute(
       "href",
-      "/games/42",
+      "/games/42?title=Live+game",
     );
   });
 });

@@ -86,6 +86,7 @@ function Home() {
                   key={game.id}
                   to="/games/$gameId"
                   params={{ gameId: String(game.id) }}
+                  search={{ title: game.name }}
                   className="flex items-center gap-3 border-b border-border px-4 py-3 text-sm font-semibold transition-colors last:border-b-0 hover:bg-surface-2"
                 >
                   {game.name}
@@ -163,6 +164,7 @@ function Home() {
               <Link
                 to="/games/$gameId"
                 params={{ gameId: String(best.id) }}
+                search={{ title: best.name }}
                 className="block h-full"
               >
                 <FeaturedDeal deal={best} />

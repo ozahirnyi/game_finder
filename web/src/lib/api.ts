@@ -108,6 +108,13 @@ export type SteamAccount = {
   avatar?: string | null;
   linked_at?: string | null;
 };
+export type TelegramAccount = {
+  linked: boolean;
+  configured: boolean;
+  username?: string | null;
+  linked_at?: string | null;
+};
+export type TelegramLink = { configured: boolean; url?: string | null; message?: string | null };
 export type SteamLibrarySync = SteamAccount & {
   games?: LibraryGame[];
   synced_at?: string | null;
@@ -254,6 +261,18 @@ export function syncSteamLibrary() {
 
 export function unlinkSteamAccount() {
   return apiRequest<SteamAccount>("/steam/me", { auth: true, method: "DELETE" });
+}
+
+export function getTelegramAccount() {
+  return apiRequest<TelegramAccount>("/telegram/me", { auth: true });
+}
+
+export function getTelegramLinkUrl() {
+  return apiRequest<TelegramLink>("/telegram/link-url", { auth: true, method: "POST" });
+}
+
+export function unlinkTelegramAccount() {
+  return apiRequest<TelegramAccount>("/telegram/me", { auth: true, method: "DELETE" });
 }
 
 export function previewPsnImport(file: File) {
