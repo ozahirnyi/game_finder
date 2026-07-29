@@ -3,8 +3,10 @@ import { GameCover } from "@/components/GameCover";
 import { Chip, PriceBlock } from "@/components/ui-bits";
 
 export type GameCardData = {
-  /** Internal catalog id — the card always links here, never to an external store. */
+  /** Confirmed internal catalog id. */
   gameId?: string;
+  /** Verified storefront URL for a deal without an internal catalog identity. */
+  externalUrl?: string;
   title: string;
   coverUrl?: string;
   coverFrom: string;
@@ -18,10 +20,7 @@ export type GameCardData = {
   store?: string;
 };
 
-/**
- * Canonical game card. Always navigates to the internal game page —
- * external storefront links live on the detail page only.
- */
+/** Canonical game card. It never guesses an internal game identity. */
 export function GameCard({
   game,
   aspect = "aspect-[16/9]",
@@ -83,11 +82,23 @@ export function GameCard({
     "hover-lift group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-surface transition hover:border-primary/40";
 
   if (!game.gameId) {
+    if (game.externalUrl) {
+      return (
+        <a href={game.externalUrl} target="_blank" rel="noreferrer" className={className}>
+          {inner}
+        </a>
+      );
+    }
     return <div className={className}>{inner}</div>;
   }
 
   return (
-    <Link to="/games/$gameId" params={{ gameId: game.gameId }} search={{ title: game.title }} className={className}>
+    <Link
+      to="/games/$gameId"
+      params={{ gameId: game.gameId }}
+      search={{ title: game.title }}
+      className={className}
+    >
       {inner}
     </Link>
   );

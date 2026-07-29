@@ -11,16 +11,47 @@ import {
   PriceBlock,
   SectionHeader,
 } from "@/components/ui-bits";
-import { addWishlist, getCatalogGame, getPriceHistory, searchGames } from "@/lib/api";
+import { addWishlist, getCatalogGame, getLibraryOverview, getPriceHistory, searchGames } from "@/lib/api";
 import { exactCatalogMatch } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
 export const Route = createFileRoute("/games/$gameId")({
-  validateSearch: (search: Record<string, unknown>): { title?: string } =>
-    typeof search.title === "string" ? { title: search.title } : {},
-  loaderDeps: ({ search }) => ({ title: search.title }),
+  validateSearch: (search: Record<string, unknown>): { title?: string; source?: "steam" } => ({
+    ...(typeof search.title === "string" ? { title: search.title } : {}),
+    ...(search.source === "steam" ? { source: "steam" } : {}),
+  }),
+  loaderDeps: ({ search }) => ({ title: search.title, source: search.source }),
   loader: async ({ params, deps }) => {
     try {
+      if (deps.source === "steam") {
+        const overview = await getLibraryOverview();
+        const steamGame = overview.games.find(
+          (game) => game.source === "steam" && game.external_id === params.gameId,
+        );
+        if (!steamGame?.external_id) throw new Error("Steam game is not in this library");
+        return {
+          game: {
+            id: steamGame.external_id,
+            title: steamGame.title,
+            coverFrom: "#1d4ed8",
+            coverTo: "#111827",
+            coverUrl: steamGame.cover_url ?? undefined,
+            genres: [],
+            platforms: ["PC"],
+            releaseDate: undefined,
+            rating: 0,
+            description: "This game is from your Steam library. Catalog details are unavailable.",
+            price: null,
+            originalPrice: null,
+            discount: null,
+            currency: undefined,
+            store: "Steam",
+            storeUrl: `https://store.steampowered.com/app/${steamGame.external_id}/`,
+            coop: false,
+            isSteamLibrary: true,
+          },
+        };
+      }
       let catalog;
       try {
         catalog = await getCatalogGame(params.gameId);
@@ -53,6 +84,7 @@ export const Route = createFileRoute("/games/$gameId")({
           store: undefined,
           storeUrl: undefined,
           coop: false,
+          isSteamLibrary: false,
         },
       };
     } catch {
@@ -134,6 +166,7 @@ function GameDetail() {
   const priceQuery = useQuery({
     queryKey: ["price-history", catalogGame.id],
     queryFn: () => getPriceHistory(catalogGame.id),
+    enabled: !catalogGame.isSteamLibrary,
   });
   const queryClient = useQueryClient();
   const wishlistMutation = useMutation({
@@ -147,8 +180,8 @@ function GameDetail() {
     originalPrice: current?.regular?.amount ?? null,
     discount: current?.cut ?? null,
     currency: current?.price?.currency,
-    store: current?.shop ?? undefined,
-    storeUrl: current?.url ?? undefined,
+    store: current?.shop ?? catalogGame.store,
+    storeUrl: current?.url ?? catalogGame.storeUrl,
   };
 
   const owners: Array<{ id: string; avatarFrom: string; avatarTo: string; name: string; online: boolean; activity?: string }> = [];
@@ -346,19 +379,21 @@ function GameDetail() {
               unavailable={priceUnavailable}
             />
 
-            <button
-              onClick={() =>
-                wishlistMutation.mutate({
-                  id: Number(game.id),
-                  name: game.title,
-                  background_image: game.coverUrl ?? null,
-                })
-              }
-              disabled={wishlistMutation.isPending}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
-            >
-              <Heart className="size-4" /> Add to wishlist
-            </button>
+            {!catalogGame.isSteamLibrary && (
+              <button
+                onClick={() =>
+                  wishlistMutation.mutate({
+                    id: Number(game.id),
+                    name: game.title,
+                    background_image: game.coverUrl ?? null,
+                  })
+                }
+                disabled={wishlistMutation.isPending}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
+              >
+                <Heart className="size-4" /> Add to wishlist
+              </button>
+            )}
 
             {/* External action — deliberately separated from the card/CTA above */}
             <div className="mt-4 border-t border-border pt-4">

@@ -1320,6 +1320,34 @@ def test_steam_library_cover_url_uses_the_steam_cdn():
     )
 
 
+def test_library_overview_preserves_stored_steam_app_identity(monkeypatch):
+    user = SimpleNamespace(id=uuid.uuid4(), steam_id=None)
+    saved = SimpleNamespace(
+        id=uuid.uuid4(), title="Fall Guys", source="steam", external_id="1097150",
+        img_icon_url=None, playtime_forever=120, created_at=datetime.now(timezone.utc),
+    )
+
+    class Query:
+        def filter(self, *_args): return self
+        def order_by(self, *_args): return self
+        def all(self): return [saved]
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: SimpleNamespace(query=lambda _model: Query())
+    try:
+        response = client.get("/library/overview")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["games"] == [{
+        "id": str(saved.id), "source": "steam", "external_id": "1097150",
+        "detail_game_id": "1097150", "title": "Fall Guys",
+        "cover_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/1097150/library_600x900.jpg",
+        "playtime_forever": 120,
+    }]
+
+
 def test_dashboard_library_stats_and_linked_steam_library_contract(monkeypatch):
     user = SimpleNamespace(
         id=uuid.uuid4(), email="player@example.com", created_at=datetime.now(timezone.utc),

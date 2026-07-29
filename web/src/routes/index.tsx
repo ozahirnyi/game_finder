@@ -169,6 +169,10 @@ function Home() {
               >
                 <FeaturedDeal deal={best} />
               </Link>
+            ) : best.url ? (
+              <a href={best.url} target="_blank" rel="noreferrer" className="block h-full">
+                <FeaturedDeal deal={best} />
+              </a>
             ) : (
               <FeaturedDeal deal={best} />
             )}
@@ -212,6 +216,7 @@ function Home() {
               <GameCard
                 game={{
                   gameId: deal.id == null ? undefined : String(deal.id),
+                  externalUrl: deal.id == null ? (deal.url ?? undefined) : undefined,
                   title: deal.name,
                   coverUrl: deal.background_image ?? undefined,
                   coverFrom: "#c75f28",
