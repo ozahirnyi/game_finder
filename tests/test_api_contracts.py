@@ -1313,9 +1313,11 @@ def test_dashboard_reports_ready_and_error_deal_states(monkeypatch):
 
 def test_steam_library_cover_url_uses_the_steam_cdn():
     assert main.steam_library_cover_url("10", "iconhash") == (
-        "https://media.steampowered.com/steamcommunity/public/images/apps/10/iconhash.jpg"
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/10/library_600x900.jpg"
     )
-    assert main.steam_library_cover_url("10", None) is None
+    assert main.steam_library_cover_url("10", None) == (
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/10/library_600x900.jpg"
+    )
 
 
 def test_dashboard_library_stats_and_linked_steam_library_contract(monkeypatch):
