@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
-import { getLibraryOverview, type LibraryOverviewGame } from "@/lib/api";
+import { getLibraryOverview, searchGames, type LibraryOverviewGame } from "@/lib/api";
+import { exactCatalogMatch } from "@/lib/catalogMatch";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
 
 export const Route = createFileRoute("/library")({
@@ -31,13 +32,21 @@ export const Route = createFileRoute("/library")({
 
 const tabs = ["All games", "Steam", "PlayStation"] as const;
 type Tab = (typeof tabs)[number];
+type SortOrder = "playtime-desc" | "playtime-asc";
 
 function LibraryPage() {
   const [tab, setTab] = useState<Tab>("All games");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("playtime-desc");
   const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview });
   const owned = libraryQuery.data?.games ?? [];
   const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
-  const visible = sourceForTab ? owned.filter((game) => game.source === sourceForTab) : owned;
+  const visible = useMemo(() => {
+    const filtered = sourceForTab ? owned.filter((game) => game.source === sourceForTab) : owned;
+    return [...filtered].sort((left, right) => {
+      const difference = (left.playtime_forever ?? 0) - (right.playtime_forever ?? 0);
+      return sortOrder === "playtime-desc" ? -difference : difference;
+    });
+  }, [owned, sourceForTab, sortOrder]);
 
   return (
     <AppShell>
@@ -69,6 +78,17 @@ function LibraryPage() {
             {item}
           </button>
         ))}
+        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+          Sort by time
+          <select
+            value={sortOrder}
+            onChange={(event) => setSortOrder(event.target.value as SortOrder)}
+            className="rounded-md border border-border bg-surface px-2 py-1 text-foreground"
+          >
+            <option value="playtime-desc">Most played</option>
+            <option value="playtime-asc">Least played</option>
+          </select>
+        </label>
       </div>
 
       {libraryQuery.isLoading && (
@@ -125,13 +145,19 @@ function LibraryPage() {
 }
 
 function LibraryCard({ game }: { game: LibraryOverviewGame }) {
+  const catalogQuery = useQuery({
+    queryKey: ["catalog-cover", game.title],
+    queryFn: () => searchGames(game.title),
+    enabled: !game.cover_url,
+  });
+  const catalogCover = exactCatalogMatch(catalogQuery.data?.results ?? [], game.title)?.background_image ?? undefined;
   const contents = (
     <>
       <GameCover
         from="#1d4ed8"
         to="#111827"
         title={game.title}
-        image={game.cover_url ?? undefined}
+        image={game.cover_url ?? catalogCover}
         fallbackImage={
           game.source === "steam" && game.external_id
             ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.external_id}/header.jpg`
@@ -165,8 +191,9 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
   );
   const className =
     "hover-lift group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]";
-  return game.detail_game_id ? (
-    <Link to="/games/$gameId" params={{ gameId: game.detail_game_id }} className={className}>
+  const gameId = game.detail_game_id ?? game.external_id;
+  return gameId ? (
+    <Link to="/games/$gameId" params={{ gameId }} search={{ title: game.title }} className={className}>
       {contents}
     </Link>
   ) : (

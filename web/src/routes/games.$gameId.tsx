@@ -11,13 +11,26 @@ import {
   PriceBlock,
   SectionHeader,
 } from "@/components/ui-bits";
-import { addWishlist, getCatalogGame, getPriceHistory } from "@/lib/api";
+import { addWishlist, getCatalogGame, getPriceHistory, searchGames } from "@/lib/api";
+import { exactCatalogMatch } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
 export const Route = createFileRoute("/games/$gameId")({
-  loader: async ({ params }) => {
+  validateSearch: (search: Record<string, unknown>): { title?: string } =>
+    typeof search.title === "string" ? { title: search.title } : {},
+  loaderDeps: ({ search }) => ({ title: search.title }),
+  loader: async ({ params, deps }) => {
     try {
-      const catalog = await getCatalogGame(params.gameId);
+      let catalog;
+      try {
+        catalog = await getCatalogGame(params.gameId);
+      } catch {
+        if (!deps.title) throw new Error("Catalog title unavailable");
+        const results = await searchGames(deps.title);
+        const match = exactCatalogMatch(results.results, deps.title);
+        if (!match) throw new Error("Catalog game unavailable");
+        catalog = await getCatalogGame(match.id);
+      }
       return {
         game: {
           id: String(catalog.id),
