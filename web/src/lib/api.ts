@@ -58,6 +58,22 @@ export type LibraryGame = {
   cover_url?: string | null;
 };
 
+export type LibraryOverviewGame = {
+  id: string;
+  source: "manual" | "psn" | "steam";
+  external_id?: string | null;
+  detail_game_id?: string | null;
+  title: string;
+  cover_url?: string | null;
+  playtime_forever?: number | null;
+};
+
+export type LibraryOverview = {
+  games: LibraryOverviewGame[];
+  steam_available: boolean;
+  steam_error?: string | null;
+};
+
 export type CollectionGame = {
   id: string;
   catalog_game_id: number;
@@ -284,6 +300,10 @@ export function getProfile() {
 
 export function getLibrary() {
   return apiRequest<LibraryGame[]>("/games", { auth: true });
+}
+
+export function getLibraryOverview() {
+  return apiRequest<LibraryOverview>("/library/overview", { auth: true });
 }
 
 export function getWishlist() {

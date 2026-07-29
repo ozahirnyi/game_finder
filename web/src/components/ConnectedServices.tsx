@@ -7,6 +7,8 @@ import {
   getSteamAccount,
   getSteamLinkUrl,
   syncSteamLibrary,
+  type OAuthLoginUrl,
+  type SteamAccount,
   unlinkSteamAccount,
 } from "@/lib/api";
 import { Check, Gamepad2, Loader2, RefreshCw, Unlink, Upload } from "lucide-react";
@@ -56,7 +58,11 @@ const btnPrimary =
 export function ConnectedServices() {
   const client = useQueryClient();
   const steamQuery = useQuery({ queryKey: ["steam-account"], queryFn: getSteamAccount });
-  const action = useMutation({
+  const action = useMutation<
+    OAuthLoginUrl | SteamAccount,
+    Error,
+    "google" | "link" | "sync" | "unlink"
+  >({
     mutationFn: (kind: "google" | "link" | "sync" | "unlink") =>
       kind === "google"
         ? getGoogleLinkUrl()
@@ -69,6 +75,7 @@ export function ConnectedServices() {
       if ("url" in result) window.location.assign(result.url);
       client.invalidateQueries({ queryKey: ["steam-account"] });
       client.invalidateQueries({ queryKey: ["library"] });
+      client.invalidateQueries({ queryKey: ["library-overview"] });
     },
   });
   const steam = steamQuery.data;

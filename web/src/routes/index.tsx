@@ -1,73 +1,67 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowRight, Search, Tag, Users } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/AppShell";
-import { GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
-import { Chip, EmptyState, Panel, PriceBlock, Stat } from "@/components/ui-bits";
-import { getDeals, getTrendingGames, searchGames } from "@/lib/api";
-import { Search, ArrowRight, Tag, Users } from "lucide-react";
+import { Chip, EmptyState, Panel, PriceBlock, SectionHeader, Stat } from "@/components/ui-bits";
+import {
+  getAuthSnapshot,
+  getDeals,
+  getFriends,
+  getLibraryOverview,
+  getProfile,
+  searchGames,
+  subscribeToAuthChanges,
+} from "@/lib/api";
 
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Playfinder — Find your next game" },
-      {
-        name: "description",
-        content:
-          "Search games across stores, track live price drops by region, and see what your friends are playing — no account required.",
-      },
-      { property: "og:title", content: "Playfinder — Find your next game" },
-      {
-        property: "og:description",
-        content:
-          "Search games, discover new favourites, and catch live price drops before you sign in.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
-  component: Home,
-});
+export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
-  const [region, setRegion] = useState<string>("US");
+  const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
+  const [region, setRegion] = useState("US");
   const [query, setQuery] = useState("");
-
+  const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile, enabled: signedIn });
+  const libraryQuery = useQuery({
+    queryKey: ["library-overview"],
+    queryFn: getLibraryOverview,
+    enabled: signedIn,
+  });
+  const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends, enabled: signedIn });
   const searchQuery = useQuery({
     queryKey: ["home-search", query],
     queryFn: () => searchGames(query),
     enabled: query.trim().length >= 2,
   });
   const dealsQuery = useQuery({ queryKey: ["deals", region], queryFn: () => getDeals(region) });
-  const trendingQuery = useQuery({ queryKey: ["trending-games"], queryFn: getTrendingGames });
-  const results = searchQuery.data?.results ?? [];
   const deals = dealsQuery.data?.results ?? [];
+  const results = searchQuery.data?.results ?? [];
   const best = deals[0];
   const rest = deals.slice(1);
 
   return (
     <AppShell>
-      {/* Hero search */}
       <section className="animate-reveal ember-glow grain sheen relative mb-8 overflow-hidden rounded-3xl border border-border bg-surface p-6 sm:p-10">
-        <p className="label-mono relative mb-3 text-primary">Playfinder</p>
+        <p className="label-mono relative mb-3 text-primary">
+          {signedIn ? "Tonight" : "Playfinder"}
+        </p>
         <h1 className="relative max-w-2xl text-[2.5rem] font-bold leading-[0.95] tracking-[-0.035em] text-balance sm:text-6xl">
-          Find your next game
+          {signedIn ? "Play with friends tonight" : "Find your next game"}
         </h1>
         <p className="relative mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
-          Search games, discover new favourites, and catch live price drops — before you even sign
-          in.
+          {signedIn
+            ? `${profileQuery.data?.display_name ?? "Your dashboard"} · ${libraryQuery.data?.games.length ?? 0} games in your library · ${friendsQuery.data?.length ?? 0} friends connected`
+            : "Search games, discover new favourites, and catch live price drops — before you even sign in."}
         </p>
-
         <form
           className="relative mt-7 flex flex-col gap-3 sm:flex-row"
-          onSubmit={(e) => e.preventDefault()}
+          onSubmit={(event) => event.preventDefault()}
         >
           <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border bg-background/70 px-5 py-4 backdrop-blur focus-within:border-primary/60">
             <Search className="size-4 text-muted-foreground" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder="Search games by title"
               className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
@@ -79,8 +73,6 @@ function Home() {
             Search games
           </Link>
         </form>
-
-        {/* Live inline results (typeahead) */}
         {query.trim() !== "" && (
           <div className="animate-pop relative mt-4 overflow-hidden rounded-2xl border border-border bg-background/80 backdrop-blur">
             {results.length === 0 ? (
@@ -88,24 +80,15 @@ function Home() {
                 No matches for “{query}”. Try a shorter title.
               </p>
             ) : (
-              results.map((g) => (
+              results.map((game) => (
                 <Link
-                  key={g.id}
+                  key={game.id}
                   to="/games/$gameId"
-                  params={{ gameId: String(g.id) }}
-                  className="flex items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-b-0 hover:bg-surface-2"
+                  params={{ gameId: String(game.id) }}
+                  className="flex items-center gap-3 border-b border-border px-4 py-3 text-sm font-semibold transition-colors last:border-b-0 hover:bg-surface-2"
                 >
-                  <GameCover
-                    from={g.coverFrom}
-                    to={g.coverTo}
-                    title={g.name}
-                    image={g.background_image}
-                    compact
-                    bare
-                    className="size-10 shrink-0 rounded-md"
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.name}</span>
-                  <span className="label-mono text-muted-foreground">View details</span>
+                  {game.name}
+                  <span className="ml-auto label-mono text-muted-foreground">View details</span>
                 </Link>
               ))
             )}
@@ -113,7 +96,42 @@ function Home() {
         )}
       </section>
 
-      {/* Price drops */}
+      {signedIn && (
+        <section className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2">
+          <Panel className="p-6">
+            <SectionHeader
+              title="Your library"
+              hint={libraryQuery.data?.steam_error ?? "Steam and PlayStation games"}
+            />
+            <p className="mt-3 text-sm text-muted-foreground">
+              {libraryQuery.data?.games.length
+                ? `${libraryQuery.data.games.length} games ready to explore.`
+                : "Sync Steam or import PlayStation games to fill your library."}
+            </p>
+            <Link
+              to="/library"
+              className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+            >
+              Open library
+            </Link>
+          </Panel>
+          <Panel className="p-6">
+            <SectionHeader title="Friends online" hint="Your gaming circle" />
+            <p className="mt-3 text-sm text-muted-foreground">
+              {friendsQuery.data?.length
+                ? `${friendsQuery.data.length} friends connected.`
+                : "Add friends to see shared games and activity."}
+            </p>
+            <Link
+              to="/friends"
+              className="mt-4 inline-flex rounded-lg border border-border px-4 py-2 text-sm font-bold"
+            >
+              Open friends
+            </Link>
+          </Panel>
+        </section>
+      )}
+
       <section className="animate-reveal mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="label-mono mb-2 flex items-center gap-2 text-primary">
@@ -126,21 +144,19 @@ function Home() {
           <select
             aria-label="Region"
             value={region}
-            onChange={(e) => setRegion(e.target.value)}
+            onChange={(event) => setRegion(event.target.value)}
             className="rounded-xl border border-border bg-surface px-3 py-2 text-sm font-semibold outline-none focus:border-primary/60"
           >
-            {["US", "UA", "GB", "EU"].map((r) => (
-              <option key={r} value={r}>
-                {r}
+            {["US", "UA", "GB", "EU"].map((item) => (
+              <option key={item} value={item}>
+                {item}
               </option>
             ))}
           </select>
         </div>
       </section>
-
       {best && (
         <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
-          {/* Featured deal — internal link to the game page */}
           <div className="animate-reveal group lg:col-span-7">
             {best.id != null ? (
               <Link
@@ -154,8 +170,6 @@ function Home() {
               <FeaturedDeal deal={best} />
             )}
           </div>
-
-          {/* Stats + friends teaser */}
           <div className="animate-reveal flex flex-col gap-5 lg:col-span-5">
             <Panel className="ember-glow grain p-5">
               <div className="relative grid grid-cols-2 gap-4">
@@ -163,7 +177,6 @@ function Home() {
                 <Stat label="Region" value={region} />
               </div>
             </Panel>
-
             <Panel className="flex-1 p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="flex items-center gap-2 text-lg font-bold">
@@ -173,62 +186,70 @@ function Home() {
                   All
                 </Link>
               </div>
-              <EmptyState
-                title="Sign in to see friends"
-                description="Your friends and their activity appear here."
-              />
+              {signedIn ? (
+                <p className="text-sm text-muted-foreground">
+                  {friendsQuery.data?.length
+                    ? `${friendsQuery.data.length} friends are connected.`
+                    : "Add friends to see shared games and activity."}
+                </p>
+              ) : (
+                <EmptyState
+                  title="Sign in to see friends"
+                  description="Your friends and their activity appear here."
+                />
+              )}
             </Panel>
           </div>
-
-          {/* Deal grid */}
-          {rest.map((d, i) => (
+          {rest.map((deal, index) => (
             <div
-              key={d.id}
+              key={deal.id ?? deal.name}
               className="animate-reveal lg:col-span-3"
-              style={{ animationDelay: `${60 + i * 40}ms` }}
+              style={{ animationDelay: `${60 + index * 40}ms` }}
             >
               <GameCard
                 game={{
-                  gameId: d.id == null ? undefined : String(d.id),
-                  title: d.name,
-                  coverUrl: d.background_image,
-                  price: d.current?.price?.amount,
-                  originalPrice: d.current?.regular?.amount,
-                  discount: d.current?.cut,
-                  currency: d.current?.price?.currency,
-                  store: d.current?.shop,
+                  gameId: deal.id == null ? undefined : String(deal.id),
+                  title: deal.name,
+                  coverUrl: deal.background_image ?? undefined,
+                  coverFrom: "#c75f28",
+                  coverTo: "#22243a",
+                  price: deal.current?.price?.amount ?? undefined,
+                  originalPrice: deal.current?.regular?.amount ?? undefined,
+                  discount: deal.current?.cut,
+                  currency: deal.current?.price?.currency ?? undefined,
+                  store: deal.current?.shop ?? undefined,
                 }}
               />
             </div>
           ))}
-
-          {/* Account CTA */}
-          <div className="animate-reveal lg:col-span-12">
-            <Panel className="ember-glow grain flex flex-col items-start justify-between gap-5 p-6 sm:flex-row sm:items-center">
-              <div className="relative">
-                <h3 className="text-xl font-bold tracking-tight">
-                  Save games and get price-drop alerts
-                </h3>
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  Browsing is free. An account adds wishlist alerts, your library, and friends.
-                </p>
-              </div>
-              <div className="relative flex shrink-0 flex-wrap gap-2">
-                <Link
-                  to="/sign-in"
-                  className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
-                >
-                  Sign in
-                </Link>
-                <Link
-                  to="/sign-up"
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
-                >
-                  Create account <ArrowRight className="size-3.5" />
-                </Link>
-              </div>
-            </Panel>
-          </div>
+          {!signedIn && (
+            <div className="animate-reveal lg:col-span-12">
+              <Panel className="ember-glow grain flex flex-col items-start justify-between gap-5 p-6 sm:flex-row sm:items-center">
+                <div className="relative">
+                  <h3 className="text-xl font-bold tracking-tight">
+                    Save games and get price-drop alerts
+                  </h3>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    Browsing is free. An account adds wishlist alerts, your library, and friends.
+                  </p>
+                </div>
+                <div className="relative flex shrink-0 flex-wrap gap-2">
+                  <Link
+                    to="/sign-in"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    to="/sign-up"
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
+                  >
+                    Create account <ArrowRight className="size-3.5" />
+                  </Link>
+                </div>
+              </Panel>
+            </div>
+          )}
         </div>
       )}
     </AppShell>
@@ -239,23 +260,16 @@ function FeaturedDeal({
   deal,
 }: {
   deal: NonNullable<
-    ReturnType<typeof getDeals> extends Promise<infer R>
-      ? R extends { results: (infer D)[] }
-        ? D
+    ReturnType<typeof getDeals> extends Promise<infer Result>
+      ? Result extends { results: (infer Deal)[] }
+        ? Deal
         : never
       : never
   >;
 }) {
   return (
     <Panel interactive className="h-full">
-      <GameCover
-        from="#c75f28"
-        to="#22243a"
-        title={deal.name}
-        image={deal.background_image}
-        bare
-        className="aspect-[16/9] w-full transition-transform duration-500 ease-[var(--ease-studio)] group-hover:scale-[1.03]"
-      />
+      <div className="aspect-[16/9] w-full bg-gradient-to-br from-primary/60 to-surface-2" />
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 pt-16">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Chip tone="solid">-{deal.current?.cut ?? 0}%</Chip>
@@ -268,7 +282,7 @@ function FeaturedDeal({
             originalPrice={deal.current?.regular?.amount}
             discount={deal.current?.cut}
             currency={deal.current?.price?.currency}
-            store={deal.current?.shop}
+            store={deal.current?.shop ?? undefined}
             align="left"
           />
         </div>

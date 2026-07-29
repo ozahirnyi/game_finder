@@ -6,6 +6,7 @@ import {
   clearToken,
   confirmPsnImport,
   getGoogleLoginUrl,
+  getLibraryOverview,
   getSteamLinkUrl,
   getAuthSnapshot,
   getToken,
@@ -104,6 +105,25 @@ describe("apiRequest", () => {
       3,
       "/api/steam/library/sync",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("reads the Steam-aware library overview", async () => {
+    setToken("token");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ games: [], steam_available: true, steam_error: null }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getLibraryOverview();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/library/overview",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
     );
   });
 
