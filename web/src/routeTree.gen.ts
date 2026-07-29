@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as PsnImportRouteImport } from './routes/psn-import'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
@@ -40,6 +41,11 @@ const DealsRoute = DealsRouteImport.update({
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PsnImportRoute = PsnImportRouteImport.update({
+  id: '/psn-import',
+  path: '/psn-import',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/deals': typeof DealsRoute
   '/library': typeof LibraryRoute
+  '/psn-import': typeof PsnImportRoute
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/deals': typeof DealsRoute
   '/library': typeof LibraryRoute
+  '/psn-import': typeof PsnImportRoute
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/deals': typeof DealsRoute
   '/library': typeof LibraryRoute
+  '/psn-import': typeof PsnImportRoute
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/deals'
     | '/library'
+    | '/psn-import'
     | '/search'
     | '/sign-in'
     | '/sign-up'
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/deals'
     | '/library'
+    | '/psn-import'
     | '/search'
     | '/sign-in'
     | '/sign-up'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/deals'
     | '/library'
+    | '/psn-import'
     | '/search'
     | '/sign-in'
     | '/sign-up'
@@ -176,6 +188,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   DealsRoute: typeof DealsRoute
   LibraryRoute: typeof LibraryRoute
+  PsnImportRoute: typeof PsnImportRoute
   SearchRoute: typeof SearchRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
@@ -214,6 +227,13 @@ declare module '@tanstack/react-router' {
       path: '/library'
       fullPath: '/library'
       preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/psn-import': {
+      id: '/psn-import'
+      path: '/psn-import'
+      fullPath: '/psn-import'
+      preLoaderRoute: typeof PsnImportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -280,6 +300,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   DealsRoute: DealsRoute,
   LibraryRoute: LibraryRoute,
+  PsnImportRoute: PsnImportRoute,
   SearchRoute: SearchRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
