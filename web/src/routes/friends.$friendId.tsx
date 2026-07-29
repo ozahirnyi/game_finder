@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
-import { ProfileView } from "@/components/ProfileView";
+import { ProfileView, type ProfileData } from "@/components/ProfileView";
 import { getFriends } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
 import { ArrowLeft } from "lucide-react";
@@ -64,7 +64,7 @@ function FriendNotFound() {
 
 function FriendProfilePage() {
   const { friend } = Route.useLoaderData();
-  const owned: never[] = [];
+  const owned: ProfileData["games"] = [];
 
   return (
     <AppShell>

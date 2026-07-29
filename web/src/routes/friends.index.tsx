@@ -47,8 +47,8 @@ function FriendsPage() {
   }));
   const list = friends;
   const focus = list[0];
-  const sharedGames: never[] = [];
-  const activity: never[] = [];
+  const sharedGames: Array<{ id: string; title: string; coverFrom: string; coverTo: string; coverUrl?: string }> = [];
+  const activity: Array<{ id: string; who: string; verb: string; target: string; time: string }> = [];
 
   return (
     <AppShell>

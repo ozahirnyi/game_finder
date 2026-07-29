@@ -135,8 +135,8 @@ function GameDetail() {
     storeUrl: current?.url ?? undefined,
   };
 
-  const owners: never[] = [];
-  const similar: never[] = [];
+  const owners: Array<{ id: string; avatarFrom: string; avatarTo: string; name: string; online: boolean; activity?: string }> = [];
+  const similar: Array<{ id: string; title: string; coverUrl?: string; coverFrom: string; coverTo: string; genres: string[]; price?: number | null; originalPrice?: number | null; discount?: number | null; currency?: string; store?: string }> = [];
   const priceUnavailable = game.price == null;
   const priceHistory = (priceQuery.data?.deals ?? [])
     .map((deal, index) => ({
