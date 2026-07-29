@@ -47,6 +47,16 @@ def _candidate_columns(rows: Iterable[tuple[object, ...]], sheet_name: str) -> t
     return None
 
 
+def _transaction_detail_columns(rows: Iterable[tuple[object, ...]], sheet_name: str) -> tuple[int, int, int] | None:
+    if sheet_name.casefold() != "transaction detail":
+        return None
+    for row_index, row in enumerate(rows):
+        headers = [_normalized_header(value) for value in row]
+        if "game name" in headers and "content type" in headers:
+            return row_index, headers.index("game name"), headers.index("content type")
+    return None
+
+
 def parse_psn_export(content: bytes) -> list[str]:
     if not content:
         raise HTTPException(status_code=400, detail="The PSN export file is empty")
@@ -68,6 +78,20 @@ def parse_psn_export(content: bytes) -> list[str]:
                     buffered_rows.append(next(rows))
                 except StopIteration:
                     break
+            transaction_columns = _transaction_detail_columns(buffered_rows, worksheet.title)
+            if transaction_columns:
+                header_index, game_name_column, content_type_column = transaction_columns
+                for row in chain(buffered_rows[header_index + 1 :], rows):
+                    content_type = _normalized_header(
+                        row[content_type_column] if content_type_column < len(row) else None
+                    )
+                    if content_type != "game":
+                        continue
+                    title = normalize_title(row[game_name_column] if game_name_column < len(row) else None)
+                    if title:
+                        titles.setdefault(title.casefold(), title)
+                continue
+
             header = _candidate_columns(buffered_rows, worksheet.title)
             if not header:
                 continue
