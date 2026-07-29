@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView } from "@/components/ProfileView";
 import { getLibraryOverview, getProfile } from "@/lib/api";
+import { libraryPlaytime } from "@/lib/collectionPresentation";
 
 export const Route = createFileRoute("/account")({
   head: () => ({
@@ -41,14 +42,14 @@ export function AccountPage() {
           avatarFrom: "#7c3aed",
           avatarTo: "#111827",
           region: "US",
-          hours: owned.reduce((total, game) => total + (game.playtime_forever ?? 0), 0) / 60,
+          hours: libraryPlaytime(owned.reduce((total, game) => total + (game.playtime_forever ?? 0), 0)),
           games: owned.map((game) => ({
             id: game.id,
             title: game.title,
             coverFrom: "#1d4ed8",
             coverTo: "#111827",
             coverUrl: game.cover_url ?? undefined,
-            playtime: game.playtime_forever == null ? null : game.playtime_forever / 60,
+            playtime: game.playtime_forever == null ? null : Math.floor(game.playtime_forever / 60),
             source: game.source,
           })),
           stores: [
