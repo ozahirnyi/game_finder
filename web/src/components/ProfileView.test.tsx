@@ -44,4 +44,9 @@ describe("ProfileView library visibility", () => {
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
     expect(screen.getByRole("dialog", { name: /profile settings/i })).toBeInTheDocument();
   });
+  it("formats friend game playtime from minutes", () => {
+    profile.games[0].playtime = 125;
+    renderProfile(false);
+    expect(screen.getByText("2h 5m")).toBeInTheDocument();
+  });
 });

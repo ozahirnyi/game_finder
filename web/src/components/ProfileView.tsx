@@ -8,6 +8,12 @@ import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { createConversation, createMessage, updateProfile } from "@/lib/api";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
+function formatPlaytime(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours > 0 ? (remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`) : `${remainder}m`;
+}
+
 export type ProfileData = {
   name: string;
   handle: string;
@@ -323,7 +329,7 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
                       <p className="truncate text-sm font-bold">{g.title}</p>
                       <p className="label-mono mt-1.5 flex items-center gap-1.5 text-muted-foreground">
                         <Gamepad2 className="size-3" />
-                        {g.playtime ? `${g.playtime}h` : (g.source ?? "Owned")}
+                        {g.playtime != null ? formatPlaytime(g.playtime) : (g.source ?? "Owned")}
                       </p>
                     </div>
                   </Link>
