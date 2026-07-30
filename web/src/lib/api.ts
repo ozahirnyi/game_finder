@@ -166,7 +166,7 @@ export type SteamLibrarySync = SteamAccount & {
   updated?: number;
 };
 export type SteamSocialFriend = { steam_id: string; persona_name?: string | null; avatar?: string | null; library_public: boolean; common_games_count: number; taste_match_percent: number };
-export type SteamSocial = { friends: SteamSocialFriend[]; friends_total: number; top_friend_games: { appid: number; name: string; friends: number }[] };
+export type SteamSocial = { friends: SteamSocialFriend[]; friends_total: number; friends_has_more: boolean; top_friend_games: { appid: number; name: string; friends: number }[] };
 export type PsnImportPreview = {
   games: string[];
   total: number;
@@ -305,8 +305,8 @@ export function syncSteamLibrary() {
   return apiRequest<SteamLibrarySync>("/steam/library/sync", { auth: true, method: "POST" });
 }
 
-export function getSteamSocial() {
-  return apiRequest<SteamSocial>("/steam/social", { auth: true });
+export function getSteamSocial(friends_limit = 12, friends_offset = 0) {
+  return apiRequest<SteamSocial>(`/steam/social?friends_limit=${friends_limit}&friends_offset=${friends_offset}`, { auth: true });
 }
 
 export function unlinkSteamAccount() {
