@@ -35,7 +35,7 @@ export const Route = createFileRoute("/games/$gameId")({
             title: steamGame.title,
             coverFrom: "#1d4ed8",
             coverTo: "#111827",
-            coverUrl: steamGame.cover_url ?? undefined,
+            coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamGame.external_id}/header.jpg`,
             genres: [],
             platforms: ["PC"],
             releaseDate: undefined,
