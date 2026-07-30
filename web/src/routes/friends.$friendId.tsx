@@ -99,6 +99,7 @@ function FriendProfilePage() {
           avatarTo: friend.avatarTo,
           avatarUrl: friend.avatarUrl,
           bio: friend.bio,
+          friendId: friend.id,
           region: "Global",
           online: false,
           hours: "—",

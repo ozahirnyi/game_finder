@@ -168,12 +168,16 @@ def test_public_profile_returns_owned_library_and_collection_covers(social_db):
     assert payload["wishlist"]["data"][0]["cover_url"] == "https://cover/wishlist"
 
 
-def test_friend_profile_returns_friend_bio_avatar_and_library(social_db):
+def test_friend_profile_returns_friend_bio_avatar_and_library(monkeypatch, social_db):
     alice, bob, charlie, _ = create_users(social_db)
     bob.bio = "Steam collector"
+    bob.steam_id = "bob-steam"
+    async def fake_owned_games(steam_id):
+        assert steam_id == "bob-steam"
+        return [{"appid": 620, "name": "Portal 2", "playtime_forever": 120, "img_icon_url": "icon"}]
+    monkeypatch.setattr(main, "fetch_owned_games", fake_owned_games)
     social_db.add_all([
         Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)),
-        Game(owner_id=bob.id, title="Portal 2", source="steam", img_icon_url="https://cover/portal"),
     ])
     social_db.commit()
 
