@@ -39,7 +39,8 @@ function DealsPage() {
       />
 
       {hero && (
-        <div className="mb-10 grid grid-cols-1 gap-6 overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/15 via-transparent to-transparent p-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:p-8">
+        <div className="relative mb-10 grid grid-cols-1 gap-6 overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/15 via-transparent to-transparent p-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:p-8">
+          {gameLink(hero) && <Link to="/games/$gameId" {...gameLink(hero)!} aria-label={`Open ${hero.name} on Playfinder`} className="absolute inset-0 z-10 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />}
           <div>
             <div className="mb-4 flex items-center gap-2">
               <Flame className="size-4 text-primary" />
@@ -47,7 +48,7 @@ function DealsPage() {
                 Deal of the day
               </span>
             </div>
-            {gameLink(hero) ? <Link to="/games/$gameId" {...gameLink(hero)!} className="block text-4xl font-extrabold tracking-tight hover:text-primary">{hero.name}</Link> : <h3 className="text-4xl font-extrabold tracking-tight">{hero.name}</h3>}
+            <h3 className="text-4xl font-extrabold tracking-tight">{hero.name}</h3>
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
               Matches your wishlist and 3 friends already own it. Sale ends in 2 days.
             </p>
@@ -70,9 +71,8 @@ function DealsPage() {
               </div>
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
-              {gameLink(hero) && <Link to="/games/$gameId" {...gameLink(hero)!} className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-foreground/5">View on Playfinder</Link>}
-              {hero.current?.url && <a href={hero.current.url} target="_blank" rel="noreferrer" aria-label={`Open in ${hero.current.shop ?? "store"}`} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">Open in {hero.current.shop ?? "store"}</a>}
-              <button className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-foreground/5">
+              {hero.current?.url && <a href={hero.current.url} target="_blank" rel="noreferrer" aria-label={`Open in ${hero.current.shop ?? "store"}`} className="relative z-20 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">Open in {hero.current.shop ?? "store"}</a>}
+              <button className="relative z-20 rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-foreground/5">
                 Invite friends to buy together
               </button>
             </div>
@@ -91,8 +91,9 @@ function DealsPage() {
         {deals.slice(1).map((g) => (
           <div
             key={g.id}
-            className="hover-lift group flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
+            className="hover-lift group relative flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
           >
+            {gameLink(g) && <Link to="/games/$gameId" {...gameLink(g)!} aria-label={`Open ${g.name} on Playfinder`} className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />}
             <GameCover
               from="#dc2626"
               to="#111827"
@@ -102,14 +103,13 @@ function DealsPage() {
               className="size-24 shrink-0 rounded-xl"
             />
             <div className="min-w-0 flex-1">
-              {gameLink(g) ? <Link to="/games/$gameId" {...gameLink(g)!} className="block truncate text-lg font-bold transition-colors group-hover:text-primary">{g.name}</Link> : <h4 className="truncate text-lg font-bold">{g.name}</h4>}
+              <h4 className="truncate text-lg font-bold transition-colors group-hover:text-primary">{g.name}</h4>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {g.current?.shop ?? "Store offer"}
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <Chip>{g.current?.shop ?? "Store"}</Chip>
-                {gameLink(g) && <Link to="/games/$gameId" {...gameLink(g)!} className="text-xs font-bold text-foreground hover:text-primary hover:underline">View on Playfinder</Link>}
-                {g.current?.url && <a href={g.current.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline">Open in {g.current.shop ?? "store"}</a>}
+                {g.current?.url && <a href={g.current.url} target="_blank" rel="noreferrer" className="relative z-20 text-xs font-bold text-primary hover:underline">Open in {g.current.shop ?? "store"}</a>}
               </div>
             </div>
             <div className="text-right">

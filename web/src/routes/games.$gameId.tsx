@@ -12,7 +12,7 @@ import {
   PriceBlock,
   SectionHeader,
 } from "@/components/ui-bits";
-import { addWishlist, ApiError, createGameInvite, createPriceAlert, getCatalogGame, getFriends, getPriceHistory, getWishlist, searchGames } from "@/lib/api";
+import { addWishlist, ApiError, createGameInvite, createPriceAlert, getCatalogGame, getFriends, getLibraryOverview, getPriceHistory, getWishlist, searchGames } from "@/lib/api";
 import { exactCatalogMatch } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
@@ -25,7 +25,12 @@ export const Route = createFileRoute("/games/$gameId")({
   loader: async ({ params, deps }) => {
     try {
       if (deps.source === "steam") {
-        const title = deps.title;
+        const libraryGame = deps.title
+          ? undefined
+          : (await getLibraryOverview()).games.find(
+              (game) => game.source === "steam" && game.external_id === params.gameId,
+            );
+        const title = deps.title ?? libraryGame?.title;
         if (!title) throw new Error("Steam game title unavailable");
         return {
           game: {
@@ -39,7 +44,9 @@ export const Route = createFileRoute("/games/$gameId")({
             platforms: ["PC"],
             releaseDate: undefined,
             rating: 0,
-            description: "Steam Store game. Catalog details are unavailable.",
+            description: libraryGame
+              ? "This game is from your Steam library. Catalog details are unavailable."
+              : "Steam Store game. Catalog details are unavailable.",
             price: null,
             originalPrice: null,
             discount: null,
@@ -47,7 +54,7 @@ export const Route = createFileRoute("/games/$gameId")({
             store: "Steam",
             storeUrl: `https://store.steampowered.com/app/${params.gameId}/`,
             coop: false,
-            isSteamLibrary: true,
+            isSteamLibrary: Boolean(libraryGame),
           },
         };
       }
