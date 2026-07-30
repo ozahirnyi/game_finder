@@ -35,7 +35,7 @@ def test_collection_and_price_alert_routes_are_registered():
         ("/wishlist", "GET"),
         ("/wishlist", "POST"),
         ("/wishlist/{catalog_game_id}", "PATCH"),
-        ("/wishlist/{catalog_game_id}", "DELETE"),
+        ("/wishlist/{wishlist_item_id}", "DELETE"),
         ("/price-alerts", "GET"),
         ("/price-alerts", "POST"),
         ("/price-alerts/{alert_id}", "PATCH"),
