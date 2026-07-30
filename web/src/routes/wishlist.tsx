@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
-import { getWishlist, removeWishlist } from "@/lib/api";
+import { createPriceAlert, getPriceAlerts, getWishlist, removeWishlist, type PriceAlertCreate } from "@/lib/api";
 import { wishlistPriceLabel } from "@/lib/collectionPresentation";
 import { Bell, Heart, Trash2 } from "lucide-react";
 
@@ -30,10 +31,22 @@ export const Route = createFileRoute("/wishlist")({
 
 function WishlistPage() {
   const queryClient = useQueryClient();
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [catalogGameId, setCatalogGameId] = useState("");
+  const [targetPrice, setTargetPrice] = useState("");
   const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist });
   const removeMutation = useMutation({
     mutationFn: removeWishlist,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
+  });
+  const alertsQuery = useQuery({ queryKey: ["price-alerts"], queryFn: getPriceAlerts });
+  const alertMutation = useMutation({
+    mutationFn: (data: PriceAlertCreate) => createPriceAlert(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["price-alerts"] });
+      setShowAlerts(false);
+      setTargetPrice("");
+    },
   });
 
   const wl = wishlistQuery.data ?? [];
@@ -45,12 +58,60 @@ function WishlistPage() {
         hint="Games you're waiting on, with live pricing"
         action={
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold hover:bg-foreground/5">
+            <button
+              onClick={() => {
+                setCatalogGameId(String(wl[0]?.catalog_game_id ?? ""));
+                setShowAlerts(true);
+              }}
+              disabled={wl.length === 0}
+              className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-bold hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
+            >
               <Bell className="size-3.5" /> Price alerts
             </button>
           </div>
         }
       />
+
+      {showAlerts && (
+        <section aria-label="Price alerts" className="mb-6 rounded-2xl border border-border bg-surface p-5">
+          <h2 className="text-lg font-bold">Price alerts</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {alertsQuery.data?.length ?? 0} active alert{(alertsQuery.data?.length ?? 0) === 1 ? "" : "s"}.
+          </p>
+          {!!alertsQuery.data?.length && (
+            <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+              {alertsQuery.data.map((alert) => (
+                <li key={alert.id}>Game #{alert.wishlist_catalog_game_id}: {alert.target_price != null ? `alert below ${alert.target_price}` : `alert at ${alert.target_discount}% off`}</li>
+              ))}
+            </ul>
+          )}
+          <form
+            className="mt-4 flex flex-wrap items-end gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const value = Number(targetPrice);
+              if (!catalogGameId || !Number.isFinite(value) || value <= 0) return;
+              alertMutation.mutate({
+                wishlist_catalog_game_id: Number(catalogGameId),
+                target_price: value,
+                delivery_channels: ["in_app"],
+              });
+            }}
+          >
+            <label className="grid gap-1 text-sm font-semibold">Game
+              <select value={catalogGameId} onChange={(event) => setCatalogGameId(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2">
+                {wl.map((game) => <option key={game.id} value={game.catalog_game_id}>{game.title}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-semibold">Target price
+              <input aria-label="Target price" type="number" min="0.01" step="0.01" required value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2" />
+            </label>
+            <button type="submit" disabled={alertMutation.isPending} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Save alert</button>
+            <button type="button" onClick={() => setShowAlerts(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-bold">Cancel</button>
+          </form>
+          {alertMutation.isError && <p role="alert" className="mt-3 text-sm text-destructive">Could not save this alert. It may already exist.</p>}
+        </section>
+      )}
 
       {wl.length === 0 && (
         <EmptyState

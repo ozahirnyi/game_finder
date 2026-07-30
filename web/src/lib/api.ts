@@ -81,6 +81,26 @@ export type CollectionGame = {
   cover_url?: string | null;
 };
 
+export type PriceAlertCreate = {
+  wishlist_catalog_game_id: number;
+  target_price?: number;
+  target_discount?: number;
+  delivery_channels: ("in_app" | "telegram")[];
+};
+
+export type PriceAlert = PriceAlertCreate & {
+  id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GameInviteCreate = {
+  recipient_id: string;
+  game_name: string;
+  game_id?: number;
+  note?: string;
+};
+
 export type Friend = {
   user: {
     id: string;
@@ -365,6 +385,18 @@ export function removeWishlist(id: string) {
 
 export function getFriends() {
   return apiRequest<Friend[]>("/friends", { auth: true });
+}
+
+export function createGameInvite(data: GameInviteCreate) {
+  return apiRequest("/game-invites", { auth: true, method: "POST", body: data });
+}
+
+export function getPriceAlerts() {
+  return apiRequest<PriceAlert[]>("/price-alerts", { auth: true });
+}
+
+export function createPriceAlert(data: PriceAlertCreate) {
+  return apiRequest<PriceAlert>("/price-alerts", { auth: true, method: "POST", body: data });
 }
 
 export function getNotifications() {

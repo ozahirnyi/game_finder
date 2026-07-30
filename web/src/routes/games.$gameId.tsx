@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
@@ -11,7 +12,7 @@ import {
   PriceBlock,
   SectionHeader,
 } from "@/components/ui-bits";
-import { addWishlist, getCatalogGame, getLibraryOverview, getPriceHistory, searchGames } from "@/lib/api";
+import { addWishlist, ApiError, createGameInvite, createPriceAlert, getCatalogGame, getFriends, getLibraryOverview, getPriceHistory, getWishlist, searchGames } from "@/lib/api";
 import { exactCatalogMatch } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
@@ -169,9 +170,43 @@ function GameDetail() {
     enabled: !catalogGame.isSteamLibrary,
   });
   const queryClient = useQueryClient();
+  const [showAlertForm, setShowAlertForm] = useState(false);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [targetPrice, setTargetPrice] = useState("");
+  const [recipientId, setRecipientId] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist, enabled: !catalogGame.isSteamLibrary });
+  const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
   const wishlistMutation = useMutation({
     mutationFn: addWishlist,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
+  });
+  const alertMutation = useMutation({
+    mutationFn: async (target_price: number) => {
+      const catalogGameId = Number(catalogGame.id);
+      if (!wishlistQuery.data?.some((item) => item.catalog_game_id === catalogGameId)) {
+        try {
+          await addWishlist({ id: catalogGameId, name: catalogGame.title, background_image: catalogGame.coverUrl ?? null });
+        } catch (error) {
+          if (!(error instanceof ApiError && error.status === 409)) throw error;
+        }
+      }
+      return createPriceAlert({ wishlist_catalog_game_id: catalogGameId, target_price, delivery_channels: ["in_app"] });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wishlist"] });
+      queryClient.invalidateQueries({ queryKey: ["price-alerts"] });
+      setShowAlertForm(false);
+      setTargetPrice("");
+      setActionMessage("Alert saved");
+    },
+  });
+  const inviteMutation = useMutation({
+    mutationFn: (recipient_id: string) => createGameInvite({ recipient_id, game_name: catalogGame.title, game_id: Number(catalogGame.id) }),
+    onSuccess: () => {
+      setShowInviteForm(false);
+      setActionMessage("Invite sent");
+    },
   });
   const current = priceQuery.data?.current;
   const game = {
@@ -415,16 +450,44 @@ function GameDetail() {
             </div>
 
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5">
+              <button onClick={() => setShowAlertForm(true)} disabled={catalogGame.isSteamLibrary} className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50">
                 <Bell className="size-3.5" /> Alert
               </button>
-              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5">
+              <button onClick={() => { setRecipientId(friendsQuery.data?.[0]?.user.id ?? ""); setShowInviteForm(true); }} disabled={friendsQuery.isLoading || !friendsQuery.data?.length} title={!friendsQuery.data?.length ? "Add a PlayFinder friend to send an invite." : undefined} className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50">
                 <Users className="size-3.5" /> Invite
               </button>
-              <button className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5">
+              <button onClick={async () => {
+                try {
+                  const url = new URL(`/games/${game.id}`, window.location.origin).href;
+                  if (navigator.share) await navigator.share({ title: game.title, url });
+                  else { await navigator.clipboard.writeText(url); setActionMessage("Link copied"); }
+                } catch { setActionMessage("Could not share this link"); }
+              }} className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5">
                 <Share2 className="size-3.5" /> Share
               </button>
             </div>
+            {actionMessage && <p role="status" className="mt-3 text-xs font-semibold text-muted-foreground">{actionMessage}</p>}
+            {!friendsQuery.isLoading && !friendsQuery.data?.length && (
+              <p className="mt-3 text-xs text-muted-foreground">Add a PlayFinder friend to send an invite.</p>
+            )}
+            {showAlertForm && (
+              <form className="mt-4 space-y-3 border-t border-border pt-4" onSubmit={(event) => { event.preventDefault(); const value = Number(targetPrice); if (Number.isFinite(value) && value > 0) alertMutation.mutate(value); }}>
+                <label className="grid gap-1 text-xs font-bold">Target price
+                  <input aria-label="Target price" type="number" min="0.01" step="0.01" required value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} className="rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                </label>
+                <div className="flex gap-2"><button type="submit" disabled={alertMutation.isPending} className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Save alert</button><button type="button" onClick={() => setShowAlertForm(false)} className="rounded-md border border-border px-3 py-2 text-xs font-bold">Cancel</button></div>
+                {alertMutation.isError && <p role="alert" className="text-xs text-destructive">Could not save this alert.</p>}
+              </form>
+            )}
+            {showInviteForm && (
+              <form className="mt-4 space-y-3 border-t border-border pt-4" onSubmit={(event) => { event.preventDefault(); if (recipientId) inviteMutation.mutate(recipientId); }}>
+                <label className="grid gap-1 text-xs font-bold">Friend
+                  <select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="rounded-md border border-border bg-background px-3 py-2 text-sm">{friendsQuery.data?.map((friend) => <option key={friend.user.id} value={friend.user.id}>{friend.user.display_name}</option>)}</select>
+                </label>
+                <div className="flex gap-2"><button type="submit" disabled={inviteMutation.isPending} className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Send invite</button><button type="button" onClick={() => setShowInviteForm(false)} className="rounded-md border border-border px-3 py-2 text-xs font-bold">Cancel</button></div>
+                {inviteMutation.isError && <p role="alert" className="text-xs text-destructive">Could not send this invite.</p>}
+              </form>
+            )}
           </div>
 
           <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 to-transparent p-6">
