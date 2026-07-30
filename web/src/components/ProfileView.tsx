@@ -5,7 +5,7 @@ import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { ConnectedServices } from "@/components/ConnectedServices";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
-import { updateProfile } from "@/lib/api";
+import { createConversation, createMessage, updateProfile } from "@/lib/api";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
 export type ProfileData = {
@@ -30,6 +30,7 @@ export type ProfileData = {
     source?: string;
   }[];
   activity?: { id: number | string; text: string; time: string }[];
+  friendId?: string;
   settings?: {
     displayName: string;
     bio: string;
@@ -44,6 +45,8 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
   const [libraryVisibility, setLibraryVisibility] = useState(
     profile.settings?.libraryVisibility ?? "public",
   );
+  const [messageOpen, setMessageOpen] = useState(false);
+  const [messageBody, setMessageBody] = useState("");
   const queryClient = useQueryClient();
   const saveSettings = useMutation({
     mutationFn: updateProfile,
@@ -51,6 +54,14 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       setSettingsOpen(false);
     },
+  });
+  const sendMessage = useMutation({
+    mutationFn: async () => {
+      if (!profile.friendId) throw new Error("Friend not available");
+      const conversation = await createConversation(profile.friendId);
+      return createMessage(conversation.id, messageBody.trim());
+    },
+    onSuccess: () => { setMessageBody(""); setMessageOpen(false); },
   });
   const steam = profile.stores.find((s) => s.name === "Steam")?.count ?? 0;
   const psn = profile.stores.find((s) => s.name === "PlayStation")?.count ?? 0;
@@ -119,10 +130,9 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
                 <UserPlus className="size-4" /> Invite to play
               </button>
               <button
-                disabled
-                aria-label="Messaging is coming soon"
-                title="Messaging is coming soon"
-                className="grid size-11 cursor-not-allowed place-items-center rounded-xl border border-border opacity-50"
+                onClick={() => setMessageOpen(true)}
+                aria-label={`Message ${profile.name}`}
+                className="grid size-11 place-items-center rounded-xl border border-border transition hover:border-primary/50"
               >
                 <MessageCircle className="size-4" />
               </button>
@@ -203,6 +213,16 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
                 {saveSettings.isPending ? "Saving…" : "Save"}
               </button>
             </div>
+          </form>
+        </div>
+      )}
+      {!isSelf && messageOpen && (
+        <div role="dialog" aria-label={`Message ${profile.name}`} className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+          <form onSubmit={(event) => { event.preventDefault(); if (messageBody.trim()) sendMessage.mutate(); }} className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+            <h2 className="text-xl font-bold">Message {profile.name}</h2>
+            <textarea aria-label="Message text" value={messageBody} onChange={(event) => setMessageBody(event.target.value)} required maxLength={2000} className="mt-4 min-h-28 w-full rounded-lg border border-border bg-surface-2 p-3" />
+            {sendMessage.isError && <p role="alert" className="mt-2 text-sm text-destructive">Could not send message.</p>}
+            <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setMessageOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold">Cancel</button><button type="submit" disabled={sendMessage.isPending} className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">Send</button></div>
           </form>
         </div>
       )}

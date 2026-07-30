@@ -1351,7 +1351,7 @@ def list_friends(
 
 
 @app.get("/friends/{user_id}/profile", response_model=FriendProfileRead)
-def get_friend_profile(
+async def get_friend_profile(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -1360,11 +1360,28 @@ def get_friend_profile(
     if friend is None or not are_friends(db, current_user.id, friend.id):
         raise HTTPException(status_code=404, detail="Friend not found")
     if can_view_section(friend, current_user, friend.library_visibility, db):
-        games = db.query(Game).filter(Game.owner_id == friend.id).order_by(func.lower(Game.title)).all()
+        games = db.query(Game).filter(Game.owner_id == friend.id, Game.source != "steam").order_by(func.lower(Game.title)).all()
+        library_items = [public_library_game_response(game).model_dump(mode="json") for game in games]
+        if friend.steam_id and can_view_section(friend, current_user, friend.steam_visibility, db):
+            try:
+                steam_games = await fetch_owned_games(friend.steam_id)
+            except HTTPException:
+                steam_games = []
+            library_items.extend(
+                PublicLibraryGameRead(
+                    id=uuid.uuid5(uuid.NAMESPACE_URL, f"steam:{game['appid']}"),
+                    title=game["name"],
+                    source="steam",
+                    cover_url=steam_library_cover_url(game["appid"], game.get("img_icon_url")),
+                    playtime_forever=game.get("playtime_forever"),
+                    detail_game_id=str(game["appid"]),
+                ).model_dump(mode="json")
+                for game in steam_games
+            )
         library = PublicDataBlock(
-            status="ready" if games else "empty",
-            data=[public_library_game_response(game).model_dump(mode="json") for game in games],
-            message=None if games else "No library games have been saved yet.",
+            status="ready" if library_items else "empty",
+            data=library_items,
+            message=None if library_items else "No library games have been saved yet.",
         )
     else:
         library = hidden_public_block()

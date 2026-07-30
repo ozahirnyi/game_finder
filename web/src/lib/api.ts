@@ -128,6 +128,8 @@ export type FriendProfile = {
   };
 };
 
+export type Conversation = { id: string };
+
 export type Profile = {
   id: string;
   email: string;
@@ -406,6 +408,14 @@ export function getFriends() {
 
 export function getFriendProfile(id: string) {
   return apiRequest<FriendProfile>(`/friends/${id}/profile`, { auth: true });
+}
+
+export function createConversation(recipient_id: string) {
+  return apiRequest<Conversation>("/conversations", { auth: true, method: "POST", body: { recipient_id } });
+}
+
+export function createMessage(conversationId: string, body: string) {
+  return apiRequest(`/conversations/${conversationId}/messages`, { auth: true, method: "POST", body: { body } });
 }
 
 export function searchUsers(query: string) {
