@@ -1,8 +1,11 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { ConnectedServices } from "@/components/ConnectedServices";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { updateProfile } from "@/lib/api";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
 export type ProfileData = {
@@ -27,9 +30,28 @@ export type ProfileData = {
     source?: string;
   }[];
   activity?: { id: number | string; text: string; time: string }[];
+  settings?: {
+    displayName: string;
+    bio: string;
+    libraryVisibility: "public" | "friends" | "private";
+  };
 };
 
 export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf: boolean }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [displayName, setDisplayName] = useState(profile.settings?.displayName ?? profile.name);
+  const [bio, setBio] = useState(profile.settings?.bio ?? profile.bio ?? "");
+  const [libraryVisibility, setLibraryVisibility] = useState(
+    profile.settings?.libraryVisibility ?? "public",
+  );
+  const queryClient = useQueryClient();
+  const saveSettings = useMutation({
+    mutationFn: updateProfile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      setSettingsOpen(false);
+    },
+  });
   const steam = profile.stores.find((s) => s.name === "Steam")?.count ?? 0;
   const psn = profile.stores.find((s) => s.name === "PlayStation")?.count ?? 0;
 
@@ -74,7 +96,10 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
         <div className="relative flex shrink-0 gap-2">
           {isSelf ? (
             <>
-              <button className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold transition hover:border-primary/50">
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold transition hover:border-primary/50"
+              >
                 <Settings className="size-4" /> Settings
               </button>
               <Link
@@ -86,16 +111,101 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
             </>
           ) : (
             <>
-              <button disabled title="Invites are coming soon" className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground opacity-50">
+              <button
+                disabled
+                title="Invites are coming soon"
+                className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground opacity-50"
+              >
                 <UserPlus className="size-4" /> Invite to play
               </button>
-              <button disabled aria-label="Messaging is coming soon" title="Messaging is coming soon" className="grid size-11 cursor-not-allowed place-items-center rounded-xl border border-border opacity-50">
+              <button
+                disabled
+                aria-label="Messaging is coming soon"
+                title="Messaging is coming soon"
+                className="grid size-11 cursor-not-allowed place-items-center rounded-xl border border-border opacity-50"
+              >
                 <MessageCircle className="size-4" />
               </button>
             </>
           )}
         </div>
       </Panel>
+
+      {isSelf && settingsOpen && (
+        <div
+          role="dialog"
+          aria-label="Profile settings"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveSettings.mutate({
+                display_name: displayName.trim(),
+                bio: bio.trim() || null,
+                library_visibility: libraryVisibility,
+              });
+            }}
+            className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl"
+          >
+            <h2 className="text-xl font-bold">Profile settings</h2>
+            <label className="mt-5 block text-sm font-semibold">
+              Display name
+              <input
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                required
+                minLength={3}
+                className="mt-2 w-full rounded-lg border border-border bg-surface-2 px-3 py-2"
+              />
+            </label>
+            <label className="mt-4 block text-sm font-semibold">
+              Bio
+              <textarea
+                value={bio}
+                onChange={(event) => setBio(event.target.value)}
+                maxLength={1000}
+                className="mt-2 min-h-24 w-full rounded-lg border border-border bg-surface-2 px-3 py-2"
+              />
+            </label>
+            <label className="mt-4 block text-sm font-semibold">
+              Library visibility
+              <select
+                value={libraryVisibility}
+                onChange={(event) =>
+                  setLibraryVisibility(event.target.value as "public" | "friends" | "private")
+                }
+                className="mt-2 w-full rounded-lg border border-border bg-surface-2 px-3 py-2"
+              >
+                <option value="public">Public</option>
+                <option value="friends">Friends</option>
+                <option value="private">Private</option>
+              </select>
+            </label>
+            {saveSettings.isError && (
+              <p className="mt-3 text-sm text-destructive">
+                Could not save settings. Check that the display name is available.
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saveSettings.isPending}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+              >
+                {saveSettings.isPending ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="mb-8 flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl border border-border bg-surface-2 px-5 py-4">
         {[
@@ -147,60 +257,60 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
         )}
 
         {!isSelf && (
-        <Panel className="p-6 lg:col-span-12">
-          <SectionHeader
-            title={isSelf ? "Your library" : "Their library"}
-            hint={`${profile.games.length} games`}
-          />
-          {profile.games.length === 0 ? (
-            <EmptyState
-              icon={<Library className="size-5" />}
-              title="No games yet"
-              description={
-                isSelf
-                  ? "Connect Steam or import your PlayStation library to fill this in."
-                  : "This player hasn't shared any games."
-              }
-              action={
-                isSelf ? (
-                  <Link
-                    to="/psn-import"
-                    className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-                  >
-                    Import PlayStation library
-                  </Link>
-                ) : undefined
-              }
+          <Panel className="p-6 lg:col-span-12">
+            <SectionHeader
+              title={isSelf ? "Your library" : "Their library"}
+              hint={`${profile.games.length} games`}
             />
-          ) : (
-            <div className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {profile.games.map((g) => (
-                <Link
-                  key={g.id}
-                  to="/games/$gameId"
-                  params={{ gameId: g.id }}
-                  className="hover-lift overflow-hidden rounded-xl border border-border bg-surface-2 hover:border-primary/40"
-                >
-                  <GameCover
-                    from={g.coverFrom}
-                    to={g.coverTo}
-                    title={g.title}
-                    image={g.coverUrl}
-                    bare
-                    className="aspect-video w-full"
-                  />
-                  <div className="p-3">
-                    <p className="truncate text-sm font-bold">{g.title}</p>
-                    <p className="label-mono mt-1.5 flex items-center gap-1.5 text-muted-foreground">
-                      <Gamepad2 className="size-3" />
-                      {g.playtime ? `${g.playtime}h` : (g.source ?? "Owned")}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Panel>
+            {profile.games.length === 0 ? (
+              <EmptyState
+                icon={<Library className="size-5" />}
+                title="No games yet"
+                description={
+                  isSelf
+                    ? "Connect Steam or import your PlayStation library to fill this in."
+                    : "This player hasn't shared any games."
+                }
+                action={
+                  isSelf ? (
+                    <Link
+                      to="/psn-import"
+                      className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+                    >
+                      Import PlayStation library
+                    </Link>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <div className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {profile.games.map((g) => (
+                  <Link
+                    key={g.id}
+                    to="/games/$gameId"
+                    params={{ gameId: g.id }}
+                    className="hover-lift overflow-hidden rounded-xl border border-border bg-surface-2 hover:border-primary/40"
+                  >
+                    <GameCover
+                      from={g.coverFrom}
+                      to={g.coverTo}
+                      title={g.title}
+                      image={g.coverUrl}
+                      bare
+                      className="aspect-video w-full"
+                    />
+                    <div className="p-3">
+                      <p className="truncate text-sm font-bold">{g.title}</p>
+                      <p className="label-mono mt-1.5 flex items-center gap-1.5 text-muted-foreground">
+                        <Gamepad2 className="size-3" />
+                        {g.playtime ? `${g.playtime}h` : (g.source ?? "Owned")}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Panel>
         )}
       </div>
     </>

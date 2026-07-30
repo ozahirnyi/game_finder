@@ -98,7 +98,12 @@ export type Profile = {
   bio?: string | null;
   platforms: string[];
   favorite_genres: string[];
+  library_visibility?: "public" | "friends" | "private";
 };
+
+export type ProfileUpdate = Pick<Profile, "display_name" | "bio" | "library_visibility">;
+export type RecommendationItem = { title: string; reason: string; tags: string[] };
+export type RecommendationResponse = { recommendations: RecommendationItem[] };
 
 export type OAuthLoginUrl = { url: string };
 export type SteamAccount = {
@@ -297,6 +302,13 @@ export function searchGames(query: string) {
   return apiRequest<{ results: CatalogGame[] }>(`/search/games?q=${encodeURIComponent(query)}`);
 }
 
+export function getRecommendations(prompt: string) {
+  return apiRequest<RecommendationResponse>("/recommendations", {
+    method: "POST",
+    body: { prompt, liked_game_ids: [] },
+  });
+}
+
 export function getTrendingGames() {
   return apiRequest<{ results: CatalogGame[] }>("/catalog/trending-games?page_size=12");
 }
@@ -321,6 +333,10 @@ export function getPriceHistory(id: string | number, country = "US") {
 
 export function getProfile() {
   return apiRequest<Profile>("/profile", { auth: true });
+}
+
+export function updateProfile(data: ProfileUpdate) {
+  return apiRequest<Profile>("/profile", { auth: true, method: "PATCH", body: data });
 }
 
 export function getLibrary() {

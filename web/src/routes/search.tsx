@@ -1,122 +1,130 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
-import { searchGames } from "@/lib/api";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { getRecommendations, searchGames } from "@/lib/api";
+import { Search, Sparkles } from "lucide-react";
 
-export const Route = createFileRoute("/search")({
-  head: () => ({
-    meta: [
-      { title: "Search — Playfinder" },
-      {
-        name: "description",
-        content: "Search games by title, genre, platform and active deals across stores.",
-      },
-      { property: "og:title", content: "Search — Playfinder" },
-      {
-        property: "og:description",
-        content: "Find games by title, genre, platform and price across storefronts.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
-  component: SearchPage,
-});
+export const Route = createFileRoute("/search")({ component: SearchPage });
 
 const filters = ["All", "Co-op", "PC", "PS5", "On sale", "Roguelike", "RPG", "Multiplayer"];
 
 function SearchPage() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState("All");
-
+  const [mode, setMode] = useState<"catalog" | "ai">("catalog");
   const searchQuery = useQuery({
     queryKey: ["search", query],
     queryFn: () => searchGames(query),
-    enabled: query.trim().length >= 2,
+    enabled: mode === "catalog" && query.trim().length >= 2,
   });
+  const recommendationMutation = useMutation({ mutationFn: getRecommendations });
   const results = searchQuery.data?.results ?? [];
 
   return (
     <AppShell>
-      <SectionHeader title="Search" hint="Find a game by title, genre or platform" />
-
+      <SectionHeader title="Search" hint="Find games by title or ask AI for recommendations" />
+      <div className="mb-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setMode("catalog")}
+          className={`rounded-md px-3 py-1.5 text-xs font-bold ${mode === "catalog" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
+        >
+          Search games
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("ai")}
+          className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${mode === "ai" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
+        >
+          <Sparkles className="size-3.5" /> AI search
+        </button>
+      </div>
       <form
+        aria-label="search form"
         className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 focus-within:border-primary/60"
-        onSubmit={(e) => e.preventDefault()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (mode === "ai" && query.trim()) recommendationMutation.mutate(query.trim());
+        }}
       >
         <Search className="size-4 text-muted-foreground" />
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(event) => setQuery(event.target.value)}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          placeholder="Search by title, genre, mood…"
+          placeholder={
+            mode === "ai" ? "Describe what you want to play…" : "Search by title, genre, mood…"
+          }
         />
         <button
-          type="button"
-          className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground"
+          type="submit"
+          className="rounded-md border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground"
         >
-          <SlidersHorizontal className="size-3.5" /> Filters
+          {mode === "ai" ? "Ask AI" : "Search"}
         </button>
       </form>
-
-      <div className="mb-8 flex flex-wrap gap-2">
-        {filters.map((f) => (
-          <button
-            key={f}
-            onClick={() => setActive(f)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-              f === active
-                ? "border-primary bg-primary/15 text-primary"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="label-mono text-muted-foreground">
-          {query.trim() === "" ? "Start typing to search" : `${results.length} results`}
-        </p>
-        <div className="flex items-center gap-2">
-          <select className="rounded-md border border-border bg-surface px-2 py-1 text-xs">
-            <option>Relevance</option>
-            <option>Price ↑</option>
-            <option>Discount</option>
-            <option>Rating</option>
-          </select>
-        </div>
-      </div>
-
-      {query.trim() !== "" && results.length === 0 && (
-        <EmptyState
-          icon={<Search className="size-5" />}
-          title="No games match your search"
-          description="Try a different title or clear some filters."
-        />
-      )}
-
-      {results.length > 0 && (
-        <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
-          {results.map((g) => (
-            <GameCard
-              key={g.id}
-              aspect="aspect-[3/4]"
-              game={{
-                gameId: String(g.id),
-                title: g.name,
-                coverFrom: "#312e81",
-                coverTo: "#111827",
-                coverUrl: g.background_image ?? undefined,
-                genres: g.genres,
-                platforms: g.platforms,
-              }}
+      {mode === "catalog" && (
+        <>
+          <div className="mb-8 flex flex-wrap gap-2">
+            {filters.map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setActive(filter)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${filter === active ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+          {query.trim() !== "" && results.length === 0 && (
+            <EmptyState
+              icon={<Search className="size-5" />}
+              title="No games match your search"
+              description="Try a different title or clear some filters."
             />
+          )}
+          {results.length > 0 && (
+            <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
+              {results.map((game) => (
+                <GameCard
+                  key={game.id}
+                  aspect="aspect-[3/4]"
+                  game={{
+                    gameId: String(game.id),
+                    title: game.name,
+                    coverFrom: "#312e81",
+                    coverTo: "#111827",
+                    coverUrl: game.background_image ?? undefined,
+                    genres: game.genres,
+                    platforms: game.platforms,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      {mode === "ai" && (
+        <div className="space-y-3">
+          {recommendationMutation.isPending && (
+            <p className="text-sm text-muted-foreground">Finding games for you…</p>
+          )}
+          {recommendationMutation.isError && (
+            <EmptyState
+              icon={<Sparkles className="size-5" />}
+              title="AI search is unavailable"
+              description="Please try again in a moment."
+            />
+          )}
+          {recommendationMutation.data?.recommendations.map((item) => (
+            <article key={item.title} className="rounded-xl border border-border bg-surface p-4">
+              <h3 className="font-bold">{item.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{item.reason}</p>
+              <p className="mt-3 text-xs text-primary">{item.tags.join(" · ")}</p>
+            </article>
           ))}
         </div>
       )}

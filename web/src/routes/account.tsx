@@ -42,7 +42,16 @@ export function AccountPage() {
           avatarFrom: "#7c3aed",
           avatarTo: "#111827",
           region: "US",
-          hours: libraryPlaytime(owned.reduce((total, game) => total + (game.playtime_forever ?? 0), 0)),
+          settings: profile
+            ? {
+                displayName: profile.display_name,
+                bio: profile.bio ?? "",
+                libraryVisibility: profile.library_visibility ?? "public",
+              }
+            : undefined,
+          hours: libraryPlaytime(
+            owned.reduce((total, game) => total + (game.playtime_forever ?? 0), 0),
+          ),
           games: owned.map((game) => ({
             id: game.id,
             title: game.title,
