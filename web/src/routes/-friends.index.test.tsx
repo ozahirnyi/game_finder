@@ -68,4 +68,18 @@ describe("FriendsPage", () => {
     expect(screen.getByText("67% match · 3 shared")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Steam Sam" })).toHaveAttribute("href", "https://steamcommunity.com/profiles/765");
   });
+
+  it("loads the next page of Steam friends", async () => {
+    api.getSteamSocial.mockImplementation((_limit: number, offset: number) => Promise.resolve(
+      offset === 0
+        ? { friends: [{ steam_id: "765", persona_name: "Steam Sam", taste_match_percent: 67, common_games_count: 3, library_public: true }], friends_total: 2, friends_has_more: true, top_friend_games: [] }
+        : { friends: [{ steam_id: "766", persona_name: "Steam Pat", taste_match_percent: 42, common_games_count: 1, library_public: true }], friends_total: 2, friends_has_more: false, top_friend_games: [] },
+    ));
+    renderFriends();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show more Steam friends" }));
+
+    expect(await screen.findByText("Steam Pat")).toBeInTheDocument();
+    expect(api.getSteamSocial).toHaveBeenLastCalledWith(12, 1);
+  });
 });

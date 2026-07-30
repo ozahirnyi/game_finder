@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
@@ -35,7 +35,13 @@ function FriendsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("");
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
-  const steamSocialQuery = useQuery({ queryKey: ["steam-social"], queryFn: getSteamSocial, retry: false });
+  const steamSocialQuery = useInfiniteQuery({
+    queryKey: ["steam-social"],
+    queryFn: ({ pageParam }) => getSteamSocial(12, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) => lastPage.friends_has_more ? pages.reduce((total, page) => total + page.friends.length, 0) : undefined,
+    retry: false,
+  });
   const incomingQuery = useQuery({ queryKey: ["friend-requests", "incoming"], queryFn: getIncomingFriendRequests });
   const searchQuery = useQuery({
     queryKey: ["user-search", searchTerm],
@@ -73,7 +79,8 @@ function FriendsPage() {
     platforms: [],
   }));
   const list = friends;
-  const steamFriends = steamSocialQuery.data?.friends ?? [];
+  const steamFriends = steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? [];
+  const steamFriendsTotal = steamSocialQuery.data?.pages[0]?.friends_total ?? 0;
   const focus = list[0];
   const sharedGames: Array<{ id: string; title: string; coverFrom: string; coverTo: string; coverUrl?: string }> = [];
   const activity: Array<{ id: string; who: string; verb: string; target: string; time: string }> = [];
@@ -84,7 +91,7 @@ function FriendsPage() {
         <div className="space-y-10 lg:col-span-8">
           <div>
             <SectionHeader
-              title="Friends"
+              title="Playfinder friends"
               hint={`${friends.length} friends · ${friends.filter((f) => f.online).length} online now`}
               action={
                 <div className="flex items-center gap-2">
@@ -140,7 +147,7 @@ function FriendsPage() {
             </div>
 
             <section className="mb-8">
-              <SectionHeader title="Steam friends" hint={steamSocialQuery.data ? `${steamSocialQuery.data.friends_total} friends` : "Connect Steam to compare libraries"} />
+              <SectionHeader title="Steam friends" hint={steamSocialQuery.data ? `${steamFriendsTotal} friends` : "Connect Steam to compare libraries"} />
               {steamFriends.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {steamFriends.map((friend) => (
@@ -153,6 +160,7 @@ function FriendsPage() {
               ) : (
                 <EmptyState icon={<Users className="size-5" />} title="No Steam friends available" description={steamSocialQuery.isError ? "Steam friends list is private or unavailable." : "Connect Steam to compare libraries and taste match."} />
               )}
+              {steamSocialQuery.hasNextPage && <button type="button" onClick={() => steamSocialQuery.fetchNextPage()} disabled={steamSocialQuery.isFetchingNextPage} className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:border-primary/50">{steamSocialQuery.isFetchingNextPage ? "Loading…" : "Show more Steam friends"}</button>}
             </section>
 
             {friends.length === 0 ? (
