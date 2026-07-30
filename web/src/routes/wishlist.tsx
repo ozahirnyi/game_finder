@@ -75,7 +75,7 @@ function WishlistPage() {
               key={g.id}
               className="hover-lift grid grid-cols-1 gap-6 rounded-2xl border border-border bg-surface p-5 hover:border-primary/40 md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
             >
-              <Link to="/games/$gameId" params={{ gameId: g.id }}>
+              <Link to="/games/$gameId" params={{ gameId: String(g.catalog_game_id) }}>
                 <GameCover
                   from="#7c3aed"
                   to="#111827"
@@ -89,7 +89,7 @@ function WishlistPage() {
               <div className="min-w-0">
                 <Link
                   to="/games/$gameId"
-                  params={{ gameId: g.id }}
+                  params={{ gameId: String(g.catalog_game_id) }}
                   className="truncate text-lg font-bold transition-colors hover:text-primary"
                 >
                   {g.title}
@@ -102,14 +102,14 @@ function WishlistPage() {
               <div className="flex items-center justify-end gap-2">
                 <Link
                   to="/games/$gameId"
-                  params={{ gameId: g.id }}
+                  params={{ gameId: String(g.catalog_game_id) }}
                   className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
                 >
                   View game
                 </Link>
                 <button
                   aria-label={`Remove ${g.title} from wishlist`}
-                  onClick={() => removeMutation.mutate(Number(g.id))}
+                  onClick={() => removeMutation.mutate(g.id)}
                   disabled={removeMutation.isPending}
                   className="grid size-9 place-items-center rounded-lg border border-border text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
                 >

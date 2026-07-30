@@ -359,7 +359,7 @@ export function addWishlist(game: CatalogGame) {
   });
 }
 
-export function removeWishlist(id: number) {
+export function removeWishlist(id: string) {
   return apiRequest<void>(`/wishlist/${id}`, { auth: true, method: "DELETE" });
 }
 
