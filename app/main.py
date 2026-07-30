@@ -35,7 +35,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
-    PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
+    PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead
 from app.steam import (
@@ -1348,6 +1348,27 @@ def list_friends(
         friend = db.query(User).filter(User.id == friend_id).first()
         result.append(FriendshipRead(user=public_user_response(friend), created_at=friendship.created_at))
     return result
+
+
+@app.get("/friends/{user_id}/profile", response_model=FriendProfileRead)
+def get_friend_profile(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friend = db.query(User).filter(User.id == user_id).first()
+    if friend is None or not are_friends(db, current_user.id, friend.id):
+        raise HTTPException(status_code=404, detail="Friend not found")
+    if can_view_section(friend, current_user, friend.library_visibility, db):
+        games = db.query(Game).filter(Game.owner_id == friend.id).order_by(func.lower(Game.title)).all()
+        library = PublicDataBlock(
+            status="ready" if games else "empty",
+            data=[public_library_game_response(game).model_dump(mode="json") for game in games],
+            message=None if games else "No library games have been saved yet.",
+        )
+    else:
+        library = hidden_public_block()
+    return FriendProfileRead(user=public_user_response(friend), library=library)
 
 
 @app.delete("/friends/{user_id}", status_code=204)

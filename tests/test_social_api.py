@@ -168,6 +168,26 @@ def test_public_profile_returns_owned_library_and_collection_covers(social_db):
     assert payload["wishlist"]["data"][0]["cover_url"] == "https://cover/wishlist"
 
 
+def test_friend_profile_returns_friend_bio_avatar_and_library(social_db):
+    alice, bob, charlie, _ = create_users(social_db)
+    bob.bio = "Steam collector"
+    social_db.add_all([
+        Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)),
+        Game(owner_id=bob.id, title="Portal 2", source="steam", img_icon_url="https://cover/portal"),
+    ])
+    social_db.commit()
+
+    response = use_social_api(alice, social_db).get(f"/friends/{bob.id}/profile")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["user"]["id"] == str(bob.id)
+    assert payload["user"]["bio"] == "Steam collector"
+    assert payload["library"]["status"] == "ready"
+    assert payload["library"]["data"][0]["title"] == "Portal 2"
+    assert use_social_api(charlie, social_db).get(f"/friends/{bob.id}/profile").status_code == 404
+
+
 def test_social_profile_nickname_and_player_search_are_public_but_private_fields_are_not(social_db):
     alice, bob, charlie, _hidden = create_users(social_db)
     api = use_social_api(alice, social_db)

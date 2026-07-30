@@ -464,6 +464,11 @@ class FriendshipRead(BaseModel):
     created_at: datetime
 
 
+class FriendProfileRead(BaseModel):
+    user: PublicUserRead
+    library: PublicDataBlock
+
+
 class ConversationCreate(BaseModel):
     recipient_id: uuid.UUID
 

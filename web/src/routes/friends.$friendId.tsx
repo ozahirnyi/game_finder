@@ -1,14 +1,19 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView, type ProfileData } from "@/components/ProfileView";
-import { getFriends } from "@/lib/api";
+import { getFriendProfile } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
 import { ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/friends/$friendId")({
   loader: async ({ params }) => {
-    const friend = (await getFriends()).find(({ user }) => user.id === params.friendId)?.user;
-    if (!friend) throw notFound();
+    let profile;
+    try {
+      profile = await getFriendProfile(params.friendId);
+    } catch {
+      throw notFound();
+    }
+    const friend = profile.user;
     return {
       friend: {
         id: friend.id,
@@ -16,6 +21,9 @@ export const Route = createFileRoute("/friends/$friendId")({
         handle: friendDisplayName(friend),
         avatarFrom: "#7c3aed",
         avatarTo: "#111827",
+        avatarUrl: friend.avatar ?? undefined,
+        bio: friend.bio ?? undefined,
+        library: profile.library,
       },
     };
   },
@@ -64,7 +72,15 @@ function FriendNotFound() {
 
 function FriendProfilePage() {
   const { friend } = Route.useLoaderData();
-  const owned: ProfileData["games"] = [];
+  const owned: ProfileData["games"] = friend.library.data.map((game) => ({
+    id: game.id,
+    title: game.title,
+    coverFrom: "#7c3aed",
+    coverTo: "#111827",
+    coverUrl: game.cover_url ?? undefined,
+    playtime: game.playtime_forever,
+    source: game.source,
+  }));
 
   return (
     <AppShell>
@@ -81,20 +97,22 @@ function FriendProfilePage() {
           handle: friend.handle,
           avatarFrom: friend.avatarFrom,
           avatarTo: friend.avatarTo,
-          region: "US",
+          avatarUrl: friend.avatarUrl,
+          bio: friend.bio,
+          region: "Global",
           online: false,
           hours: "—",
           games: owned,
           stores: [
             {
               name: "Steam",
-              count: owned.filter((g) => g.source === "Steam").length,
-              note: "Library details unavailable",
+              count: owned.filter((g) => g.source?.toLowerCase() === "steam").length,
+              note: friend.library.status === "hidden" ? "Library is private" : "Synced games",
             },
             {
               name: "PlayStation",
-              count: owned.filter((g) => g.source === "PlayStation").length,
-              note: "Library details unavailable",
+              count: owned.filter((g) => g.source?.toLowerCase() === "psn").length,
+              note: friend.library.status === "hidden" ? "Library is private" : "Synced games",
             },
           ],
           activity: [],

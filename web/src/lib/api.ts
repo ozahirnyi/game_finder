@@ -119,6 +119,15 @@ export type FriendRequest = {
   created_at: string;
 };
 
+export type FriendProfile = {
+  user: Friend["user"];
+  library: {
+    status: "ready" | "empty" | "hidden";
+    data: LibraryGame[];
+    message?: string | null;
+  };
+};
+
 export type Profile = {
   id: string;
   email: string;
@@ -393,6 +402,10 @@ export function removeWishlist(id: string) {
 
 export function getFriends() {
   return apiRequest<Friend[]>("/friends", { auth: true });
+}
+
+export function getFriendProfile(id: string) {
+  return apiRequest<FriendProfile>(`/friends/${id}/profile`, { auth: true });
 }
 
 export function searchUsers(query: string) {
