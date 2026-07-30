@@ -31,6 +31,9 @@ class CatalogGameDb:
     def refresh(self, _game):
         return None
 
+    def delete(self, game):
+        self.games.remove(game)
+
 
 class CatalogGameQuery:
     def __init__(self, db):
@@ -172,6 +175,32 @@ def test_catalog_wishlist_save_requires_authentication():
     response = client.post("/wishlist/catalog-games/274755")
 
     assert response.status_code == 401
+
+
+def test_wishlist_response_separates_catalog_identity_from_record_identity_for_removal(monkeypatch):
+    owner_id = uuid.uuid4()
+    db = CatalogGameDb()
+
+    async def fake_fetch(rawg_id: int):
+        return {"id": rawg_id, "name": "Hades II", "background_image": None}
+
+    main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+
+    try:
+        saved = client.post("/wishlist/catalog-games/274755")
+        payload = saved.json()
+        removed = client.delete(f"/wishlist/{payload['id']}")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert saved.status_code == 201
+    assert uuid.UUID(payload["id"])
+    assert payload["catalog_game_id"] == 274755
+    assert payload["id"] != str(payload["catalog_game_id"])
+    assert removed.status_code == 204
+    assert db.games == []
 
 
 def test_catalog_favorite_save_is_idempotent_and_server_authoritative(monkeypatch):

@@ -1731,13 +1731,15 @@ def update_wishlist_item(
     return collection_response(item)
 
 
-@app.delete("/wishlist/{catalog_game_id}", status_code=204)
+@app.delete("/wishlist/{wishlist_item_id}", status_code=204)
 def remove_wishlist_item(
-    catalog_game_id: int,
+    wishlist_item_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = get_owned_wishlist_item(db, current_user.id, catalog_game_id)
+    item = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id, WishlistItem.id == wishlist_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Wishlist item not found")
     db.delete(item)
     db.commit()
 
