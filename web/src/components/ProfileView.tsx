@@ -229,7 +229,7 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
       )}
       {!isSelf && messageOpen && (
         <div role="dialog" aria-label={`Message ${profile.name}`} className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-          <form onSubmit={(event) => { event.preventDefault(); if (messageBody.trim()) sendMessage.mutate(); }} className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+          <form onSubmit={(event) => { event.preventDefault(); if (messageBody.trim()) sendMessage.mutate(); }} className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl">
             <h2 className="text-xl font-bold">Message {profile.name}</h2>
             <textarea aria-label="Message text" value={messageBody} onChange={(event) => setMessageBody(event.target.value)} required maxLength={2000} className="mt-4 min-h-28 w-full rounded-lg border border-border bg-surface-2 p-3" />
             {sendMessage.isError && <p role="alert" className="mt-2 text-sm text-destructive">Could not send message.</p>}
@@ -239,7 +239,7 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
       )}
       {!isSelf && inviteOpen && (
         <div role="dialog" aria-label={`Invite ${profile.name}`} className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-          <form onSubmit={(event) => { event.preventDefault(); if (gameName.trim()) sendInvite.mutate(); }} className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+          <form onSubmit={(event) => { event.preventDefault(); if (gameName.trim()) sendInvite.mutate(); }} className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl">
             <h2 className="text-xl font-bold">Invite {profile.name} to play</h2>
             <input aria-label="Game name" value={gameName} onChange={(event) => setGameName(event.target.value)} required maxLength={255} placeholder="Game name" className="mt-4 w-full rounded-lg border border-border bg-surface-2 p-3" />
             {sendInvite.isError && <p role="alert" className="mt-2 text-sm text-destructive">Could not send invite.</p>}
