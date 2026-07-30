@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
@@ -227,7 +228,7 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
           </form>
         </div>
       )}
-      {!isSelf && messageOpen && (
+      {!isSelf && messageOpen && typeof document !== "undefined" && createPortal(
         <div role="dialog" aria-label={`Message ${profile.name}`} className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
           <form onSubmit={(event) => { event.preventDefault(); if (messageBody.trim()) sendMessage.mutate(); }} className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl">
             <h2 className="text-xl font-bold">Message {profile.name}</h2>
@@ -236,8 +237,8 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
             <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setMessageOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold">Cancel</button><button type="submit" disabled={sendMessage.isPending} className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">Send</button></div>
           </form>
         </div>
-      )}
-      {!isSelf && inviteOpen && (
+      , document.body)}
+      {!isSelf && inviteOpen && typeof document !== "undefined" && createPortal(
         <div role="dialog" aria-label={`Invite ${profile.name}`} className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
           <form onSubmit={(event) => { event.preventDefault(); if (gameName.trim()) sendInvite.mutate(); }} className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl">
             <h2 className="text-xl font-bold">Invite {profile.name} to play</h2>
@@ -246,7 +247,7 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
             <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setInviteOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold">Cancel</button><button type="submit" disabled={sendInvite.isPending} className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">Send invite</button></div>
           </form>
         </div>
-      )}
+      , document.body)}
 
       <div className="mb-8 flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl border border-border bg-surface-2 px-5 py-4">
         {[
