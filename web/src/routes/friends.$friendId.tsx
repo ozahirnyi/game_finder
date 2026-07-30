@@ -11,6 +11,9 @@ export function formatFriendPlaytime(games: Array<{ playtime?: number | null; pl
 }
 
 export const Route = createFileRoute("/friends/$friendId")({
+  validateSearch: (search: Record<string, unknown>): { compose?: "message" | "invite" } => ({
+    ...(search.compose === "message" || search.compose === "invite" ? { compose: search.compose } : {}),
+  }),
   loader: async ({ params }) => {
     let profile;
     try {
@@ -77,6 +80,7 @@ function FriendNotFound() {
 
 function FriendProfilePage() {
   const { friend } = Route.useLoaderData();
+  const { compose } = Route.useSearch();
   const owned: ProfileData["games"] = friend.library.data.map((game) => ({
     id: game.id,
     title: game.title,
@@ -97,6 +101,7 @@ function FriendProfilePage() {
       </Link>
       <ProfileView
         isSelf={false}
+        initialComposer={compose}
         profile={{
           name: friend.name,
           handle: friend.handle,

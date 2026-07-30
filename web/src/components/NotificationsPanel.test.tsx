@@ -33,5 +33,7 @@ describe("NotificationsPanel", () => {
     );
 
     expect(await screen.findByText("Sam accepted your friend request.")).toBeInTheDocument();
+    expect(screen.getByText("Friend request accepted")).toBeInTheDocument();
+    expect(screen.queryByText("friend_request_accepted")).not.toBeInTheDocument();
   });
 });

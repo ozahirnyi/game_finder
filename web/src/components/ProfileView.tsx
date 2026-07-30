@@ -5,7 +5,7 @@ import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { ConnectedServices } from "@/components/ConnectedServices";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
-import { createConversation, createMessage, updateProfile } from "@/lib/api";
+import { createConversation, createGameInvite, createMessage, updateProfile } from "@/lib/api";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
 function formatPlaytime(minutes: number) {
@@ -44,15 +44,17 @@ export type ProfileData = {
   };
 };
 
-export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf: boolean }) {
+export function ProfileView({ profile, isSelf, initialComposer }: { profile: ProfileData; isSelf: boolean; initialComposer?: "message" | "invite" }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [displayName, setDisplayName] = useState(profile.settings?.displayName ?? profile.name);
   const [bio, setBio] = useState(profile.settings?.bio ?? profile.bio ?? "");
   const [libraryVisibility, setLibraryVisibility] = useState(
     profile.settings?.libraryVisibility ?? "public",
   );
-  const [messageOpen, setMessageOpen] = useState(false);
+  const [messageOpen, setMessageOpen] = useState(initialComposer === "message");
   const [messageBody, setMessageBody] = useState("");
+  const [inviteOpen, setInviteOpen] = useState(initialComposer === "invite");
+  const [gameName, setGameName] = useState("");
   const queryClient = useQueryClient();
   const saveSettings = useMutation({
     mutationFn: updateProfile,
@@ -68,6 +70,13 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
       return createMessage(conversation.id, messageBody.trim());
     },
     onSuccess: () => { setMessageBody(""); setMessageOpen(false); },
+  });
+  const sendInvite = useMutation({
+    mutationFn: () => {
+      if (!profile.friendId) throw new Error("Friend not available");
+      return createGameInvite({ recipient_id: profile.friendId, game_name: gameName.trim() });
+    },
+    onSuccess: () => { setGameName(""); setInviteOpen(false); },
   });
   const steam = profile.stores.find((s) => s.name === "Steam")?.count ?? 0;
   const psn = profile.stores.find((s) => s.name === "PlayStation")?.count ?? 0;
@@ -128,11 +137,7 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
             </>
           ) : (
             <>
-              <button
-                disabled
-                title="Invites are coming soon"
-                className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground opacity-50"
-              >
+              <button onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">
                 <UserPlus className="size-4" /> Invite to play
               </button>
               <button
@@ -229,6 +234,16 @@ export function ProfileView({ profile, isSelf }: { profile: ProfileData; isSelf:
             <textarea aria-label="Message text" value={messageBody} onChange={(event) => setMessageBody(event.target.value)} required maxLength={2000} className="mt-4 min-h-28 w-full rounded-lg border border-border bg-surface-2 p-3" />
             {sendMessage.isError && <p role="alert" className="mt-2 text-sm text-destructive">Could not send message.</p>}
             <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setMessageOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold">Cancel</button><button type="submit" disabled={sendMessage.isPending} className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">Send</button></div>
+          </form>
+        </div>
+      )}
+      {!isSelf && inviteOpen && (
+        <div role="dialog" aria-label={`Invite ${profile.name}`} className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+          <form onSubmit={(event) => { event.preventDefault(); if (gameName.trim()) sendInvite.mutate(); }} className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+            <h2 className="text-xl font-bold">Invite {profile.name} to play</h2>
+            <input aria-label="Game name" value={gameName} onChange={(event) => setGameName(event.target.value)} required maxLength={255} placeholder="Game name" className="mt-4 w-full rounded-lg border border-border bg-surface-2 p-3" />
+            {sendInvite.isError && <p role="alert" className="mt-2 text-sm text-destructive">Could not send invite.</p>}
+            <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setInviteOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold">Cancel</button><button type="submit" disabled={sendInvite.isPending} className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">Send invite</button></div>
           </form>
         </div>
       )}

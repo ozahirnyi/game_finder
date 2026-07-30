@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -30,6 +30,7 @@ export const Route = createFileRoute("/friends/")({
 });
 
 function FriendsPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [friendSource, setFriendSource] = useState<"playfinder" | "steam">("playfinder");
@@ -231,10 +232,10 @@ function FriendsPage() {
                       </p>
                     </div>
                     <div className="flex flex-col gap-2" onClick={(e) => e.preventDefault()}>
-                      <button disabled title="Invites are coming soon" className="cursor-not-allowed rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground opacity-50">
+                      <button onClick={() => navigate({ to: "/friends/$friendId", params: { friendId: f.id }, search: { compose: "invite" } })} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
                         Invite to play
                       </button>
-                      <button disabled title="Messaging is coming soon" className="cursor-not-allowed rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold opacity-50">
+                      <button onClick={() => navigate({ to: "/friends/$friendId", params: { friendId: f.id }, search: { compose: "message" } })} className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold">
                         Message
                       </button>
                     </div>

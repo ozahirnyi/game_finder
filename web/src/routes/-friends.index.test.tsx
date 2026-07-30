@@ -61,6 +61,14 @@ describe("FriendsPage", () => {
     await waitFor(() => expect(api.acceptFriendRequest).toHaveBeenCalledWith("request-1"));
   });
 
+  it("enables message and invite actions for an existing friend", async () => {
+    api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
+    renderFriends();
+
+    expect(await screen.findByRole("button", { name: "Message" })).toBeEnabled();
+    expect(screen.getAllByRole("button", { name: "Invite to play" })[0]).toBeEnabled();
+  });
+
   it("shows Steam friends with taste match and a Steam profile link", async () => {
     renderFriends();
 
