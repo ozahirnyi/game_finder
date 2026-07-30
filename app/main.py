@@ -184,6 +184,10 @@ def public_user_response(user: User) -> PublicUserRead:
     )
 
 
+def notification_actor_name(user: User) -> str:
+    return (getattr(user, "steam_persona_name", None) or getattr(user, "public_nickname", None) or getattr(user, "display_name", None) or "A player").strip()
+
+
 def user_pair(first_id: uuid.UUID, second_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
     return (first_id, second_id) if str(first_id) < str(second_id) else (second_id, first_id)
 
@@ -1284,7 +1288,7 @@ def create_friend_request(
     request = FriendRequest(sender_id=current_user.id, recipient_id=recipient.id, message=data.message)
     db.add(request)
     db.flush()
-    create_notification(db, recipient.id, "friend_request", {"request_id": str(request.id), "from": current_user.display_name})
+    create_notification(db, recipient.id, "friend_request", {"request_id": str(request.id), "from": notification_actor_name(current_user)})
     db.commit()
     db.refresh(request)
     return friend_request_response(db, request)
@@ -1307,7 +1311,7 @@ def accept_friend_request(
     friendship = Friendship(user_low_id=low_id, user_high_id=high_id)
     db.add(friendship)
     sender = db.query(User).filter(User.id == request.sender_id).first()
-    create_notification(db, sender.id, "friend_request_accepted", {"by": current_user.display_name})
+    create_notification(db, sender.id, "friend_request_accepted", {"by": notification_actor_name(current_user)})
     db.delete(request)
     db.commit()
     db.refresh(friendship)
@@ -1483,7 +1487,7 @@ def create_message(
     conversation.updated_at = datetime.now(timezone.utc)
     recipient_id = conversation.user_high_id if conversation.user_low_id == current_user.id else conversation.user_low_id
     db.add(message)
-    create_notification(db, recipient_id, "message", {"conversation_id": str(conversation.id), "from": current_user.display_name, "preview": message.body[:120]})
+    create_notification(db, recipient_id, "message", {"conversation_id": str(conversation.id), "from": notification_actor_name(current_user), "preview": message.body[:120]})
     db.commit()
     db.refresh(message)
     return MessageRead(id=message.id, conversation_id=message.conversation_id, sender_id=message.sender_id, body=message.body, created_at=message.created_at, read_at=message.read_at)
@@ -1514,7 +1518,7 @@ def create_game_invite(
     invite = GameInvite(sender_id=current_user.id, recipient_id=recipient.id, game_id=data.game_id, game_name=data.game_name.strip(), note=data.note)
     db.add(invite)
     db.flush()
-    create_notification(db, recipient.id, "game_invite", {"invite_id": str(invite.id), "from": current_user.display_name, "game_name": invite.game_name})
+    create_notification(db, recipient.id, "game_invite", {"invite_id": str(invite.id), "from": notification_actor_name(current_user), "game_name": invite.game_name})
     db.commit()
     db.refresh(invite)
     return game_invite_response(db, invite)
@@ -1534,7 +1538,7 @@ def respond_to_game_invite(
         raise HTTPException(status_code=409, detail="Game invite has already been answered")
     invite.status = data.status
     invite.responded_at = datetime.now(timezone.utc)
-    create_notification(db, invite.sender_id, "game_invite_response", {"invite_id": str(invite.id), "by": current_user.display_name, "status": data.status})
+    create_notification(db, invite.sender_id, "game_invite_response", {"invite_id": str(invite.id), "by": notification_actor_name(current_user), "status": data.status})
     db.commit()
     db.refresh(invite)
     return game_invite_response(db, invite)

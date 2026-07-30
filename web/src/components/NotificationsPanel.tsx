@@ -11,6 +11,14 @@ const iconFor = {
   system: Bell,
 } as const;
 
+const titleFor: Record<string, string> = {
+  friend_request: "Friend request",
+  friend_request_accepted: "Friend request accepted",
+  message: "New message",
+  game_invite: "Game invite",
+  game_invite_response: "Game invite response",
+};
+
 function notificationMessage(type: string, payload: Record<string, unknown>) {
   const from = typeof payload.from === "string" ? payload.from : "A player";
   const by = typeof payload.by === "string" ? payload.by : "A player";
@@ -133,7 +141,7 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-bold">{n.type}</p>
+                    <p className="truncate text-sm font-bold">{titleFor[n.type] ?? "Notification"}</p>
                     {isUnread && <Chip tone="primary">New</Chip>}
                   </div>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">
