@@ -20,7 +20,8 @@ it("links a Steam deal without a catalog match to an in-site Steam game page", a
   const router = createRouter({ routeTree: root.addChildren([route]), history: createMemoryHistory({ initialEntries: ["/"] }) });
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RouterProvider router={router} /></QueryClientProvider>);
 
-  expect((await screen.findByRole("link", { name: "Portal 2" })).getAttribute("href")).toContain("/games/620?source=steam&title=Portal+2");
-  expect(screen.getByRole("link", { name: "View on Playfinder" })).toHaveAttribute("href", "/games/620?source=steam&title=Portal+2");
+  expect((await screen.findByRole("link", { name: "Open Portal 2 on Playfinder" })).getAttribute("href")).toBe("/games/620?source=steam&title=Portal+2");
+  expect(screen.queryByRole("link", { name: "View on Playfinder" })).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Open in Steam" })).toHaveAttribute("href", "https://store.steampowered.com/app/620");
+  expect(screen.getByRole("link", { name: "Open in Steam" })).toHaveAttribute("target", "_blank");
 });
