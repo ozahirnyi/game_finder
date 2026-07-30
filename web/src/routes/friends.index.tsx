@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, PresenceDot, SectionHeader } from "@/components/ui-bits";
-import { getFriends } from "@/lib/api";
+import { acceptFriendRequest, createFriendRequest, getFriends, getIncomingFriendRequests, searchUsers } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
 import { Search, UserPlus, Gamepad2, MessageCircle, Users } from "lucide-react";
 
@@ -29,7 +30,32 @@ export const Route = createFileRoute("/friends/")({
 });
 
 function FriendsPage() {
+  const queryClient = useQueryClient();
+  const [showAddFriend, setShowAddFriend] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [status, setStatus] = useState("");
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
+  const incomingQuery = useQuery({ queryKey: ["friend-requests", "incoming"], queryFn: getIncomingFriendRequests });
+  const searchQuery = useQuery({
+    queryKey: ["user-search", searchTerm],
+    queryFn: () => searchUsers(searchTerm),
+    enabled: showAddFriend && searchTerm.trim().length >= 2,
+  });
+  const requestMutation = useMutation({
+    mutationFn: (data: { recipient_id: string; message?: string }) => createFriendRequest(data),
+    onSuccess: () => {
+      setStatus("Request sent");
+      setSearchTerm("");
+    },
+  });
+  const acceptMutation = useMutation({
+    mutationFn: (id: string) => acceptFriendRequest(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["friends"] });
+      queryClient.invalidateQueries({ queryKey: ["friend-requests", "incoming"] });
+      setStatus("Friend added");
+    },
+  });
   const friends = (friendsQuery.data ?? []).map(({ user }) => ({
     id: user.id,
     name: friendDisplayName(user),
@@ -60,16 +86,53 @@ function FriendsPage() {
               hint={`${friends.length} friends · ${friends.filter((f) => f.online).length} online now`}
               action={
                 <div className="flex items-center gap-2">
-                  <button className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">
+                  <button onClick={() => setShowAddFriend(true)} className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">
                     <UserPlus className="size-3.5" /> Add friend
                   </button>
                 </div>
               }
             />
+            {showAddFriend && (
+              <section aria-label="Add friend" className="mb-6 rounded-2xl border border-border bg-surface p-4">
+                <label className="grid gap-2 text-sm font-bold">Player name
+                  <input aria-label="Player name" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search by display name" className="rounded-lg border border-border bg-background px-3 py-2 font-normal" />
+                </label>
+                {searchTerm.trim().length >= 2 && !searchQuery.isLoading && searchQuery.data?.length === 0 && <p className="mt-3 text-sm text-muted-foreground">No players found.</p>}
+                <div className="mt-3 space-y-2">
+                  {searchQuery.data?.map((player) => (
+                    <div key={player.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                      <span className="font-semibold">{friendDisplayName(player)}</span>
+                      <button onClick={() => requestMutation.mutate({ recipient_id: player.id })} disabled={requestMutation.isPending} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">Add {friendDisplayName(player)}</button>
+                    </div>
+                  ))}
+                </div>
+                {requestMutation.isError && <p role="alert" className="mt-3 text-sm text-destructive">Could not send this request.</p>}
+                <button type="button" onClick={() => setShowAddFriend(false)} className="mt-4 text-xs font-bold text-muted-foreground">Close</button>
+              </section>
+            )}
+            {incomingQuery.data?.length ? (
+              <section aria-label="Friend requests" className="mb-6 space-y-2 rounded-2xl border border-border bg-surface p-4">
+                <h2 className="text-base font-bold">Friend requests</h2>
+                {incomingQuery.data.map((request) => (
+                  <div key={request.id} className="flex items-center justify-between gap-3">
+                    <span className="text-sm">{friendDisplayName(request.sender)}</span>
+                    <button onClick={() => acceptMutation.mutate(request.id)} disabled={acceptMutation.isPending} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">Accept {friendDisplayName(request.sender)}</button>
+                  </div>
+                ))}
+              </section>
+            ) : null}
+            {status && <p role="status" className="mb-4 text-sm font-semibold text-primary">{status}</p>}
             <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 focus-within:border-primary/60">
               <Search className="size-4 text-muted-foreground" />
               <input
-                placeholder="Find players by game, language, platform, play style…"
+                aria-label="Find players"
+                value={searchTerm}
+                onFocus={() => setShowAddFriend(true)}
+                onChange={(event) => {
+                  setSearchTerm(event.target.value);
+                  setShowAddFriend(true);
+                }}
+                placeholder="Find players by name"
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
             </div>
@@ -80,7 +143,7 @@ function FriendsPage() {
                 title="No friends yet"
                 description="Add friends to compare libraries and find games you can play together."
                 action={
-                  <button className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">
+                  <button onClick={() => setShowAddFriend(true)} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">
                     Add friend
                   </button>
                 }
