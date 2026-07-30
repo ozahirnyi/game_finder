@@ -57,7 +57,7 @@ describe("WishlistPage", () => {
     const gameRoute = createRoute({
       getParentRoute: () => rootRoute,
       path: "/games/$gameId",
-      component: () => null,
+      component: () => <p>Game detail opened</p>,
     });
     const router = createRouter({
       routeTree: rootRoute.addChildren([wishlistRoute, gameRoute]),
@@ -79,6 +79,9 @@ describe("WishlistPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove Hades II from wishlist" }));
 
     await waitFor(() => expect(api.removeWishlist.mock.calls[0]?.[0]).toBe(wishlistRecordId));
+
+    fireEvent.click(screen.getByTestId(`wishlist-card-${wishlistRecordId}`));
+    expect(await screen.findByText("Game detail opened")).toBeInTheDocument();
   });
 
   it("creates a price alert from the section action", async () => {

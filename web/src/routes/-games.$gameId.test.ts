@@ -36,7 +36,7 @@ describe("Steam library game loader", () => {
     } as never);
 
     expect(result.game.coverUrl).toBe(
-      "https://cdn.cloudflare.steamstatic.com/steam/apps/620/header.jpg",
+      "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_hero.jpg",
     );
   });
 });
