@@ -11,6 +11,25 @@ const iconFor = {
   system: Bell,
 } as const;
 
+function notificationMessage(type: string, payload: Record<string, unknown>) {
+  const from = typeof payload.from === "string" ? payload.from : "A player";
+  const by = typeof payload.by === "string" ? payload.by : "A player";
+  switch (type) {
+    case "friend_request":
+      return `${from} sent you a friend request.`;
+    case "friend_request_accepted":
+      return `${by} accepted your friend request.`;
+    case "message":
+      return `${from}: ${typeof payload.preview === "string" ? payload.preview : "sent you a message."}`;
+    case "game_invite":
+      return `${from} invited you to play ${typeof payload.game_name === "string" ? payload.game_name : "a game"}.`;
+    case "game_invite_response":
+      return `${by} ${payload.status === "accepted" ? "accepted" : "declined"} your game invite.`;
+    default:
+      return typeof payload.message === "string" ? payload.message : "New Playfinder notification";
+  }
+}
+
 export function NotificationsPanel({ className = "" }: { className?: string }) {
   const [showSettings, setShowSettings] = useState(false);
   const [prefs, setPrefs] = useState([
@@ -118,7 +137,7 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                     {isUnread && <Chip tone="primary">New</Chip>}
                   </div>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {String(n.payload.message ?? "New Playfinder notification")}
+                    {notificationMessage(n.type, n.payload)}
                   </p>
                 </div>
                 <span className="label-mono shrink-0 text-muted-foreground">
