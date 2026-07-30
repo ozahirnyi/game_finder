@@ -49,4 +49,14 @@ describe("ProfileView library visibility", () => {
     renderProfile(false);
     expect(screen.getByText("2h 5m")).toBeInTheDocument();
   });
+  it("shows the message form above its backdrop", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView profile={{ ...profile, friendId: "friend-1" }} isSelf={false} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Message Player" }));
+    expect(screen.getByRole("dialog", { name: "Message Player" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Message Player" })).toBeVisible();
+  });
 });
