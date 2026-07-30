@@ -47,6 +47,7 @@ All new functionality must be covered by automated tests.
 
 - Backend changes: add or update focused `pytest` tests under `tests/`.
 - Frontend changes: add or update focused Vitest tests under `web/src/**`.
+- New code must not land without automated coverage for the changed behavior. Backend coverage is measured by `python scripts/check_backend_coverage.py`; the repository baseline gate is `--cov-fail-under=94` and must not be lowered. If coverage rises enough to support the next stable integer gate, raise the gate in the same PR or a follow-up coverage-maintenance PR.
 - Mock or stub RAWG, Redis, OpenAI, Steam, Google, Telegram, and price-provider calls. Unit/contract tests should not require live API keys, network calls, or running external services unless the task explicitly asks for integration tests.
 - If changing database models, include an Alembic migration and tests or assertions that cover the changed contract.
 
@@ -76,6 +77,7 @@ Backend tests:
 
 ```bash
 pytest
+python scripts/check_backend_coverage.py
 ```
 
 Frontend:
@@ -106,8 +108,19 @@ Apply these rules in every chat working on this project:
 Apply these rules in every chat working on this project:
 
 - Create a separate `codex/<task-name>` branch before implementation. Do not work directly on shared phase branches.
+- All code entering `main` must be merged through a pull request. Do not push directly to `main`.
 - Use `main` as the base branch for every pull request. Never create or use `phase-6` branches or pull requests.
 - Keep commits small and thematic. Before committing or publishing, inspect `git status` and the scoped diff, then run relevant tests followed by the full applicable test/build suite.
 - Preserve unrelated changes and never commit secrets, credentials, generated local artifacts, or old changes outside the task.
 - Push the task branch and create a pull request for review. Its description must summarize the changes and list verification commands.
-- Merge only after user approval or review. After merging, confirm that production deployed from `main` and run the applicable production health check.
+- Before a pull request is considered merge-ready, create a code-review sub-agent with medium reasoning to review the full diff. If the reviewer finds bugs, regressions, missing tests, or policy violations, the main session must fix them and then start another medium-reasoning review sub-agent. Repeat this loop until the reviewer explicitly approves with no findings.
+- Merge only after user approval and a clean medium-reasoning sub-agent review. After merging, confirm that production deployed from `main` and run the applicable production health check.
+
+## Worktree Policy
+
+Apply these rules in every code-changing chat working on this project:
+
+- Create a dedicated worktree under `.worktrees/` from the latest `origin/main` before editing code or tests.
+- Use a `codex/<task-name>` branch in that worktree.
+- Keep the original checkout untouched except for explicitly requested changes.
+- Run git status and scoped diffs from the active task worktree before staging, committing, pushing, or opening a pull request.

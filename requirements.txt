@@ -14,4 +14,5 @@ openai
 slowapi
 python-multipart
 pytest
+pytest-cov==6.2.1
 openpyxl==3.1.5
