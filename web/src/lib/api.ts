@@ -111,6 +111,14 @@ export type Friend = {
   };
 };
 
+export type FriendRequest = {
+  id: string;
+  sender: Friend["user"];
+  recipient: Friend["user"];
+  message?: string | null;
+  created_at: string;
+};
+
 export type Profile = {
   id: string;
   email: string;
@@ -385,6 +393,22 @@ export function removeWishlist(id: string) {
 
 export function getFriends() {
   return apiRequest<Friend[]>("/friends", { auth: true });
+}
+
+export function searchUsers(query: string) {
+  return apiRequest<Friend["user"][]>(`/users/search?q=${encodeURIComponent(query)}`, { auth: true });
+}
+
+export function getIncomingFriendRequests() {
+  return apiRequest<FriendRequest[]>("/friends/requests/incoming", { auth: true });
+}
+
+export function createFriendRequest(data: { recipient_id: string; message?: string }) {
+  return apiRequest<FriendRequest>("/friends/requests", { auth: true, method: "POST", body: data });
+}
+
+export function acceptFriendRequest(id: string) {
+  return apiRequest<Friend>(`/friends/requests/${id}/accept`, { auth: true, method: "POST" });
 }
 
 export function createGameInvite(data: GameInviteCreate) {
