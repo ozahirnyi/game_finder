@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, PresenceDot, SectionHeader } from "@/components/ui-bits";
-import { acceptFriendRequest, createFriendRequest, getFriends, getIncomingFriendRequests, searchUsers } from "@/lib/api";
+import { acceptFriendRequest, createFriendRequest, getFriends, getIncomingFriendRequests, getSteamSocial, searchUsers } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
 import { Search, UserPlus, Gamepad2, MessageCircle, Users } from "lucide-react";
 
@@ -35,6 +35,7 @@ function FriendsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("");
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
+  const steamSocialQuery = useQuery({ queryKey: ["steam-social"], queryFn: getSteamSocial, retry: false });
   const incomingQuery = useQuery({ queryKey: ["friend-requests", "incoming"], queryFn: getIncomingFriendRequests });
   const searchQuery = useQuery({
     queryKey: ["user-search", searchTerm],
@@ -72,6 +73,7 @@ function FriendsPage() {
     platforms: [],
   }));
   const list = friends;
+  const steamFriends = steamSocialQuery.data?.friends ?? [];
   const focus = list[0];
   const sharedGames: Array<{ id: string; title: string; coverFrom: string; coverTo: string; coverUrl?: string }> = [];
   const activity: Array<{ id: string; who: string; verb: string; target: string; time: string }> = [];
@@ -136,6 +138,22 @@ function FriendsPage() {
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
             </div>
+
+            <section className="mb-8">
+              <SectionHeader title="Steam friends" hint={steamSocialQuery.data ? `${steamSocialQuery.data.friends_total} friends` : "Connect Steam to compare libraries"} />
+              {steamFriends.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {steamFriends.map((friend) => (
+                    <a key={friend.steam_id} href={`https://steamcommunity.com/profiles/${friend.steam_id}`} target="_blank" rel="noreferrer" aria-label={friend.persona_name ?? "Steam friend"} className="hover-lift flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
+                      <Avatar from="#2563eb" to="#111827" name={friend.persona_name ?? "Steam friend"} image={friend.avatar ?? undefined} className="size-12 rounded-full" />
+                      <div className="min-w-0"><p className="truncate font-bold">{friend.persona_name ?? "Steam friend"}</p><p className="mt-1 text-xs text-muted-foreground">{friend.library_public ? `${friend.taste_match_percent}% match · ${friend.common_games_count} shared` : "Library is private"}</p></div>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState icon={<Users className="size-5" />} title="No Steam friends available" description={steamSocialQuery.isError ? "Steam friends list is private or unavailable." : "Connect Steam to compare libraries and taste match."} />
+              )}
+            </section>
 
             {friends.length === 0 ? (
               <EmptyState
@@ -263,7 +281,7 @@ function FriendsPage() {
         {/* Right rail */}
         <div className="space-y-8 lg:col-span-4">
           {focus ? (
-            <div className="rounded-3xl border border-border bg-surface p-6">
+            <div className="hidden rounded-3xl border border-border bg-surface p-6">
               <Link
                 to="/friends/$friendId"
                 params={{ friendId: focus.id }}

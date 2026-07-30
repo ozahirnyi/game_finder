@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   createFriendRequest: vi.fn(),
   getFriends: vi.fn(),
   getIncomingFriendRequests: vi.fn(),
+  getSteamSocial: vi.fn(),
   searchUsers: vi.fn(),
 }));
 
@@ -33,6 +34,7 @@ describe("FriendsPage", () => {
     cleanup();
     api.getFriends.mockResolvedValue([]);
     api.getIncomingFriendRequests.mockResolvedValue([]);
+    api.getSteamSocial.mockResolvedValue({ friends: [{ steam_id: "765", persona_name: "Steam Sam", taste_match_percent: 67, common_games_count: 3, library_public: true }], friends_total: 1, top_friend_games: [] });
     api.searchUsers.mockResolvedValue([{ id: "player-1", display_name: "Sam" }]);
     api.createFriendRequest.mockResolvedValue({ id: "request-1" });
     api.acceptFriendRequest.mockResolvedValue({ user: { id: "player-1", display_name: "Sam" } });
@@ -57,5 +59,13 @@ describe("FriendsPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Accept Sam" }));
 
     await waitFor(() => expect(api.acceptFriendRequest).toHaveBeenCalledWith("request-1"));
+  });
+
+  it("shows Steam friends with taste match and a Steam profile link", async () => {
+    renderFriends();
+
+    expect(await screen.findByText("Steam Sam")).toBeInTheDocument();
+    expect(screen.getByText("67% match · 3 shared")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Steam Sam" })).toHaveAttribute("href", "https://steamcommunity.com/profiles/765");
   });
 });
