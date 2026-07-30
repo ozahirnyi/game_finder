@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -31,6 +31,7 @@ export const Route = createFileRoute("/wishlist")({
 
 function WishlistPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [showAlerts, setShowAlerts] = useState(false);
   const [catalogGameId, setCatalogGameId] = useState("");
   const [targetPrice, setTargetPrice] = useState("");
@@ -134,7 +135,17 @@ function WishlistPage() {
           {wl.map((g) => (
             <div
               key={g.id}
-              className="hover-lift grid grid-cols-1 gap-6 rounded-2xl border border-border bg-surface p-5 hover:border-primary/40 md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
+              data-testid={`wishlist-card-${g.id}`}
+              role="link"
+              tabIndex={0}
+              onClick={() => navigate({ to: "/games/$gameId", params: { gameId: String(g.catalog_game_id) } })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  navigate({ to: "/games/$gameId", params: { gameId: String(g.catalog_game_id) } });
+                }
+              }}
+              className="hover-lift grid cursor-pointer grid-cols-1 gap-6 rounded-2xl border border-border bg-surface p-5 hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
             >
               <Link to="/games/$gameId" params={{ gameId: String(g.catalog_game_id) }}>
                 <GameCover
@@ -170,7 +181,10 @@ function WishlistPage() {
                 </Link>
                 <button
                   aria-label={`Remove ${g.title} from wishlist`}
-                  onClick={() => removeMutation.mutate(g.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    removeMutation.mutate(g.id);
+                  }}
                   disabled={removeMutation.isPending}
                   className="grid size-9 place-items-center rounded-lg border border-border text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
                 >

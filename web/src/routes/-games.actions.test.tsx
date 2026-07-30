@@ -111,6 +111,16 @@ describe("GameDetail actions", () => {
     });
   });
 
+  it("confirms when the game is added to the wishlist", async () => {
+    renderGame();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add to wishlist" }));
+
+    await waitFor(() => expect(api.addWishlist).toHaveBeenCalled());
+    expect(await screen.findByRole("button", { name: "In wishlist" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Added to wishlist");
+  });
+
   it("sends a game invite to the selected PlayFinder friend", async () => {
     renderGame();
 

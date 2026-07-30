@@ -36,7 +36,8 @@ export const Route = createFileRoute("/games/$gameId")({
             title: steamGame.title,
             coverFrom: "#1d4ed8",
             coverTo: "#111827",
-            coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamGame.external_id}/header.jpg`,
+            coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamGame.external_id}/library_hero.jpg`,
+            fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamGame.external_id}/header.jpg`,
             genres: [],
             platforms: ["PC"],
             releaseDate: undefined,
@@ -73,6 +74,7 @@ export const Route = createFileRoute("/games/$gameId")({
           coverFrom: "#1d4ed8",
           coverTo: "#111827",
           coverUrl: catalog.background_image ?? undefined,
+          fallbackCoverUrl: undefined,
           genres: catalog.genres ?? [],
           platforms: catalog.platforms ?? [],
           releaseDate: catalog.released ?? undefined,
@@ -175,11 +177,16 @@ function GameDetail() {
   const [targetPrice, setTargetPrice] = useState("");
   const [recipientId, setRecipientId] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [wishlistAdded, setWishlistAdded] = useState(false);
   const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist, enabled: !catalogGame.isSteamLibrary });
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
   const wishlistMutation = useMutation({
     mutationFn: addWishlist,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wishlist"] });
+      setWishlistAdded(true);
+      setActionMessage("Added to wishlist");
+    },
   });
   const alertMutation = useMutation({
     mutationFn: async (target_price: number) => {
@@ -218,6 +225,9 @@ function GameDetail() {
     store: current?.shop ?? catalogGame.store,
     storeUrl: current?.url ?? catalogGame.storeUrl,
   };
+  const isInWishlist = wishlistAdded || wishlistQuery.data?.some(
+    (item) => item.catalog_game_id === Number(catalogGame.id),
+  );
 
   const owners: Array<{ id: string; avatarFrom: string; avatarTo: string; name: string; online: boolean; activity?: string }> = [];
   const similar: Array<{ id: string; title: string; coverUrl?: string; coverFrom: string; coverTo: string; genres: string[]; price?: number | null; originalPrice?: number | null; discount?: number | null; currency?: string; store?: string }> = [];
@@ -245,6 +255,7 @@ function GameDetail() {
           to={game.coverTo}
           title={game.title}
           image={game.coverUrl}
+          fallbackImage={game.fallbackCoverUrl}
           bare
           className="h-72 w-full sm:h-96"
         />
@@ -423,10 +434,10 @@ function GameDetail() {
                     background_image: game.coverUrl ?? null,
                   })
                 }
-                disabled={wishlistMutation.isPending}
+                disabled={wishlistMutation.isPending || isInWishlist}
                 className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
               >
-                <Heart className="size-4" /> Add to wishlist
+                <Heart className="size-4" /> {wishlistMutation.isPending ? "Adding…" : isInWishlist ? "In wishlist" : "Add to wishlist"}
               </button>
             )}
 
