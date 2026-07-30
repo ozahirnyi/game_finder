@@ -24,6 +24,12 @@ function DealsPage() {
   const dealsQuery = useQuery({ queryKey: ["deals", "US"], queryFn: () => getDeals("US") });
   const deals = dealsQuery.data?.results ?? [];
   const hero = deals[0];
+  const gameLink = (deal: (typeof deals)[number]) =>
+    deal.id != null
+      ? { params: { gameId: String(deal.id) }, search: undefined }
+      : deal.steam_appid != null
+        ? { params: { gameId: String(deal.steam_appid) }, search: { source: "steam" as const, title: deal.name } }
+        : null;
 
   return (
     <AppShell>
@@ -41,7 +47,7 @@ function DealsPage() {
                 Deal of the day
               </span>
             </div>
-            {hero.id != null ? <Link to="/games/$gameId" params={{ gameId: String(hero.id) }} className="block text-4xl font-extrabold tracking-tight hover:text-primary">{hero.name}</Link> : <h3 className="text-4xl font-extrabold tracking-tight">{hero.name}</h3>}
+            {gameLink(hero) ? <Link to="/games/$gameId" {...gameLink(hero)!} className="block text-4xl font-extrabold tracking-tight hover:text-primary">{hero.name}</Link> : <h3 className="text-4xl font-extrabold tracking-tight">{hero.name}</h3>}
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
               Matches your wishlist and 3 friends already own it. Sale ends in 2 days.
             </p>
@@ -64,6 +70,7 @@ function DealsPage() {
               </div>
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
+              {gameLink(hero) && <Link to="/games/$gameId" {...gameLink(hero)!} className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-foreground/5">View on Playfinder</Link>}
               {hero.current?.url && <a href={hero.current.url} target="_blank" rel="noreferrer" aria-label={`Open in ${hero.current.shop ?? "store"}`} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">Open in {hero.current.shop ?? "store"}</a>}
               <button className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-bold hover:bg-foreground/5">
                 Invite friends to buy together
@@ -95,12 +102,13 @@ function DealsPage() {
               className="size-24 shrink-0 rounded-xl"
             />
             <div className="min-w-0 flex-1">
-              {g.id != null ? <Link to="/games/$gameId" params={{ gameId: String(g.id) }} className="block truncate text-lg font-bold transition-colors group-hover:text-primary">{g.name}</Link> : <h4 className="truncate text-lg font-bold">{g.name}</h4>}
+              {gameLink(g) ? <Link to="/games/$gameId" {...gameLink(g)!} className="block truncate text-lg font-bold transition-colors group-hover:text-primary">{g.name}</Link> : <h4 className="truncate text-lg font-bold">{g.name}</h4>}
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {g.current?.shop ?? "Store offer"}
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <Chip>{g.current?.shop ?? "Store"}</Chip>
+                {gameLink(g) && <Link to="/games/$gameId" {...gameLink(g)!} className="text-xs font-bold text-foreground hover:text-primary hover:underline">View on Playfinder</Link>}
                 {g.current?.url && <a href={g.current.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline">Open in {g.current.shop ?? "store"}</a>}
               </div>
             </div>

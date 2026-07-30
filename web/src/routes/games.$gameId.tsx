@@ -12,7 +12,7 @@ import {
   PriceBlock,
   SectionHeader,
 } from "@/components/ui-bits";
-import { addWishlist, ApiError, createGameInvite, createPriceAlert, getCatalogGame, getFriends, getLibraryOverview, getPriceHistory, getWishlist, searchGames } from "@/lib/api";
+import { addWishlist, ApiError, createGameInvite, createPriceAlert, getCatalogGame, getFriends, getPriceHistory, getWishlist, searchGames } from "@/lib/api";
 import { exactCatalogMatch } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
@@ -25,30 +25,27 @@ export const Route = createFileRoute("/games/$gameId")({
   loader: async ({ params, deps }) => {
     try {
       if (deps.source === "steam") {
-        const overview = await getLibraryOverview();
-        const steamGame = overview.games.find(
-          (game) => game.source === "steam" && game.external_id === params.gameId,
-        );
-        if (!steamGame?.external_id) throw new Error("Steam game is not in this library");
+        const title = deps.title;
+        if (!title) throw new Error("Steam game title unavailable");
         return {
           game: {
-            id: steamGame.external_id,
-            title: steamGame.title,
+            id: params.gameId,
+            title,
             coverFrom: "#1d4ed8",
             coverTo: "#111827",
-            coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamGame.external_id}/library_hero.jpg`,
-            fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamGame.external_id}/header.jpg`,
+            coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/library_hero.jpg`,
+            fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/header.jpg`,
             genres: [],
             platforms: ["PC"],
             releaseDate: undefined,
             rating: 0,
-            description: "This game is from your Steam library. Catalog details are unavailable.",
+            description: "Steam Store game. Catalog details are unavailable.",
             price: null,
             originalPrice: null,
             discount: null,
             currency: undefined,
             store: "Steam",
-            storeUrl: `https://store.steampowered.com/app/${steamGame.external_id}/`,
+            storeUrl: `https://store.steampowered.com/app/${params.gameId}/`,
             coop: false,
             isSteamLibrary: true,
           },

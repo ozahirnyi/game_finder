@@ -2538,6 +2538,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
                 match = None
             return {
                 "id": match.get("id") if match else None,
+                "steam_appid": deal.get("steam_appid"),
                 "name": deal["name"],
                 "released": match.get("released") if match else None,
                 "background_image": deal.get("background_image") or (match.get("background_image") if match else None),

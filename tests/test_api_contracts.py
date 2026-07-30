@@ -571,6 +571,7 @@ def test_homepage_deals_returns_steam_store_deals(monkeypatch):
     assert response.status_code == 200
     payload = response.json()
     assert payload["results"][0]["id"] == 960575
+    assert payload["results"][0]["steam_appid"] == 1623730
     assert payload["results"][0]["name"] == "Palworld"
     assert payload["results"][0]["current"]["cut"] == 30
     assert payload["results"][0]["background_image"].startswith("https://shared.akamai.steamstatic.com/")
@@ -595,6 +596,7 @@ def test_homepage_deals_does_not_attach_a_different_rawg_game(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["results"][0]["id"] is None
+    assert response.json()["results"][0]["steam_appid"] is None
 
 
 def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch):

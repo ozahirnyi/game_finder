@@ -34,6 +34,7 @@ export type CatalogGame = {
 
 export type Deal = {
   id?: number | null;
+  steam_appid?: number | null;
   name: string;
   background_image?: string | null;
   url?: string | null;

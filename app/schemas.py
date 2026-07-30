@@ -416,6 +416,7 @@ class GamePriceHistory(BaseModel):
 
 class HomeDealItem(BaseModel):
     id: int | None = None
+    steam_appid: int | None = None
     name: str
     released: str | None = None
     background_image: str | None = None
