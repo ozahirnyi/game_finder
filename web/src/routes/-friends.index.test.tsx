@@ -82,4 +82,16 @@ describe("FriendsPage", () => {
     expect(await screen.findByText("Steam Pat")).toBeInTheDocument();
     expect(api.getSteamSocial).toHaveBeenLastCalledWith(12, 1);
   });
+
+  it("uses a separate Steam tab and sorts friends by match", async () => {
+    api.getSteamSocial.mockResolvedValue({ friends: [
+      { steam_id: "1", persona_name: "Low match", taste_match_percent: 12, common_games_count: 1, library_public: true },
+      { steam_id: "2", persona_name: "High match", taste_match_percent: 88, common_games_count: 8, library_public: true },
+    ], friends_total: 2, friends_has_more: false, top_friend_games: [] });
+    renderFriends();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Steam friends" }));
+    const names = await screen.findAllByRole("link");
+    expect(names.map((link) => link.getAttribute("aria-label"))).toEqual(["High match", "Low match"]);
+  });
 });
