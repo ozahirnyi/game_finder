@@ -32,6 +32,8 @@ export const Route = createFileRoute("/friends/")({
 function FriendsPage() {
   const queryClient = useQueryClient();
   const [showAddFriend, setShowAddFriend] = useState(false);
+  const [friendSource, setFriendSource] = useState<"playfinder" | "steam">("playfinder");
+  const [steamExpanded, setSteamExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("");
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
@@ -79,7 +81,8 @@ function FriendsPage() {
     platforms: [],
   }));
   const list = friends;
-  const steamFriends = steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? [];
+  const steamFriends = (steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? []).sort((a, b) => b.taste_match_percent - a.taste_match_percent || b.common_games_count - a.common_games_count);
+  const visibleSteamFriends = steamExpanded ? steamFriends : steamFriends.slice(0, 12);
   const steamFriendsTotal = steamSocialQuery.data?.pages[0]?.friends_total ?? 0;
   const focus = list[0];
   const sharedGames: Array<{ id: string; title: string; coverFrom: string; coverTo: string; coverUrl?: string }> = [];
@@ -91,13 +94,15 @@ function FriendsPage() {
         <div className="space-y-10 lg:col-span-8">
           <div>
             <SectionHeader
-              title="Playfinder friends"
+              title="Friends"
               hint={`${friends.length} friends · ${friends.filter((f) => f.online).length} online now`}
               action={
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setShowAddFriend(true)} className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">
+                  <button onClick={() => setFriendSource("playfinder")} className={`rounded-lg px-3 py-2 text-xs font-bold ${friendSource === "playfinder" ? "bg-primary text-primary-foreground" : "border border-border"}`}>Playfinder friends</button>
+                  <button onClick={() => setFriendSource("steam")} className={`rounded-lg px-3 py-2 text-xs font-bold ${friendSource === "steam" ? "bg-primary text-primary-foreground" : "border border-border"}`}>Steam friends</button>
+                  {friendSource === "playfinder" && <button onClick={() => setShowAddFriend(true)} className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">
                     <UserPlus className="size-3.5" /> Add friend
-                  </button>
+                  </button>}
                 </div>
               }
             />
@@ -131,7 +136,7 @@ function FriendsPage() {
               </section>
             ) : null}
             {status && <p role="status" className="mb-4 text-sm font-semibold text-primary">{status}</p>}
-            <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 focus-within:border-primary/60">
+            <div className={`mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 focus-within:border-primary/60 ${friendSource === "steam" ? "hidden" : ""}`}>
               <Search className="size-4 text-muted-foreground" />
               <input
                 aria-label="Find players"
@@ -146,11 +151,11 @@ function FriendsPage() {
               />
             </div>
 
-            <section className="mb-8">
+            <section className={friendSource === "steam" ? "mb-8" : "hidden"}>
               <SectionHeader title="Steam friends" hint={steamSocialQuery.data ? `${steamFriendsTotal} friends` : "Connect Steam to compare libraries"} />
               {steamFriends.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {steamFriends.map((friend) => (
+                  {visibleSteamFriends.map((friend) => (
                     <a key={friend.steam_id} href={`https://steamcommunity.com/profiles/${friend.steam_id}`} target="_blank" rel="noreferrer" aria-label={friend.persona_name ?? "Steam friend"} className="hover-lift flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
                       <Avatar from="#2563eb" to="#111827" name={friend.persona_name ?? "Steam friend"} image={friend.avatar ?? undefined} className="size-12 rounded-full" />
                       <div className="min-w-0"><p className="truncate font-bold">{friend.persona_name ?? "Steam friend"}</p><p className="mt-1 text-xs text-muted-foreground">{friend.library_public ? `${friend.taste_match_percent}% match · ${friend.common_games_count} shared` : "Library is private"}</p></div>
@@ -160,10 +165,10 @@ function FriendsPage() {
               ) : (
                 <EmptyState icon={<Users className="size-5" />} title="No Steam friends available" description={steamSocialQuery.isError ? "Steam friends list is private or unavailable." : "Connect Steam to compare libraries and taste match."} />
               )}
-              {steamSocialQuery.hasNextPage && <button type="button" onClick={() => steamSocialQuery.fetchNextPage()} disabled={steamSocialQuery.isFetchingNextPage} className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:border-primary/50">{steamSocialQuery.isFetchingNextPage ? "Loading…" : "Show more Steam friends"}</button>}
+              {(steamSocialQuery.hasNextPage || steamFriends.length > 12) && <button type="button" onClick={() => { if (!steamExpanded) { setSteamExpanded(true); if (steamSocialQuery.hasNextPage) steamSocialQuery.fetchNextPage(); } else if (steamSocialQuery.hasNextPage) steamSocialQuery.fetchNextPage(); else setSteamExpanded(false); }} disabled={steamSocialQuery.isFetchingNextPage} className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:border-primary/50">{steamSocialQuery.isFetchingNextPage ? "Loading…" : steamExpanded && !steamSocialQuery.hasNextPage ? "Show fewer Steam friends" : "Show more Steam friends"}</button>}
             </section>
 
-            {friends.length === 0 ? (
+            {friendSource === "playfinder" && (friends.length === 0 ? (
               <EmptyState
                 icon={<Users className="size-5" />}
                 title="No friends yet"
@@ -236,10 +241,10 @@ function FriendsPage() {
                   </Link>
                 ))}
               </div>
-            )}
+            ))}
           </div>
 
-          <div>
+          <div className={friendSource === "playfinder" ? "" : "hidden"}>
             <SectionHeader
               title="Games you can play together"
               hint="Titles owned by you and your friends"
