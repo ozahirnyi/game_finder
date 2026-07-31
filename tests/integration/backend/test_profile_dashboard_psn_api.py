@@ -168,6 +168,29 @@ def test_psn_import_preview_parses_xlsx_without_persisting(api_client, db_sessio
     assert db_session.query(Game).count() == 0
 
 
+@pytest.mark.parametrize(
+    ("filename", "content", "content_type", "expected_games"),
+    [
+        ("export.csv", b"Game Name\nHades\nCeleste\n", "text/csv", ["Hades", "Celeste"]),
+        (
+            "export.json",
+            b'{"games": [{"title": "Returnal"}, {"title": "Hades"}]}',
+            "application/json",
+            ["Returnal", "Hades"],
+        ),
+    ],
+)
+def test_psn_import_preview_accepts_supported_non_xlsx_exports(
+    api_client, user_factory, auth_as, filename, content, content_type, expected_games
+):
+    auth_as(user_factory(email=f"psn-{filename}@example.com"))
+
+    response = api_client.post("/psn/import/preview", files={"file": (filename, content, content_type)})
+
+    assert response.status_code == 200
+    assert response.json()["games"] == expected_games
+
+
 def test_psn_import_confirm_persists_owner_scoped_idempotent_games(
     api_client, db_session, user_factory, auth_as
 ):

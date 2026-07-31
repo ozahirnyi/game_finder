@@ -57,3 +57,25 @@ def test_parse_psn_export_uses_only_game_transactions_from_playstation_export():
 
 def test_psn_external_id_is_stable_across_whitespace_and_case():
     assert psn_external_id("Hades") == psn_external_id("  hades  ")
+
+
+def test_parse_psn_export_reads_unique_game_titles_from_csv():
+    content = b"Game Title,Platform\nHades,PS5\n hades ,PS4\nCeleste,PS4\n"
+
+    assert parse_psn_export(content, "library.csv") == ["Hades", "Celeste"]
+
+
+def test_parse_psn_export_reads_titles_from_json_game_collection():
+    content = b'{"games": [{"title": "Returnal"}, {"game name": "Hades"}, {"title": " returnal "}]}'
+
+    assert parse_psn_export(content, "library.json") == ["Returnal", "Hades"]
+
+
+def test_parse_psn_export_rejects_invalid_json():
+    with pytest.raises(HTTPException, match="valid JSON"):
+        parse_psn_export(b"{", "library.json")
+
+
+def test_parse_psn_export_rejects_unsupported_file_extension():
+    with pytest.raises(HTTPException, match="supported PSN export"):
+        parse_psn_export(b"Game Title\nHades\n", "library.txt")

@@ -26,7 +26,7 @@
 - Consumes: `parse_psn_export(content: bytes, filename: str)`.
 - Produces: coverage for format dispatch and preview API behavior.
 
-- [ ] **Step 1: Add parser tests**
+- [x] **Step 1: Add parser tests**
 
 ```python
 assert parse_psn_export(b"Game Title\nHades\n hades \nCeleste\n", "library.csv") == ["Hades", "Celeste"]
@@ -37,13 +37,13 @@ with pytest.raises(HTTPException, match="supported PSN export"):
     parse_psn_export(b"game", "library.txt")
 ```
 
-- [ ] **Step 2: Run the new parser tests (RED)**
+- [x] **Step 2: Run the new parser tests (RED)**
 
 Run: `rtk pytest -q tests/test_psn_export.py`
 
 Expected: failure because `parse_psn_export` has no filename argument and no CSV/JSON reader.
 
-- [ ] **Step 3: Add preview API tests for CSV and JSON**
+- [x] **Step 3: Add preview API tests for CSV and JSON**
 
 ```python
 response = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")})
@@ -51,7 +51,7 @@ assert response.status_code == 200
 assert response.json()["games"] == ["Hades"]
 ```
 
-- [ ] **Step 4: Run the targeted API tests (RED)**
+- [x] **Step 4: Run the targeted API tests (RED)**
 
 Run: `rtk pytest -q tests/integration/backend/test_profile_dashboard_psn_api.py -k psn_import_preview`
 
@@ -69,7 +69,7 @@ Expected: CSV/JSON requests fail with the current XLSX-only validation.
 - Consumes: `parse_psn_export(content: bytes, filename: str)`.
 - Produces: `list[str]` or an HTTP 400/413/422 exception.
 
-- [ ] **Step 1: Implement the smallest parser dispatch**
+- [x] **Step 1: Implement the smallest parser dispatch**
 
 ```python
 def parse_psn_export(content: bytes, filename: str) -> list[str]:
@@ -81,7 +81,7 @@ def parse_psn_export(content: bytes, filename: str) -> list[str]:
 
 Use stdlib `csv` with `utf-8-sig`, `json.loads(content.decode("utf-8"))`, and the existing title/header rules. Keep `Transaction Detail` XLSX filtering intact. `_collect_titles` applies `normalize_title`, first-seen case-folded deduplication, and the 500-title cap.
 
-- [ ] **Step 2: Forward the filename from preview**
+- [x] **Step 2: Forward the filename from preview**
 
 ```python
 filename = file.filename or ""
@@ -90,7 +90,7 @@ if Path(filename).suffix.casefold() not in {".xlsx", ".csv", ".json"}:
 games = parse_psn_export(await file.read(), filename)
 ```
 
-- [ ] **Step 3: Run parser and API tests (GREEN)**
+- [x] **Step 3: Run parser and API tests (GREEN)**
 
 Run: `rtk pytest -q tests/test_psn_export.py tests/integration/backend/test_profile_dashboard_psn_api.py -k "psn or external_id"`
 
@@ -107,7 +107,7 @@ Expected: all selected tests pass.
 - Consumes: `previewPsnImport(file: File)` and API errors.
 - Produces: an upload-only route without sample/empty/error simulation controls.
 
-- [ ] **Step 1: Add a failing route test**
+- [x] **Step 1: Add a failing route test**
 
 ```tsx
 expect(screen.getByText(/choose an export file/i)).toBeInTheDocument();
@@ -116,17 +116,17 @@ expect(screen.queryByText(/preview empty state/i)).not.toBeInTheDocument();
 expect(screen.queryByText(/preview error state/i)).not.toBeInTheDocument();
 ```
 
-- [ ] **Step 2: Run the route test (RED)**
+- [x] **Step 2: Run the route test (RED)**
 
 Run: `rtk npm --prefix web test -- src/routes/-psn-import.test.tsx`
 
 Expected: failure because the three demo controls are rendered.
 
-- [ ] **Step 3: Delete simulation state and controls**
+- [x] **Step 3: Delete simulation state and controls**
 
 Remove `emptyPreview`, `visibleRows`, the sample-file creation buttons, and the local error-state trigger. In `onError`, retain the server error message in `fileError`; render it with `InlineError` and allow retrying upload.
 
-- [ ] **Step 4: Run frontend test (GREEN)**
+- [x] **Step 4: Run frontend test (GREEN)**
 
 Run: `rtk npm --prefix web test -- src/routes/-psn-import.test.tsx`
 
@@ -137,19 +137,19 @@ Expected: pass.
 **Files:**
 - Modify: only files from Tasks 1–3.
 
-- [ ] **Step 1: Run focused backend and frontend suites**
+- [x] **Step 1: Run focused backend and frontend suites**
 
 Run: `rtk pytest -q tests/test_psn_export.py tests/integration/backend/test_profile_dashboard_psn_api.py` and `rtk npm --prefix web test -- src/components/PsnImportFlow.test.tsx src/routes/-psn-import.test.tsx`.
 
 Expected: all tests pass.
 
-- [ ] **Step 2: Run type/build verification**
+- [x] **Step 2: Run type/build verification**
 
 Run: `rtk npm --prefix web run build`.
 
 Expected: successful production build.
 
-- [ ] **Step 3: Inspect task-only diff and commit**
+- [x] **Step 3: Inspect task-only diff and commit**
 
 Run: `rtk diff -- app/psn_export.py app/main.py tests/test_psn_export.py tests/integration/backend/test_profile_dashboard_psn_api.py web/src/routes/psn-import.tsx web/src/routes/-psn-import.test.tsx`.
 

@@ -79,7 +79,6 @@ function PsnImportPage() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [emptyPreview, setEmptyPreview] = useState(false);
   const client = useQueryClient();
   const [rows, setRows] = useState<
     {
@@ -99,7 +98,10 @@ function PsnImportPage() {
       setPhase("idle");
       setStep("preview");
     },
-    onError: () => setPhase("error"),
+    onError: (error) => {
+      setFileError(error instanceof Error ? error.message : "We couldn't read that file.");
+      setPhase("error");
+    },
   });
   const confirm = useMutation({
     mutationFn: confirmPsnImport,
@@ -110,8 +112,6 @@ function PsnImportPage() {
     },
   });
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const visibleRows = emptyPreview ? [] : rows;
 
   function parseFile(file: File) {
     const name = file.name;
@@ -151,11 +151,15 @@ function PsnImportPage() {
           <Panel className="p-6">
             <SectionHeader title="Upload export" hint="XLSX, CSV or JSON, up to 10 MB" />
             {phase === "error" ? (
-              <ErrorState
-                title="We couldn't read that file"
-                description="The export looks corrupted or is in an unsupported format."
-                onRetry={() => setPhase("idle")}
-              />
+              <div className="space-y-4">
+                <InlineError>{fileError ?? "We couldn't read that file."}</InlineError>
+                <button
+                  onClick={() => setPhase("idle")}
+                  className="rounded-xl border border-border px-4 py-2 text-sm font-bold transition hover:border-primary/50"
+                >
+                  Try another file
+                </button>
+              </div>
             ) : phase === "loading" || confirm.isPending ? (
               <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-surface-2 py-14">
                 <Loader2 className="size-5 animate-spin text-primary" />
@@ -196,37 +200,6 @@ function PsnImportPage() {
                     <InlineError>{fileError}</InlineError>
                   </div>
                 )}
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    onClick={() =>
-                      parseFile(
-                        new File(["Game Name\nExample Game"], "psn-library.csv", {
-                          type: "text/csv",
-                        }),
-                      )
-                    }
-                    className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:opacity-90"
-                  >
-                    Use sample export
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEmptyPreview(true);
-                      parseFile(
-                        new File(["Game Name\n"], "empty-export.csv", { type: "text/csv" }),
-                      );
-                    }}
-                    className="rounded-xl border border-border px-4 py-2 text-sm font-bold transition hover:border-primary/50"
-                  >
-                    Preview empty state
-                  </button>
-                  <button
-                    onClick={() => setPhase("error")}
-                    className="rounded-xl border border-border px-4 py-2 text-sm font-bold text-muted-foreground transition hover:border-destructive/50"
-                  >
-                    Preview error state
-                  </button>
-                </div>
               </>
             )}
           </Panel>
@@ -249,7 +222,6 @@ function PsnImportPage() {
                 action={
                   <button
                     onClick={() => {
-                      setEmptyPreview(false);
                       setStep("upload");
                     }}
                     className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
@@ -389,7 +361,6 @@ function PsnImportPage() {
                 <button
                   onClick={() => {
                     setStep("upload");
-                    setEmptyPreview(false);
                     setFileName(null);
                   }}
                   className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold transition hover:border-primary/50"
