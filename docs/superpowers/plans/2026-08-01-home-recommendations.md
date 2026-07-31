@@ -22,7 +22,7 @@
 - Modify: `web/src/lib/api.ts`
 - Modify: `web/src/lib/api.test.ts`
 
-- [ ] **Step 1: Add a failing API-client test**
+- [x] **Step 1: Add a failing API-client test**
 
 ```ts
 setToken("token");
@@ -32,18 +32,18 @@ expect(fetchMock).toHaveBeenCalledWith("/api/dashboard", expect.objectContaining
 }));
 ```
 
-- [ ] **Step 2: Run it (RED)**
+- [x] **Step 2: Run it (RED)**
 
 Run: `rtk npm --prefix web test -- src/lib/api.test.ts`
 
-- [ ] **Step 3: Add types and client function**
+- [x] **Step 3: Add types and client function**
 
 ```ts
 export type Dashboard = { recommendations: DataBlock<RecommendationItem[]> };
 export function getDashboard() { return apiRequest<Dashboard>("/dashboard", { auth: true }); }
 ```
 
-- [ ] **Step 4: Run it (GREEN)**
+- [x] **Step 4: Run it (GREEN)**
 
 Run: `rtk npm --prefix web test -- src/lib/api.test.ts`
 
@@ -53,15 +53,15 @@ Run: `rtk npm --prefix web test -- src/lib/api.test.ts`
 - Modify: `web/src/routes/index.tsx`
 - Create: `web/src/routes/-index.recommendations.test.tsx`
 
-- [ ] **Step 1: Add failing Home tests**
+- [x] **Step 1: Add failing Home tests**
 
 Cover: authenticated ready recommendation with ID link; authenticated empty message; authenticated error message; guest trending catalog card.
 
-- [ ] **Step 2: Run tests (RED)**
+- [x] **Step 2: Run tests (RED)**
 
 Run: `rtk npm --prefix web test -- src/routes/-index.recommendations.test.tsx`
 
-- [ ] **Step 3: Implement minimal sections**
+- [x] **Step 3: Implement minimal sections**
 
 ```tsx
 const dashboardQuery = useQuery({ queryKey: ["dashboard"], queryFn: getDashboard, enabled: signedIn });
@@ -70,7 +70,7 @@ const trendingQuery = useQuery({ queryKey: ["trending-games"], queryFn: getTrend
 
 Render the signed-in `DataBlock` states explicitly. Render guests through `GameCard` with `gameId: String(game.id)`. Use a direct `Link` for recommendation items only when `rawg_id != null`.
 
-- [ ] **Step 4: Run tests (GREEN)**
+- [x] **Step 4: Run tests (GREEN)**
 
 Run: `rtk npm --prefix web test -- src/routes/-index.recommendations.test.tsx`
 
@@ -79,14 +79,14 @@ Run: `rtk npm --prefix web test -- src/routes/-index.recommendations.test.tsx`
 **Files:**
 - Modify: files in Tasks 1–2 plus this plan's checkboxes.
 
-- [ ] **Step 1: Run focused tests and build**
+- [x] **Step 1: Run focused tests and build**
 
 Run: `rtk npm --prefix web test -- src/lib/api.test.ts src/routes/-index.recommendations.test.tsx` and `rtk npm --prefix web run build`.
 
-- [ ] **Step 2: Run targeted lint and inspect staged diff**
+- [x] **Step 2: Run targeted lint and inspect staged diff**
 
 Run: `rtk npx --prefix web eslint src/lib/api.ts src/lib/api.test.ts src/routes/index.tsx src/routes/-index.recommendations.test.tsx` and `rtk git diff --cached --check`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Commit: `feat: restore home recommendations`.
