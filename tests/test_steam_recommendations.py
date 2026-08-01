@@ -103,6 +103,7 @@ async def test_personal_recommendations_cache_key_changes_with_profile_library_a
     await recommendations.get_personalized_recommendations(User(user.id, genres=["Puzzle"]), [Saved("Saved")], [{"appid": 1, "name": "Owned", "playtime_forever": 2}])
 
     assert keys[0] != keys[1]
+    assert keys[0].startswith("steam_recommendations:v4:")
 
 
 @pytest.mark.anyio

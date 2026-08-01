@@ -79,7 +79,7 @@ def _personal_fingerprint(user, saved_games: list, steam_games: list[dict]) -> s
 
 async def get_personalized_recommendations(user, saved_games: list, steam_games: list[dict]) -> dict:
     fingerprint = _personal_fingerprint(user, saved_games, steam_games)
-    key = f"steam_recommendations:v3:{user.id}:{fingerprint}"
+    key = f"steam_recommendations:v4:{user.id}:{fingerprint}"
     try:
         cached = await cache_get(key)
         if cached is not None:
