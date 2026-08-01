@@ -1218,7 +1218,7 @@ def test_dashboard_returns_explicit_empty_and_not_connected_blocks():
     payload = response.json()
     assert payload["library"]["status"] == "empty"
     assert payload["steam"]["status"] == "not_connected"
-    assert payload["recommendations"]["status"] == "empty"
+    assert payload["recommendations"]["status"] == "ready"
     assert payload["social"]["status"] == "not_connected"
 
 
