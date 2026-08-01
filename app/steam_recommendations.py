@@ -77,6 +77,29 @@ def _personal_fingerprint(user, saved_games: list, steam_games: list[dict]) -> s
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
+async def enrich_steam_candidate(candidate: dict) -> dict:
+    title = str(candidate.get("name") or "").strip()
+    enriched = {**candidate, "rawg_id": None}
+    if not title:
+        return enriched
+    try:
+        matches = await fetch_rawg_games(title, page=1)
+        match = next(
+            (
+                game
+                for game in matches.get("results", [])
+                if str(game.get("name") or "").casefold() == title.casefold()
+            ),
+            None,
+        )
+        if match:
+            enriched["rawg_id"] = match.get("id")
+            enriched["background_image"] = match.get("background_image") or candidate.get("background_image")
+    except Exception:
+        pass
+    return enriched
+
+
 async def get_personalized_recommendations(user, saved_games: list, steam_games: list[dict]) -> dict:
     fingerprint = _personal_fingerprint(user, saved_games, steam_games)
     key = f"steam_recommendations:v4:{user.id}:{fingerprint}"
@@ -110,7 +133,12 @@ async def get_personalized_recommendations(user, saved_games: list, steam_games:
         except Exception:
             pass
     offset = int(fingerprint[:8], 16) % max(len(available), 1)
-    selected = (available[offset:] + available[:offset])[:6]
+    selected_candidates = (available[offset:] + available[:offset])[:6]
+    selected = (
+        selected_candidates
+        if popular_fallback
+        else await asyncio.gather(*(enrich_steam_candidate(candidate) for candidate in selected_candidates))
+    )
     reason = "Popular game selected because personalized catalog is unavailable." if popular_fallback else "Available on Steam and selected from your library and profile signals."
     result = {"recommendations": [{"title": candidate["name"], "reason": reason, "tags": [], "rawg_id": candidate.get("rawg_id"), "cover_url": candidate.get("background_image")} for candidate in selected], "cache_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=CACHE_TTL_SECONDS)).isoformat()}
     try:

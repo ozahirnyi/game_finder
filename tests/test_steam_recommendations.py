@@ -120,6 +120,27 @@ async def test_personal_recommendations_exclude_owned_and_saved_titles(monkeypat
 
 
 @pytest.mark.anyio
+async def test_personal_recommendations_add_rawg_id_for_exact_candidate_title(monkeypatch):
+    async def cache_get(_key): return None
+    async def cache_set(*_args): return None
+    async def candidates():
+        return {"candidates": [{"steam_appid": 3, "name": "Eligible", "background_image": "steam-cover"}]}
+    async def rawg(title, page=1):
+        assert (title, page) == ("Eligible", 1)
+        return {"results": [{"id": 77, "name": "eligible", "background_image": "rawg-cover"}]}
+
+    monkeypatch.setattr(recommendations, "cache_get", cache_get)
+    monkeypatch.setattr(recommendations, "cache_set", cache_set)
+    monkeypatch.setattr(recommendations, "fetch_steam_store_deal_candidates", candidates)
+    monkeypatch.setattr(recommendations, "fetch_rawg_games", rawg)
+
+    result = await recommendations.get_personalized_recommendations(User(uuid.uuid4()), [], [])
+
+    assert result["recommendations"][0]["rawg_id"] == 77
+    assert result["recommendations"][0]["cover_url"] == "rawg-cover"
+
+
+@pytest.mark.anyio
 async def test_personal_recommendations_fall_back_to_non_owned_rawg_trends(monkeypatch):
     async def cache_get(_key): return None
     async def cache_set(*_args): return None

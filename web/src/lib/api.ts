@@ -46,6 +46,7 @@ export type Deal = {
     cut?: number | null;
   } | null;
 };
+export type GenreDealResponse = { popular: Deal[]; sections: { genre: string; results: Deal[] }[] };
 
 export type Money = { amount: number; currency: string };
 
@@ -141,7 +142,7 @@ export type Profile = {
   library_visibility?: "public" | "friends" | "private";
 };
 
-export type ProfileUpdate = Pick<Profile, "display_name" | "bio" | "library_visibility">;
+export type ProfileUpdate = Pick<Profile, "display_name" | "bio" | "library_visibility" | "platforms" | "favorite_genres">;
 export type RecommendationItem = { title: string; reason: string; tags: string[] };
 export type RecommendationResponse = { recommendations: RecommendationItem[] };
 export type DashboardBlock<T> = {
@@ -396,6 +397,10 @@ export function getDeals(country: string) {
   return apiRequest<{ results: Deal[] }>(
     `/prices/deals?country=${encodeURIComponent(country)}&page_size=12`,
   );
+}
+
+export function getGenreDeals() {
+  return apiRequest<GenreDealResponse>("/prices/genre-deals");
 }
 
 export function getPriceHistory(id: string | number, country = "US") {

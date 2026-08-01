@@ -65,7 +65,7 @@ beforeEach(() => {
 });
 
 describe("Home recommendations", () => {
-  it("links a signed-in recommendation with a verified game ID", async () => {
+  it("links the enriched Eligible recommendation to its game details", async () => {
     api.getAuthSnapshot.mockReturnValue(true);
     api.getDashboard.mockResolvedValue({
       recommendations: {
@@ -73,7 +73,7 @@ describe("Home recommendations", () => {
         data: {
           recommendations: [
             {
-              title: "Returnal",
+              title: "Eligible",
               reason: "Fast action",
               tags: ["Action"],
               rawg_id: 123,
@@ -86,8 +86,8 @@ describe("Home recommendations", () => {
 
     renderHome();
 
-    expect((await screen.findByRole("link", { name: /Returnal/i })).getAttribute("href")).toBe(
-      "/games/123?title=Returnal",
+    expect((await screen.findByRole("link", { name: /Eligible/i })).getAttribute("href")).toBe(
+      "/games/123?title=Eligible",
     );
   });
 
