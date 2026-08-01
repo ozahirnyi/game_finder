@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 
 from app.openai_client import get_recommendation
-from app.integrations.rawg import fetch_rawg_games
+from app.integrations.rawg import fetch_rawg_games, fetch_rawg_trending_games
 from app.redis_client import cache_get, cache_set
 from app.steam_store import fetch_steam_store_deal_candidates
 
@@ -93,9 +93,26 @@ async def get_personalized_recommendations(user, saved_games: list, steam_games:
     except Exception:
         candidates = []
     available = [candidate for candidate in candidates if int(candidate.get("steam_appid") or 0) not in owned_ids and str(candidate.get("name") or "").casefold() not in excluded]
+    popular_fallback = False
+    if not available:
+        try:
+            trending = await fetch_rawg_trending_games(page=1, page_size=12)
+            available = [
+                {
+                    "name": game["name"],
+                    "rawg_id": game.get("id"),
+                    "background_image": game.get("background_image"),
+                }
+                for game in trending.get("results", [])
+                if str(game.get("name") or "").casefold() not in excluded
+            ]
+            popular_fallback = True
+        except Exception:
+            pass
     offset = int(fingerprint[:8], 16) % max(len(available), 1)
     selected = (available[offset:] + available[:offset])[:6]
-    result = {"recommendations": [{"title": candidate["name"], "reason": "Available on Steam and selected from your library and profile signals.", "tags": [], "rawg_id": None, "cover_url": candidate.get("background_image")} for candidate in selected], "cache_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=CACHE_TTL_SECONDS)).isoformat()}
+    reason = "Popular game selected because personalized catalog is unavailable." if popular_fallback else "Available on Steam and selected from your library and profile signals."
+    result = {"recommendations": [{"title": candidate["name"], "reason": reason, "tags": [], "rawg_id": candidate.get("rawg_id"), "cover_url": candidate.get("background_image")} for candidate in selected], "cache_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=CACHE_TTL_SECONDS)).isoformat()}
     try:
         await cache_set(key, result, CACHE_TTL_SECONDS)
     except Exception:
