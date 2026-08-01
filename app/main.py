@@ -583,10 +583,11 @@ async def preview_psn_import(
     current_user: User = Depends(get_current_user),
 ):
     """Parse a user-provided PSN data export without persisting the source file."""
-    if not (file.filename or "").lower().endswith(".xlsx"):
-        raise HTTPException(status_code=400, detail="Upload the Excel file received from PlayStation (.xlsx)")
+    filename = file.filename or ""
+    if not filename.casefold().endswith((".xlsx", ".csv", ".json")):
+        raise HTTPException(status_code=400, detail="Upload a supported PSN export (.xlsx, .csv, or .json)")
     content = await file.read()
-    games = parse_psn_export(content)
+    games = parse_psn_export(content, filename)
     return PsnImportPreview(
         games=games,
         total=len(games),
