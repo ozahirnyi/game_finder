@@ -47,6 +47,8 @@ export function AccountPage() {
                 displayName: profile.display_name,
                 bio: profile.bio ?? "",
                 libraryVisibility: profile.library_visibility ?? "public",
+                platforms: profile.platforms,
+                favoriteGenres: profile.favorite_genres,
               }
             : undefined,
           hours: libraryPlaytime(

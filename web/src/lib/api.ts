@@ -142,7 +142,7 @@ export type Profile = {
   library_visibility?: "public" | "friends" | "private";
 };
 
-export type ProfileUpdate = Pick<Profile, "display_name" | "bio" | "library_visibility">;
+export type ProfileUpdate = Pick<Profile, "display_name" | "bio" | "library_visibility" | "platforms" | "favorite_genres">;
 export type RecommendationItem = { title: string; reason: string; tags: string[] };
 export type RecommendationResponse = { recommendations: RecommendationItem[] };
 export type DashboardBlock<T> = {

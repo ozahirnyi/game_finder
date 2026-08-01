@@ -9,6 +9,13 @@ import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { createConversation, createGameInvite, createMessage, updateProfile } from "@/lib/api";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
+const GENRE_OPTIONS = ["Action", "Adventure", "RPG", "Strategy", "Indie", "Shooter", "Puzzle", "Simulation", "Sports", "Racing", "Horror"];
+const PLATFORM_OPTIONS = ["PC", "PlayStation", "Xbox", "Nintendo Switch", "Mobile"];
+
+function toggle(values: string[], value: string) {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
 function formatPlaytime(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
@@ -42,6 +49,8 @@ export type ProfileData = {
     displayName: string;
     bio: string;
     libraryVisibility: "public" | "friends" | "private";
+    platforms: string[];
+    favoriteGenres: string[];
   };
 };
 
@@ -52,6 +61,8 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
   const [libraryVisibility, setLibraryVisibility] = useState(
     profile.settings?.libraryVisibility ?? "public",
   );
+  const [platforms, setPlatforms] = useState(profile.settings?.platforms ?? []);
+  const [favoriteGenres, setFavoriteGenres] = useState(profile.settings?.favoriteGenres ?? []);
   const [messageOpen, setMessageOpen] = useState(initialComposer === "message");
   const [messageBody, setMessageBody] = useState("");
   const [inviteOpen, setInviteOpen] = useState(initialComposer === "invite");
@@ -61,6 +72,8 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
     mutationFn: updateProfile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["genre-deals"] });
       setSettingsOpen(false);
     },
   });
@@ -166,6 +179,8 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
                 display_name: displayName.trim(),
                 bio: bio.trim() || null,
                 library_visibility: libraryVisibility,
+                platforms,
+                favorite_genres: favoriteGenres,
               });
             }}
             className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl"
@@ -190,6 +205,8 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
                 className="mt-2 min-h-24 w-full rounded-lg border border-border bg-surface-2 px-3 py-2"
               />
             </label>
+            <PreferenceChips label="Favourite genres" options={GENRE_OPTIONS} selected={favoriteGenres} onToggle={(value) => setFavoriteGenres(toggle(favoriteGenres, value))} />
+            <PreferenceChips label="Platforms" options={PLATFORM_OPTIONS} selected={platforms} onToggle={(value) => setPlatforms(toggle(platforms, value))} />
             <label className="mt-4 block text-sm font-semibold">
               Library visibility
               <select
@@ -357,4 +374,9 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
       </div>
     </>
   );
+}
+
+function PreferenceChips({ label, options, selected, onToggle }: { label: string; options: string[]; selected: string[]; onToggle: (value: string) => void }) {
+  const values = [...options, ...selected.filter((value) => !options.includes(value))];
+  return <fieldset className="mt-4"><legend className="text-sm font-semibold">{label}</legend><div className="mt-2 flex flex-wrap gap-2">{values.map((value) => <button key={value} type="button" aria-pressed={selected.includes(value)} onClick={() => onToggle(value)} className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${selected.includes(value) ? "border-primary bg-primary/15 text-primary" : "border-border"}`}>{value}</button>)}</div></fieldset>;
 }

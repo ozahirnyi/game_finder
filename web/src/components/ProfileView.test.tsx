@@ -1,10 +1,16 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const api = vi.hoisted(() => ({ updateProfile: vi.fn().mockResolvedValue({}) }));
+
 vi.mock("./ConnectedServices", () => ({ ConnectedServices: () => <div /> }));
 vi.mock("./NotificationsPanel", () => ({ NotificationsPanel: () => <div /> }));
+vi.mock("@/lib/api", async () => ({
+  ...(await vi.importActual<typeof import("@/lib/api")>("@/lib/api")),
+  updateProfile: api.updateProfile,
+}));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
@@ -43,6 +49,14 @@ describe("ProfileView library visibility", () => {
     renderProfile(true);
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
     expect(screen.getByRole("dialog", { name: /profile settings/i })).toBeInTheDocument();
+  });
+  it("saves selected favorite genres and platforms", async () => {
+    renderProfile(true);
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    fireEvent.click(screen.getByRole("button", { name: "RPG" }));
+    fireEvent.click(screen.getByRole("button", { name: "PC" }));
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(api.updateProfile.mock.calls[0][0]).toEqual(expect.objectContaining({ favorite_genres: ["RPG"], platforms: ["PC"] })));
   });
   it("formats friend game playtime from minutes", () => {
     profile.games[0].playtime = 125;
