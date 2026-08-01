@@ -70,15 +70,17 @@ describe("Home recommendations", () => {
     api.getDashboard.mockResolvedValue({
       recommendations: {
         status: "ready",
-        data: [
-          {
-            title: "Returnal",
-            reason: "Fast action",
-            tags: ["Action"],
-            rawg_id: 123,
-            cover_url: null,
-          },
-        ],
+        data: {
+          recommendations: [
+            {
+              title: "Returnal",
+              reason: "Fast action",
+              tags: ["Action"],
+              rawg_id: 123,
+              cover_url: null,
+            },
+          ],
+        },
       },
     });
 

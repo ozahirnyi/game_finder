@@ -53,7 +53,7 @@ function Home() {
   const best = deals[0];
   const rest = deals.slice(1);
   const recommendationBlock = dashboardQuery.data?.recommendations;
-  const recommendations = recommendationBlock?.data ?? [];
+  const recommendations = recommendationBlock?.data?.recommendations ?? [];
   const trendingGames = trendingQuery.data?.results ?? [];
 
   return (
