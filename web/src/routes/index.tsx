@@ -8,12 +8,15 @@ import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, Panel, PriceBlock, SectionHeader, Stat } from "@/components/ui-bits";
 import {
   getAuthSnapshot,
+  getDashboard,
   getDeals,
   getFriends,
   getLibraryOverview,
   getProfile,
+  getTrendingGames,
   searchGames,
   subscribeToAuthChanges,
+  type DashboardRecommendation,
 } from "@/lib/api";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -29,6 +32,16 @@ function Home() {
     enabled: signedIn,
   });
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends, enabled: signedIn });
+  const dashboardQuery = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: getDashboard,
+    enabled: signedIn,
+  });
+  const trendingQuery = useQuery({
+    queryKey: ["trending-games"],
+    queryFn: getTrendingGames,
+    enabled: !signedIn,
+  });
   const searchQuery = useQuery({
     queryKey: ["home-search", query],
     queryFn: () => searchGames(query),
@@ -39,6 +52,9 @@ function Home() {
   const results = searchQuery.data?.results ?? [];
   const best = deals[0];
   const rest = deals.slice(1);
+  const recommendationBlock = dashboardQuery.data?.recommendations;
+  const recommendations = recommendationBlock?.data ?? [];
+  const trendingGames = trendingQuery.data?.results ?? [];
 
   return (
     <AppShell>
@@ -133,6 +149,60 @@ function Home() {
           </Panel>
         </section>
       )}
+
+      <section className="animate-reveal mb-8">
+        <div className="mb-5">
+          <p className="label-mono mb-2 text-primary">{signedIn ? "For you" : "Discover"}</p>
+          <h2 className="text-3xl font-bold tracking-[-0.03em]">
+            {signedIn ? "Recommended for you" : "Popular games"}
+          </h2>
+        </div>
+        {signedIn ? (
+          dashboardQuery.isPending ? (
+            <Panel className="p-6 text-sm text-muted-foreground">Finding recommendations…</Panel>
+          ) : recommendationBlock?.status === "ready" && recommendations.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {recommendations.map((recommendation) => (
+                <RecommendationCard
+                  key={`${recommendation.rawg_id ?? recommendation.title}`}
+                  recommendation={recommendation}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title={
+                recommendationBlock?.status === "error"
+                  ? "Recommendations are unavailable"
+                  : "No recommendations yet"
+              }
+              description={
+                recommendationBlock?.message ??
+                "Connect Steam, import your library, or update your profile to get personalized recommendations."
+              }
+            />
+          )
+        ) : trendingGames.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {trendingGames.map((game) => (
+              <GameCard
+                key={game.id}
+                game={{
+                  gameId: String(game.id),
+                  title: game.name,
+                  coverUrl: game.background_image ?? undefined,
+                  coverFrom: "#c75f28",
+                  coverTo: "#22243a",
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <Panel className="p-6 text-sm text-muted-foreground">
+            Popular games are temporarily unavailable.
+          </Panel>
+        )}
+      </section>
 
       <section className="animate-reveal mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -261,6 +331,46 @@ function Home() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+function RecommendationCard({ recommendation }: { recommendation: DashboardRecommendation }) {
+  const content = (
+    <Panel interactive={recommendation.rawg_id != null} className="h-full p-5">
+      {recommendation.cover_url && (
+        <GameCover
+          title={recommendation.title}
+          image={recommendation.cover_url}
+          from="#c75f28"
+          to="#22243a"
+          className="mb-4 aspect-[16/9] w-full"
+        />
+      )}
+      <h3 className="text-lg font-bold">{recommendation.title}</h3>
+      <p className="mt-2 text-sm text-muted-foreground">{recommendation.reason}</p>
+      {recommendation.tags.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {recommendation.tags.map((tag) => (
+            <Chip key={tag} tone="outline">
+              {tag}
+            </Chip>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+
+  if (recommendation.rawg_id == null) return content;
+
+  return (
+    <Link
+      to="/games/$gameId"
+      params={{ gameId: String(recommendation.rawg_id) }}
+      search={{ title: recommendation.title }}
+      className="block h-full"
+    >
+      {content}
+    </Link>
   );
 }
 

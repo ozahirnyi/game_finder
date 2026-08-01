@@ -144,6 +144,16 @@ export type Profile = {
 export type ProfileUpdate = Pick<Profile, "display_name" | "bio" | "library_visibility">;
 export type RecommendationItem = { title: string; reason: string; tags: string[] };
 export type RecommendationResponse = { recommendations: RecommendationItem[] };
+export type DashboardBlock<T> = {
+  status: "ready" | "empty" | "error" | "not_connected";
+  data: T;
+  message?: string | null;
+};
+export type DashboardRecommendation = RecommendationItem & {
+  rawg_id?: number | null;
+  cover_url?: string | null;
+};
+export type Dashboard = { recommendations: DashboardBlock<DashboardRecommendation[]> };
 
 export type OAuthLoginUrl = { url: string };
 export type SteamAccount = {
@@ -166,8 +176,20 @@ export type SteamLibrarySync = SteamAccount & {
   created?: number;
   updated?: number;
 };
-export type SteamSocialFriend = { steam_id: string; persona_name?: string | null; avatar?: string | null; library_public: boolean; common_games_count: number; taste_match_percent: number };
-export type SteamSocial = { friends: SteamSocialFriend[]; friends_total: number; friends_has_more: boolean; top_friend_games: { appid: number; name: string; friends: number }[] };
+export type SteamSocialFriend = {
+  steam_id: string;
+  persona_name?: string | null;
+  avatar?: string | null;
+  library_public: boolean;
+  common_games_count: number;
+  taste_match_percent: number;
+};
+export type SteamSocial = {
+  friends: SteamSocialFriend[];
+  friends_total: number;
+  friends_has_more: boolean;
+  top_friend_games: { appid: number; name: string; friends: number }[];
+};
 export type PsnImportPreview = {
   games: string[];
   total: number;
@@ -307,7 +329,10 @@ export function syncSteamLibrary() {
 }
 
 export function getSteamSocial(friends_limit = 12, friends_offset = 0) {
-  return apiRequest<SteamSocial>(`/steam/social?friends_limit=${friends_limit}&friends_offset=${friends_offset}`, { auth: true });
+  return apiRequest<SteamSocial>(
+    `/steam/social?friends_limit=${friends_limit}&friends_offset=${friends_offset}`,
+    { auth: true },
+  );
 }
 
 export function unlinkSteamAccount() {
@@ -357,6 +382,10 @@ export function getRecommendations(prompt: string) {
 
 export function getTrendingGames() {
   return apiRequest<{ results: CatalogGame[] }>("/catalog/trending-games?page_size=12");
+}
+
+export function getDashboard() {
+  return apiRequest<Dashboard>("/dashboard", { auth: true });
 }
 
 export function getCatalogGame(id: string | number) {
@@ -418,15 +447,25 @@ export function getFriendProfile(id: string) {
 }
 
 export function createConversation(recipient_id: string) {
-  return apiRequest<Conversation>("/conversations", { auth: true, method: "POST", body: { recipient_id } });
+  return apiRequest<Conversation>("/conversations", {
+    auth: true,
+    method: "POST",
+    body: { recipient_id },
+  });
 }
 
 export function createMessage(conversationId: string, body: string) {
-  return apiRequest(`/conversations/${conversationId}/messages`, { auth: true, method: "POST", body: { body } });
+  return apiRequest(`/conversations/${conversationId}/messages`, {
+    auth: true,
+    method: "POST",
+    body: { body },
+  });
 }
 
 export function searchUsers(query: string) {
-  return apiRequest<Friend["user"][]>(`/users/search?q=${encodeURIComponent(query)}`, { auth: true });
+  return apiRequest<Friend["user"][]>(`/users/search?q=${encodeURIComponent(query)}`, {
+    auth: true,
+  });
 }
 
 export function getIncomingFriendRequests() {

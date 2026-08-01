@@ -5,6 +5,7 @@ import {
   apiRequest,
   clearToken,
   confirmPsnImport,
+  getDashboard,
   getGoogleLoginUrl,
   getLibraryOverview,
   getSteamLinkUrl,
@@ -105,6 +106,25 @@ describe("apiRequest", () => {
       3,
       "/api/steam/library/sync",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("loads the authenticated dashboard", async () => {
+    setToken("token");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ recommendations: { status: "empty", data: [] } }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getDashboard();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/dashboard",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
     );
   });
 
