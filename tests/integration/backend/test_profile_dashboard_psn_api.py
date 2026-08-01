@@ -111,7 +111,7 @@ def test_dashboard_empty_and_not_connected_states(api_client, user_factory, auth
     body = response.json()
     assert body["deals"]["status"] == "empty"
     assert body["steam"]["status"] == "not_connected"
-    assert body["recommendations"]["status"] == "empty"
+    assert body["recommendations"]["status"] == "ready"
 
 
 def test_dashboard_ready_and_error_states_are_boundary_mocked(
@@ -152,6 +152,44 @@ def test_dashboard_ready_and_error_states_are_boundary_mocked(
     failed = api_client.get("/dashboard")
     assert failed.json()["deals"]["status"] == "error"
     assert failed.json()["steam"]["status"] == "error"
+
+
+def test_dashboard_uses_saved_library_when_linked_steam_fetch_fails(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    user = auth_as(user_factory(email="dashboard-steam-fallback@example.com", steam_id="76561192"))
+    db_session.add(Game(owner_id=user.id, title="Hades", source="manual"))
+    db_session.commit()
+    monkeypatch.setattr(app_main, "fetch_steam_store_deals", AsyncMock(return_value=[]))
+    monkeypatch.setattr(app_main, "fetch_owned_games", AsyncMock(side_effect=RuntimeError("steam")))
+    recommendations = AsyncMock(return_value={"recommendations": [{"title": "Celeste"}]})
+    monkeypatch.setattr(app_main, "get_personalized_recommendations", recommendations)
+
+    response = api_client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert response.json()["steam"]["status"] == "error"
+    assert response.json()["recommendations"]["status"] == "ready"
+    recommendations.assert_awaited_once()
+    arguments = recommendations.await_args.args
+    assert arguments[0] is user
+    assert [game.title for game in arguments[1]] == ["Hades"]
+    assert arguments[2] == []
+
+
+def test_dashboard_returns_popular_recommendations_without_personal_signals(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    user = auth_as(user_factory(email="dashboard-popular@example.com"))
+    monkeypatch.setattr(app_main, "fetch_steam_store_deals", AsyncMock(return_value=[]))
+    recommendations = AsyncMock(return_value={"recommendations": [{"title": "Popular Game"}]})
+    monkeypatch.setattr(app_main, "get_personalized_recommendations", recommendations)
+
+    response = api_client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert response.json()["recommendations"]["status"] == "ready"
+    recommendations.assert_awaited_once_with(user, [], [])
 
 
 def test_psn_import_preview_parses_xlsx_without_persisting(api_client, db_session, user_factory, auth_as):

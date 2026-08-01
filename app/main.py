@@ -1926,14 +1926,21 @@ async def dashboard(current_user: User = Depends(get_current_user), db: Session 
         library_data["total_playtime_hours"] = round(library_data["total_playtime_minutes"] / 60, 1)
         library = DataBlock(status="ready", data=library_data)
     saved_games = list_games(db, current_user.id)
-    has_profile_signals = bool(current_user.favorite_genres or current_user.platforms or current_user.bio)
-    if steam_block.status in {"ready", "empty", "not_connected"} and (steam_games or saved_games or has_profile_signals):
-        try:
-            recommendation_block = DataBlock(status="ready", data=await get_personalized_recommendations(current_user, saved_games, steam_games if steam_block.status == "ready" else []))
-        except Exception:
-            recommendation_block = DataBlock(status="error", data=[], message="Recommendations are temporarily unavailable. Please try again later.")
-    else:
-        recommendation_block = empty_block("Add games or connect Steam to get recommendations.")
+    try:
+        recommendation_block = DataBlock(
+            status="ready",
+            data=await get_personalized_recommendations(
+                current_user,
+                saved_games,
+                steam_games if steam_block.status == "ready" else [],
+            ),
+        )
+    except Exception:
+        recommendation_block = DataBlock(
+            status="error",
+            data=[],
+            message="Recommendations are temporarily unavailable. Please try again later.",
+        )
     return DashboardRead(
         user=DataBlock(status="ready", data=user_profile_response(current_user, db=db).model_dump(mode="json")),
         library=library,
