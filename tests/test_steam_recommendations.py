@@ -116,3 +116,28 @@ async def test_personal_recommendations_exclude_owned_and_saved_titles(monkeypat
     monkeypatch.setattr(recommendations, "fetch_steam_store_deal_candidates", candidates)
     result = await recommendations.get_personalized_recommendations(User(uuid.uuid4()), [Saved("Saved")], [{"appid": 1, "name": "Owned"}])
     assert [item["title"] for item in result["recommendations"]] == ["Eligible"]
+
+
+@pytest.mark.anyio
+async def test_personal_recommendations_fall_back_to_non_owned_rawg_trends(monkeypatch):
+    async def cache_get(_key): return None
+    async def cache_set(*_args): return None
+    async def candidates(): return {"candidates": []}
+    async def trending(page, page_size):
+        assert (page, page_size) == (1, 12)
+        return {"results": [
+            {"id": 1, "name": "Saved", "background_image": "saved-cover"},
+            {"id": 2, "name": "Top Game", "background_image": "top-cover"},
+        ]}
+
+    monkeypatch.setattr(recommendations, "cache_get", cache_get)
+    monkeypatch.setattr(recommendations, "cache_set", cache_set)
+    monkeypatch.setattr(recommendations, "fetch_steam_store_deal_candidates", candidates)
+    monkeypatch.setattr(recommendations, "fetch_rawg_trending_games", trending)
+
+    result = await recommendations.get_personalized_recommendations(User(uuid.uuid4()), [Saved("Saved")], [])
+
+    assert result["recommendations"] == [{
+        "title": "Top Game", "reason": "Popular game selected because personalized catalog is unavailable.",
+        "tags": [], "rawg_id": 2, "cover_url": "top-cover",
+    }]
