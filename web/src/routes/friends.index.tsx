@@ -90,6 +90,10 @@ function FriendsPage() {
   const sharedGames: Array<{ id: string; title: string; coverFrom: string; coverTo: string; coverUrl?: string }> = [];
   const activity: Array<{ id: string; who: string; verb: string; target: string; time: string }> = [];
 
+  if (friendsQuery.isPending && !friendsQuery.data) {
+    return <AppShell><div data-testid="friends-loading" className="rounded-2xl border border-border bg-surface p-6 text-sm text-muted-foreground">Loading your friends…</div></AppShell>;
+  }
+
   return (
     <AppShell>
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">

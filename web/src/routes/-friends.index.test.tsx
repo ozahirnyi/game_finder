@@ -91,6 +91,14 @@ describe("FriendsPage", () => {
     expect(api.getSteamSocial).toHaveBeenLastCalledWith(12, 1);
   });
 
+  it("shows a Friends skeleton while its first request is pending", async () => {
+    api.getFriends.mockImplementation(() => new Promise(() => {}));
+
+    renderFriends();
+
+    expect(await screen.findByTestId("friends-loading")).toBeInTheDocument();
+  });
+
   it("uses a separate Steam tab and sorts friends by match", async () => {
     api.getSteamSocial.mockResolvedValue({ friends: [
       { steam_id: "1", persona_name: "Low match", taste_match_percent: 12, common_games_count: 1, library_public: true },

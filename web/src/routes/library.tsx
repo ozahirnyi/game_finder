@@ -91,10 +91,12 @@ function LibraryPage() {
         </label>
       </div>
 
-      {libraryQuery.isLoading && (
-        <p className="text-sm text-muted-foreground">Loading your library…</p>
+      {libraryQuery.isPending && !libraryQuery.data && (
+        <div data-testid="library-loading" className="rounded-2xl border border-border bg-surface p-6 text-sm text-muted-foreground">
+          Loading your library…
+        </div>
       )}
-      {!libraryQuery.isLoading && visible.length === 0 && (
+      {!(libraryQuery.isPending && !libraryQuery.data) && visible.length === 0 && (
         <EmptyState
           icon={<LibraryIcon className="size-5" />}
           title={
