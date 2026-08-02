@@ -91,4 +91,4 @@ async def test_steam_genre_lookup_returns_store_categories_and_tolerates_missing
     monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
 
     assert await steam_store.fetch_steam_store_game_genres([10, 20], "US") == {10: ["Action", "RPG"], 20: []}
-    assert sorted(requested_appids) == ["10", "20"]
+    assert sorted(requested_appids) == [10, 20]
