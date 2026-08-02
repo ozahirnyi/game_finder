@@ -4,7 +4,7 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-const api = vi.hoisted(() => ({ getDeals: vi.fn() }));
+const api = vi.hoisted(() => ({ getGenreDeals: vi.fn() }));
 vi.mock("@/lib/api", () => api);
 vi.mock("@/components/AppShell", () => ({ AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock("@/components/GameCover", () => ({ GameCover: () => <div /> }));
@@ -12,9 +12,12 @@ vi.mock("@/components/GameCover", () => ({ GameCover: () => <div /> }));
 import { Route } from "./deals";
 
 it("links a Steam deal without a catalog match to an in-site Steam game page", async () => {
-  api.getDeals.mockResolvedValue({ results: [
-    { id: null, steam_appid: 620, name: "Portal 2", current: { shop: "Steam", url: "https://store.steampowered.com/app/620", price: { amount: 1, currency: "USD" } } },
-  ] });
+  api.getGenreDeals.mockResolvedValue({
+    popular: [
+      { id: null, steam_appid: 620, name: "Portal 2", current: { shop: "Steam", url: "https://store.steampowered.com/app/620", price: { amount: 1, currency: "USD" } } },
+    ],
+    sections: [],
+  });
   const root = createRootRoute({ component: Outlet });
   const route = createRoute({ getParentRoute: () => root, path: "/", component: Route.options.component });
   const router = createRouter({ routeTree: root.addChildren([route]), history: createMemoryHistory({ initialEntries: ["/"] }) });
