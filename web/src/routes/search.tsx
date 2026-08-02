@@ -93,7 +93,8 @@ function SearchPage() {
                   key={game.id}
                   aspect="aspect-[3/4]"
                   game={{
-                    gameId: String(game.id),
+                    gameId: game.source === "steam" || game.id === null ? undefined : String(game.id),
+                    externalUrl: game.source === "steam" ? game.url ?? undefined : undefined,
                     title: game.name,
                     coverFrom: "#312e81",
                     coverTo: "#111827",

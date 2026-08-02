@@ -27,7 +27,7 @@ from app.integrations.rawg import (
 )
 from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
-from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_price, fetch_steam_store_game_genres
+from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
@@ -2417,7 +2417,7 @@ async def steam_recommendations(
     return await get_cached_steam_recommendations(current_user.id, games, data.prompt)
 
 
-@app.get("/search/games",response_model=GameSearchResponse)
+@app.get("/search/games", response_model=GameSearchResponse, response_model_exclude_unset=True)
 @limiter.limit("30/minute")
 async def search(request: Request, q: str, page: int = 1):
     q = q.strip().lower()
@@ -2431,6 +2431,25 @@ async def search(request: Request, q: str, page: int = 1):
     try:
         return await get_json_cached(key,CACHE_TTL,fetch)
     except RAWGError as e:
+        if e.status_code == 504:
+            steam_key = build_cache_key("steam_store_search", q=q, page=page)
+
+            async def fetch_steam():
+                games = await fetch_steam_store_search(q, page_size=20)
+                return {"results": [
+                    {
+                        "id": None,
+                        "name": game["name"],
+                        "released": None,
+                        "background_image": game.get("background_image"),
+                        "source": "steam",
+                        "steam_appid": game["steam_appid"],
+                        "url": game["url"],
+                    }
+                    for game in games
+                ]}
+
+            return JSONResponse(content=await get_json_cached(steam_key, CACHE_TTL, fetch_steam))
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e))
@@ -2451,7 +2470,7 @@ async def catalog_game_detail(rawg_id: int):
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
-@app.get("/catalog/upcoming-games", response_model=GameSearchResponse)
+@app.get("/catalog/upcoming-games", response_model=GameSearchResponse, response_model_exclude_unset=True)
 @limiter.limit("30/minute")
 async def upcoming_games(request: Request, page: int = 1, page_size: int = 8):
     if page < 1:
@@ -2469,7 +2488,7 @@ async def upcoming_games(request: Request, page: int = 1, page_size: int = 8):
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
-@app.get("/catalog/trending-games", response_model=GameSearchResponse)
+@app.get("/catalog/trending-games", response_model=GameSearchResponse, response_model_exclude_unset=True)
 @limiter.limit("30/minute")
 async def trending_games(request: Request, page: int = 1, page_size: int = 8):
     if page < 1:

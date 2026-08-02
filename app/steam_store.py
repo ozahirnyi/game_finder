@@ -9,6 +9,34 @@ STEAM_STORE_BASE_URL = "https://store.steampowered.com"
 EXPECTED_CURRENCY_BY_COUNTRY = {"UA": "UAH"}
 
 
+async def fetch_steam_store_search(query: str, page_size: int = 20) -> list[dict[str, Any]]:
+    params = {"term": query, "l": "english", "cc": "us"}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(f"{STEAM_STORE_BASE_URL}/api/storesearch/", params=params)
+            response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail=f"Steam Store request failed: {exc.response.status_code}") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Steam Store request failed") from exc
+
+    results = []
+    for item in response.json().get("items", []):
+        appid = item.get("id")
+        name = (item.get("name") or "").strip()
+        if not appid or not name:
+            continue
+        results.append({
+            "steam_appid": int(appid),
+            "name": name,
+            "background_image": item.get("tiny_image") or item.get("header_image"),
+            "url": f"{STEAM_STORE_BASE_URL}/app/{appid}/",
+        })
+        if len(results) >= page_size:
+            break
+    return results
+
+
 def _money_from_steam_cents(cents: int | None, currency: str | None) -> dict[str, Any] | None:
     if cents is None or not currency:
         return None
