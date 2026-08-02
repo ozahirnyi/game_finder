@@ -80,7 +80,14 @@ function SearchPage() {
               </button>
             ))}
           </div>
-          {query.trim() !== "" && results.length === 0 && (
+          {query.trim() !== "" && searchQuery.isFetching && (
+            <EmptyState
+              icon={<Search className="size-5 animate-pulse" />}
+              title="Searching games…"
+              description="Checking the catalog and Steam."
+            />
+          )}
+          {query.trim() !== "" && !searchQuery.isFetching && results.length === 0 && (
             <EmptyState
               icon={<Search className="size-5" />}
               title="No games match your search"
