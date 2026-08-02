@@ -393,6 +393,10 @@ export function getCatalogGame(id: string | number) {
   return apiRequest<CatalogGame>(`/catalog/games/${id}`);
 }
 
+export function getSteamGameByTitle(title: string) {
+  return apiRequest<{ appid: number; name: string; background_image?: string | null; description_raw?: string | null; genres: string[]; platforms: string[]; current?: Deal["current"]; url?: string | null }>(`/steam/games/resolve?title=${encodeURIComponent(title)}`);
+}
+
 export function getDeals(country: string) {
   return apiRequest<{ results: Deal[] }>(
     `/prices/deals?country=${encodeURIComponent(country)}&page_size=12`,

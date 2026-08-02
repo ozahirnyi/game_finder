@@ -88,8 +88,14 @@ async def fetch_steam_store_game_price(title: str, country: str = "US") -> dict[
     regular = _money_from_steam_cents(overview.get("initial"), overview.get("currency"))
     url = f"https://store.steampowered.com/app/{appid}/"
     return {
+        "appid": appid,
         "itad_id": f"steam:{appid}",
         "title": data.get("name") or item.get("name") or title,
+        "name": data.get("name") or item.get("name") or title,
+        "background_image": data.get("header_image"),
+        "description_raw": data.get("short_description"),
+        "genres": [genre["description"] for genre in data.get("genres") or [] if genre.get("description")],
+        "platforms": ["PC"],
         "url": url,
         "current": {
             "shop": "Steam", "price": price,

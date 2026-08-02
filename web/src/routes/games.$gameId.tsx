@@ -12,7 +12,7 @@ import {
   PriceBlock,
   SectionHeader,
 } from "@/components/ui-bits";
-import { addWishlist, ApiError, createGameInvite, createPriceAlert, getCatalogGame, getFriends, getLibraryOverview, getPriceHistory, getWishlist, searchGames } from "@/lib/api";
+import { addWishlist, ApiError, createGameInvite, createPriceAlert, getCatalogGame, getFriends, getLibraryOverview, getPriceHistory, getSteamGameByTitle, getWishlist, searchGames } from "@/lib/api";
 import { exactCatalogMatch } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
@@ -96,27 +96,28 @@ export const Route = createFileRoute("/games/$gameId")({
       };
     } catch {
       if (deps.title && deps.source !== "steam") {
+        const steamGame = await getSteamGameByTitle(deps.title);
         return {
           game: {
-            id: params.gameId,
-            title: deps.title,
+            id: String(steamGame.appid),
+            title: steamGame.name,
             coverFrom: "#1d4ed8",
             coverTo: "#111827",
-            coverUrl: undefined,
+            coverUrl: steamGame.background_image ?? undefined,
             fallbackCoverUrl: undefined,
-            genres: [],
-            platforms: [],
+            genres: steamGame.genres,
+            platforms: steamGame.platforms,
             releaseDate: undefined,
             rating: 0,
-            description: "Catalog details are temporarily unavailable.",
-            price: null,
+            description: steamGame.description_raw ?? "Steam Store game.",
+            price: steamGame.current?.price?.amount ?? null,
             originalPrice: null,
             discount: null,
-            currency: undefined,
-            store: undefined,
-            storeUrl: undefined,
+            currency: steamGame.current?.price?.currency,
+            store: steamGame.current?.shop ?? "Steam",
+            storeUrl: steamGame.current?.url ?? steamGame.url ?? undefined,
             coop: false,
-            isSteamLibrary: false,
+            isSteamLibrary: true,
           },
         };
       }
