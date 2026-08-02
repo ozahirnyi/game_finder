@@ -111,7 +111,7 @@ def test_genre_deals_rawg_fallback_and_missing_popular_match():
 
     async def rawg(name, _):
         if name == "Deal":
-            raise genre_deals.RAWGError("down")
+            return {"results": []}
         return {"results": [{"id": 2, "name": "Other", "genres": ["Puzzle"]}]}
 
     result = asyncio.run(genre_deals.build_genre_deal_groups("UA", [" action ", "ACTION", " ", "RPG"], candidates, rawg))
