@@ -8,8 +8,8 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
   getAuthSnapshot: vi.fn(),
@@ -64,6 +64,8 @@ beforeEach(() => {
   api.searchGames.mockResolvedValue({ results: [] });
 });
 
+afterEach(cleanup);
+
 describe("Home recommendations", () => {
   it("links the enriched Eligible recommendation to its game details", async () => {
     api.getAuthSnapshot.mockReturnValue(true);
@@ -89,6 +91,17 @@ describe("Home recommendations", () => {
     expect((await screen.findByRole("link", { name: /Eligible/i })).getAttribute("href")).toBe(
       "/games/123?title=Eligible",
     );
+  });
+
+  it("opens an unenriched recommendation through its exact title", async () => {
+    api.getAuthSnapshot.mockReturnValue(true);
+    api.getDashboard.mockResolvedValue({
+      recommendations: { status: "ready", data: { recommendations: [{ title: "Unknown title", reason: "Fits", tags: [], rawg_id: null, cover_url: null }] } },
+    });
+
+    renderHome();
+
+    expect((await screen.findByRole("link", { name: /Unknown title/i })).getAttribute("href")).toBe("/games/0?title=Unknown+title");
   });
 
   it("shows an honest signed-in empty state", async () => {
