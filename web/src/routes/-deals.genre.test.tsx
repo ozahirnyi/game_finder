@@ -31,6 +31,6 @@ describe("DealsPage genre deals", () => {
 
     expect(await screen.findByText("Popular on Steam")).toBeInTheDocument();
     for (const title of ["Popular 1", "Popular 2", "Popular 3", "Popular 4", "Action", "RPG", "Adventure", "Strategy", "Indie"]) expect(screen.getByText(title)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /open action game on playfinder/i })).toHaveAttribute("href", "/games/10");
+    expect(screen.getByRole("link", { name: /open action game on playfinder/i })).toHaveAttribute("href", "/games/10?title=Action game");
   });
 });

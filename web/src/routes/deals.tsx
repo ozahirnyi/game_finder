@@ -12,7 +12,7 @@ export const Route = createFileRoute("/deals")({
 
 function gameLink(deal: Deal) {
   return deal.id != null
-    ? { params: { gameId: String(deal.id) }, search: undefined }
+    ? { params: { gameId: String(deal.id) }, search: { title: deal.name } }
     : deal.steam_appid != null
       ? { params: { gameId: String(deal.steam_appid) }, search: { source: "steam" as const, title: deal.name } }
       : null;
