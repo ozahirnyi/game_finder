@@ -6,15 +6,14 @@ Every game card in search, price drops, and discovery opens the same internal ga
 
 ## Design
 
-- Use `/games/:gameId` for catalog games and `/games/steam-:appId` for Steam-only results. Both routes render `GameDetailScreen`.
-- Let the detail API resolve a `steam-:appId` identifier through Steam Store data and return the existing catalog-game shape. The page shows its Steam purchase link there.
-- Replace Steam fallback capsule images with a larger Steam header image when available; keep the existing unavailable-cover state if Steam provides none.
-- Make each price-drop card use the same internal destination. Remove its card-level store link; the detail page owns the external purchase action.
+- Use the existing `/games/:gameId` route for every card. Steam-only cards pass their Steam app id and `source=steam`; the existing route loader already resolves that mode and shows its store URL on the detail page.
+- Replace Steam search capsule images with the app's Steam header image; keep the existing unavailable-cover state if Steam provides none.
+- Make each price-drop card use the same internal destination. The card no longer opens the store; the detail page owns the external purchase action.
 
 ## Error handling and tests
 
 - If Steam metadata cannot be loaded, the detail screen retains its existing error and retry state.
-- Add API and UI tests proving Steam-search cards and Steam price drops link internally, and that the detail API returns the larger image and Steam URL.
+- Add API and UI tests proving Steam-search cards and Steam price drops link internally, and that Steam search returns a header-sized image URL.
 
 ## Scope
 
