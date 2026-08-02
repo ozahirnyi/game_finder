@@ -712,7 +712,7 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
     assert len(first.json()["sections"][0]["results"]) == 5
     assert second.status_code == 200
     assert cache_keys[0] == cache_keys[1]
-    assert cache_keys[0].startswith("steam_genre_deals_v3:")
+    assert cache_keys[0].startswith("steam_genre_deals_v4:")
 
 
 def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
