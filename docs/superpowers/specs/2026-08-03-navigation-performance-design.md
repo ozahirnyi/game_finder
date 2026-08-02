@@ -2,11 +2,12 @@
 
 ## Goal
 
-Make transitions to Library and Friends feel immediate after the initial site load, while preserving fresh user data.
+Make the first authenticated screen useful quickly and transitions to Library and Friends feel immediate, while preserving fresh user data.
 
 ## Scope
 
 - Optimize authenticated navigation to `/library` and `/friends`.
+- Optimize the initial authenticated home render without changing its content.
 - Do not change product features, API response shapes, or Steam synchronization.
 - Keep a clear loading state only for a first visit or an actual request failure.
 
@@ -16,14 +17,15 @@ Use React Query as a short-lived shared cache and prefetch the two high-value de
 
 ## Data Flow
 
-1. Once authentication is known, `AppShell` prefetches `library-overview`, `friends`, incoming friend requests, and the first Steam-social page at idle priority.
+1. The first authenticated home render prioritizes profile and the visible dashboard. Sidebar deals and low-priority social data render after the initial content is ready.
+2. Once authentication is known, `AppShell` prefetches `library-overview`, `friends`, incoming friend requests, and the first Steam-social page at idle priority.
 2. Navigation entries for Library and Friends prefetch their route and respective query data on hover or keyboard focus.
 3. Library and Friends render cached data immediately. React Query revalidates stale data in the background.
 4. On a cold navigation, each route renders a skeleton; on an error, it renders the existing explicit error state.
 
 ## Cache Policy
 
-- `library-overview`, `friends`, incoming friend requests, and the first Steam-social page use a 90-second `staleTime`.
+- `profile`, `library-overview`, `friends`, incoming friend requests, and the first Steam-social page use a 90-second `staleTime`.
 - Cached data may be shown while a background refetch is active.
 - Mutations that change friends invalidate the relevant cached queries immediately.
 - No persistent browser storage is introduced; a full reload begins with an empty in-memory cache.
@@ -33,6 +35,7 @@ Use React Query as a short-lived shared cache and prefetch the two high-value de
 - Clicking Library or Friends after initial authenticated load updates navigation feedback in under 100 ms.
 - With warmed cache, page content is available in under 500 ms in normal conditions.
 - A cold visit shows an intentional skeleton rather than a blank page or a misleading empty state.
+- The first authenticated screen renders its shell and primary content without waiting for sidebar deals or route prefetches.
 - Existing friend mutations still refresh Friends data correctly.
 
 ## Verification
