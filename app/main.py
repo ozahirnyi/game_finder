@@ -27,7 +27,7 @@ from app.integrations.rawg import (
 )
 from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
-from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_price
+from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_price, fetch_steam_store_game_genres
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
@@ -2580,6 +2580,7 @@ async def genre_deals(current_user: User | None = Depends(get_optional_current_u
             genres,
             fetch_steam_store_deal_candidates,
             fetch_rawg_games,
+            fetch_steam_store_game_genres,
         )
 
     return await get_json_cached(key, CACHE_TTL, fetch)

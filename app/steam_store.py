@@ -101,6 +101,28 @@ async def fetch_steam_store_game_price(title: str, country: str = "US") -> dict[
     }
 
 
+async def fetch_steam_store_game_genres(appids: list[int], country: str = "US") -> dict[int, list[str]]:
+    """Return Steam storefront genres for the supplied app IDs without failing a deals page."""
+    ids = list(dict.fromkeys(appid for appid in appids if appid > 0))
+    if not ids:
+        return {}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                f"{STEAM_STORE_BASE_URL}/api/appdetails",
+                params={"appids": ",".join(map(str, ids)), "cc": country, "l": "english"},
+            )
+            response.raise_for_status()
+    except httpx.HTTPError:
+        return {}
+
+    payload = response.json()
+    return {
+        appid: [genre["description"] for genre in (payload.get(str(appid), {}).get("data", {}).get("genres") or []) if genre.get("description")]
+        for appid in ids
+    }
+
+
 async def fetch_steam_store_deal_candidates(country: str = "US", page_size: int = 60) -> dict[str, list[dict[str, Any]]]:
     params = {"cc": country, "l": "english"}
     try:

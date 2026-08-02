@@ -42,6 +42,7 @@ async def _enrich_deal(
         match = None
     item = {
         "id": match.get("id") if match else None,
+        "steam_appid": deal["steam_appid"],
         "name": deal["name"],
         "released": match.get("released") if match else None,
         "background_image": deal.get("background_image") or (match.get("background_image") if match else None),
@@ -81,12 +82,24 @@ async def build_genre_deal_groups(
     favorite_genres: list[str] | None,
     fetch_candidates: Callable[[str], Awaitable[dict[str, list[dict[str, Any]]]]],
     fetch_rawg_games: Callable[[str, int], Awaitable[dict[str, Any]]],
+    fetch_steam_genres: Callable[[list[int], str], Awaitable[dict[int, list[str]]]] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     selected_genres = select_deal_genres(favorite_genres)
     candidates = await fetch_candidates(country)
     rawg_by_appid: dict[int, tuple[dict[str, Any], set[str]]] = {}
     for deal in candidates["candidates"]:
         rawg_by_appid[deal["steam_appid"]] = await _enrich_deal(deal, fetch_rawg_games)
+
+    if fetch_steam_genres:
+        missing_genres = [appid for appid, (_, genres) in rawg_by_appid.items() if not genres]
+        try:
+            steam_genres = await fetch_steam_genres(missing_genres, country)
+        except Exception:
+            steam_genres = {}
+        for appid, genres in steam_genres.items():
+            if appid in rawg_by_appid and genres:
+                item, _ = rawg_by_appid[appid]
+                rawg_by_appid[appid] = item, {normalize_genre(genre) for genre in genres}
 
     popular = []
     for deal in candidates["popular"]:

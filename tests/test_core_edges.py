@@ -119,6 +119,30 @@ def test_genre_deals_rawg_fallback_and_missing_popular_match():
     assert len(result["sections"]) == 5
 
 
+def test_genre_deals_keep_steam_navigation_and_use_steam_genres_when_rawg_is_down():
+    async def candidates(_):
+        return {
+            "candidates": [{"steam_appid": 10, "name": "Steam Deal", "current": {}}],
+            "popular": [{"steam_appid": 10, "name": "Steam Deal", "current": {}}],
+        }
+
+    async def rawg(_, __):
+        raise genre_deals.RAWGError("down")
+
+    async def steam_genres(appids, country):
+        assert (appids, country) == ([10], "US")
+        return {10: ["Action"]}
+
+    result = asyncio.run(
+        genre_deals.build_genre_deal_groups(
+            "US", ["Action"], candidates, rawg, steam_genres,
+        )
+    )
+
+    assert result["popular"][0]["steam_appid"] == 10
+    assert result["sections"][0]["results"][0]["steam_appid"] == 10
+
+
 def test_openai_helpers_and_fallback_paths(monkeypatch):
     monkeypatch.setenv("AI_FALLBACK_ENABLED", "off")
     assert not openai_client.fallback_enabled()
