@@ -273,6 +273,9 @@ class GameSearchItem(BaseModel):
     name: str | None = None
     released: str | None = None
     background_image: str | None = None
+    source: str | None = None
+    steam_appid: int | None = None
+    url: str | None = None
 
 
 class GameSearchResponse(BaseModel):
