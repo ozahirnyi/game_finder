@@ -1,10 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Home, Search, Library, Heart, Tag, Users, Palette } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
 import { Avatar } from "./GameCover";
 import { getAuthSnapshot, getDeals, getProfile, subscribeToAuthChanges } from "@/lib/api";
+import { friendsQueryOptions, incomingFriendRequestsQueryOptions, libraryOverviewQueryOptions, steamSocialFirstPageQueryOptions } from "@/lib/navigationQueries";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -19,6 +20,32 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [themeOpen, setThemeOpen] = useState(false);
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
+  const queryClient = useQueryClient();
+  const prefetchDestination = (to: (typeof nav)[number]["to"]) => {
+    if (to === "/library") {
+      void queryClient.prefetchQuery(libraryOverviewQueryOptions());
+    }
+    if (to === "/friends") {
+      void queryClient.prefetchQuery(friendsQueryOptions());
+      void queryClient.prefetchQuery(incomingFriendRequestsQueryOptions());
+      void queryClient.prefetchQuery(steamSocialFirstPageQueryOptions());
+    }
+  };
+
+  useEffect(() => {
+    if (!signedIn) return;
+
+    const prefetch = () => {
+      prefetchDestination("/library");
+      prefetchDestination("/friends");
+    };
+    if ("requestIdleCallback" in window) {
+      const idleCallback = window.requestIdleCallback(prefetch);
+      return () => window.cancelIdleCallback(idleCallback);
+    }
+    const timeout = window.setTimeout(prefetch, 0);
+    return () => window.clearTimeout(timeout);
+  }, [queryClient, signedIn]);
   const dealsQuery = useQuery({
     queryKey: ["deals", "US", "sidebar"],
     queryFn: () => getDeals("US"),
@@ -35,7 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background text-foreground">
       {/* Desktop sidebar */}
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface p-6 lg:flex">
-        <Link to="/" className="mb-10 flex items-center gap-3 px-2">
+        <Link to="/" preload="intent" className="mb-10 flex items-center gap-3 px-2">
           <div className="grid size-8 place-items-center rounded-lg bg-primary shadow-[0_8px_24px_-10px_var(--primary)]">
             <div className="size-3.5 rounded-sm bg-primary-foreground" />
           </div>
@@ -52,6 +79,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
+                preload="intent"
+                onFocus={() => prefetchDestination(item.to)}
+                onPointerEnter={() => prefetchDestination(item.to)}
                 className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-[var(--ease-studio)] ${
                   active
                     ? "bg-primary/10 text-primary"
@@ -81,6 +111,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {signedIn && profile ? (
             <Link
               to="/account"
+              preload="intent"
               className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:border-primary/50"
             >
               <Avatar
@@ -100,12 +131,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               <div className="flex items-center gap-2">
                 <Link
                   to="/sign-in"
+                  preload="intent"
                   className="flex-1 rounded-lg border border-border px-3 py-2 text-center text-xs font-bold transition hover:border-primary/50"
                 >
                   Sign in
                 </Link>
                 <Link
                   to="/sign-up"
+                  preload="intent"
                   className="flex-1 rounded-lg bg-primary px-3 py-2 text-center text-xs font-bold text-primary-foreground transition hover:opacity-90"
                 >
                   Create
@@ -119,7 +152,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Top bar (mobile) */}
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 px-4 py-3 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" preload="intent" className="flex items-center gap-2">
             <div className="grid size-7 place-items-center rounded-md bg-primary">
               <div className="size-3.5 rounded-sm bg-primary-foreground" />
             </div>
@@ -137,7 +170,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Palette className="size-4" />
             </button>
             {signedIn && profile ? (
-              <Link to="/account" aria-label="Your profile">
+              <Link to="/account" preload="intent" aria-label="Your profile">
                 <Avatar
                   from="#e85d3a"
                   to="#7c2d12"
@@ -148,6 +181,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ) : (
               <Link
                 to="/sign-in"
+                preload="intent"
                 className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
               >
                 Sign in
@@ -180,6 +214,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               key={item.to}
               to={item.to}
+              preload="intent"
+              onFocus={() => prefetchDestination(item.to)}
+              onPointerEnter={() => prefetchDestination(item.to)}
               className={`relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-1 py-1.5 transition-colors duration-200 active:scale-95 ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}
