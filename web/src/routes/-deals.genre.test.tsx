@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ getDeals: vi.fn(), getGenreDeals: vi.fn() }));
 
@@ -12,6 +12,8 @@ vi.mock("@tanstack/react-router", async () => {
 });
 
 import { Route } from "./deals";
+
+afterEach(cleanup);
 
 const deal = (name: string, id: number) => ({
   id,
