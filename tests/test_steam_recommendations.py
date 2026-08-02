@@ -39,7 +39,7 @@ async def test_cached_recommendations_reuse_a_matching_user_library(monkeypatch)
         return calls.get("cached")
 
     async def cache_set(_key, value, ttl):
-        assert ttl == 21600
+        calls["ttl"] = ttl
         calls["cached"] = value
 
     def provider(_prompt, excluded):
@@ -59,6 +59,7 @@ async def test_cached_recommendations_reuse_a_matching_user_library(monkeypatch)
     assert first == second
     assert first["cache_expires_at"]
     assert calls["provider"] == 1
+    assert calls["ttl"] == 24 * 60 * 60
     assert str(user_id) in calls["keys"][0]
     assert calls["keys"][0].startswith("steam_recommendations:v2:")
 
