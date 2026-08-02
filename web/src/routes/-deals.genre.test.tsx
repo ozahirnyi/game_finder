@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
@@ -30,7 +30,23 @@ describe("DealsPage genre deals", () => {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><DealsPage /></QueryClientProvider>);
 
     expect(await screen.findByText("Popular on Steam")).toBeInTheDocument();
-    for (const title of ["Popular 1", "Popular 2", "Popular 3", "Popular 4", "Action", "RPG", "Adventure", "Strategy", "Indie"]) expect(screen.getByText(title)).toBeInTheDocument();
+    for (const title of ["Popular 1", "Popular 2", "Popular 3", "Popular 4"]) expect(screen.getByText(title)).toBeInTheDocument();
+    for (const genre of ["Action", "RPG", "Adventure", "Strategy", "Indie"]) expect(screen.getByRole("button", { name: genre })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open action game on playfinder/i })).toHaveAttribute("href", "/games/10?title=Action game");
+  });
+
+  it("shows only the selected genre's five large cards", async () => {
+    api.getGenreDeals.mockResolvedValue({
+      popular: [deal("Popular 1", 1), deal("Popular 2", 2), deal("Popular 3", 3), deal("Popular 4", 4)],
+      sections: ["Action", "RPG", "Adventure", "Strategy", "Indie"].map((genre, index) => ({ genre, results: [deal(`${genre} game`, index + 10)] })),
+    });
+    const DealsPage = Route.options.component!;
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><DealsPage /></QueryClientProvider>);
+
+    await screen.findAllByText("Action game");
+    fireEvent.click(screen.getByRole("button", { name: "RPG" }));
+
+    expect(screen.getAllByText("RPG game")).not.toHaveLength(0);
+    expect(screen.queryByText("Action game")).not.toBeInTheDocument();
   });
 });
