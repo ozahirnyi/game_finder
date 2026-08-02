@@ -11,12 +11,12 @@ import app.main as main
 client = TestClient(main.app)
 
 
-def test_search_uses_steam_results_when_rawg_times_out(monkeypatch):
+def test_search_uses_steam_without_waiting_for_unavailable_rawg(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
 
     async def fake_rawg(*_args, **_kwargs):
-        raise main.RAWGError("RAWG request timeout", 504)
+        raise AssertionError("catalog search must not delay Steam search")
 
     async def fake_steam(query, page_size):
         assert query == "hades"

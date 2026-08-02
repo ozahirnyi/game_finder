@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
 import { getRecommendations, searchGames } from "@/lib/api";
+import { gameDetailTarget } from "@/lib/gameRoute";
 import { Search, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/search")({ component: SearchPage });
@@ -79,7 +80,14 @@ function SearchPage() {
               </button>
             ))}
           </div>
-          {query.trim() !== "" && results.length === 0 && (
+          {query.trim() !== "" && searchQuery.isFetching && (
+            <EmptyState
+              icon={<Search className="size-5 animate-pulse" />}
+              title="Searching games…"
+              description="Checking the catalog and Steam."
+            />
+          )}
+          {query.trim() !== "" && !searchQuery.isFetching && results.length === 0 && (
             <EmptyState
               icon={<Search className="size-5" />}
               title="No games match your search"
@@ -88,22 +96,25 @@ function SearchPage() {
           )}
           {results.length > 0 && (
             <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
-              {results.map((game) => (
-                <GameCard
-                  key={game.id}
-                  aspect="aspect-[3/4]"
-                  game={{
-                    gameId: game.source === "steam" || game.id === null ? undefined : String(game.id),
-                    externalUrl: game.source === "steam" ? game.url ?? undefined : undefined,
-                    title: game.name,
-                    coverFrom: "#312e81",
-                    coverTo: "#111827",
-                    coverUrl: game.background_image ?? undefined,
-                    genres: game.genres,
-                    platforms: game.platforms,
-                  }}
-                />
-              ))}
+              {results.map((game) => {
+                const target = gameDetailTarget(game.id, game.steam_appid);
+                return (
+                  <GameCard
+                    key={game.id ?? game.steam_appid}
+                    aspect="aspect-[3/4]"
+                    game={{
+                      gameId: target?.gameId,
+                      source: target?.source,
+                      title: game.name,
+                      coverFrom: "#312e81",
+                      coverTo: "#111827",
+                      coverUrl: game.background_image ?? undefined,
+                      genres: game.genres,
+                      platforms: game.platforms,
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
         </>

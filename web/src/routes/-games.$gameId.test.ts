@@ -16,9 +16,52 @@ vi.mock("@/lib/api", () => ({
   getSteamGameByTitle: api.getSteamGameByTitle,
 }));
 
-import { Route } from "./games.$gameId";
+import { mergeGamePrice, Route } from "./games.$gameId";
 
 describe("Steam library game loader", () => {
+  it("loads Steam Store details and price for a Steam search result", async () => {
+    api.getSteamGameByTitle.mockResolvedValue({
+      appid: 1145360,
+      name: "Hades",
+      description_raw: "Escape the Underworld.",
+      genres: ["Action"],
+      platforms: ["PC"],
+      current: {
+        shop: "Steam",
+        price: { amount: 25, currency: "USD" },
+        regular: { amount: 30, currency: "USD" },
+        cut: 17,
+        url: "https://store.steampowered.com/app/1145360/",
+      },
+    });
+
+    const loader = Route.options.loader;
+    if (typeof loader !== "function") throw new Error("Expected a route loader");
+
+    const result = await loader({
+      params: { gameId: "1145360" },
+      deps: { title: "Hades", source: "steam" },
+    } as never);
+
+    expect(result.game).toMatchObject({
+      id: "1145360",
+      title: "Hades",
+      price: 25,
+      store: "Steam",
+      isSteamLibrary: true,
+    });
+  });
+
+  it("keeps a Steam price when no RAWG price history is requested", () => {
+    expect(mergeGamePrice({ price: 25, originalPrice: 30, discount: 17, currency: "USD", store: "Steam" }, undefined)).toMatchObject({
+      price: 25,
+      originalPrice: 30,
+      discount: 17,
+      currency: "USD",
+      store: "Steam",
+    });
+  });
+
   it("uses the verified Steam app header image for the detail hero", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [

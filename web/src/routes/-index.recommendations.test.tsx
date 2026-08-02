@@ -8,7 +8,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -67,6 +67,20 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Home recommendations", () => {
+  it("shows a search-in-progress state instead of an empty result", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.searchGames.mockImplementation(() => new Promise(() => {}));
+
+    renderHome();
+
+    fireEvent.change(await screen.findByPlaceholderText("Search games by title"), {
+      target: { value: "Hades" },
+    });
+
+    expect(screen.getByText("Searching games…")).toBeInTheDocument();
+    expect(screen.queryByText(/No matches for/i)).not.toBeInTheDocument();
+  });
+
   it("links the enriched Eligible recommendation to its game details", async () => {
     api.getAuthSnapshot.mockReturnValue(true);
     api.getDashboard.mockResolvedValue({
