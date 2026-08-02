@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 import httpx
@@ -106,21 +107,20 @@ async def fetch_steam_store_game_genres(appids: list[int], country: str = "US") 
     ids = list(dict.fromkeys(appid for appid in appids if appid > 0))
     if not ids:
         return {}
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(
-                f"{STEAM_STORE_BASE_URL}/api/appdetails",
-                params={"appids": ",".join(map(str, ids)), "cc": country, "l": "english"},
-            )
-            response.raise_for_status()
-    except httpx.HTTPError:
-        return {}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        async def fetch_one(appid: int) -> tuple[int, list[str]]:
+            try:
+                response = await client.get(
+                    f"{STEAM_STORE_BASE_URL}/api/appdetails",
+                    params={"appids": appid, "cc": country, "l": "english"},
+                )
+                response.raise_for_status()
+            except httpx.HTTPError:
+                return appid, []
+            data = (response.json().get(str(appid)) or {}).get("data") or {}
+            return appid, [genre["description"] for genre in data.get("genres") or [] if genre.get("description")]
 
-    payload = response.json()
-    return {
-        appid: [genre["description"] for genre in (payload.get(str(appid), {}).get("data", {}).get("genres") or []) if genre.get("description")]
-        for appid in ids
-    }
+        return dict(await asyncio.gather(*(fetch_one(appid) for appid in ids)))
 
 
 async def fetch_steam_store_deal_candidates(country: str = "US", page_size: int = 60) -> dict[str, list[dict[str, Any]]]:

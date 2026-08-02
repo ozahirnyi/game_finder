@@ -73,21 +73,22 @@ async def test_ukrainian_deals_reject_ruble_prices(monkeypatch):
 
 @pytest.mark.anyio
 async def test_steam_genre_lookup_returns_store_categories_and_tolerates_missing_app(monkeypatch):
+    requested_appids = []
+
     async def fake_get(self, _url, *, params):
-        assert params["appids"] == "10,20"
+        requested_appids.append(params["appids"])
 
         class Response:
             def raise_for_status(self):
                 return None
 
             def json(self):
-                return {
-                    "10": {"data": {"genres": [{"description": "Action"}, {"description": "RPG"}]}},
-                    "20": {"success": False},
-                }
+                appid = int(params["appids"])
+                return {str(appid): {"data": {"genres": [{"description": "Action"}, {"description": "RPG"}]}}} if appid == 10 else {"20": {"success": False}}
 
         return Response()
 
     monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
 
     assert await steam_store.fetch_steam_store_game_genres([10, 20], "US") == {10: ["Action", "RPG"], 20: []}
+    assert sorted(requested_appids) == ["10", "20"]
