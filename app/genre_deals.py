@@ -30,7 +30,8 @@ def select_deal_genres(favorite_genres: list[str] | None) -> list[str]:
 async def _enrich_deal(
     deal: dict[str, Any],
     fetch_rawg_games: Callable[[str, int], Awaitable[dict[str, Any]]],
-) -> tuple[dict[str, Any], set[str]]:
+) -> tuple[dict[str, Any], set[str], bool]:
+    rawg_failed = False
     try:
         rawg = await fetch_rawg_games(deal["name"], 1)
         results = [game for game in rawg.get("results", []) if game.get("id")]
@@ -40,6 +41,7 @@ async def _enrich_deal(
         )
     except RAWGError:
         match = None
+        rawg_failed = True
     item = {
         "id": match.get("id") if match else None,
         "steam_appid": deal["steam_appid"],
@@ -50,7 +52,20 @@ async def _enrich_deal(
         "current": deal.get("current"),
         "history_low_all": deal.get("history_low_all"),
     }
-    return item, {normalize_genre(genre) for genre in (match or {}).get("genres", [])}
+    return item, {normalize_genre(genre) for genre in (match or {}).get("genres", [])}, rawg_failed
+
+
+def _unenriched_deal(deal: dict[str, Any]) -> tuple[dict[str, Any], set[str]]:
+    return {
+        "id": None,
+        "steam_appid": deal["steam_appid"],
+        "name": deal["name"],
+        "released": None,
+        "background_image": deal.get("background_image"),
+        "url": deal.get("url"),
+        "current": deal.get("current"),
+        "history_low_all": deal.get("history_low_all"),
+    }, set()
 
 
 def _fallback_genres(selected: list[str], enriched: list[tuple[dict[str, Any], set[str]]]) -> list[str]:
@@ -87,8 +102,14 @@ async def build_genre_deal_groups(
     selected_genres = select_deal_genres(favorite_genres)
     candidates = await fetch_candidates(country)
     rawg_by_appid: dict[int, tuple[dict[str, Any], set[str]]] = {}
+    rawg_unavailable = False
     for deal in candidates["candidates"]:
-        rawg_by_appid[deal["steam_appid"]] = await _enrich_deal(deal, fetch_rawg_games)
+        if rawg_unavailable:
+            rawg_by_appid[deal["steam_appid"]] = _unenriched_deal(deal)
+            continue
+        item, item_genres, rawg_failed = await _enrich_deal(deal, fetch_rawg_games)
+        rawg_by_appid[deal["steam_appid"]] = item, item_genres
+        rawg_unavailable = rawg_failed
 
     if fetch_steam_genres:
         missing_genres = [appid for appid, (_, genres) in rawg_by_appid.items() if not genres]
@@ -105,7 +126,12 @@ async def build_genre_deal_groups(
     for deal in candidates["popular"]:
         enriched = rawg_by_appid.get(deal["steam_appid"])
         if enriched is None:
-            enriched = await _enrich_deal(deal, fetch_rawg_games)
+            if rawg_unavailable:
+                enriched = _unenriched_deal(deal)
+            else:
+                item, item_genres, rawg_failed = await _enrich_deal(deal, fetch_rawg_games)
+                enriched = item, item_genres
+                rawg_unavailable = rawg_failed
             rawg_by_appid[deal["steam_appid"]] = enriched
         popular.append(enriched[0])
     genres = _fallback_genres(selected_genres, list(rawg_by_appid.values()))
