@@ -11,7 +11,7 @@ from app.integrations.rawg import fetch_rawg_games, fetch_rawg_trending_games
 from app.redis_client import cache_get, cache_set
 from app.steam_store import fetch_steam_store_deal_candidates
 
-CACHE_TTL_SECONDS = 6 * 60 * 60
+CACHE_TTL_SECONDS = 24 * 60 * 60
 
 
 def build_steam_recommendation_prompt(games: list[dict], extra_prompt: str | None = None) -> str:

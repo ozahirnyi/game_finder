@@ -336,7 +336,7 @@ function Home() {
 
 function RecommendationCard({ recommendation }: { recommendation: DashboardRecommendation }) {
   const content = (
-    <Panel interactive={recommendation.rawg_id != null} className="h-full p-5">
+    <Panel interactive className="h-full p-5">
       {recommendation.cover_url && (
         <GameCover
           title={recommendation.title}
@@ -360,12 +360,10 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
     </Panel>
   );
 
-  if (recommendation.rawg_id == null) return content;
-
   return (
     <Link
       to="/games/$gameId"
-      params={{ gameId: String(recommendation.rawg_id) }}
+      params={{ gameId: String(recommendation.rawg_id ?? 0) }}
       search={{ title: recommendation.title }}
       className="block h-full"
     >
