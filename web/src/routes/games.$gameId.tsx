@@ -95,6 +95,31 @@ export const Route = createFileRoute("/games/$gameId")({
         },
       };
     } catch {
+      if (deps.title && deps.source !== "steam") {
+        return {
+          game: {
+            id: params.gameId,
+            title: deps.title,
+            coverFrom: "#1d4ed8",
+            coverTo: "#111827",
+            coverUrl: undefined,
+            fallbackCoverUrl: undefined,
+            genres: [],
+            platforms: [],
+            releaseDate: undefined,
+            rating: 0,
+            description: "Catalog details are temporarily unavailable.",
+            price: null,
+            originalPrice: null,
+            discount: null,
+            currency: undefined,
+            store: undefined,
+            storeUrl: undefined,
+            coop: false,
+            isSteamLibrary: false,
+          },
+        };
+      }
       throw notFound();
     }
   },
