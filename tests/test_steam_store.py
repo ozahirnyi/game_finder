@@ -5,7 +5,7 @@ from app import steam_store
 
 
 @pytest.mark.anyio
-async def test_steam_search_uses_header_cover(monkeypatch):
+async def test_steam_search_uses_portrait_library_cover(monkeypatch):
     async def fake_get(self, *_args, **_kwargs):
         class Response:
             def raise_for_status(self):
@@ -21,7 +21,7 @@ async def test_steam_search_uses_header_cover(monkeypatch):
     results = await steam_store.fetch_steam_store_search("hades")
 
     assert results[0]["background_image"] == (
-        "https://cdn.cloudflare.steamstatic.com/steam/apps/1145360/header.jpg"
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/1145360/library_600x900.jpg"
     )
 
 
