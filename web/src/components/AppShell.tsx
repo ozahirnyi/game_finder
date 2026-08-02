@@ -16,9 +16,19 @@ const nav = [
   { to: "/friends", label: "Friends", icon: Users },
 ] as const;
 
+function scheduleIdle(callback: () => void) {
+  if ("requestIdleCallback" in window) {
+    const idleCallback = window.requestIdleCallback(callback);
+    return () => window.cancelIdleCallback(idleCallback);
+  }
+  const timeout = window.setTimeout(callback, 0);
+  return () => window.clearTimeout(timeout);
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [themeOpen, setThemeOpen] = useState(false);
+  const [sidebarDealsReady, setSidebarDealsReady] = useState(false);
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
   const queryClient = useQueryClient();
   const prefetchDestination = (to: (typeof nav)[number]["to"]) => {
@@ -39,16 +49,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       prefetchDestination("/library");
       prefetchDestination("/friends");
     };
-    if ("requestIdleCallback" in window) {
-      const idleCallback = window.requestIdleCallback(prefetch);
-      return () => window.cancelIdleCallback(idleCallback);
-    }
-    const timeout = window.setTimeout(prefetch, 0);
-    return () => window.clearTimeout(timeout);
+    return scheduleIdle(prefetch);
   }, [queryClient, signedIn]);
+
+  useEffect(() => scheduleIdle(() => setSidebarDealsReady(true)), []);
   const dealsQuery = useQuery({
     queryKey: ["deals", "US", "sidebar"],
     queryFn: () => getDeals("US"),
+    enabled: sidebarDealsReady,
   });
   const deals = dealsQuery.data?.results ?? [];
   const profileQuery = useQuery({
@@ -102,10 +110,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <ThemeSelector />
 
           <div className="ember-glow grain relative overflow-hidden rounded-xl border border-border bg-surface-2 p-4">
-            <p className="label-mono relative mb-1.5 text-primary">Live deals</p>
-            <p className="relative text-xs text-muted-foreground">
-              {deals.length} price drops tracked · refreshed 4m ago
-            </p>
+            {sidebarDealsReady && !dealsQuery.isPending ? (
+              <>
+                <p className="label-mono relative mb-1.5 text-primary">Live deals</p>
+                <p className="relative text-xs text-muted-foreground">
+                  {deals.length} price drops tracked · refreshed 4m ago
+                </p>
+              </>
+            ) : <p className="label-mono relative text-primary">Live deals · loading</p>}
           </div>
 
           {signedIn && profile ? (
