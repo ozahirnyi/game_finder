@@ -5,8 +5,9 @@ import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
-import { getLibraryOverview, type LibraryOverviewGame } from "@/lib/api";
+import { type LibraryOverviewGame } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
+import { libraryOverviewQueryOptions } from "@/lib/navigationQueries";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -36,7 +37,7 @@ type SortOrder = "playtime-desc" | "playtime-asc";
 function LibraryPage() {
   const [tab, setTab] = useState<Tab>("All games");
   const [sortOrder, setSortOrder] = useState<SortOrder>("playtime-desc");
-  const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview });
+  const libraryQuery = useQuery(libraryOverviewQueryOptions());
   const owned = libraryQuery.data?.games ?? [];
   const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
   const visible = useMemo(() => {

@@ -4,8 +4,9 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, PresenceDot, SectionHeader } from "@/components/ui-bits";
-import { acceptFriendRequest, createFriendRequest, getFriends, getIncomingFriendRequests, getSteamSocial, searchUsers } from "@/lib/api";
+import { acceptFriendRequest, createFriendRequest, getSteamSocial, searchUsers } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
+import { friendsQueryOptions, incomingFriendRequestsQueryOptions, steamSocialFirstPageQueryOptions } from "@/lib/navigationQueries";
 import { Search, UserPlus, Gamepad2, MessageCircle, Users } from "lucide-react";
 
 export const Route = createFileRoute("/friends/")({
@@ -37,15 +38,15 @@ function FriendsPage() {
   const [steamExpanded, setSteamExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("");
-  const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
+  const friendsQuery = useQuery(friendsQueryOptions());
   const steamSocialQuery = useInfiniteQuery({
-    queryKey: ["steam-social"],
+    ...steamSocialFirstPageQueryOptions(),
     queryFn: ({ pageParam }) => getSteamSocial(12, pageParam),
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) => lastPage.friends_has_more ? pages.reduce((total, page) => total + page.friends.length, 0) : undefined,
     retry: false,
   });
-  const incomingQuery = useQuery({ queryKey: ["friend-requests", "incoming"], queryFn: getIncomingFriendRequests });
+  const incomingQuery = useQuery(incomingFriendRequestsQueryOptions());
   const searchQuery = useQuery({
     queryKey: ["user-search", searchTerm],
     queryFn: () => searchUsers(searchTerm),
