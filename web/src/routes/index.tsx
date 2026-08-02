@@ -18,6 +18,7 @@ import {
   subscribeToAuthChanges,
   type DashboardRecommendation,
 } from "@/lib/api";
+import { gameDetailTarget } from "@/lib/gameRoute";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -52,6 +53,7 @@ function Home() {
   const results = searchQuery.data?.results ?? [];
   const best = deals[0];
   const rest = deals.slice(1);
+  const bestTarget = best ? gameDetailTarget(best.id, best.steam_appid) : undefined;
   const recommendationBlock = dashboardQuery.data?.recommendations;
   const recommendations = recommendationBlock?.data?.recommendations ?? [];
   const trendingGames = trendingQuery.data?.results ?? [];
@@ -97,18 +99,21 @@ function Home() {
                 No matches for “{query}”. Try a shorter title.
               </p>
             ) : (
-              results.map((game) => (
-                <Link
-                  key={game.id}
-                  to="/games/$gameId"
-                  params={{ gameId: String(game.id) }}
-                  search={{ title: game.name }}
-                  className="flex items-center gap-3 border-b border-border px-4 py-3 text-sm font-semibold transition-colors last:border-b-0 hover:bg-surface-2"
-                >
-                  {game.name}
-                  <span className="ml-auto label-mono text-muted-foreground">View details</span>
-                </Link>
-              ))
+              results.map((game) => {
+                const target = gameDetailTarget(game.id, game.steam_appid);
+                return target ? (
+                  <Link
+                    key={game.id ?? game.steam_appid}
+                    to="/games/$gameId"
+                    params={{ gameId: target.gameId }}
+                    search={{ title: game.name, ...(target.source ? { source: target.source } : {}) }}
+                    className="flex items-center gap-3 border-b border-border px-4 py-3 text-sm font-semibold transition-colors last:border-b-0 hover:bg-surface-2"
+                  >
+                    {game.name}
+                    <span className="ml-auto label-mono text-muted-foreground">View details</span>
+                  </Link>
+                ) : null;
+              })
             )}
           </div>
         )}
@@ -230,19 +235,15 @@ function Home() {
       {best && (
         <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
           <div className="animate-reveal group lg:col-span-7">
-            {best.id != null ? (
+            {bestTarget ? (
               <Link
                 to="/games/$gameId"
-                params={{ gameId: String(best.id) }}
-                search={{ title: best.name }}
+                params={{ gameId: bestTarget.gameId }}
+                search={{ title: best.name, ...(bestTarget.source ? { source: bestTarget.source } : {}) }}
                 className="block h-full"
               >
                 <FeaturedDeal deal={best} />
               </Link>
-            ) : best.url ? (
-              <a href={best.url} target="_blank" rel="noreferrer" className="block h-full">
-                <FeaturedDeal deal={best} />
-              </a>
             ) : (
               <FeaturedDeal deal={best} />
             )}
@@ -277,29 +278,32 @@ function Home() {
               )}
             </Panel>
           </div>
-          {rest.map((deal, index) => (
-            <div
-              key={deal.id ?? deal.name}
-              className="animate-reveal lg:col-span-3"
-              style={{ animationDelay: `${60 + index * 40}ms` }}
-            >
-              <GameCard
-                game={{
-                  gameId: deal.id == null ? undefined : String(deal.id),
-                  externalUrl: deal.id == null ? (deal.url ?? undefined) : undefined,
-                  title: deal.name,
-                  coverUrl: deal.background_image ?? undefined,
-                  coverFrom: "#c75f28",
-                  coverTo: "#22243a",
-                  price: deal.current?.price?.amount ?? undefined,
-                  originalPrice: deal.current?.regular?.amount ?? undefined,
-                  discount: deal.current?.cut,
-                  currency: deal.current?.price?.currency ?? undefined,
-                  store: deal.current?.shop ?? undefined,
-                }}
-              />
-            </div>
-          ))}
+          {rest.map((deal, index) => {
+            const target = gameDetailTarget(deal.id, deal.steam_appid);
+            return (
+              <div
+                key={deal.id ?? deal.steam_appid ?? deal.name}
+                className="animate-reveal lg:col-span-3"
+                style={{ animationDelay: `${60 + index * 40}ms` }}
+              >
+                <GameCard
+                  game={{
+                    gameId: target?.gameId,
+                    source: target?.source,
+                    title: deal.name,
+                    coverUrl: deal.background_image ?? undefined,
+                    coverFrom: "#c75f28",
+                    coverTo: "#22243a",
+                    price: deal.current?.price?.amount ?? undefined,
+                    originalPrice: deal.current?.regular?.amount ?? undefined,
+                    discount: deal.current?.cut,
+                    currency: deal.current?.price?.currency ?? undefined,
+                    store: deal.current?.shop ?? undefined,
+                  }}
+                />
+              </div>
+            );
+          })}
           {!signedIn && (
             <div className="animate-reveal lg:col-span-12">
               <Panel className="ember-glow grain flex flex-col items-start justify-between gap-5 p-6 sm:flex-row sm:items-center">
