@@ -2569,7 +2569,7 @@ async def genre_deals(current_user: User | None = Depends(get_optional_current_u
     country = ((current_user.steam_country_code if current_user else None) or "US").strip().upper()
     genres = select_deal_genres(current_user.favorite_genres if current_user else [])
     key = build_cache_key(
-        "steam_genre_deals_v2",
+        "steam_genre_deals_v3",
         country=country,
         genres=[normalize_genre(genre) for genre in genres],
     )
