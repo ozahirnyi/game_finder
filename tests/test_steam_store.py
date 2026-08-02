@@ -5,6 +5,27 @@ from app import steam_store
 
 
 @pytest.mark.anyio
+async def test_steam_search_uses_header_cover(monkeypatch):
+    async def fake_get(self, *_args, **_kwargs):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"items": [{"id": 1145360, "name": "Hades"}]}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    results = await steam_store.fetch_steam_store_search("hades")
+
+    assert results[0]["background_image"] == (
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/1145360/header.jpg"
+    )
+
+
+@pytest.mark.anyio
 async def test_popular_deals_fill_from_specials_after_discounted_top_sellers(monkeypatch):
     async def fake_get(self, *_args, **_kwargs):
         class Response:
