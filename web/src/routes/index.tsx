@@ -94,7 +94,13 @@ function Home() {
         </form>
         {query.trim() !== "" && (
           <div className="animate-pop relative mt-4 overflow-hidden rounded-2xl border border-border bg-background/80 backdrop-blur">
-            {results.length === 0 ? (
+            {query.trim().length < 2 ? (
+              <p className="px-5 py-6 text-sm text-muted-foreground">
+                Type at least 2 characters to search.
+              </p>
+            ) : searchQuery.isFetching ? (
+              <p className="px-5 py-6 text-sm text-muted-foreground">Searching games…</p>
+            ) : results.length === 0 ? (
               <p className="px-5 py-6 text-sm text-muted-foreground">
                 No matches for “{query}”. Try a shorter title.
               </p>
