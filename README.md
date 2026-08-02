@@ -151,10 +151,10 @@ The web app runs at `http://localhost:3000` and calls the API URL from `web/.env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-For a deployed frontend, point it at the Railway backend after the latest API deploy:
+For the Lightsail deployment, point the frontend at nginx's FastAPI proxy:
 
 ```bash
-NEXT_PUBLIC_API_URL=https://game-finder.up.railway.app
+NEXT_PUBLIC_API_URL=https://playfinder.cc/api
 ```
 
 For the API, keep these values in `.env`:
@@ -184,12 +184,12 @@ SECRET_KEY=your-secret-key
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 ```
 
-On Railway, set `FRONTEND_ORIGINS` to the comma-separated list of frontend URLs that should be allowed by CORS. For example:
+On Lightsail, set the backend public URLs and CORS origins to the site domain:
 
 ```bash
-FRONTEND_ORIGINS=http://localhost:3000,https://your-gamefinder-frontend.railway.app
-FRONTEND_PUBLIC_URL=https://your-gamefinder-frontend.railway.app
-BACKEND_PUBLIC_URL=https://your-gamefinder-api.railway.app
+FRONTEND_ORIGINS=http://localhost:3000,https://playfinder.cc,https://www.playfinder.cc
+FRONTEND_PUBLIC_URL=https://playfinder.cc
+BACKEND_PUBLIC_URL=https://playfinder.cc/api
 ```
 
 Set `AI_FALLBACK_ENABLED=false` in production if you want `/recommendations` to fail visibly with `503` when OpenAI is unavailable instead of returning local fallback recommendations.
@@ -202,7 +202,7 @@ Telegram alerts MVP uses a Telegram bot. Create a bot with BotFather, set `TELEG
 `TELEGRAM_BOT_USERNAME`, and `TELEGRAM_WEBHOOK_SECRET`, then point Telegram at:
 
 ```bash
-https://your-gamefinder-api.railway.app/telegram/webhook/your-webhook-secret
+https://playfinder.cc/api/telegram/webhook/your-webhook-secret
 ```
 
 The profile page can then open `https://t.me/<bot>?start=<link-token>`. After the user presses Start,
@@ -263,12 +263,12 @@ Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy.
 
 ## Deployment
 
-The backend is deployed and accessible at:
+The Lightsail backend is available through nginx at:
 
-https://game-finder.up.railway.app
+https://playfinder.cc/api
 
 ### API Docs:
-https://game-finder.up.railway.app/docs
+https://playfinder.cc/api/docs
 
 ---
 

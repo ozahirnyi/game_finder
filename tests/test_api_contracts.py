@@ -10,6 +10,41 @@ import app.main as main
 client = TestClient(main.app)
 
 
+def test_search_uses_steam_results_when_rawg_times_out(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_rawg_games(_query: str, page: int):
+        raise main.RAWGError("RAWG request timeout", status_code=504)
+
+    async def fake_fetch_steam_store_search(query: str, page_size: int):
+        assert query == "hades"
+        assert page_size == 20
+        return [{
+            "steam_appid": 1145360,
+            "name": "Hades",
+            "background_image": "https://cdn.example/hades.jpg",
+            "url": "https://store.steampowered.com/app/1145360/",
+        }]
+
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+    monkeypatch.setattr(main, "fetch_steam_store_search", fake_fetch_steam_store_search, raising=False)
+
+    response = client.get("/search/games?q=Hades")
+
+    assert response.status_code == 200
+    assert response.json() == {"results": [{
+        "id": None,
+        "name": "Hades",
+        "released": None,
+        "background_image": "https://cdn.example/hades.jpg",
+        "source": "steam",
+        "steam_appid": 1145360,
+        "url": "https://store.steampowered.com/app/1145360/",
+    }]}
+
+
 def test_catalog_game_detail_returns_normalized_rawg_data(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()

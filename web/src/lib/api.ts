@@ -18,6 +18,9 @@ export type SearchGame = {
   name: string | null;
   released: string | null;
   background_image: string | null;
+  source?: "steam";
+  steam_appid?: number;
+  url?: string;
 };
 
 export type SearchResponse = {
@@ -186,7 +189,7 @@ export type TelegramLink = {
   message: string | null;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://game-finder.up.railway.app";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://playfinder.cc/api";
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
 
@@ -301,7 +304,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     const detail = payload?.detail;
     let message = Array.isArray(detail)
       ? detail.map((item) => item.msg ?? JSON.stringify(item)).join(", ")
-      : detail ?? `Request failed with status ${response.status}`;
+      : typeof detail === "object" && typeof detail?.message === "string"
+        ? detail.message
+        : detail ?? `Request failed with status ${response.status}`;
     if (options.auth && response.status === 401) {
       removeStoredToken();
       message = "Your session expired. Please log in again.";
