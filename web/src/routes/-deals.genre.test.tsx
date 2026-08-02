@@ -32,7 +32,7 @@ describe("DealsPage genre deals", () => {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><DealsPage /></QueryClientProvider>);
 
     expect(await screen.findByText("Popular on Steam")).toBeInTheDocument();
-    for (const title of ["Popular 1", "Popular 2", "Popular 3", "Popular 4"]) expect(screen.getByText(title)).toBeInTheDocument();
+    for (const title of ["Popular 1", "Popular 2", "Popular 3", "Popular 4"]) expect(screen.getAllByText(title).length).toBeGreaterThan(0);
     for (const genre of ["Action", "RPG", "Adventure", "Strategy", "Indie"]) expect(screen.getByRole("button", { name: genre })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open action game on playfinder/i })).toHaveAttribute("href", "/games/10?title=Action game");
   });

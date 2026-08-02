@@ -414,6 +414,17 @@ class GamePriceHistory(BaseModel):
     deals: list[PriceDeal] = Field(default_factory=list)
 
 
+class SteamStoreGameDetail(BaseModel):
+    appid: int
+    name: str
+    background_image: str | None = None
+    description_raw: str | None = None
+    genres: list[str] = Field(default_factory=list)
+    platforms: list[str] = Field(default_factory=lambda: ["PC"])
+    current: PriceDeal | None = None
+    url: str | None = None
+
+
 class HomeDealItem(BaseModel):
     id: int | None = None
     steam_appid: int | None = None
