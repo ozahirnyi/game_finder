@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
 import uuid
@@ -632,6 +633,57 @@ def test_homepage_deals_does_not_attach_a_different_rawg_game(monkeypatch):
     assert response.status_code == 200
     assert response.json()["results"][0]["id"] is None
     assert response.json()["results"][0]["steam_appid"] is None
+
+
+def test_homepage_deals_returns_steam_results_when_rawg_enrichment_is_slow(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_fetch_steam_store_deals(**_kwargs):
+        return [{"steam_appid": 1145360, "name": "Hades", "background_image": "steam-cover", "url": "https://store.test/hades"}]
+
+    async def slow_rawg_games(*_args, **_kwargs):
+        await asyncio.sleep(0.1)
+        return {"results": [{"id": 1, "name": "Hades"}]}
+
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deals", fake_fetch_steam_store_deals)
+    monkeypatch.setattr(main, "fetch_rawg_games", slow_rawg_games)
+    monkeypatch.setattr(main, "DEAL_RAWG_ENRICHMENT_TIMEOUT_SECONDS", 0.001, raising=False)
+
+    response = client.get("/prices/deals?page_size=1")
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["id"] is None
+    assert response.json()["results"][0]["steam_appid"] == 1145360
+
+
+def test_genre_deals_falls_back_to_steam_when_rawg_is_slow(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_candidates(_country: str):
+        deal = {"steam_appid": 1145360, "name": "Hades", "background_image": "steam-cover", "url": "https://store.test/hades", "current": {"cut": 50}, "history_low_all": None}
+        return {"popular": [deal], "candidates": [deal]}
+
+    async def slow_rawg_games(*_args, **_kwargs):
+        await asyncio.sleep(0.1)
+        return {"results": [{"id": 1, "name": "Hades", "genres": ["Action"]}]}
+
+    async def fake_steam_genres(appids, _country):
+        return {appid: ["Action"] for appid in appids}
+
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_candidates)
+    monkeypatch.setattr(main, "fetch_rawg_games", slow_rawg_games)
+    monkeypatch.setattr(main, "fetch_steam_store_game_genres", fake_steam_genres)
+    monkeypatch.setattr(main, "DEAL_RAWG_ENRICHMENT_TIMEOUT_SECONDS", 0.001)
+
+    response = client.get("/prices/genre-deals")
+
+    assert response.status_code == 200
+    assert response.json()["popular"][0]["id"] is None
+    assert response.json()["popular"][0]["steam_appid"] == 1145360
 
 
 def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch):
