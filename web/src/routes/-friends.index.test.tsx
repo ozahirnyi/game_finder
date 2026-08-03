@@ -19,11 +19,17 @@ vi.mock("@/components/GameCover", () => ({ Avatar: () => <div />, GameCover: () 
 
 import { Route } from "./friends.index";
 
-function renderFriends() {
+function renderFriends(prefetchedSteamSocial?: unknown) {
   const rootRoute = createRootRoute({ component: Outlet });
   const friendsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Route.options.component });
   const router = createRouter({ routeTree: rootRoute.addChildren([friendsRoute]), history: createMemoryHistory({ initialEntries: ["/"] }) });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  if (prefetchedSteamSocial) {
+    queryClient.setQueryData(["steam-social"], {
+      pages: [prefetchedSteamSocial],
+      pageParams: [0],
+    });
+  }
   return render(<QueryClientProvider client={queryClient}><RouterProvider router={router} /></QueryClientProvider>);
 }
 
@@ -89,6 +95,17 @@ describe("FriendsPage", () => {
 
     expect(await screen.findByText("Steam Pat")).toBeInTheDocument();
     expect(api.getSteamSocial).toHaveBeenLastCalledWith(12, 1);
+  });
+
+  it("does not crash after Steam friends were prefetched from navigation", async () => {
+    renderFriends({
+      friends: [{ steam_id: "765", persona_name: "Steam Sam", taste_match_percent: 67, common_games_count: 3, library_public: true }],
+      friends_total: 1,
+      friends_has_more: false,
+      top_friend_games: [],
+    });
+
+    expect(await screen.findByText("Steam Sam")).toBeInTheDocument();
   });
 
   it("shows a Friends skeleton while its first request is pending", async () => {

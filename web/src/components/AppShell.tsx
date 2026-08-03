@@ -5,7 +5,7 @@ import { Home, Search, Library, Heart, Tag, Users, Palette } from "lucide-react"
 import { ThemeSelector } from "./ThemeSelector";
 import { Avatar } from "./GameCover";
 import { getAuthSnapshot, getDeals, getProfile, subscribeToAuthChanges } from "@/lib/api";
-import { friendsQueryOptions, incomingFriendRequestsQueryOptions, libraryOverviewQueryOptions, steamSocialFirstPageQueryOptions } from "@/lib/navigationQueries";
+import { friendsQueryOptions, incomingFriendRequestsQueryOptions, libraryOverviewQueryOptions, steamSocialInfiniteQueryOptions } from "@/lib/navigationQueries";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (to === "/friends") {
       void queryClient.prefetchQuery(friendsQueryOptions());
       void queryClient.prefetchQuery(incomingFriendRequestsQueryOptions());
-      void queryClient.prefetchQuery(steamSocialFirstPageQueryOptions());
+      void queryClient.prefetchInfiniteQuery(steamSocialInfiniteQueryOptions());
     }
   };
 
