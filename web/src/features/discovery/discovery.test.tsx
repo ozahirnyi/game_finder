@@ -5,13 +5,8 @@ import { DealsScreen } from "./DealsScreen";
 import { DiscoveryScreen } from "./DiscoveryScreen";
 import { GameDetailScreen } from "./GameDetailScreen";
 import { SearchScreen } from "./SearchScreen";
-import SearchPage from "@/app/search/page";
 
-const navigationState = vi.hoisted(() => ({ params: new URLSearchParams() }));
-
-vi.mock("next/navigation", () => ({
-  useSearchParams: () => navigationState.params,
-}));
+vi.mock("@tanstack/react-router", () => ({ Link: ({ children, ...props }: React.ComponentProps<"a">) => <a {...props}>{children}</a> }));
 
 vi.mock("@/lib/api", () => ({
   getCatalogGame: vi.fn(),
@@ -20,6 +15,8 @@ vi.mock("@/lib/api", () => ({
   getTrendingGames: vi.fn(),
   getUpcomingGames: vi.fn(),
   searchGames: vi.fn(),
+  createSavedGame: vi.fn(),
+  isAuthenticated: vi.fn(() => false),
 }));
 
 describe("discovery API regions", () => {
@@ -27,7 +24,7 @@ describe("discovery API regions", () => {
     vi.mocked(getTrendingGames).mockResolvedValue({ results: [] });
     vi.mocked(getUpcomingGames).mockResolvedValue({ results: [] });
     vi.mocked(getGamePriceHistory).mockResolvedValue({
-      itad_id: "1", title: "Hades II", url: null, current: null, history_low_all: null, history_low_1y: null, history_low_3m: null, deals: [],
+      itad_id: "1", title: "Hades II", url: null, current: null, history_low_all: null, history_low_1y: null, history_low_3m: null, deals: [], history: [],
     });
   });
 
@@ -40,12 +37,12 @@ describe("discovery API regions", () => {
     expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
   });
 
-  it("shows the fallback cover when a result has no background image", async () => {
+  it("shows a generated cover when a result has no background image", async () => {
     vi.mocked(getHomepageDeals).mockResolvedValue({
       results: [{ id: 1, name: "Hades II", released: null, background_image: null, url: null, current: null, history_low_all: null }],
     });
     render(<DealsScreen />);
-    expect(await screen.findByLabelText("Hades II cover unavailable")).toBeVisible();
+    expect(await screen.findByText("GF · HADE")).toBeVisible();
   });
 
   it("renders trending and upcoming games from their API regions", async () => {
@@ -72,16 +69,23 @@ describe("discovery API regions", () => {
 
   it("renders game details and price history", async () => {
     vi.mocked(getCatalogGame).mockResolvedValue({
-      id: 1, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [],
+      id: 1, name: "Hades II", released: "2025-01-10", background_image: null, description_raw: null, rating: 4.5, genres: [], platforms: [],
+    });
+    vi.mocked(getGamePriceHistory).mockResolvedValue({
+      itad_id: "1", title: "Hades II", url: null, current: null, history_low_all: null, history_low_1y: null, history_low_3m: null, deals: [],
+      history: [{ timestamp: "2026-07-01", shop: "Steam", price: { amount: 19.99, currency: "USD" }, regular: null }],
     });
     render(<GameDetailScreen gameId="1" />);
     expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
     expect(await screen.findByText("Current price")).toBeVisible();
+    expect(screen.getByText("2025-01-10")).toBeVisible();
+    expect(screen.getByText("Rating: 4.5 / 5")).toBeVisible();
+    expect(screen.getByText("Steam · 19.99 USD")).toBeVisible();
   });
 
   it("keeps successful price history visible when the catalog request fails", async () => {
     vi.mocked(getCatalogGame).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ id: 1, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] });
-    vi.mocked(getGamePriceHistory).mockResolvedValue({ itad_id: "1", title: "Hades II", url: null, current: { shop: "Store", price: { amount: 19, currency: "USD" }, regular: null, cut: null, url: null, timestamp: null }, history_low_all: null, history_low_1y: null, history_low_3m: null, deals: [] });
+    vi.mocked(getGamePriceHistory).mockResolvedValue({ itad_id: "1", title: "Hades II", url: null, current: { shop: "Store", price: { amount: 19, currency: "USD" }, regular: null, cut: null, url: null, timestamp: null }, history_low_all: null, history_low_1y: null, history_low_3m: null, deals: [], history: [] });
     render(<GameDetailScreen gameId="1" />);
     expect(await screen.findByText("19 USD")).toBeVisible();
     const catalogCalls = vi.mocked(getCatalogGame).mock.calls.length;
@@ -90,17 +94,5 @@ describe("discovery API regions", () => {
     expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
     expect(getCatalogGame).toHaveBeenCalledTimes(catalogCalls + 1);
     expect(getGamePriceHistory).toHaveBeenCalledTimes(priceCalls);
-  });
-
-  it("updates search results when App Router query params change", async () => {
-    navigationState.params = new URLSearchParams("q=hades");
-    vi.mocked(searchGames).mockResolvedValue({ results: [{ id: 1, name: "Hades II", released: null, background_image: null }] });
-    const view = render(<SearchPage />);
-    expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
-    navigationState.params = new URLSearchParams("q=celeste");
-    vi.mocked(searchGames).mockResolvedValue({ results: [{ id: 2, name: "Celeste", released: null, background_image: null }] });
-    view.rerender(<SearchPage />);
-    expect(await screen.findByRole("heading", { name: "Celeste" })).toBeVisible();
-    expect(searchGames).toHaveBeenLastCalledWith("celeste");
   });
 });

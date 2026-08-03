@@ -177,6 +177,12 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
             "history_low_1y": {"amount": 9.99, "currency": "USD"},
             "history_low_3m": {"amount": 12.49, "currency": "USD"},
             "deals": [],
+            "history": [{
+                "timestamp": "2026-07-01T12:00:00+00:00",
+                "shop": "Steam",
+                "price": {"amount": 19.99, "currency": "USD"},
+                "regular": {"amount": 39.99, "currency": "USD"},
+            }],
         }
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
@@ -188,6 +194,12 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
     assert response.status_code == 200
     assert response.json()["current"]["price"] == {"amount": 9.99, "currency": "USD"}
     assert response.json()["history_low_all"] == {"amount": 8.99, "currency": "USD"}
+    assert response.json()["history"] == [{
+        "timestamp": "2026-07-01T12:00:00+00:00",
+        "shop": "Steam",
+        "price": {"amount": 19.99, "currency": "USD"},
+        "regular": {"amount": 39.99, "currency": "USD"},
+    }]
 
 
 def test_homepage_deals_returns_steam_store_deals(monkeypatch):

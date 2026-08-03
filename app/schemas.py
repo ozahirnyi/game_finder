@@ -8,6 +8,7 @@ class GameCreate(BaseModel):
     title: str = Field(max_length=255)
     notes: Optional[str] = Field(default=None, max_length=255)
     info: Optional[str] = Field(default=None, max_length=500)
+    external_id: Optional[str] = Field(default=None, max_length=64)
 
 
 class GameRead(BaseModel):
@@ -210,6 +211,13 @@ class PriceDeal(BaseModel):
     timestamp: str | None = None
 
 
+class PriceHistoryPoint(BaseModel):
+    timestamp: str | None = None
+    shop: str | None = None
+    price: PriceMoney | None = None
+    regular: PriceMoney | None = None
+
+
 class GamePriceHistory(BaseModel):
     itad_id: str
     title: str
@@ -219,6 +227,7 @@ class GamePriceHistory(BaseModel):
     history_low_1y: PriceMoney | None = None
     history_low_3m: PriceMoney | None = None
     deals: list[PriceDeal] = Field(default_factory=list)
+    history: list[PriceHistoryPoint] = Field(default_factory=list)
 
 
 class HomeDealItem(BaseModel):

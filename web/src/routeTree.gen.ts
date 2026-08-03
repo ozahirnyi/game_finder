@@ -251,8 +251,8 @@ export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
+import type { getRouter } from './Z:/Dev/PycharmProjects/game_finder/.worktrees/wishlist-game-details/web/src/router.tsx'
+import type { startInstance } from './Z:/Dev/PycharmProjects/game_finder/.worktrees/wishlist-game-details/web/src/start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true

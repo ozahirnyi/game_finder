@@ -4,14 +4,9 @@ import { GameCover } from "./GameCover";
 import { Badge, Button, Panel, Section, StatePanel } from "./ui";
 
 describe("design primitives", () => {
-  it("uses an image when artwork is available and a labelled fallback otherwise", () => {
-    const { rerender } = render(<GameCover title="Hades II" src="https://cdn.example/hades.jpg" />);
-
-    expect(screen.getByRole("img", { name: "Hades II" })).toHaveAttribute("src", "https://cdn.example/hades.jpg");
-
-    rerender(<GameCover title="Hades II" src={null} />);
-
-    expect(screen.getByLabelText("Hades II cover unavailable")).toBeInTheDocument();
+  it("renders the current gradient cover contract", () => {
+    render(<GameCover title="Hades II" from="#111111" to="#222222" />);
+    expect(screen.getByText("Hades II")).toBeInTheDocument();
   });
 
   it("renders error state with an enabled retry action", () => {

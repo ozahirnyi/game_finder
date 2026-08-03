@@ -61,6 +61,7 @@ export type GamePriceHistory = {
   history_low_1y: PriceMoney | null;
   history_low_3m: PriceMoney | null;
   deals: PriceDeal[];
+  history: Array<Pick<PriceDeal, "shop" | "price" | "regular" | "timestamp">>;
 };
 
 export type HomeDeal = {
@@ -403,11 +404,11 @@ export function getSavedGame(id: string) {
   return request<SavedGame>(`/games/${id}`, { auth: true });
 }
 
-export function createSavedGame(title: string, info?: string, notes = "") {
+export function createSavedGame(title: string, info?: string, notes = "", externalId?: string) {
   return request<SavedGame>("/games", {
     method: "POST",
     auth: true,
-    body: { title, notes, info },
+    body: { title, notes, info, external_id: externalId },
   });
 }
 

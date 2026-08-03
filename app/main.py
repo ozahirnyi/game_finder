@@ -231,7 +231,7 @@ def list_game_route(db: Session = Depends(get_db),current_user: User = Depends(g
 
 @app.post("/games", status_code=201, response_model=GameRead)
 def create_game_route(game: GameCreate,db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
-    created = create_game(db, game.model_dump(), current_user.id)
+    created = create_game(db, game.model_dump(exclude_none=True), current_user.id)
     notify_saved_game(current_user, created.title)
     return created
 

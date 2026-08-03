@@ -8,6 +8,11 @@ function isWishlisted(game: SavedGame) {
   return /\bwishlist\b/i.test(game.notes ?? "");
 }
 
+function catalogHref(game: SavedGame) {
+  const rawgId = game.external_id?.match(/^rawg:(\d+)$/)?.[1];
+  return rawgId ? `/games/${rawgId}` : `/search?q=${encodeURIComponent(game.title)}`;
+}
+
 export function WishlistScreen() {
   const authenticated = isAuthenticated();
   const [games, setGames] = useState<SavedGame[]>([]);
@@ -47,7 +52,7 @@ export function WishlistScreen() {
         <StatePanel kind="empty" title="No wishlist games yet" detail="Add the word “wishlist” to a saved game’s notes to include it here." />
       ) : games.map((game) => (
         <Panel as="article" key={game.id}>
-          <h2>{game.title}</h2>
+          <h2><a href={catalogHref(game)} aria-label={game.external_id?.startsWith("rawg:") ? `Open ${game.title}` : `Find ${game.title}`}>{game.title}</a></h2>
           {game.notes ? <p>{game.notes}</p> : null}
         </Panel>
       ))}

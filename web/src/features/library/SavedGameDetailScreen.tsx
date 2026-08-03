@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { Button, Panel, StatePanel } from "@/components/ui";
 import { SavedGame, deleteSavedGame, getSavedGame, isAuthenticated, updateSavedGame } from "@/lib/api";
@@ -63,7 +62,7 @@ export function SavedGameDetailScreen({ id }: { id: string }) {
 
   return (
     <main className="stack">
-      <Link href="/favorites">Back to library</Link>
+      <a href="/favorites">Back to library</a>
       <header className="section-header"><p className="eyebrow">Saved game</p><h1>{game.title}</h1>{game.info ? <p>{game.info}</p> : null}</header>
       {error ? <p className="alert error" role="alert">{error}</p> : null}
       <Panel>

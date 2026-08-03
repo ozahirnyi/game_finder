@@ -15,8 +15,10 @@ const api = vi.hoisted(() => ({
 const push = vi.fn();
 
 vi.mock("@/lib/api", () => api);
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
-vi.mock("next/link", () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }));
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => (destination: { to: string }) => push(destination.to),
+  Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+}));
 
 describe("AuthPanel", () => {
   beforeEach(() => {
