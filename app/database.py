@@ -204,11 +204,17 @@ class Favorite(Base):
 
 class WishlistItem(Base):
     __tablename__ = "wishlist_items"
-    __table_args__ = (UniqueConstraint("user_id", "catalog_game_id", name="uq_wishlist_user_catalog_game"),)
+    __table_args__ = (UniqueConstraint("user_id", "source", "external_id", name="uq_wishlist_user_provider_game"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     catalog_game_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="catalog", server_default="catalog")
+    external_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        default=lambda context: f"rawg:{context.get_current_parameters()['catalog_game_id']}",
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     cover_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

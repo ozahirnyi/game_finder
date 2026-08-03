@@ -27,7 +27,7 @@ from app.integrations.rawg import (
 )
 from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
-from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
+from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
@@ -236,6 +236,8 @@ def collection_response(item: Favorite | WishlistItem) -> CatalogCollectionRead:
     return CatalogCollectionRead(
         id=item.id,
         catalog_game_id=item.catalog_game_id,
+        source=getattr(item, "source", None) or "catalog",
+        external_id=getattr(item, "external_id", None) or f"rawg:{item.catalog_game_id}",
         title=item.title,
         cover_url=item.cover_url,
         created_at=item.created_at,
@@ -1706,7 +1708,12 @@ def add_wishlist_item(
     existing = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id, WishlistItem.catalog_game_id == data.catalog_game_id).first()
     if existing:
         raise HTTPException(status_code=409, detail="Game is already in wishlist")
-    item = WishlistItem(user_id=current_user.id, **data.model_dump())
+    item = WishlistItem(
+        user_id=current_user.id,
+        source="catalog",
+        external_id=f"rawg:{data.catalog_game_id}",
+        **data.model_dump(),
+    )
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -1743,11 +1750,60 @@ async def save_catalog_wishlist_game(
     item = WishlistItem(
         user_id=current_user.id,
         catalog_game_id=rawg_id,
+        source="catalog",
+        external_id=f"rawg:{rawg_id}",
         title=detail["name"],
         cover_url=detail.get("background_image"),
     )
     db.add(item)
     db.commit()
+    db.refresh(item)
+    response.status_code = 201
+    return collection_response(item)
+
+
+@app.post("/wishlist/steam-games/{appid}", response_model=CatalogCollectionRead)
+async def save_steam_wishlist_game(
+    appid: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if appid < 1:
+        raise HTTPException(status_code=400, detail="appid must be >= 1")
+
+    existing = (
+        db.query(WishlistItem)
+        .filter(WishlistItem.user_id == current_user.id, WishlistItem.source == "steam", WishlistItem.external_id == str(appid))
+        .first()
+    )
+    if existing:
+        response.status_code = 200
+        return collection_response(existing)
+
+    detail = await fetch_steam_store_game_detail(appid)
+    item = WishlistItem(
+        user_id=current_user.id,
+        catalog_game_id=appid,
+        source="steam",
+        external_id=str(appid),
+        title=detail["name"],
+        cover_url=detail.get("background_image"),
+    )
+    db.add(item)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = (
+            db.query(WishlistItem)
+            .filter(WishlistItem.user_id == current_user.id, WishlistItem.source == "steam", WishlistItem.external_id == str(appid))
+            .first()
+        )
+        if existing:
+            response.status_code = 200
+            return collection_response(existing)
+        raise
     db.refresh(item)
     response.status_code = 201
     return collection_response(item)
@@ -2532,9 +2588,29 @@ async def game_price_history(rawg_id: int, country: str = "US"):
         return await fetch_steam_store_game_price(title, country=normalized_country)
 
 
+@app.get("/prices/steam-games/{appid}", response_model=GamePriceHistory)
+async def steam_game_price_history(appid: int, country: str = "US"):
+    normalized_country = country.strip().upper()
+    if appid < 1:
+        raise HTTPException(status_code=400, detail="appid must be >= 1")
+    try:
+        return await fetch_game_price_history(str(appid), country=normalized_country, steam_appid=appid)
+    except HTTPException as exc:
+        if exc.status_code not in {502, 503}:
+            raise
+        return await fetch_steam_store_game_detail(appid, country=normalized_country)
+
+
 @app.get("/steam/games/resolve", response_model=SteamStoreGameDetail)
 async def resolve_steam_game(title: str, country: str = "US"):
     return await fetch_steam_store_game_price(title, country=country.strip().upper())
+
+
+@app.get("/steam/games/{appid}", response_model=SteamStoreGameDetail)
+async def get_steam_game(appid: int, country: str = "US"):
+    if appid < 1:
+        raise HTTPException(status_code=400, detail="appid must be >= 1")
+    return await fetch_steam_store_game_detail(appid, country=country.strip().upper())
 
 
 @app.get("/prices/deals", response_model=HomeDealResponse)

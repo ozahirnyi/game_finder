@@ -82,6 +82,8 @@ export type LibraryOverview = {
 export type CollectionGame = {
   id: string;
   catalog_game_id: number;
+  source: string;
+  external_id: string;
   title: string;
   cover_url?: string | null;
 };
@@ -402,6 +404,10 @@ export function getSteamGameByTitle(title: string) {
   return apiRequest<{ appid: number; name: string; background_image?: string | null; description_raw?: string | null; genres: string[]; platforms: string[]; current?: Deal["current"]; url?: string | null }>(`/steam/games/resolve?title=${encodeURIComponent(title)}`);
 }
 
+export function getSteamGame(appid: string | number) {
+  return apiRequest<{ appid: number; name: string; background_image?: string | null; description_raw?: string | null; genres: string[]; platforms: string[]; released?: string | null; rating?: number | null; current?: Deal["current"]; url?: string | null }>(`/steam/games/${appid}`);
+}
+
 export function getDeals(country: string, pageSize = 12) {
   return apiRequest<{ results: Deal[]; cached_at?: string | null }>(
     `/prices/deals?country=${encodeURIComponent(country)}&page_size=${pageSize}`,
@@ -419,6 +425,15 @@ export function getPriceHistory(id: string | number, country = "US") {
     history_low_all?: Money | null;
     history: Array<{ timestamp?: string | null; shop?: string | null; price?: Money | null; regular?: Money | null }>;
   }>(`/prices/games/${id}?country=${encodeURIComponent(country)}`);
+}
+
+export function getSteamPriceHistory(appid: string | number, country = "US") {
+  return apiRequest<{
+    current?: Deal["current"];
+    deals: Deal["current"][];
+    history_low_all?: Money | null;
+    history: Array<{ timestamp?: string | null; shop?: string | null; price?: Money | null; regular?: Money | null }>;
+  }>(`/prices/steam-games/${appid}?country=${encodeURIComponent(country)}`);
 }
 
 export function getProfile() {
@@ -447,6 +462,10 @@ export function addWishlist(game: CatalogGame) {
     method: "POST",
     body: { catalog_game_id: game.id, title: game.name, cover_url: game.background_image ?? null },
   });
+}
+
+export function addSteamWishlist(appid: string | number) {
+  return apiRequest<CollectionGame>(`/wishlist/steam-games/${appid}`, { auth: true, method: "POST" });
 }
 
 export function removeWishlist(id: string) {
