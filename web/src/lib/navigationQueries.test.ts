@@ -12,7 +12,7 @@ import {
   friendsQueryOptions,
   incomingFriendRequestsQueryOptions,
   libraryOverviewQueryOptions,
-  steamSocialFirstPageQueryOptions,
+  steamSocialInfiniteQueryOptions,
 } from "./navigationQueries";
 
 describe("navigation query options", () => {
@@ -21,13 +21,13 @@ describe("navigation query options", () => {
     expect(libraryOverviewQueryOptions().queryKey).toEqual(["library-overview"]);
     expect(friendsQueryOptions().staleTime).toBe(90_000);
     expect(incomingFriendRequestsQueryOptions().staleTime).toBe(90_000);
-    expect(steamSocialFirstPageQueryOptions().staleTime).toBe(90_000);
+    expect(steamSocialInfiniteQueryOptions().staleTime).toBe(90_000);
   });
 
   it("uses the first Steam social page for navigation prefetching", async () => {
-    const options = steamSocialFirstPageQueryOptions();
+    const options = steamSocialInfiniteQueryOptions();
 
-    await expect(options.queryFn()).resolves.toBeDefined();
+    await expect(options.queryFn({ pageParam: 0 })).resolves.toBeDefined();
     expect(api.getSteamSocial).toHaveBeenCalledWith(12, 0);
   });
 });
