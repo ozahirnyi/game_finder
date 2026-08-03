@@ -22,14 +22,17 @@ export type UserRead = {
 };
 
 export type CatalogGame = {
-  id: number;
-  name: string;
+  id: number | null;
+    name: string;
   released?: string | null;
   background_image?: string | null;
   description_raw?: string | null;
   rating?: number | null;
   genres?: string[];
   platforms?: string[];
+  source?: "steam";
+  steam_appid?: number;
+  url?: string;
 };
 
 export type Deal = {
@@ -252,7 +255,9 @@ export function getAuthSnapshot() {
 
 async function toApiError(response: Response, authenticated: boolean) {
   const payload = await response.json().catch(() => null);
-  const message = payload?.detail ?? `Request failed with status ${response.status}`;
+  const message = typeof payload?.detail === "object" && typeof payload.detail?.message === "string"
+    ? payload.detail.message
+    : payload?.detail ?? `Request failed with status ${response.status}`;
   if (authenticated && response.status === 401) clearToken();
   return new ApiError(message, response.status);
 }

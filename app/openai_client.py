@@ -18,7 +18,10 @@ def fallback_or_raise(prompt: str, reason: str) -> dict:
     if fallback_enabled():
         logger.warning("%s; using fallback recommendations", reason)
         return fallback_recommendations(prompt)
-    raise HTTPException(status_code=503, detail=reason)
+    raise HTTPException(
+        status_code=503,
+        detail={"code": "ai_recommendations_unavailable", "message": reason},
+    )
 
 
 def openai_config_error(reason: str) -> HTTPException:
@@ -233,7 +236,7 @@ def get_recommendation(prompt: str, liked_game_ids: list[int]) -> dict:
         raise HTTPException(status_code=503, detail="OpenAI authentication or permission failed")
     except APIStatusError as e:
         logger.exception(e)
-        raise HTTPException(status_code=502, detail=f"OpenAI API error: {e.status_code}")
+        return fallback_or_raise(prompt, f"OpenAI API error: {e.status_code}")
     except (ValueError, KeyError):
         return fallback_or_raise(prompt, "OpenAI response was invalid")
     except Exception as e:

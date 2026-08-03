@@ -11,6 +11,41 @@ import app.main as main
 client = TestClient(main.app)
 
 
+def test_search_uses_steam_without_waiting_for_unavailable_rawg(monkeypatch):
+    async def fake_cache(_key, _ttl, fetch):
+        return await fetch()
+
+    async def fake_rawg(*_args, **_kwargs):
+        raise AssertionError("catalog search must not delay Steam search")
+
+    async def fake_steam(query, page_size):
+        assert query == "hades"
+        assert page_size == 20
+        return [{
+            "steam_appid": 1145360,
+            "name": "Hades",
+            "background_image": "https://cdn.example/hades.jpg",
+            "url": "https://store.steampowered.com/app/1145360/",
+        }]
+
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_rawg)
+    monkeypatch.setattr(main, "fetch_steam_store_search", fake_steam)
+
+    response = client.get("/search/games?q=Hades")
+
+    assert response.status_code == 200
+    assert response.json() == {"results": [{
+        "id": None,
+        "name": "Hades",
+        "released": None,
+        "background_image": "https://cdn.example/hades.jpg",
+        "source": "steam",
+        "steam_appid": 1145360,
+        "url": "https://store.steampowered.com/app/1145360/",
+    }]}
+
+
 class CatalogGameDb:
     def __init__(self):
         self.games = []

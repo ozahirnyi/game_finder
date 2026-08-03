@@ -54,7 +54,10 @@ def test_ai_fallback_can_be_disabled(monkeypatch):
         fallback_or_raise("dark rpg", "OpenAI unavailable")
     except HTTPException as exc:
         assert exc.status_code == 503
-        assert exc.detail == "OpenAI unavailable"
+        assert exc.detail == {
+            "code": "ai_recommendations_unavailable",
+            "message": "OpenAI unavailable",
+        }
     else:
         raise AssertionError("fallback_or_raise should raise when fallback is disabled")
 

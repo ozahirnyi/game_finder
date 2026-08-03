@@ -5,8 +5,9 @@ import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
-import { getLibraryOverview, type LibraryOverviewGame } from "@/lib/api";
+import { type LibraryOverviewGame } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
+import { libraryOverviewQueryOptions } from "@/lib/navigationQueries";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -36,7 +37,7 @@ type SortOrder = "playtime-desc" | "playtime-asc";
 function LibraryPage() {
   const [tab, setTab] = useState<Tab>("All games");
   const [sortOrder, setSortOrder] = useState<SortOrder>("playtime-desc");
-  const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview });
+  const libraryQuery = useQuery(libraryOverviewQueryOptions());
   const owned = libraryQuery.data?.games ?? [];
   const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
   const visible = useMemo(() => {
@@ -90,10 +91,12 @@ function LibraryPage() {
         </label>
       </div>
 
-      {libraryQuery.isLoading && (
-        <p className="text-sm text-muted-foreground">Loading your library…</p>
+      {libraryQuery.isPending && !libraryQuery.data && (
+        <div data-testid="library-loading" className="rounded-2xl border border-border bg-surface p-6 text-sm text-muted-foreground">
+          Loading your library…
+        </div>
       )}
-      {!libraryQuery.isLoading && visible.length === 0 && (
+      {!(libraryQuery.isPending && !libraryQuery.data) && visible.length === 0 && (
         <EmptyState
           icon={<LibraryIcon className="size-5" />}
           title={

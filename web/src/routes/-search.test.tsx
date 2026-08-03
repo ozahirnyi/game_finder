@@ -1,11 +1,27 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/AppShell", () => ({ AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 import { Route } from "./search";
 
 describe("SearchPage", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows search progress instead of an empty result while catalog search is pending", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+    const SearchPage = Route.options.component!;
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><SearchPage /></QueryClientProvider>);
+
+    fireEvent.change(screen.getByPlaceholderText(/search by title/i), { target: { value: "Hades" } });
+
+    expect(await screen.findByText("Searching games…")).toBeInTheDocument();
+    expect(screen.queryByText("No games match your search")).not.toBeInTheDocument();
+  });
+
   it("submits an AI prompt and displays returned recommendations", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ recommendations: [{ title: "Recommended title", reason: "Fits your prompt", tags: ["Co-op"] }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

@@ -47,6 +47,41 @@ describe("GameCard", () => {
     );
   });
 
+  it("links a Steam game to the internal detail route", async () => {
+    const rootRoute = createRootRoute({ component: Outlet });
+    const indexRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: () => (
+        <GameCard
+          game={{
+            gameId: "1145360",
+            source: "steam",
+            title: "Hades",
+            coverFrom: "#111111",
+            coverTo: "#222222",
+          }}
+        />
+      ),
+    });
+    const gameRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/games/$gameId",
+      component: () => null,
+    });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([indexRoute, gameRoute]),
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    });
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByRole("link", { name: /hades/i })).toHaveAttribute(
+      "href",
+      "/games/1145360?title=Hades&source=steam",
+    );
+  });
+
   it("opens the verified store URL when no internal catalog identity exists", async () => {
     const rootRoute = createRootRoute({ component: Outlet });
     const indexRoute = createRoute({

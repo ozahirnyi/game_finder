@@ -5,6 +5,8 @@ import { Chip, PriceBlock } from "@/components/ui-bits";
 export type GameCardData = {
   /** Confirmed internal catalog id. */
   gameId?: string;
+  /** Steam-only detail pages are resolved by the existing game route. */
+  source?: "steam";
   /** Verified storefront URL for a deal without an internal catalog identity. */
   externalUrl?: string;
   title: string;
@@ -96,7 +98,7 @@ export function GameCard({
     <Link
       to="/games/$gameId"
       params={{ gameId: game.gameId }}
-      search={{ title: game.title }}
+      search={{ title: game.title, ...(game.source ? { source: game.source } : {}) }}
       className={className}
     >
       {inner}

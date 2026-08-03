@@ -30,31 +30,32 @@ export const Route = createFileRoute("/games/$gameId")({
           : (await getLibraryOverview()).games.find(
               (game) => game.source === "steam" && game.external_id === params.gameId,
             );
-        const title = deps.title ?? libraryGame?.title;
-        if (!title) throw new Error("Steam game title unavailable");
-        return {
-          game: {
+      const title = deps.title ?? libraryGame?.title;
+      if (!title) throw new Error("Steam game title unavailable");
+      const steamGame = await getSteamGameByTitle(title).catch(() => undefined);
+      return {
+        game: {
             id: params.gameId,
             title,
             coverFrom: "#1d4ed8",
             coverTo: "#111827",
             coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/library_hero.jpg`,
             fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/header.jpg`,
-            genres: [],
-            platforms: ["PC"],
+          genres: steamGame?.genres ?? [],
+          platforms: steamGame?.platforms ?? ["PC"],
             releaseDate: undefined,
             rating: 0,
-            description: libraryGame
-              ? "This game is from your Steam library. Catalog details are unavailable."
-              : "Steam Store game. Catalog details are unavailable.",
-            price: null,
-            originalPrice: null,
-            discount: null,
-            currency: undefined,
-            store: "Steam",
-            storeUrl: `https://store.steampowered.com/app/${params.gameId}/`,
+          description: steamGame?.description_raw ?? (libraryGame
+            ? "This game is from your Steam library. Catalog details are unavailable."
+            : "Steam Store game. Catalog details are unavailable."),
+          price: steamGame?.current?.price?.amount ?? null,
+          originalPrice: steamGame?.current?.regular?.amount ?? null,
+          discount: steamGame?.current?.cut ?? null,
+          currency: steamGame?.current?.price?.currency,
+          store: steamGame?.current?.shop ?? "Steam",
+          storeUrl: steamGame?.current?.url ?? steamGame?.url ?? `https://store.steampowered.com/app/${params.gameId}/`,
             coop: false,
-            isSteamLibrary: Boolean(libraryGame),
+          isSteamLibrary: true,
           },
         };
       }
@@ -194,6 +195,25 @@ function Sparkline({ priceHistory }: { priceHistory: { price: number; date: stri
   );
 }
 
+export function mergeGamePrice<T extends {
+  price: number | null;
+  originalPrice: number | null;
+  discount: number | null;
+  currency?: string;
+  store?: string;
+  storeUrl?: string;
+}>(game: T, current?: { price?: { amount?: number | null; currency?: string | null } | null; regular?: { amount?: number | null } | null; cut?: number | null; shop?: string | null; url?: string | null } | null): T {
+  return {
+    ...game,
+    price: current?.price?.amount ?? game.price,
+    originalPrice: current?.regular?.amount ?? game.originalPrice,
+    discount: current?.cut ?? game.discount,
+    currency: current?.price?.currency ?? game.currency,
+    store: current?.shop ?? game.store,
+    storeUrl: current?.url ?? game.storeUrl,
+  };
+}
+
 function GameDetail() {
   const { game: catalogGame } = Route.useLoaderData();
   const priceQuery = useQuery({
@@ -246,15 +266,7 @@ function GameDetail() {
     },
   });
   const current = priceQuery.data?.current;
-  const game = {
-    ...catalogGame,
-    price: current?.price?.amount ?? null,
-    originalPrice: current?.regular?.amount ?? null,
-    discount: current?.cut ?? null,
-    currency: current?.price?.currency,
-    store: current?.shop ?? catalogGame.store,
-    storeUrl: current?.url ?? catalogGame.storeUrl,
-  };
+  const game = mergeGamePrice(catalogGame, current);
   const isInWishlist = wishlistAdded || wishlistQuery.data?.some(
     (item) => item.catalog_game_id === Number(catalogGame.id),
   );
