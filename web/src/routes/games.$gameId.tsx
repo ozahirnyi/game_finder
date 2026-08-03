@@ -274,10 +274,10 @@ function GameDetail() {
   const owners: Array<{ id: string; avatarFrom: string; avatarTo: string; name: string; online: boolean; activity?: string }> = [];
   const similar: Array<{ id: string; title: string; coverUrl?: string; coverFrom: string; coverTo: string; genres: string[]; price?: number | null; originalPrice?: number | null; discount?: number | null; currency?: string; store?: string }> = [];
   const priceUnavailable = game.price == null;
-  const priceHistory = (priceQuery.data?.deals ?? [])
+  const priceHistory = (priceQuery.data?.history ?? [])
     .map((deal, index) => ({
       price: deal?.price?.amount,
-      date: `Offer ${index + 1}`,
+      date: deal?.timestamp ?? `Update ${index + 1}`,
     }))
     .filter((point): point is { price: number; date: string } => typeof point.price === "number");
 

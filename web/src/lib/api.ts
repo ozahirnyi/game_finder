@@ -417,6 +417,7 @@ export function getPriceHistory(id: string | number, country = "US") {
     current?: Deal["current"];
     deals: Deal["current"][];
     history_low_all?: Money | null;
+    history: Array<{ timestamp?: string | null; shop?: string | null; price?: Money | null; regular?: Money | null }>;
   }>(`/prices/games/${id}?country=${encodeURIComponent(country)}`);
 }
 
