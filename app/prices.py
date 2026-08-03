@@ -35,6 +35,11 @@ def _deal(value: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
+def _history_point(value: dict[str, Any]) -> dict[str, Any]:
+    deal = value.get("deal") or {}
+    return {"timestamp": value.get("timestamp"), "shop": (value.get("shop") or {}).get("name"), "price": _money(deal.get("price")), "regular": _money(deal.get("regular"))}
+
+
 def _itad_error_message(response: httpx.Response) -> str:
     try:
         data = response.json()
@@ -72,6 +77,8 @@ async def fetch_game_price_history(title: str, country: str = "US") -> dict[str,
                 json=[game_id],
             )
             prices.raise_for_status()
+            history = await client.get(f"{ITAD_BASE_URL}/games/history/v2", params={"id": game_id, "country": country})
+            history.raise_for_status()
     except HTTPException:
         raise
     except httpx.HTTPStatusError as exc:
@@ -92,6 +99,8 @@ async def fetch_game_price_history(title: str, country: str = "US") -> dict[str,
     item = price_items[0]
     history_low = item.get("historyLow") or {}
     deals = [_deal(deal) for deal in item.get("deals") or []]
+    history_data = history.json()
+    history_points = history_data if isinstance(history_data, list) else history_data.get("history", [])
 
     return {
         "itad_id": game_id,
@@ -102,4 +111,5 @@ async def fetch_game_price_history(title: str, country: str = "US") -> dict[str,
         "history_low_1y": _money(history_low.get("y1")),
         "history_low_3m": _money(history_low.get("m3")),
         "deals": [deal for deal in deals if deal is not None],
+        "history": [_history_point(point) for point in history_points],
     }

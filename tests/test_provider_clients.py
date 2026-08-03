@@ -89,12 +89,14 @@ async def test_itad_price_history_normalizes_deals(monkeypatch):
     responses = [
         FakeResponse({"found": True, "game": {"id": "g1", "title": "Game", "urls": {"game": "url"}}}),
         FakeResponse([{"historyLow": {"all": {"amount": 5, "currency": "USD"}}, "deals": [{"shop": {"name": "Store"}, "price": {"amount": 6, "currency": "USD"}}]}]),
+        FakeResponse([{"timestamp": "2026-08-01T00:00:00+00:00", "shop": {"name": "Store"}, "deal": {"price": {"amount": 6, "currency": "USD"}}}]),
     ]
     monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(responses=responses))
     result = await prices.fetch_game_price_history("Game")
     assert result["itad_id"] == "g1"
     assert result["current"]["shop"] == "Store"
     assert result["history_low_all"] == {"amount": 5, "currency": "USD"}
+    assert result["history"][0]["timestamp"] == "2026-08-01T00:00:00+00:00"
 
 
 @pytest.mark.anyio

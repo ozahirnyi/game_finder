@@ -405,6 +405,12 @@ class PriceDeal(BaseModel):
     url: str | None = None
     timestamp: str | None = None
 
+class PriceHistoryPoint(BaseModel):
+    timestamp: str | None = None
+    shop: str | None = None
+    price: PriceMoney | None = None
+    regular: PriceMoney | None = None
+
 
 class GamePriceHistory(BaseModel):
     itad_id: str
@@ -415,6 +421,7 @@ class GamePriceHistory(BaseModel):
     history_low_1y: PriceMoney | None = None
     history_low_3m: PriceMoney | None = None
     deals: list[PriceDeal] = Field(default_factory=list)
+    history: list[PriceHistoryPoint] = Field(default_factory=list)
 
 
 class SteamStoreGameDetail(BaseModel):
