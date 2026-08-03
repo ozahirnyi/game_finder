@@ -441,6 +441,7 @@ class HomeDealItem(BaseModel):
 
 class HomeDealResponse(BaseModel):
     results: list[HomeDealItem] = Field(default_factory=list)
+    cached_at: datetime | None = None
 
 
 class GenreDealSection(BaseModel):

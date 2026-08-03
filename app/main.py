@@ -2542,8 +2542,8 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
     normalized_country = country.strip().upper()
     if len(normalized_country) != 2:
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
-    if page_size < 1 or page_size > 12:
-        raise HTTPException(status_code=400, detail="page_size must be between 1 and 12")
+    if page_size < 1 or page_size > 13:
+        raise HTTPException(status_code=400, detail="page_size must be between 1 and 13")
 
     key = build_cache_key("steam_store_deals", country=normalized_country, page_size=page_size)
 
@@ -2577,7 +2577,10 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
                 "history_low_all": deal.get("history_low_all"),
             }
 
-        return {"results": await asyncio.gather(*(attach_rawg_id(deal) for deal in steam_deals))}
+        return {
+            "results": await asyncio.gather(*(attach_rawg_id(deal) for deal in steam_deals)),
+            "cached_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     return await get_json_cached(key, CACHE_TTL, fetch)
 
