@@ -123,6 +123,7 @@ app.add_middleware(
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 CACHE_TTL = 3600
+DEAL_RAWG_ENRICHMENT_TIMEOUT_SECONDS = 1.5
 
 
 def get_optional_current_user(request: Request, db: Session = Depends(get_db)) -> User | None:
@@ -2551,7 +2552,10 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
 
         async def attach_rawg_id(deal: dict):
             try:
-                rawg = await fetch_rawg_games(deal["name"], page=1)
+                rawg = await asyncio.wait_for(
+                    fetch_rawg_games(deal["name"], page=1),
+                    timeout=DEAL_RAWG_ENRICHMENT_TIMEOUT_SECONDS,
+                )
                 match = next(
                     (
                         game
@@ -2560,7 +2564,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
                     ),
                     None,
                 )
-            except RAWGError:
+            except (RAWGError, asyncio.TimeoutError):
                 match = None
             return {
                 "id": match.get("id") if match else None,
@@ -2589,11 +2593,20 @@ async def genre_deals(current_user: User | None = Depends(get_optional_current_u
     )
 
     async def fetch():
+        async def fetch_rawg_deal(query: str, page: int):
+            try:
+                return await asyncio.wait_for(
+                    fetch_rawg_games(query, page),
+                    timeout=DEAL_RAWG_ENRICHMENT_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError as exc:
+                raise RAWGError("RAWG deal enrichment timeout", status_code=504) from exc
+
         return await build_genre_deal_groups(
             country,
             genres,
             fetch_steam_store_deal_candidates,
-            fetch_rawg_games,
+            fetch_rawg_deal,
             fetch_steam_store_game_genres,
         )
 
