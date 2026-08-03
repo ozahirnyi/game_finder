@@ -87,7 +87,7 @@ def test_openai_recommendation_success_and_timeout_config(monkeypatch):
     ("APITimeoutError", "fallback", None),
     ("AuthenticationError", "authentication or permission", 503),
     ("PermissionDeniedError", "authentication or permission", 503),
-    ("APIStatusError", "API error: 429", 502),
+    ("APIStatusError", "fallback", None),
     ("ValueError", "fallback", None),
     ("RuntimeError", "recommendations failed", 500),
 ])
