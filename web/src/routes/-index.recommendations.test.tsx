@@ -8,7 +8,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -156,5 +156,20 @@ describe("Home recommendations", () => {
     renderHome();
 
     expect(await screen.findByText("Hades")).toHaveAttribute("data-game-id", "44");
+  });
+
+  it("requests a twelfth standard deal for the full Price drops grid", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getDeals.mockResolvedValue({
+      results: Array.from({ length: 13 }, (_, index) => ({
+        id: index + 1,
+        name: index === 12 ? "Twelfth deal" : `Deal ${index + 1}`,
+      })),
+    });
+
+    renderHome();
+
+    expect(await screen.findByText("Twelfth deal")).toBeInTheDocument();
+    await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("US", 13));
   });
 });

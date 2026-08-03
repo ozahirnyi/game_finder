@@ -48,7 +48,7 @@ function Home() {
     queryFn: () => searchGames(query),
     enabled: query.trim().length >= 2,
   });
-  const dealsQuery = useQuery({ queryKey: ["deals", region], queryFn: () => getDeals(region) });
+  const dealsQuery = useQuery({ queryKey: ["deals", region], queryFn: () => getDeals(region, 13) });
   const deals = dealsQuery.data?.results ?? [];
   const results = searchQuery.data?.results ?? [];
   const best = deals[0];

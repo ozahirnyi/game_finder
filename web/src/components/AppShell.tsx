@@ -25,6 +25,15 @@ function scheduleIdle(callback: () => void) {
   return () => window.clearTimeout(timeout);
 }
 
+function relativeDealsAge(cachedAt?: string | null) {
+  const timestamp = cachedAt ? Date.parse(cachedAt) : Number.NaN;
+  const ageMinutes = Math.floor((Date.now() - timestamp) / 60_000);
+  if (!Number.isFinite(ageMinutes) || ageMinutes < 0) return null;
+  if (ageMinutes < 1) return "refreshed just now";
+  if (ageMinutes < 60) return `refreshed ${ageMinutes}m ago`;
+  return `refreshed ${Math.floor(ageMinutes / 60)}h ago`;
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [themeOpen, setThemeOpen] = useState(false);
@@ -59,6 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     enabled: sidebarDealsReady,
   });
   const deals = dealsQuery.data?.results ?? [];
+  const dealsAge = relativeDealsAge(dealsQuery.data?.cached_at);
   const profileQuery = useQuery({
     queryKey: ["profile", "shell"],
     queryFn: getProfile,
@@ -114,7 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <>
                 <p className="label-mono relative mb-1.5 text-primary">Live deals</p>
                 <p className="relative text-xs text-muted-foreground">
-                  {deals.length} price drops tracked · refreshed 4m ago
+                  {deals.length} price drops tracked{dealsAge ? ` · ${dealsAge}` : ""}
                 </p>
               </>
             ) : <p className="label-mono relative text-primary">Live deals · loading</p>}
