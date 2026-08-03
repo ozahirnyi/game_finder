@@ -14,7 +14,7 @@ The `Live deals` sidebar retains its current count and loading state. Once data 
 
 ## Home Price drops
 
-The existing real Steam deals remain the sole content source. The Home grid will render up to twelve real deals: one featured card plus eleven standard cards, so a full response lays out as 4 + 4 + 4. Empty and error fallback behaviour remains unchanged.
+The existing real Steam deals remain the sole content source. The Home page requests thirteen deals: one featured card plus twelve standard cards, so the standard-card grid lays out as 4 + 4 + 4. The sidebar remains limited to twelve deals. Empty and error fallback behaviour remains unchanged.
 
 ## Tests
 
