@@ -613,6 +613,36 @@ def test_homepage_deals_returns_steam_store_deals(monkeypatch):
     assert payload["results"][0]["background_image"].startswith("https://shared.akamai.steamstatic.com/")
 
 
+def test_homepage_deals_exposes_a_stable_cache_creation_time(monkeypatch):
+    cache = {}
+    calls = 0
+
+    async def fake_cache(key, _ttl, fetch):
+        if key not in cache:
+            cache[key] = await fetch()
+        return cache[key]
+
+    async def fake_fetch_steam_store_deals(**_kwargs):
+        nonlocal calls
+        calls += 1
+        return [{"steam_appid": 1145360, "name": "Hades", "background_image": "steam-cover", "url": "https://store.test/hades"}]
+
+    async def fake_rawg_games(*_args, **_kwargs):
+        return {"results": []}
+
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_steam_store_deals", fake_fetch_steam_store_deals)
+    monkeypatch.setattr(main, "fetch_rawg_games", fake_rawg_games)
+
+    first = client.get("/prices/deals?page_size=13")
+    second = client.get("/prices/deals?page_size=13")
+
+    assert first.status_code == 200
+    assert first.json()["cached_at"]
+    assert second.json()["cached_at"] == first.json()["cached_at"]
+    assert calls == 1
+
+
 def test_homepage_deals_does_not_attach_a_different_rawg_game(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
