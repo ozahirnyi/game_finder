@@ -12,7 +12,7 @@ import {
   PriceBlock,
   SectionHeader,
 } from "@/components/ui-bits";
-import { addWishlist, ApiError, createGameInvite, createPriceAlert, getCatalogGame, getFriends, getLibraryOverview, getPriceHistory, getSteamGameByTitle, getWishlist, searchGames } from "@/lib/api";
+import { addSteamWishlist, addWishlist, ApiError, createGameInvite, createPriceAlert, getCatalogGame, getFriends, getPriceHistory, getSteamGame, getSteamGameByTitle, getSteamPriceHistory, getWishlist, searchGames } from "@/lib/api";
 import { exactCatalogMatch } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
@@ -25,35 +25,26 @@ export const Route = createFileRoute("/games/$gameId")({
   loader: async ({ params, deps }) => {
     try {
       if (deps.source === "steam") {
-        const libraryGame = deps.title
-          ? undefined
-          : (await getLibraryOverview()).games.find(
-              (game) => game.source === "steam" && game.external_id === params.gameId,
-            );
-      const title = deps.title ?? libraryGame?.title;
-      if (!title) throw new Error("Steam game title unavailable");
-      const steamGame = await getSteamGameByTitle(title).catch(() => undefined);
+        const steamGame = await getSteamGame(params.gameId);
       return {
         game: {
             id: params.gameId,
-            title,
+            title: steamGame.name,
             coverFrom: "#1d4ed8",
             coverTo: "#111827",
             coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/library_hero.jpg`,
             fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/header.jpg`,
-          genres: steamGame?.genres ?? [],
-          platforms: steamGame?.platforms ?? ["PC"],
-            releaseDate: undefined,
-            rating: 0,
-          description: steamGame?.description_raw ?? (libraryGame
-            ? "This game is from your Steam library. Catalog details are unavailable."
-            : "Steam Store game. Catalog details are unavailable."),
-          price: steamGame?.current?.price?.amount ?? null,
-          originalPrice: steamGame?.current?.regular?.amount ?? null,
-          discount: steamGame?.current?.cut ?? null,
-          currency: steamGame?.current?.price?.currency,
-          store: steamGame?.current?.shop ?? "Steam",
-          storeUrl: steamGame?.current?.url ?? steamGame?.url ?? `https://store.steampowered.com/app/${params.gameId}/`,
+          genres: steamGame.genres ?? [],
+          platforms: steamGame.platforms ?? ["PC"],
+            releaseDate: steamGame.released ?? undefined,
+            rating: steamGame.rating ?? 0,
+          description: steamGame.description_raw ?? "Steam Store game.",
+          price: steamGame.current?.price?.amount ?? null,
+          originalPrice: steamGame.current?.regular?.amount ?? null,
+          discount: steamGame.current?.cut ?? null,
+          currency: steamGame.current?.price?.currency,
+          store: steamGame.current?.shop ?? "Steam",
+          storeUrl: steamGame.current?.url ?? steamGame.url ?? `https://store.steampowered.com/app/${params.gameId}/`,
             coop: false,
           isSteamLibrary: true,
           },
@@ -217,9 +208,8 @@ export function mergeGamePrice<T extends {
 function GameDetail() {
   const { game: catalogGame } = Route.useLoaderData();
   const priceQuery = useQuery({
-    queryKey: ["price-history", catalogGame.id],
-    queryFn: () => getPriceHistory(catalogGame.id),
-    enabled: !catalogGame.isSteamLibrary,
+    queryKey: ["price-history", catalogGame.isSteamLibrary ? "steam" : "catalog", catalogGame.id],
+    queryFn: () => catalogGame.isSteamLibrary ? getSteamPriceHistory(catalogGame.id) : getPriceHistory(catalogGame.id),
   });
   const queryClient = useQueryClient();
   const [showAlertForm, setShowAlertForm] = useState(false);
@@ -228,10 +218,12 @@ function GameDetail() {
   const [recipientId, setRecipientId] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [wishlistAdded, setWishlistAdded] = useState(false);
-  const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist, enabled: !catalogGame.isSteamLibrary });
+  const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist });
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
   const wishlistMutation = useMutation({
-    mutationFn: addWishlist,
+    mutationFn: () => catalogGame.isSteamLibrary
+      ? addSteamWishlist(catalogGame.id)
+      : addWishlist({ id: Number(catalogGame.id), name: catalogGame.title, background_image: catalogGame.coverUrl ?? null }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wishlist"] });
       setWishlistAdded(true);
@@ -267,8 +259,10 @@ function GameDetail() {
   });
   const current = priceQuery.data?.current;
   const game = mergeGamePrice(catalogGame, current);
-  const isInWishlist = wishlistAdded || wishlistQuery.data?.some(
-    (item) => item.catalog_game_id === Number(catalogGame.id),
+  const isInWishlist = wishlistAdded || wishlistQuery.data?.some((item) =>
+    catalogGame.isSteamLibrary
+      ? item.source === "steam" && item.external_id === String(catalogGame.id)
+      : item.source !== "steam" && item.catalog_game_id === Number(catalogGame.id),
   );
 
   const owners: Array<{ id: string; avatarFrom: string; avatarTo: string; name: string; online: boolean; activity?: string }> = [];
@@ -415,12 +409,18 @@ function GameDetail() {
                       align="left"
                     />
                   </div>
-                  <Sparkline priceHistory={priceHistory} />
-                  <div className="mt-3 flex justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {priceHistory.map((p) => (
-                      <span key={p.date}>{p.date}</span>
-                    ))}
-                  </div>
+                  {priceHistory.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No price history is available yet.</p>
+                  ) : priceHistory.length === 1 ? (
+                    <p className="text-sm text-muted-foreground">Recorded on {priceHistory[0].date}.</p>
+                  ) : (
+                    <>
+                      <Sparkline priceHistory={priceHistory} />
+                      <div className="mt-3 flex justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {priceHistory.map((p) => <span key={p.date}>{p.date}</span>)}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -467,21 +467,13 @@ function GameDetail() {
               unavailable={priceUnavailable}
             />
 
-            {!catalogGame.isSteamLibrary && (
-              <button
-                onClick={() =>
-                  wishlistMutation.mutate({
-                    id: Number(game.id),
-                    name: game.title,
-                    background_image: game.coverUrl ?? null,
-                  })
-                }
+            <button
+                onClick={() => wishlistMutation.mutate()}
                 disabled={wishlistMutation.isPending || isInWishlist}
                 className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
               >
                 <Heart className="size-4" /> {wishlistMutation.isPending ? "Adding…" : isInWishlist ? "In wishlist" : "Add to wishlist"}
               </button>
-            )}
 
             {/* External action — deliberately separated from the card/CTA above */}
             <div className="mt-4 border-t border-border pt-4">

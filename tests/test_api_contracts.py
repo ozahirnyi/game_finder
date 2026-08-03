@@ -12,6 +12,41 @@ import app.main as main
 client = TestClient(main.app)
 
 
+def test_steam_game_routes_use_app_id(monkeypatch):
+    async def fake_detail(appid: int, country: str = "US"):
+        assert appid == 1091500
+        assert country == "UA"
+        return {
+            "appid": appid,
+            "name": "Cyberpunk 2077",
+            "genres": ["RPG"],
+            "platforms": ["PC"],
+            "released": "10 Dec, 2020",
+            "rating": 86,
+            "deals": [],
+            "history": [],
+        }
+
+    async def fake_history(title: str, country: str = "US", steam_appid: int | None = None):
+        assert title == "1091500"
+        assert country == "UA"
+        assert steam_appid == 1091500
+        return {"itad_id": "itad-1091500", "title": "Cyberpunk 2077", "deals": [], "history": []}
+
+    monkeypatch.setattr(main, "fetch_steam_store_game_detail", fake_detail)
+    monkeypatch.setattr(main, "fetch_game_price_history", fake_history)
+
+    detail = client.get("/steam/games/1091500?country=UA")
+    history = client.get("/prices/steam-games/1091500?country=UA")
+
+    assert detail.status_code == 200
+    assert detail.json()["rating"] == 86
+    assert history.status_code == 200
+    assert history.json()["itad_id"] == "itad-1091500"
+    assert client.get("/steam/games/0").status_code == 400
+    assert client.get("/prices/steam-games/0").status_code == 400
+
+
 def test_search_uses_steam_without_waiting_for_unavailable_rawg(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()

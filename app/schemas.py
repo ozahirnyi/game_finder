@@ -431,6 +431,8 @@ class SteamStoreGameDetail(BaseModel):
     description_raw: str | None = None
     genres: list[str] = Field(default_factory=list)
     platforms: list[str] = Field(default_factory=lambda: ["PC"])
+    released: str | None = None
+    rating: float | None = None
     current: PriceDeal | None = None
     url: str | None = None
 
@@ -566,6 +568,8 @@ class CatalogCollectionUpdate(BaseModel):
 class CatalogCollectionRead(BaseModel):
     id: uuid.UUID
     catalog_game_id: int
+    source: str = "catalog"
+    external_id: str
     title: str
     cover_url: str | None = None
     created_at: datetime

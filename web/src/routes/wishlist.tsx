@@ -138,16 +138,16 @@ function WishlistPage() {
               data-testid={`wishlist-card-${g.id}`}
               role="link"
               tabIndex={0}
-              onClick={() => navigate({ to: "/games/$gameId", params: { gameId: String(g.catalog_game_id) } })}
+              onClick={() => navigate({ to: "/games/$gameId", params: { gameId: String(g.catalog_game_id) }, search: g.source === "steam" ? { source: "steam", title: g.title } : {} })}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  navigate({ to: "/games/$gameId", params: { gameId: String(g.catalog_game_id) } });
+                  navigate({ to: "/games/$gameId", params: { gameId: String(g.catalog_game_id) }, search: g.source === "steam" ? { source: "steam", title: g.title } : {} });
                 }
               }}
               className="hover-lift grid cursor-pointer grid-cols-1 gap-6 rounded-2xl border border-border bg-surface p-5 hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
             >
-              <Link to="/games/$gameId" params={{ gameId: String(g.catalog_game_id) }}>
+              <Link to="/games/$gameId" params={{ gameId: String(g.catalog_game_id) }} search={g.source === "steam" ? { source: "steam", title: g.title } : {}}>
                 <GameCover
                   from="#7c3aed"
                   to="#111827"
@@ -162,6 +162,7 @@ function WishlistPage() {
                 <Link
                   to="/games/$gameId"
                   params={{ gameId: String(g.catalog_game_id) }}
+                  search={g.source === "steam" ? { source: "steam", title: g.title } : {}}
                   className="truncate text-lg font-bold transition-colors hover:text-primary"
                 >
                   {g.title}
@@ -175,6 +176,7 @@ function WishlistPage() {
                 <Link
                   to="/games/$gameId"
                   params={{ gameId: String(g.catalog_game_id) }}
+                  search={g.source === "steam" ? { source: "steam", title: g.title } : {}}
                   className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
                 >
                   View game

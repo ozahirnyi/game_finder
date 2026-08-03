@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.integrations import rawg
-from app import prices, steam, telegram
+from app import prices, steam, steam_store, telegram
 
 
 class FakeResponse:
@@ -97,6 +97,33 @@ async def test_itad_price_history_normalizes_deals(monkeypatch):
     assert result["current"]["shop"] == "Store"
     assert result["history_low_all"] == {"amount": 5, "currency": "USD"}
     assert result["history"][0]["timestamp"] == "2026-08-01T00:00:00+00:00"
+
+
+@pytest.mark.anyio
+async def test_steam_store_game_detail_uses_app_id_without_title_search(monkeypatch):
+    response = FakeResponse({
+        "1091500": {
+            "success": True,
+            "data": {
+                "name": "Cyberpunk 2077",
+                "short_description": "Night City.",
+                "header_image": "https://img.test/cyberpunk.jpg",
+                "genres": [{"description": "RPG"}],
+                "platforms": {"windows": True, "mac": False, "linux": False},
+                "release_date": {"date": "10 Dec, 2020"},
+                "metacritic": {"score": 86},
+                "price_overview": {"final": 1799, "initial": 5999, "currency": "USD", "discount_percent": 70},
+            },
+        },
+    })
+    monkeypatch.setattr(steam_store.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(responses=[response]))
+
+    result = await steam_store.fetch_steam_store_game_detail(1091500)
+
+    assert result["appid"] == 1091500
+    assert result["released"] == "10 Dec, 2020"
+    assert result["rating"] == 86
+    assert result["current"]["price"] == {"amount": 17.99, "currency": "USD"}
 
 
 @pytest.mark.anyio

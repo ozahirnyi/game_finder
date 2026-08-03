@@ -4,6 +4,7 @@ const api = vi.hoisted(() => ({
   getLibraryOverview: vi.fn(),
   getCatalogGame: vi.fn(),
   searchGames: vi.fn(),
+  getSteamGame: vi.fn(),
   getSteamGameByTitle: vi.fn(),
 }));
 
@@ -12,6 +13,8 @@ vi.mock("@/lib/api", () => ({
   addWishlist: vi.fn(),
   getCatalogGame: api.getCatalogGame,
   getPriceHistory: vi.fn(),
+  getSteamGame: api.getSteamGame,
+  getSteamPriceHistory: vi.fn(),
   searchGames: api.searchGames,
   getSteamGameByTitle: api.getSteamGameByTitle,
 }));
@@ -20,12 +23,14 @@ import { mergeGamePrice, Route } from "./games.$gameId";
 
 describe("Steam library game loader", () => {
   it("loads Steam Store details and price for a Steam search result", async () => {
-    api.getSteamGameByTitle.mockResolvedValue({
+    api.getSteamGame.mockResolvedValue({
       appid: 1145360,
       name: "Hades",
       description_raw: "Escape the Underworld.",
       genres: ["Action"],
       platforms: ["PC"],
+      released: "17 Sep, 2020",
+      rating: 93,
       current: {
         shop: "Steam",
         price: { amount: 25, currency: "USD" },
@@ -49,6 +54,8 @@ describe("Steam library game loader", () => {
       price: 25,
       store: "Steam",
       isSteamLibrary: true,
+      releaseDate: "17 Sep, 2020",
+      rating: 93,
     });
   });
 

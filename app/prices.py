@@ -52,7 +52,7 @@ def _itad_error_message(response: httpx.Response) -> str:
     return "request failed"
 
 
-async def fetch_game_price_history(title: str, country: str = "US") -> dict[str, Any]:
+async def fetch_game_price_history(title: str, country: str = "US", steam_appid: int | None = None) -> dict[str, Any]:
     api_key = get_itad_api_key()
     if not api_key:
         raise HTTPException(status_code=503, detail="ITAD_API_KEY is not configured")
@@ -62,7 +62,7 @@ async def fetch_game_price_history(title: str, country: str = "US") -> dict[str,
         async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
             lookup = await client.get(
                 f"{ITAD_BASE_URL}/games/lookup/v1",
-                params={"title": title},
+                params={"appid": steam_appid} if steam_appid else {"title": title},
             )
             lookup.raise_for_status()
             lookup_data = lookup.json()

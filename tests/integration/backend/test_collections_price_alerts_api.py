@@ -68,6 +68,24 @@ def test_wishlist_manual_crud_and_owner_scoping(api_client, db_session, user_fac
     assert db_session.query(WishlistItem).filter_by(id=UUID(item_id)).one_or_none() is None
 
 
+def test_wishlist_saves_steam_games_by_app_id(api_client, db_session, user_factory, auth_as, app_main, monkeypatch):
+    owner = auth_as(user_factory(email="steam-wishlist@example.com"))
+    monkeypatch.setattr(
+        app_main,
+        "fetch_steam_store_game_detail",
+        AsyncMock(return_value={"appid": 1091500, "name": "Cyberpunk 2077", "background_image": "https://img.test/cyberpunk.jpg"}),
+    )
+
+    first = api_client.post("/wishlist/steam-games/1091500")
+    second = api_client.post("/wishlist/steam-games/1091500")
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert first.json()["source"] == "steam"
+    assert first.json()["external_id"] == "1091500"
+    assert db_session.query(WishlistItem).filter_by(user_id=owner.id, source="steam", external_id="1091500").count() == 1
+
+
 @pytest.mark.parametrize("endpoint", ["favorites", "wishlist"])
 def test_catalog_collection_fetch_persists_and_is_idempotent(
     api_client, db_session, user_factory, auth_as, app_main, monkeypatch, endpoint

@@ -136,6 +136,48 @@ async def fetch_steam_store_game_price(title: str, country: str = "US") -> dict[
     }
 
 
+async def fetch_steam_store_game_detail(appid: int, country: str = "US") -> dict[str, Any]:
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                f"{STEAM_STORE_BASE_URL}/api/appdetails",
+                params={"appids": appid, "cc": country, "l": "english"},
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Steam Store request failed") from exc
+
+    data = (response.json().get(str(appid)) or {}).get("data") or {}
+    if not data:
+        raise HTTPException(status_code=404, detail="Steam game not found")
+
+    overview = data.get("price_overview") or {}
+    price = _money_from_steam_cents(overview.get("final"), overview.get("currency"))
+    regular = _money_from_steam_cents(overview.get("initial"), overview.get("currency"))
+    url = f"{STEAM_STORE_BASE_URL}/app/{appid}/"
+    return {
+        "appid": appid,
+        "itad_id": f"steam:{appid}",
+        "title": data.get("name") or str(appid),
+        "name": data.get("name") or str(appid),
+        "background_image": data.get("header_image"),
+        "description_raw": data.get("short_description"),
+        "genres": [genre["description"] for genre in data.get("genres") or [] if genre.get("description")],
+        "platforms": [name for name, enabled in (data.get("platforms") or {}).items() if enabled] or ["PC"],
+        "released": (data.get("release_date") or {}).get("date") or None,
+        "rating": (data.get("metacritic") or {}).get("score"),
+        "url": url,
+        "current": {
+            "shop": "Steam", "price": price,
+            "regular": regular if regular != price else None,
+            "cut": int(overview.get("discount_percent") or 0),
+            "url": url, "timestamp": None,
+        } if price else None,
+        "history_low_all": None, "history_low_1y": None,
+        "history_low_3m": None, "deals": [], "history": [],
+    }
+
+
 async def fetch_steam_store_game_genres(appids: list[int], country: str = "US") -> dict[int, list[str]]:
     """Return Steam storefront genres for the supplied app IDs without failing a deals page."""
     ids = list(dict.fromkeys(appid for appid in appids if appid > 0))
