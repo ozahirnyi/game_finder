@@ -433,6 +433,7 @@ class SteamStoreGameDetail(BaseModel):
     platforms: list[str] = Field(default_factory=lambda: ["PC"])
     released: str | None = None
     rating: float | None = None
+    catalog_game_id: int | None = None
     current: PriceDeal | None = None
     url: str | None = None
 

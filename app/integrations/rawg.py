@@ -169,7 +169,7 @@ async def fetch_rawg_game_detail(rawg_id: int) -> dict[str, Any]:
         "released": data.get("released"),
         "background_image": data.get("background_image"),
         "description_raw": data.get("description_raw"),
-        "rating": data.get("rating"),
+        "rating": data.get("metacritic") or data.get("rating"),
         "genres": [genre.get("name") for genre in data.get("genres", []) if genre.get("name")],
         "platforms": [
             item.get("platform", {}).get("name")
@@ -177,3 +177,19 @@ async def fetch_rawg_game_detail(rawg_id: int) -> dict[str, Any]:
             if item.get("platform", {}).get("name")
         ],
     }
+
+
+async def fetch_rawg_game_stores(rawg_id: int) -> list[str]:
+    if not RAWG_API_KEY:
+        raise RAWGError("RAWG_API_KEY is missing")
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(RAWG_TIMEOUT_SECONDS)) as client:
+            response = await client.get(f"{RAWG_BASE_URL}/games/{rawg_id}/stores", params={"key": RAWG_API_KEY})
+            response.raise_for_status()
+    except httpx.TimeoutException as exc:
+        raise RAWGError("RAWG request timeout", status_code=504) from exc
+    except httpx.RequestError as exc:
+        raise RAWGError("RAWG connection error", status_code=502) from exc
+    except httpx.HTTPStatusError as exc:
+        raise RAWGError(f"RAWG HTTP error: {exc.response.status_code}", status_code=502) from exc
+    return [str(store.get("url") or "") for store in response.json().get("results", [])]
