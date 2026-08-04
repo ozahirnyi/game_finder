@@ -11,22 +11,24 @@ async def run_cached(_key, _ttl, fetch):
 
 
 def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_main, monkeypatch):
-    fetch_steam = AsyncMock(return_value=[{
-        "steam_appid": 1145360,
+    fetch_igdb = AsyncMock(return_value={"results": [{
+        "id": 999,
         "name": "Hades",
+        "released": "2020-09-17",
         "background_image": "https://img.test/hades.jpg",
-        "url": "https://store.test/hades",
-    }])
+        "steam_appid": 1145360,
+    }]})
     cached = AsyncMock(side_effect=run_cached)
-    monkeypatch.setattr(app_main, "fetch_steam_store_search", fetch_steam)
+    monkeypatch.setattr(app_main, "fetch_igdb_games", fetch_igdb)
     monkeypatch.setattr(app_main, "get_json_cached", cached)
 
     response = api_client.get("/search/games", params={"q": "  HADES  ", "page": 2})
 
     assert response.status_code == 200
     assert response.json()["results"][0]["name"] == "Hades"
-    assert response.json()["results"][0]["source"] == "steam"
-    fetch_steam.assert_awaited_once_with("hades", page_size=20)
+    assert response.json()["results"][0]["id"] == 999
+    assert "source" not in response.json()["results"][0]
+    fetch_igdb.assert_awaited_once_with("hades", page=2)
     assert cached.await_count == 1
 
 
@@ -36,18 +38,18 @@ def test_search_games_rejects_invalid_query_or_page(api_client, params):
     assert response.status_code == 400
 
 
-def test_search_games_maps_steam_store_error(api_client, app_main, monkeypatch):
+def test_search_games_maps_igdb_error(api_client, app_main, monkeypatch):
     monkeypatch.setattr(
         app_main,
-        "fetch_steam_store_search",
-        AsyncMock(side_effect=HTTPException(502, "Steam Store request failed")),
+        "fetch_igdb_games",
+        AsyncMock(side_effect=app_main.IGDBError("IGDB request failed", 502)),
     )
     monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
 
     response = api_client.get("/search/games", params={"q": "hades"})
 
     assert response.status_code == 502
-    assert response.json()["detail"] == "Steam Store request failed"
+    assert response.json()["detail"] == "IGDB request failed"
 
 
 def test_catalog_detail_normalizes_response(api_client, app_main, monkeypatch):

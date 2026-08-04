@@ -2482,24 +2482,15 @@ async def search(request: Request, q: str, page: int = 1):
         raise HTTPException(status_code=400, detail="q cannot be empty")
     if page < 1:
         raise HTTPException(status_code=400, detail="page must be >= 1")
-    steam_key = build_cache_key("steam_store_search", q=q, page=page)
+    key = build_cache_key("igdb_search", q=q, page=page)
 
-    async def fetch_steam():
-        games = await fetch_steam_store_search(q, page_size=20)
-        return {"results": [
-            {
-                "id": None,
-                "name": game["name"],
-                "released": None,
-                "background_image": game.get("background_image"),
-                "source": "steam",
-                "steam_appid": game["steam_appid"],
-                "url": game["url"],
-            }
-            for game in games
-        ]}
+    async def fetch():
+        return await fetch_igdb_games(q, page=page)
 
-    return JSONResponse(content=await get_json_cached(steam_key, CACHE_TTL, fetch_steam))
+    try:
+        return JSONResponse(content=await get_json_cached(key, CACHE_TTL, fetch))
+    except IGDBError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
 
 @app.get("/catalog/games/{igdb_id}", response_model=GameCatalogDetail)
