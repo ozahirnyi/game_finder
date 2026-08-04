@@ -2502,7 +2502,7 @@ async def search(request: Request, q: str, page: int = 1):
     if page < 1:
         raise HTTPException(status_code=400, detail="page must be >= 1")
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search", q=catalog_query, page=page)
+    key = build_cache_key("igdb_search_v2", q=catalog_query, page=page)
 
     async def fetch():
         payload = await fetch_igdb_games(catalog_query, page=page)
