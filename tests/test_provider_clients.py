@@ -127,6 +127,17 @@ async def test_steam_store_game_detail_uses_app_id_without_title_search(monkeypa
 
 
 @pytest.mark.anyio
+async def test_rawg_game_stores_returns_urls_and_maps_provider_errors(monkeypatch):
+    monkeypatch.setattr(rawg, "RAWG_API_KEY", "key")
+    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"results": [{"url": "https://store.steampowered.com/app/1091500/"}]})))
+    assert await rawg.fetch_rawg_game_stores(1) == ["https://store.steampowered.com/app/1091500/"]
+
+    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({}, status_code=503)))
+    with pytest.raises(rawg.RAWGError, match="503"):
+        await rawg.fetch_rawg_game_stores(1)
+
+
+@pytest.mark.anyio
 async def test_itad_http_errors_map_to_http_exception(monkeypatch):
     monkeypatch.setenv("ITAD_API_KEY", "key")
     monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"detail": "bad key"}, 401)))

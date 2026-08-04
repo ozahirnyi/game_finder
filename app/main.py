@@ -2,6 +2,7 @@ import asyncio
 import os
 import uuid
 import contextlib
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
@@ -23,6 +24,7 @@ from app.integrations.rawg import (
     fetch_rawg_games,
     fetch_rawg_trending_games,
     fetch_rawg_upcoming_games,
+    fetch_rawg_game_stores,
     RAWGError,
 )
 from app.prices import fetch_game_price_history
@@ -2610,7 +2612,29 @@ async def resolve_steam_game(title: str, country: str = "US"):
 async def get_steam_game(appid: int, country: str = "US"):
     if appid < 1:
         raise HTTPException(status_code=400, detail="appid must be >= 1")
-    return await fetch_steam_store_game_detail(appid, country=country.strip().upper())
+    steam_detail = await fetch_steam_store_game_detail(appid, country=country.strip().upper())
+    try:
+        candidates = await fetch_rawg_games(steam_detail["name"])
+        for candidate in candidates.get("results", [])[:10]:
+            rawg_id = candidate.get("id")
+            if not rawg_id:
+                continue
+            stores = await fetch_rawg_game_stores(rawg_id)
+            if not any(re.search(rf"store\.steampowered\.com/app/{appid}(?:/|$)", url) for url in stores):
+                continue
+            catalog = await fetch_rawg_game_detail(rawg_id)
+            steam_detail.update({
+                "catalog_game_id": rawg_id,
+                "released": catalog.get("released") or steam_detail.get("released"),
+                "rating": catalog.get("rating") or steam_detail.get("rating"),
+                "genres": catalog.get("genres") or steam_detail.get("genres"),
+                "platforms": catalog.get("platforms") or steam_detail.get("platforms"),
+                "description_raw": catalog.get("description_raw") or steam_detail.get("description_raw"),
+            })
+            break
+    except RAWGError:
+        pass
+    return steam_detail
 
 
 @app.get("/prices/deals", response_model=HomeDealResponse)

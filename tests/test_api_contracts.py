@@ -35,6 +35,7 @@ def test_steam_game_routes_use_app_id(monkeypatch):
 
     monkeypatch.setattr(main, "fetch_steam_store_game_detail", fake_detail)
     monkeypatch.setattr(main, "fetch_game_price_history", fake_history)
+    monkeypatch.setattr(main, "fetch_rawg_games", lambda _title: asyncio.sleep(0, result={"results": []}))
 
     detail = client.get("/steam/games/1091500?country=UA")
     history = client.get("/prices/steam-games/1091500?country=UA")
@@ -45,6 +46,48 @@ def test_steam_game_routes_use_app_id(monkeypatch):
     assert history.json()["itad_id"] == "itad-1091500"
     assert client.get("/steam/games/0").status_code == 400
     assert client.get("/prices/steam-games/0").status_code == 400
+
+
+def test_steam_detail_enriches_only_verified_rawg_store_match(monkeypatch):
+    async def steam_detail(appid: int, country: str = "US"):
+        return {"appid": appid, "name": "Example Game", "genres": ["Action"], "platforms": ["Windows"], "released": None, "rating": None, "deals": [], "history": []}
+
+    async def candidates(_title: str):
+        return {"results": [{"id": 1, "name": "Example Game"}, {"id": 2, "name": "Example Game Deluxe"}]}
+
+    async def stores(rawg_id: int):
+        return ["https://store.steampowered.com/app/999/other-game/" if rawg_id == 1 else "https://store.steampowered.com/app/1091500/example-game/"]
+
+    async def detail(rawg_id: int):
+        assert rawg_id == 2
+        return {"id": 2, "released": "2020-01-01", "rating": 90, "genres": ["RPG"], "platforms": ["PC", "PlayStation 5"]}
+
+    monkeypatch.setattr(main, "fetch_steam_store_game_detail", steam_detail)
+    monkeypatch.setattr(main, "fetch_rawg_games", candidates)
+    monkeypatch.setattr(main, "fetch_rawg_game_stores", stores)
+    monkeypatch.setattr(main, "fetch_rawg_game_detail", detail)
+
+    response = client.get("/steam/games/1091500")
+
+    assert response.status_code == 200
+    assert response.json()["rating"] == 90
+    assert response.json()["platforms"] == ["PC", "PlayStation 5"]
+
+
+def test_steam_detail_keeps_steam_metadata_when_rawg_is_unavailable(monkeypatch):
+    async def steam_detail(appid: int, country: str = "US"):
+        return {"appid": appid, "name": "Example Game", "genres": ["Action"], "platforms": ["Windows"], "released": "2020", "rating": 80, "deals": [], "history": []}
+
+    async def unavailable(_title: str):
+        raise main.RAWGError("offline")
+
+    monkeypatch.setattr(main, "fetch_steam_store_game_detail", steam_detail)
+    monkeypatch.setattr(main, "fetch_rawg_games", unavailable)
+
+    response = client.get("/steam/games/1091500")
+
+    assert response.status_code == 200
+    assert response.json()["platforms"] == ["Windows"]
 
 
 def test_search_uses_steam_without_waiting_for_unavailable_rawg(monkeypatch):
