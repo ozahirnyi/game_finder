@@ -53,6 +53,28 @@ async def test_igdb_oauth_token_is_cached(monkeypatch):
     monkeypatch.setenv("IGDB_CLIENT_SECRET", "secret")
     monkeypatch.setattr(client.httpx, "AsyncClient", lambda **_: Http())
     assert await client._access_token() == ("client", "token")
+
+
+@pytest.mark.anyio
+async def test_igdb_oauth_rejects_missing_token_and_empty_detail(monkeypatch):
+    import app.integrations.igdb as client
+    class Response:
+        def raise_for_status(self): pass
+        def json(self): return {}
+    class Http:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *_): pass
+        async def post(self, *_args, **_kwargs): return Response()
+    client._token = None
+    monkeypatch.setenv("IGDB_CLIENT_ID", "client")
+    monkeypatch.setenv("IGDB_CLIENT_SECRET", "secret")
+    monkeypatch.setattr(client.httpx, "AsyncClient", lambda **_: Http())
+    with pytest.raises(client.IGDBError, match="access token"):
+        await client._access_token()
+    async def empty(*_): return []
+    monkeypatch.setattr(client, "_query", empty)
+    with pytest.raises(client.IGDBError, match="not found"):
+        await client.fetch_igdb_game_detail(1)
     assert await client._access_token() == ("client", "token")
 
 
