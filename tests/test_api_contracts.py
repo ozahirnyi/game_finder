@@ -82,38 +82,33 @@ def test_steam_detail_keeps_steam_metadata_when_igdb_is_unavailable(monkeypatch)
     assert response.json()["platforms"] == ["Windows"]
 
 
-def test_search_uses_steam_without_waiting_for_unavailable_igdb(monkeypatch):
+def test_search_uses_igdb_catalog_results(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
 
-    async def fake_igdb(*_args, **_kwargs):
-        raise AssertionError("catalog search must not delay Steam search")
-
-    async def fake_steam(query, page_size):
+    async def fake_igdb(query, *, page):
         assert query == "hades"
-        assert page_size == 20
-        return [{
-            "steam_appid": 1145360,
+        assert page == 1
+        return {"results": [{
+            "id": 3498,
             "name": "Hades",
+            "released": "2020-09-17",
             "background_image": "https://cdn.example/hades.jpg",
-            "url": "https://store.steampowered.com/app/1145360/",
-        }]
+            "steam_appid": 1145360,
+        }]}
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_igdb_games", fake_igdb)
-    monkeypatch.setattr(main, "fetch_steam_store_search", fake_steam)
 
     response = client.get("/search/games?q=Hades")
 
     assert response.status_code == 200
     assert response.json() == {"results": [{
-        "id": None,
+        "id": 3498,
         "name": "Hades",
-        "released": None,
+        "released": "2020-09-17",
         "background_image": "https://cdn.example/hades.jpg",
-        "source": "steam",
         "steam_appid": 1145360,
-        "url": "https://store.steampowered.com/app/1145360/",
     }]}
 
 
