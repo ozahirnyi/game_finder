@@ -52,6 +52,8 @@ async def test_igdb_oauth_token_is_cached(monkeypatch):
     monkeypatch.setenv("IGDB_CLIENT_ID", "client")
     monkeypatch.setenv("IGDB_CLIENT_SECRET", "secret")
     monkeypatch.setattr(client.httpx, "AsyncClient", lambda **_: Http())
+    assert await client._access_token() == ("client", "token")
+    assert await client._access_token() == ("client", "token")
 
 
 @pytest.mark.anyio
