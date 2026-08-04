@@ -156,7 +156,7 @@ export type DashboardBlock<T> = {
   message?: string | null;
 };
 export type DashboardRecommendation = RecommendationItem & {
-  rawg_id?: number | null;
+  igdb_id?: number | null;
   cover_url?: string | null;
 };
 export type Dashboard = { recommendations: DashboardBlock<{ recommendations: DashboardRecommendation[] }> };

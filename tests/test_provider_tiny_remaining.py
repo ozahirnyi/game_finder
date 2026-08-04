@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from openpyxl import Workbook
 
 from app import google_auth, prices, psn_export, telegram
-from app.integrations import rawg
+from app.integrations import igdb
 
 
 class FakeResponse:
@@ -52,13 +52,13 @@ class FakeAsyncClient:
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("error", [httpx.TimeoutException("timeout"), httpx.RequestError("offline")])
-async def test_rawg_detail_retries_then_maps_provider_errors(monkeypatch, error):
-    monkeypatch.setattr(rawg, "RAWG_API_KEY", "key")
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(error=error))
-    monkeypatch.setattr(rawg.asyncio, "sleep", lambda *_: _completed())
+async def test_igdb_detail_retries_then_maps_provider_errors(monkeypatch, error):
+    monkeypatch.setattr(igdb, "IGDB_API_KEY", "key")
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(error=error))
+    monkeypatch.setattr(igdb.asyncio, "sleep", lambda *_: _completed())
 
-    with pytest.raises(rawg.RAWGError) as exc:
-        await rawg.fetch_rawg_game_detail(7)
+    with pytest.raises(igdb.IGDBError) as exc:
+        await igdb.fetch_igdb_game_detail(7)
     assert exc.value.status_code == (504 if isinstance(error, httpx.TimeoutException) else 502)
 
 
@@ -67,11 +67,11 @@ async def _completed():
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("function", [rawg.fetch_rawg_upcoming_games, rawg.fetch_rawg_trending_games])
-async def test_rawg_list_maps_http_status_error(monkeypatch, function):
-    monkeypatch.setattr(rawg, "RAWG_API_KEY", "key")
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(get_result=FakeResponse({}, 503)))
-    with pytest.raises(rawg.RAWGError, match="503") as exc:
+@pytest.mark.parametrize("function", [igdb.fetch_igdb_upcoming_games, igdb.fetch_igdb_trending_games])
+async def test_igdb_list_maps_http_status_error(monkeypatch, function):
+    monkeypatch.setattr(igdb, "IGDB_API_KEY", "key")
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(get_result=FakeResponse({}, 503)))
+    with pytest.raises(igdb.IGDBError, match="503") as exc:
         await function()
     assert exc.value.status_code == 502
 

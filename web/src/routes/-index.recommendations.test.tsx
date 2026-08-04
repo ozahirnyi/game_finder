@@ -92,7 +92,7 @@ describe("Home recommendations", () => {
               title: "Eligible",
               reason: "Fast action",
               tags: ["Action"],
-              rawg_id: 123,
+              igdb_id: 123,
               cover_url: null,
             },
           ],
@@ -110,7 +110,7 @@ describe("Home recommendations", () => {
   it("opens an unenriched recommendation through its exact title", async () => {
     api.getAuthSnapshot.mockReturnValue(true);
     api.getDashboard.mockResolvedValue({
-      recommendations: { status: "ready", data: { recommendations: [{ title: "Unknown title", reason: "Fits", tags: [], rawg_id: null, cover_url: null }] } },
+      recommendations: { status: "ready", data: { recommendations: [{ title: "Unknown title", reason: "Fits", tags: [], igdb_id: null, cover_url: null }] } },
     });
 
     renderHome();

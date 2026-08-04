@@ -3,7 +3,7 @@ import pytest
 from fastapi import HTTPException
 
 from app import google_auth, prices
-from app.integrations import rawg
+from app.integrations import igdb
 
 
 class Response:
@@ -104,36 +104,36 @@ async def test_google_verify_maps_jwks_http_and_jwt_errors(monkeypatch):
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("function", [rawg.fetch_rawg_games, rawg.fetch_rawg_upcoming_games, rawg.fetch_rawg_trending_games, rawg.fetch_rawg_game_detail])
-async def test_rawg_functions_require_api_key(monkeypatch, function):
-    monkeypatch.setattr(rawg, "RAWG_API_KEY", None)
-    with pytest.raises(rawg.RAWGError, match="missing"):
-        if function is rawg.fetch_rawg_games:
+@pytest.mark.parametrize("function", [igdb.fetch_igdb_games, igdb.fetch_igdb_upcoming_games, igdb.fetch_igdb_trending_games, igdb.fetch_igdb_game_detail])
+async def test_igdb_functions_require_api_key(monkeypatch, function):
+    monkeypatch.setattr(igdb, "IGDB_API_KEY", None)
+    with pytest.raises(igdb.IGDBError, match="missing"):
+        if function is igdb.fetch_igdb_games:
             await function("game")
-        elif function is rawg.fetch_rawg_game_detail:
+        elif function is igdb.fetch_igdb_game_detail:
             await function(1)
         else:
             await function()
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("function", [rawg.fetch_rawg_upcoming_games, rawg.fetch_rawg_trending_games])
+@pytest.mark.parametrize("function", [igdb.fetch_igdb_upcoming_games, igdb.fetch_igdb_trending_games])
 @pytest.mark.parametrize("error", [httpx.TimeoutException("timeout"), httpx.RequestError("request")])
-async def test_rawg_list_errors(monkeypatch, function, error):
-    monkeypatch.setattr(rawg, "RAWG_API_KEY", "key")
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: AsyncClient(error=error))
-    with pytest.raises(rawg.RAWGError) as exc:
+async def test_igdb_list_errors(monkeypatch, function, error):
+    monkeypatch.setattr(igdb, "IGDB_API_KEY", "key")
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: AsyncClient(error=error))
+    with pytest.raises(igdb.IGDBError) as exc:
         await function()
     assert exc.value.status_code in {502, 504}
 
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("status,expected", [(404, 404), (500, 502)])
-async def test_rawg_detail_http_status(monkeypatch, status, expected):
-    monkeypatch.setattr(rawg, "RAWG_API_KEY", "key")
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: AsyncClient(get_result=Response(status_code=status)))
-    with pytest.raises(rawg.RAWGError) as exc:
-        await rawg.fetch_rawg_game_detail(1)
+async def test_igdb_detail_http_status(monkeypatch, status, expected):
+    monkeypatch.setattr(igdb, "IGDB_API_KEY", "key")
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: AsyncClient(get_result=Response(status_code=status)))
+    with pytest.raises(igdb.IGDBError) as exc:
+        await igdb.fetch_igdb_game_detail(1)
     assert exc.value.status_code == expected
 
 

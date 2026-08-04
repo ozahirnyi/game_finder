@@ -4,7 +4,7 @@ import httpx
 import pytest
 from fastapi import HTTPException
 
-from app.integrations import rawg
+from app.integrations import igdb
 from app import prices, steam, steam_store, telegram
 
 
@@ -50,37 +50,37 @@ class FakeAsyncClient:
 
 
 @pytest.mark.anyio
-async def test_rawg_search_normalizes_results(monkeypatch):
-    monkeypatch.setattr(rawg, "RAWG_API_KEY", "key")
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(
+async def test_igdb_search_normalizes_results(monkeypatch):
+    monkeypatch.setattr(igdb, "IGDB_API_KEY", "key")
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(
         response=FakeResponse({"results": [{"id": 1, "name": "Game", "genres": [{"name": "RPG"}, {}]}]})
     ))
 
-    assert await rawg.fetch_rawg_games("game") == {
-        "results": [{"id": 1, "name": "Game", "released": None, "background_image": None, "genres": ["RPG"]}]
+    assert await igdb.fetch_igdb_games("game") == {
+        "results": [{"id": 1, "name": "Game", "released": None, "background_image": None, "description_raw": None, "rating": None, "genres": ["RPG"], "platforms": [], "steam_appid": None}]
     }
 
 
 @pytest.mark.parametrize("error,status", [("timeout", 504), ("request", 502), (None, 502)])
 @pytest.mark.anyio
-async def test_rawg_errors_map_to_rawg_error(monkeypatch, error, status):
-    monkeypatch.setattr(rawg, "RAWG_API_KEY", "key")
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse(status_code=500, error=error)))
+async def test_igdb_errors_map_to_igdb_error(monkeypatch, error, status):
+    monkeypatch.setattr(igdb, "IGDB_API_KEY", "key")
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse(status_code=500, error=error)))
 
-    with pytest.raises(rawg.RAWGError) as exc:
-        await rawg.fetch_rawg_games("game")
+    with pytest.raises(igdb.IGDBError) as exc:
+        await igdb.fetch_igdb_games("game")
     assert exc.value.status_code == status
 
 
 @pytest.mark.anyio
-async def test_rawg_detail_upcoming_and_trending_happy_paths(monkeypatch):
-    monkeypatch.setattr(rawg, "RAWG_API_KEY", "key")
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"id": 1, "name": "Game", "genres": [{"name": "RPG"}], "platforms": [{"platform": {"name": "PC"}}]})))
-    assert (await rawg.fetch_rawg_game_detail(1))["platforms"] == ["PC"]
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"results": [{"id": 2, "name": "Soon"}]})))
-    assert (await rawg.fetch_rawg_upcoming_games())["results"][0]["name"] == "Soon"
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"results": [{"id": 3, "name": "Hot"}]})))
-    assert (await rawg.fetch_rawg_trending_games())["results"][0]["name"] == "Hot"
+async def test_igdb_detail_upcoming_and_trending_happy_paths(monkeypatch):
+    monkeypatch.setattr(igdb, "IGDB_API_KEY", "key")
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"id": 1, "name": "Game", "genres": [{"name": "RPG"}], "platforms": [{"platform": {"name": "PC"}}]})))
+    assert (await igdb.fetch_igdb_game_detail(1))["platforms"] == ["PC"]
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"results": [{"id": 2, "name": "Soon"}]})))
+    assert (await igdb.fetch_igdb_upcoming_games())["results"][0]["name"] == "Soon"
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"results": [{"id": 3, "name": "Hot"}]})))
+    assert (await igdb.fetch_igdb_trending_games())["results"][0]["name"] == "Hot"
 
 
 @pytest.mark.anyio
@@ -127,14 +127,14 @@ async def test_steam_store_game_detail_uses_app_id_without_title_search(monkeypa
 
 
 @pytest.mark.anyio
-async def test_rawg_game_stores_returns_urls_and_maps_provider_errors(monkeypatch):
-    monkeypatch.setattr(rawg, "RAWG_API_KEY", "key")
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"results": [{"url": "https://store.steampowered.com/app/1091500/"}]})))
-    assert await rawg.fetch_rawg_game_stores(1) == ["https://store.steampowered.com/app/1091500/"]
+async def test_igdb_game_stores_returns_urls_and_maps_provider_errors(monkeypatch):
+    monkeypatch.setattr(igdb, "IGDB_API_KEY", "key")
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"results": [{"url": "https://store.steampowered.com/app/1091500/"}]})))
+    assert await igdb.fetch_igdb_game_stores(1) == ["https://store.steampowered.com/app/1091500/"]
 
-    monkeypatch.setattr(rawg.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({}, status_code=503)))
-    with pytest.raises(rawg.RAWGError, match="503"):
-        await rawg.fetch_rawg_game_stores(1)
+    monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({}, status_code=503)))
+    with pytest.raises(igdb.IGDBError, match="503"):
+        await igdb.fetch_igdb_game_stores(1)
 
 
 @pytest.mark.anyio

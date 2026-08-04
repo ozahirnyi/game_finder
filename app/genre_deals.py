@@ -1,7 +1,7 @@
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from app.integrations.rawg import RAWGError
+from app.integrations.igdb import IGDBError
 
 
 DEFAULT_DEAL_GENRES = ("Action", "RPG", "Adventure", "Strategy", "Indie")
@@ -29,19 +29,19 @@ def select_deal_genres(favorite_genres: list[str] | None) -> list[str]:
 
 async def _enrich_deal(
     deal: dict[str, Any],
-    fetch_rawg_games: Callable[[str, int], Awaitable[dict[str, Any]]],
+    fetch_igdb_games: Callable[[str, int], Awaitable[dict[str, Any]]],
 ) -> tuple[dict[str, Any], set[str], bool]:
-    rawg_failed = False
+    igdb_failed = False
     try:
-        rawg = await fetch_rawg_games(deal["name"], 1)
-        results = [game for game in rawg.get("results", []) if game.get("id")]
+        igdb = await fetch_igdb_games(deal["name"], 1)
+        results = [game for game in igdb.get("results", []) if game.get("id")]
         match = next(
             (game for game in results if normalize_genre(game.get("name") or "") == normalize_genre(deal["name"])),
             results[0] if results else None,
         )
-    except RAWGError:
+    except IGDBError:
         match = None
-        rawg_failed = True
+        igdb_failed = True
     item = {
         "id": match.get("id") if match else None,
         "steam_appid": deal["steam_appid"],
@@ -52,7 +52,7 @@ async def _enrich_deal(
         "current": deal.get("current"),
         "history_low_all": deal.get("history_low_all"),
     }
-    return item, {normalize_genre(genre) for genre in (match or {}).get("genres", [])}, rawg_failed
+    return item, {normalize_genre(genre) for genre in (match or {}).get("genres", [])}, igdb_failed
 
 
 def _unenriched_deal(deal: dict[str, Any]) -> tuple[dict[str, Any], set[str]]:
@@ -96,49 +96,49 @@ async def build_genre_deal_groups(
     country: str,
     favorite_genres: list[str] | None,
     fetch_candidates: Callable[[str], Awaitable[dict[str, list[dict[str, Any]]]]],
-    fetch_rawg_games: Callable[[str, int], Awaitable[dict[str, Any]]],
+    fetch_igdb_games: Callable[[str, int], Awaitable[dict[str, Any]]],
     fetch_steam_genres: Callable[[list[int], str], Awaitable[dict[int, list[str]]]] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     selected_genres = select_deal_genres(favorite_genres)
     candidates = await fetch_candidates(country)
-    rawg_by_appid: dict[int, tuple[dict[str, Any], set[str]]] = {}
-    rawg_unavailable = False
+    igdb_by_appid: dict[int, tuple[dict[str, Any], set[str]]] = {}
+    igdb_unavailable = False
     for deal in candidates["candidates"]:
-        if rawg_unavailable:
-            rawg_by_appid[deal["steam_appid"]] = _unenriched_deal(deal)
+        if igdb_unavailable:
+            igdb_by_appid[deal["steam_appid"]] = _unenriched_deal(deal)
             continue
-        item, item_genres, rawg_failed = await _enrich_deal(deal, fetch_rawg_games)
-        rawg_by_appid[deal["steam_appid"]] = item, item_genres
-        rawg_unavailable = rawg_failed
+        item, item_genres, igdb_failed = await _enrich_deal(deal, fetch_igdb_games)
+        igdb_by_appid[deal["steam_appid"]] = item, item_genres
+        igdb_unavailable = igdb_failed
 
     if fetch_steam_genres:
-        missing_genres = [appid for appid, (_, genres) in rawg_by_appid.items() if not genres]
+        missing_genres = [appid for appid, (_, genres) in igdb_by_appid.items() if not genres]
         try:
             steam_genres = await fetch_steam_genres(missing_genres, country)
         except Exception:
             steam_genres = {}
         for appid, genres in steam_genres.items():
-            if appid in rawg_by_appid and genres:
-                item, _ = rawg_by_appid[appid]
-                rawg_by_appid[appid] = item, {normalize_genre(genre) for genre in genres}
+            if appid in igdb_by_appid and genres:
+                item, _ = igdb_by_appid[appid]
+                igdb_by_appid[appid] = item, {normalize_genre(genre) for genre in genres}
 
     popular = []
     for deal in candidates["popular"]:
-        enriched = rawg_by_appid.get(deal["steam_appid"])
+        enriched = igdb_by_appid.get(deal["steam_appid"])
         if enriched is None:
-            if rawg_unavailable:
+            if igdb_unavailable:
                 enriched = _unenriched_deal(deal)
             else:
-                item, item_genres, rawg_failed = await _enrich_deal(deal, fetch_rawg_games)
+                item, item_genres, igdb_failed = await _enrich_deal(deal, fetch_igdb_games)
                 enriched = item, item_genres
-                rawg_unavailable = rawg_failed
-            rawg_by_appid[deal["steam_appid"]] = enriched
+                igdb_unavailable = igdb_failed
+            igdb_by_appid[deal["steam_appid"]] = enriched
         popular.append(enriched[0])
-    genres = _fallback_genres(selected_genres, list(rawg_by_appid.values()))
+    genres = _fallback_genres(selected_genres, list(igdb_by_appid.values()))
     sections = [{"genre": genre, "results": []} for genre in genres]
     for section in sections:
         selected = normalize_genre(section["genre"])
-        for item, item_genres in rawg_by_appid.values():
+        for item, item_genres in igdb_by_appid.values():
             if selected in item_genres and len(section["results"]) < MAX_DEALS_PER_GENRE:
                 section["results"].append(item)
     return {"popular": popular, "sections": sections}
