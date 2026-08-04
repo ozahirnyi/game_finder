@@ -65,12 +65,12 @@ async def test_cached_recommendations_reuse_a_matching_user_library(monkeypatch)
 
 
 @pytest.mark.anyio
-async def test_normalize_recommendations_removes_owned_duplicates_and_adds_rawg_metadata(monkeypatch):
-    async def rawg(title, page=1):
+async def test_normalize_recommendations_removes_owned_duplicates_and_adds_igdb_metadata(monkeypatch):
+    async def igdb(title, page=1):
         assert title == "Hades II"
         return {"results": [{"id": 274755, "name": "Hades II", "background_image": "https://cdn.example/hades.jpg"}]}
 
-    monkeypatch.setattr(recommendations, "fetch_rawg_games", rawg)
+    monkeypatch.setattr(recommendations, "fetch_igdb_games", igdb)
     items = await recommendations.normalize_recommendations(
         {"recommendations": [
             {"title": "Rainbow Six Siege", "reason": "owned", "tags": []},
@@ -79,7 +79,7 @@ async def test_normalize_recommendations_removes_owned_duplicates_and_adds_rawg_
         ]},
         {"rainbow six siege"},
     )
-    assert items == [{"title": "Hades II", "reason": "good", "tags": [], "rawg_id": 274755, "cover_url": "https://cdn.example/hades.jpg"}]
+    assert items == [{"title": "Hades II", "reason": "good", "tags": [], "igdb_id": 274755, "cover_url": "https://cdn.example/hades.jpg"}]
 
 
 @pytest.mark.anyio
@@ -121,28 +121,28 @@ async def test_personal_recommendations_exclude_owned_and_saved_titles(monkeypat
 
 
 @pytest.mark.anyio
-async def test_personal_recommendations_add_rawg_id_for_exact_candidate_title(monkeypatch):
+async def test_personal_recommendations_add_igdb_id_for_exact_candidate_title(monkeypatch):
     async def cache_get(_key): return None
     async def cache_set(*_args): return None
     async def candidates():
         return {"candidates": [{"steam_appid": 3, "name": "Eligible", "background_image": "steam-cover"}]}
-    async def rawg(title, page=1):
+    async def igdb(title, page=1):
         assert (title, page) == ("Eligible", 1)
-        return {"results": [{"id": 77, "name": "eligible", "background_image": "rawg-cover"}]}
+        return {"results": [{"id": 77, "name": "eligible", "background_image": "igdb-cover"}]}
 
     monkeypatch.setattr(recommendations, "cache_get", cache_get)
     monkeypatch.setattr(recommendations, "cache_set", cache_set)
     monkeypatch.setattr(recommendations, "fetch_steam_store_deal_candidates", candidates)
-    monkeypatch.setattr(recommendations, "fetch_rawg_games", rawg)
+    monkeypatch.setattr(recommendations, "fetch_igdb_games", igdb)
 
     result = await recommendations.get_personalized_recommendations(User(uuid.uuid4()), [], [])
 
-    assert result["recommendations"][0]["rawg_id"] == 77
-    assert result["recommendations"][0]["cover_url"] == "rawg-cover"
+    assert result["recommendations"][0]["igdb_id"] == 77
+    assert result["recommendations"][0]["cover_url"] == "igdb-cover"
 
 
 @pytest.mark.anyio
-async def test_personal_recommendations_fall_back_to_non_owned_rawg_trends(monkeypatch):
+async def test_personal_recommendations_fall_back_to_non_owned_igdb_trends(monkeypatch):
     async def cache_get(_key): return None
     async def cache_set(*_args): return None
     async def candidates(): return {"candidates": []}
@@ -156,11 +156,11 @@ async def test_personal_recommendations_fall_back_to_non_owned_rawg_trends(monke
     monkeypatch.setattr(recommendations, "cache_get", cache_get)
     monkeypatch.setattr(recommendations, "cache_set", cache_set)
     monkeypatch.setattr(recommendations, "fetch_steam_store_deal_candidates", candidates)
-    monkeypatch.setattr(recommendations, "fetch_rawg_trending_games", trending)
+    monkeypatch.setattr(recommendations, "fetch_igdb_trending_games", trending)
 
     result = await recommendations.get_personalized_recommendations(User(uuid.uuid4()), [Saved("Saved")], [])
 
     assert result["recommendations"] == [{
         "title": "Top Game", "reason": "Popular game selected because personalized catalog is unavailable.",
-        "tags": [], "rawg_id": 2, "cover_url": "top-cover",
+        "tags": [], "igdb_id": 2, "cover_url": "top-cover",
     }]

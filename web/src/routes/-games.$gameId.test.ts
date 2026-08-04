@@ -59,7 +59,7 @@ describe("Steam library game loader", () => {
     });
   });
 
-  it("keeps a Steam price when no RAWG price history is requested", () => {
+  it("keeps a Steam price when no IGDB price history is requested", () => {
     expect(mergeGamePrice({ price: 25, originalPrice: 30, discount: 17, currency: "USD", store: "Steam" }, undefined)).toMatchObject({
       price: 25,
       originalPrice: 30,
@@ -94,9 +94,9 @@ describe("Steam library game loader", () => {
     );
   });
 
-  it("keeps a title-bearing recommendation on a detail page when RAWG is unavailable", async () => {
-    api.getCatalogGame.mockRejectedValue(new Error("RAWG timeout"));
-    api.searchGames.mockRejectedValue(new Error("RAWG timeout"));
+  it("keeps a title-bearing recommendation on a detail page when IGDB is unavailable", async () => {
+    api.getCatalogGame.mockRejectedValue(new Error("IGDB timeout"));
+    api.searchGames.mockRejectedValue(new Error("IGDB timeout"));
     api.getSteamGameByTitle.mockResolvedValue({ appid: 1145360, name: "Hades", background_image: "https://steam.example/hades.jpg", description_raw: "Escape the Underworld.", genres: ["Action"], platforms: ["PC"], current: { shop: "Steam", price: { amount: 25, currency: "USD" }, url: "https://store.steampowered.com/app/1145360/" } });
 
     const loader = Route.options.loader;

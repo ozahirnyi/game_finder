@@ -105,29 +105,29 @@ def test_wait_for_db_retries_then_succeeds(monkeypatch):
     assert engine.connect.call_count == 2
 
 
-def test_genre_deals_rawg_fallback_and_missing_popular_match():
+def test_genre_deals_igdb_fallback_and_missing_popular_match():
     async def candidates(_):
         return {"candidates": [{"steam_appid": 1, "name": "Deal", "current": 2}], "popular": [{"steam_appid": 2, "name": "Popular"}]}
 
-    async def rawg(name, _):
+    async def igdb(name, _):
         if name == "Deal":
             return {"results": []}
         return {"results": [{"id": 2, "name": "Other", "genres": ["Puzzle"]}]}
 
-    result = asyncio.run(genre_deals.build_genre_deal_groups("UA", [" action ", "ACTION", " ", "RPG"], candidates, rawg))
+    result = asyncio.run(genre_deals.build_genre_deal_groups("UA", [" action ", "ACTION", " ", "RPG"], candidates, igdb))
     assert result["popular"][0]["id"] == 2
     assert len(result["sections"]) == 5
 
 
-def test_genre_deals_keep_steam_navigation_and_use_steam_genres_when_rawg_is_down():
+def test_genre_deals_keep_steam_navigation_and_use_steam_genres_when_igdb_is_down():
     async def candidates(_):
         return {
             "candidates": [{"steam_appid": 10, "name": "Steam Deal", "current": {}}],
             "popular": [{"steam_appid": 10, "name": "Steam Deal", "current": {}}],
         }
 
-    async def rawg(_, __):
-        raise genre_deals.RAWGError("down")
+    async def igdb(_, __):
+        raise genre_deals.IGDBError("down")
 
     async def steam_genres(appids, country):
         assert (appids, country) == ([10], "US")
@@ -135,7 +135,7 @@ def test_genre_deals_keep_steam_navigation_and_use_steam_genres_when_rawg_is_dow
 
     result = asyncio.run(
         genre_deals.build_genre_deal_groups(
-            "US", ["Action"], candidates, rawg, steam_genres,
+            "US", ["Action"], candidates, igdb, steam_genres,
         )
     )
 
@@ -143,8 +143,8 @@ def test_genre_deals_keep_steam_navigation_and_use_steam_genres_when_rawg_is_dow
     assert result["sections"][0]["results"][0]["steam_appid"] == 10
 
 
-def test_genre_deals_stop_calling_rawg_after_the_first_outage():
-    rawg_calls = 0
+def test_genre_deals_stop_calling_igdb_after_the_first_outage():
+    igdb_calls = 0
 
     async def candidates(_):
         deals = [
@@ -153,19 +153,19 @@ def test_genre_deals_stop_calling_rawg_after_the_first_outage():
         ]
         return {"candidates": deals, "popular": deals}
 
-    async def rawg(_, __):
-        nonlocal rawg_calls
-        rawg_calls += 1
-        raise genre_deals.RAWGError("timeout")
+    async def igdb(_, __):
+        nonlocal igdb_calls
+        igdb_calls += 1
+        raise genre_deals.IGDBError("timeout")
 
     async def steam_genres(appids, _country):
         return {appid: ["Action"] for appid in appids}
 
     result = asyncio.run(
-        genre_deals.build_genre_deal_groups("US", ["Action"], candidates, rawg, steam_genres)
+        genre_deals.build_genre_deal_groups("US", ["Action"], candidates, igdb, steam_genres)
     )
 
-    assert rawg_calls == 1
+    assert igdb_calls == 1
     assert [item["steam_appid"] for item in result["sections"][0]["results"]] == [10, 20]
 
 

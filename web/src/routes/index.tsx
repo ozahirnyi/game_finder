@@ -175,7 +175,7 @@ function Home() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {recommendations.map((recommendation) => (
                 <RecommendationCard
-                  key={`${recommendation.rawg_id ?? recommendation.title}`}
+                  key={`${recommendation.igdb_id ?? recommendation.title}`}
                   recommendation={recommendation}
                 />
               ))}
@@ -373,7 +373,7 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
   return (
     <Link
       to="/games/$gameId"
-      params={{ gameId: String(recommendation.rawg_id ?? 0) }}
+      params={{ gameId: String(recommendation.igdb_id ?? 0) }}
       search={{ title: recommendation.title }}
       className="block h-full"
     >

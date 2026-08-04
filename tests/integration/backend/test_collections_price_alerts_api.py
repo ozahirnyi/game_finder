@@ -92,7 +92,7 @@ def test_catalog_collection_fetch_persists_and_is_idempotent(
 ):
     user = auth_as(user_factory(email=f"{endpoint}-catalog@example.com"))
     fetch = AsyncMock(return_value={"name": "Catalog Game", "background_image": "https://img.test/catalog.jpg"})
-    monkeypatch.setattr(app_main, "fetch_rawg_game_detail", fetch)
+    monkeypatch.setattr(app_main, "fetch_igdb_game_detail", fetch)
 
     first = api_client.post(f"/{endpoint}/catalog-games/303")
     second = api_client.post(f"/{endpoint}/catalog-games/303")

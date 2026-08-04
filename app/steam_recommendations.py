@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 
 from app.openai_client import get_recommendation
-from app.integrations.rawg import fetch_rawg_games, fetch_rawg_trending_games
+from app.integrations.igdb import fetch_igdb_games, fetch_igdb_trending_games
 from app.redis_client import cache_get, cache_set
 from app.steam_store import fetch_steam_store_deal_candidates
 
@@ -40,12 +40,12 @@ async def normalize_recommendations(result: dict, owned_titles: set[str]) -> lis
         if not title or key in owned_titles or key in seen:
             continue
         seen.add(key)
-        enriched = {"title": title, "reason": item.get("reason") or "", "tags": item.get("tags") or [], "rawg_id": None, "cover_url": None}
+        enriched = {"title": title, "reason": item.get("reason") or "", "tags": item.get("tags") or [], "igdb_id": None, "cover_url": None}
         try:
-            matches = await fetch_rawg_games(title, page=1)
+            matches = await fetch_igdb_games(title, page=1)
             match = next((game for game in matches.get("results", []) if str(game.get("name") or "").casefold() == key), None)
             if match:
-                enriched.update(title=match["name"], rawg_id=match.get("id"), cover_url=match.get("background_image"))
+                enriched.update(title=match["name"], igdb_id=match.get("id"), cover_url=match.get("background_image"))
         except Exception:
             pass
         normalized.append(enriched)
@@ -79,11 +79,11 @@ def _personal_fingerprint(user, saved_games: list, steam_games: list[dict]) -> s
 
 async def enrich_steam_candidate(candidate: dict) -> dict:
     title = str(candidate.get("name") or "").strip()
-    enriched = {**candidate, "rawg_id": None}
+    enriched = {**candidate, "igdb_id": None}
     if not title:
         return enriched
     try:
-        matches = await fetch_rawg_games(title, page=1)
+        matches = await fetch_igdb_games(title, page=1)
         match = next(
             (
                 game
@@ -93,7 +93,7 @@ async def enrich_steam_candidate(candidate: dict) -> dict:
             None,
         )
         if match:
-            enriched["rawg_id"] = match.get("id")
+            enriched["igdb_id"] = match.get("id")
             enriched["background_image"] = match.get("background_image") or candidate.get("background_image")
     except Exception:
         pass
@@ -119,11 +119,11 @@ async def get_personalized_recommendations(user, saved_games: list, steam_games:
     popular_fallback = False
     if not available:
         try:
-            trending = await fetch_rawg_trending_games(page=1, page_size=12)
+            trending = await fetch_igdb_trending_games(page=1, page_size=12)
             available = [
                 {
                     "name": game["name"],
-                    "rawg_id": game.get("id"),
+                    "igdb_id": game.get("id"),
                     "background_image": game.get("background_image"),
                 }
                 for game in trending.get("results", [])
@@ -140,7 +140,7 @@ async def get_personalized_recommendations(user, saved_games: list, steam_games:
         else await asyncio.gather(*(enrich_steam_candidate(candidate) for candidate in selected_candidates))
     )
     reason = "Popular game selected because personalized catalog is unavailable." if popular_fallback else "Available on Steam and selected from your library and profile signals."
-    result = {"recommendations": [{"title": candidate["name"], "reason": reason, "tags": [], "rawg_id": candidate.get("rawg_id"), "cover_url": candidate.get("background_image")} for candidate in selected], "cache_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=CACHE_TTL_SECONDS)).isoformat()}
+    result = {"recommendations": [{"title": candidate["name"], "reason": reason, "tags": [], "igdb_id": candidate.get("igdb_id"), "cover_url": candidate.get("background_image")} for candidate in selected], "cache_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=CACHE_TTL_SECONDS)).isoformat()}
     try:
         await cache_set(key, result, CACHE_TTL_SECONDS)
     except Exception:
