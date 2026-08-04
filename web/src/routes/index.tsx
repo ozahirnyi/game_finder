@@ -112,7 +112,10 @@ function Home() {
                     key={game.id ?? game.steam_appid}
                     to="/games/$gameId"
                     params={{ gameId: target.gameId }}
-                    search={{ title: game.name, ...(target.source ? { source: target.source } : {}) }}
+                    search={{
+                      title: game.name,
+                      ...(target.source ? { source: target.source } : {}),
+                    }}
                     className="flex items-center gap-3 border-b border-border px-4 py-3 text-sm font-semibold transition-colors last:border-b-0 hover:bg-surface-2"
                   >
                     {game.name}
@@ -245,7 +248,10 @@ function Home() {
               <Link
                 to="/games/$gameId"
                 params={{ gameId: bestTarget.gameId }}
-                search={{ title: best.name, ...(bestTarget.source ? { source: bestTarget.source } : {}) }}
+                search={{
+                  title: best.name,
+                  ...(bestTarget.source ? { source: bestTarget.source } : {}),
+                }}
                 className="block h-full"
               >
                 <FeaturedDeal deal={best} />

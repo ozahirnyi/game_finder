@@ -9,7 +9,19 @@ import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { createConversation, createGameInvite, createMessage, updateProfile } from "@/lib/api";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
-const GENRE_OPTIONS = ["Action", "Adventure", "RPG", "Strategy", "Indie", "Shooter", "Puzzle", "Simulation", "Sports", "Racing", "Horror"];
+const GENRE_OPTIONS = [
+  "Action",
+  "Adventure",
+  "RPG",
+  "Strategy",
+  "Indie",
+  "Shooter",
+  "Puzzle",
+  "Simulation",
+  "Sports",
+  "Racing",
+  "Horror",
+];
 const PLATFORM_OPTIONS = ["PC", "PlayStation", "Xbox", "Nintendo Switch", "Mobile"];
 
 function toggle(values: string[], value: string) {
@@ -54,7 +66,15 @@ export type ProfileData = {
   };
 };
 
-export function ProfileView({ profile, isSelf, initialComposer }: { profile: ProfileData; isSelf: boolean; initialComposer?: "message" | "invite" }) {
+export function ProfileView({
+  profile,
+  isSelf,
+  initialComposer,
+}: {
+  profile: ProfileData;
+  isSelf: boolean;
+  initialComposer?: "message" | "invite";
+}) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [displayName, setDisplayName] = useState(profile.settings?.displayName ?? profile.name);
   const [bio, setBio] = useState(profile.settings?.bio ?? profile.bio ?? "");
@@ -83,14 +103,20 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
       const conversation = await createConversation(profile.friendId);
       return createMessage(conversation.id, messageBody.trim());
     },
-    onSuccess: () => { setMessageBody(""); setMessageOpen(false); },
+    onSuccess: () => {
+      setMessageBody("");
+      setMessageOpen(false);
+    },
   });
   const sendInvite = useMutation({
     mutationFn: () => {
       if (!profile.friendId) throw new Error("Friend not available");
       return createGameInvite({ recipient_id: profile.friendId, game_name: gameName.trim() });
     },
-    onSuccess: () => { setGameName(""); setInviteOpen(false); },
+    onSuccess: () => {
+      setGameName("");
+      setInviteOpen(false);
+    },
   });
   const steam = profile.stores.find((s) => s.name === "Steam")?.count ?? 0;
   const psn = profile.stores.find((s) => s.name === "PlayStation")?.count ?? 0;
@@ -151,7 +177,10 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
             </>
           ) : (
             <>
-              <button onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">
+              <button
+                onClick={() => setInviteOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
+              >
                 <UserPlus className="size-4" /> Invite to play
               </button>
               <button
@@ -205,8 +234,18 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
                 className="mt-2 min-h-24 w-full rounded-lg border border-border bg-surface-2 px-3 py-2"
               />
             </label>
-            <PreferenceChips label="Favourite genres" options={GENRE_OPTIONS} selected={favoriteGenres} onToggle={(value) => setFavoriteGenres(toggle(favoriteGenres, value))} />
-            <PreferenceChips label="Platforms" options={PLATFORM_OPTIONS} selected={platforms} onToggle={(value) => setPlatforms(toggle(platforms, value))} />
+            <PreferenceChips
+              label="Favourite genres"
+              options={GENRE_OPTIONS}
+              selected={favoriteGenres}
+              onToggle={(value) => setFavoriteGenres(toggle(favoriteGenres, value))}
+            />
+            <PreferenceChips
+              label="Platforms"
+              options={PLATFORM_OPTIONS}
+              selected={platforms}
+              onToggle={(value) => setPlatforms(toggle(platforms, value))}
+            />
             <label className="mt-4 block text-sm font-semibold">
               Library visibility
               <select
@@ -245,26 +284,107 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
           </form>
         </div>
       )}
-      {!isSelf && messageOpen && typeof document !== "undefined" && createPortal(
-        <div role="dialog" aria-label={`Message ${profile.name}`} className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-          <form onSubmit={(event) => { event.preventDefault(); if (messageBody.trim()) sendMessage.mutate(); }} className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl">
-            <h2 className="text-xl font-bold">Message {profile.name}</h2>
-            <textarea aria-label="Message text" value={messageBody} onChange={(event) => setMessageBody(event.target.value)} required maxLength={2000} className="mt-4 min-h-28 w-full rounded-lg border border-border bg-surface-2 p-3" />
-            {sendMessage.isError && <p role="alert" className="mt-2 text-sm text-destructive">Could not send message.</p>}
-            <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setMessageOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold">Cancel</button><button type="submit" disabled={sendMessage.isPending} className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">Send</button></div>
-          </form>
-        </div>
-      , document.body)}
-      {!isSelf && inviteOpen && typeof document !== "undefined" && createPortal(
-        <div role="dialog" aria-label={`Invite ${profile.name}`} className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-          <form onSubmit={(event) => { event.preventDefault(); if (gameName.trim()) sendInvite.mutate(); }} className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl">
-            <h2 className="text-xl font-bold">Invite {profile.name} to play</h2>
-            <input aria-label="Game name" value={gameName} onChange={(event) => setGameName(event.target.value)} required maxLength={255} placeholder="Game name" className="mt-4 w-full rounded-lg border border-border bg-surface-2 p-3" />
-            {sendInvite.isError && <p role="alert" className="mt-2 text-sm text-destructive">Could not send invite.</p>}
-            <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setInviteOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold">Cancel</button><button type="submit" disabled={sendInvite.isPending} className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">Send invite</button></div>
-          </form>
-        </div>
-      , document.body)}
+      {!isSelf &&
+        messageOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-label={`Message ${profile.name}`}
+            className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+          >
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (messageBody.trim()) sendMessage.mutate();
+              }}
+              className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl"
+            >
+              <h2 className="text-xl font-bold">Message {profile.name}</h2>
+              <textarea
+                aria-label="Message text"
+                value={messageBody}
+                onChange={(event) => setMessageBody(event.target.value)}
+                required
+                maxLength={2000}
+                className="mt-4 min-h-28 w-full rounded-lg border border-border bg-surface-2 p-3"
+              />
+              {sendMessage.isError && (
+                <p role="alert" className="mt-2 text-sm text-destructive">
+                  Could not send message.
+                </p>
+              )}
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMessageOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendMessage.isPending}
+                  className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground"
+                >
+                  Send
+                </button>
+              </div>
+            </form>
+          </div>,
+          document.body,
+        )}
+      {!isSelf &&
+        inviteOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-label={`Invite ${profile.name}`}
+            className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+          >
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (gameName.trim()) sendInvite.mutate();
+              }}
+              className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl"
+            >
+              <h2 className="text-xl font-bold">Invite {profile.name} to play</h2>
+              <input
+                aria-label="Game name"
+                value={gameName}
+                onChange={(event) => setGameName(event.target.value)}
+                required
+                maxLength={255}
+                placeholder="Game name"
+                className="mt-4 w-full rounded-lg border border-border bg-surface-2 p-3"
+              />
+              {sendInvite.isError && (
+                <p role="alert" className="mt-2 text-sm text-destructive">
+                  Could not send invite.
+                </p>
+              )}
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInviteOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendInvite.isPending}
+                  className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground"
+                >
+                  Send invite
+                </button>
+              </div>
+            </form>
+          </div>,
+          document.body,
+        )}
 
       <div className="mb-8 flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl border border-border bg-surface-2 px-5 py-4">
         {[
@@ -376,7 +496,34 @@ export function ProfileView({ profile, isSelf, initialComposer }: { profile: Pro
   );
 }
 
-function PreferenceChips({ label, options, selected, onToggle }: { label: string; options: string[]; selected: string[]; onToggle: (value: string) => void }) {
+function PreferenceChips({
+  label,
+  options,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
   const values = [...options, ...selected.filter((value) => !options.includes(value))];
-  return <fieldset className="mt-4"><legend className="text-sm font-semibold">{label}</legend><div className="mt-2 flex flex-wrap gap-2">{values.map((value) => <button key={value} type="button" aria-pressed={selected.includes(value)} onClick={() => onToggle(value)} className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${selected.includes(value) ? "border-primary bg-primary/15 text-primary" : "border-border"}`}>{value}</button>)}</div></fieldset>;
+  return (
+    <fieldset className="mt-4">
+      <legend className="text-sm font-semibold">{label}</legend>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {values.map((value) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={selected.includes(value)}
+            onClick={() => onToggle(value)}
+            className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${selected.includes(value) ? "border-primary bg-primary/15 text-primary" : "border-border"}`}
+          >
+            {value}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
 }

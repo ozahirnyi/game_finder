@@ -1,8 +1,6 @@
 import asyncio
-import os
-import subprocess
-import sys
 import uuid
+import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -44,12 +42,13 @@ def test_auth_current_user_payload_and_not_found_paths(monkeypatch):
         auth.get_current_user("token", db)
 
 
-def test_auth_import_requires_secret_key():
-    env = os.environ.copy()
-    env["SECRET_KEY"] = ""
-    result = subprocess.run([sys.executable, "-c", "import app.auth"], env=env, capture_output=True, text=True)
-    assert result.returncode != 0
-    assert "SECRET_KEY is not set" in result.stderr
+def test_auth_import_requires_secret_key(monkeypatch):
+    original_secret = auth.SECRET_KEY
+    monkeypatch.setenv("SECRET_KEY", "")
+    with pytest.raises(RuntimeError, match="SECRET_KEY is not set"):
+        importlib.reload(auth)
+    monkeypatch.setenv("SECRET_KEY", original_secret)
+    importlib.reload(auth)
 
 
 def test_cache_hit_miss_and_redis_failure_paths(monkeypatch):
@@ -64,7 +63,11 @@ def test_cache_hit_miss_and_redis_failure_paths(monkeypatch):
         monkeypatch.setattr(cache, "cache_get", get)
         monkeypatch.setattr(cache, "cache_set", set_)
         assert await cache.get_json_cached("k", 10, fetch) == {"fresh": True}
-        set_.assert_awaited_once_with("k", {"fresh": True}, 10)
+        set_.assert_any_await("k", {"fresh": True}, 10)
+        set_.assert_any_await("k:stale", {"fresh": True}, 86400)
+        monkeypatch.setattr(cache, "cache_get", AsyncMock(side_effect=[None, {"stale": True}]))
+        unavailable = AsyncMock(side_effect=RuntimeError("provider unavailable"))
+        assert await cache.get_json_cached("k", 10, unavailable) == {"stale": True}
         redis_client.redis_client = None
         assert await redis_client.cache_get("k") is None
         await redis_client.cache_set("k", {"x": 1}, 2)

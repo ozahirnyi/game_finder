@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,9 +34,22 @@ import { Route } from "./index";
 
 function renderHome() {
   const root = createRootRoute({ component: Outlet });
-  const route = createRoute({ getParentRoute: () => root, path: "/", component: Route.options.component });
-  const router = createRouter({ routeTree: root.addChildren([route]), history: createMemoryHistory({ initialEntries: ["/"] }) });
-  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RouterProvider router={router} /></QueryClientProvider>);
+  const route = createRoute({
+    getParentRoute: () => root,
+    path: "/",
+    component: Route.options.component,
+  });
+  const router = createRouter({
+    routeTree: root.addChildren([route]),
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 beforeEach(() => {
@@ -47,7 +67,9 @@ describe("home startup", () => {
   it("renders the authenticated home heading before deferred sidebar deals resolve", async () => {
     renderHome();
 
-    expect(await screen.findByRole("heading", { name: "Play with friends tonight" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Play with friends tonight" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Live deals · loading")).toBeInTheDocument();
   });
 });

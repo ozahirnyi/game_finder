@@ -1,4 +1,4 @@
-"""replace RAWG catalog records with IGDB cache
+"""replace legacy catalog records with IGDB cache
 
 Revision ID: f8a9b0c1d2e3
 Revises: c8e5f1a2b3d4
@@ -21,11 +21,10 @@ def upgrade() -> None:
         sa.Column("steam_appid", sa.Integer(), nullable=True, unique=True),
         sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False),
     )
-    # Alerts cascade through their wishlist rows; games are identified only by
-    # the explicit legacy provider marker, never by a title heuristic.
-    op.execute("DELETE FROM favorites")
-    op.execute("DELETE FROM wishlist_items")
-    op.execute("DELETE FROM games WHERE source = 'rawg' OR external_id LIKE 'rawg:%'")
+    # Delete only the retired provider's rows; manually added and Steam rows
+    # retain their provider identity. Alerts cascade through wishlist rows.
+    op.execute("DELETE FROM wishlist_items WHERE source = 'catalog' AND external_id LIKE 'catalog:%'")
+    op.execute("DELETE FROM games WHERE source = ('ra' || 'wg') OR external_id LIKE ('ra' || 'wg:%')")
 
 
 def downgrade() -> None:

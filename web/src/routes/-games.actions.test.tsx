@@ -84,9 +84,7 @@ describe("GameDetail actions", () => {
     api.addWishlist.mockResolvedValue({ id: "wishlist-1" });
     api.getPriceAlerts.mockResolvedValue([]);
     api.createPriceAlert.mockResolvedValue({ id: "alert-1" });
-    api.getFriends.mockResolvedValue([
-      { user: { id: "friend-1", display_name: "Sam" } },
-    ]);
+    api.getFriends.mockResolvedValue([{ user: { id: "friend-1", display_name: "Sam" } }]);
     api.createGameInvite.mockResolvedValue({ id: "invite-1" });
   });
 
@@ -146,7 +144,9 @@ describe("GameDetail actions", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Share" }));
 
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining("/games/274755")));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining("/games/274755")),
+    );
     expect(screen.getByText("Link copied")).toBeInTheDocument();
   });
 });

@@ -16,7 +16,11 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ to, children, ...props }: React.ComponentProps<"a"> & { to: string }) => <a href={to} {...props}>{children}</a>,
+  Link: ({ to, children, ...props }: React.ComponentProps<"a"> & { to: string }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
   useRouterState: () => "/",
 }));
 
@@ -27,7 +31,13 @@ vi.mock("@/lib/api", () => api);
 function renderShell() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const prefetchQuery = vi.spyOn(queryClient, "prefetchQuery");
-  render(<QueryClientProvider client={queryClient}><AppShell><p>Home</p></AppShell></QueryClientProvider>);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <AppShell>
+        <p>Home</p>
+      </AppShell>
+    </QueryClientProvider>,
+  );
   return { queryClient, prefetchQuery };
 }
 
@@ -50,6 +60,8 @@ describe("AppShell navigation prefetching", () => {
 
     renderShell();
 
-    expect(await screen.findByText("12 price drops tracked · refreshed 7m ago")).toBeInTheDocument();
+    expect(
+      await screen.findByText("12 price drops tracked · refreshed 7m ago"),
+    ).toBeInTheDocument();
   });
 });

@@ -110,12 +110,21 @@ describe("Home recommendations", () => {
   it("opens an unenriched recommendation through its exact title", async () => {
     api.getAuthSnapshot.mockReturnValue(true);
     api.getDashboard.mockResolvedValue({
-      recommendations: { status: "ready", data: { recommendations: [{ title: "Unknown title", reason: "Fits", tags: [], igdb_id: null, cover_url: null }] } },
+      recommendations: {
+        status: "ready",
+        data: {
+          recommendations: [
+            { title: "Unknown title", reason: "Fits", tags: [], igdb_id: null, cover_url: null },
+          ],
+        },
+      },
     });
 
     renderHome();
 
-    expect((await screen.findByRole("link", { name: /Unknown title/i })).getAttribute("href")).toBe("/games/0?title=Unknown+title");
+    expect((await screen.findByRole("link", { name: /Unknown title/i })).getAttribute("href")).toBe(
+      "/games/0?title=Unknown+title",
+    );
   });
 
   it("shows an honest signed-in empty state", async () => {

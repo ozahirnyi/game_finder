@@ -23,7 +23,7 @@ export type UserRead = {
 
 export type CatalogGame = {
   id: number | null;
-    name: string;
+  name: string;
   released?: string | null;
   background_image?: string | null;
   description_raw?: string | null;
@@ -147,7 +147,10 @@ export type Profile = {
   library_visibility?: "public" | "friends" | "private";
 };
 
-export type ProfileUpdate = Pick<Profile, "display_name" | "bio" | "library_visibility" | "platforms" | "favorite_genres">;
+export type ProfileUpdate = Pick<
+  Profile,
+  "display_name" | "bio" | "library_visibility" | "platforms" | "favorite_genres"
+>;
 export type RecommendationItem = { title: string; reason: string; tags: string[] };
 export type RecommendationResponse = { recommendations: RecommendationItem[] };
 export type DashboardBlock<T> = {
@@ -159,7 +162,9 @@ export type DashboardRecommendation = RecommendationItem & {
   igdb_id?: number | null;
   cover_url?: string | null;
 };
-export type Dashboard = { recommendations: DashboardBlock<{ recommendations: DashboardRecommendation[] }> };
+export type Dashboard = {
+  recommendations: DashboardBlock<{ recommendations: DashboardRecommendation[] }>;
+};
 
 export type OAuthLoginUrl = { url: string };
 export type SteamAccount = {
@@ -257,9 +262,10 @@ export function getAuthSnapshot() {
 
 async function toApiError(response: Response, authenticated: boolean) {
   const payload = await response.json().catch(() => null);
-  const message = typeof payload?.detail === "object" && typeof payload.detail?.message === "string"
-    ? payload.detail.message
-    : payload?.detail ?? `Request failed with status ${response.status}`;
+  const message =
+    typeof payload?.detail === "object" && typeof payload.detail?.message === "string"
+      ? payload.detail.message
+      : (payload?.detail ?? `Request failed with status ${response.status}`);
   if (authenticated && response.status === 401) clearToken();
   return new ApiError(message, response.status);
 }
@@ -400,12 +406,19 @@ export function getCatalogGame(id: string | number) {
   return apiRequest<CatalogGame>(`/catalog/games/${id}`);
 }
 
-export function getSteamGameByTitle(title: string) {
-  return apiRequest<{ appid: number; name: string; background_image?: string | null; description_raw?: string | null; genres: string[]; platforms: string[]; current?: Deal["current"]; url?: string | null }>(`/steam/games/resolve?title=${encodeURIComponent(title)}`);
-}
-
 export function getSteamGame(appid: string | number) {
-  return apiRequest<{ appid: number; name: string; background_image?: string | null; description_raw?: string | null; genres: string[]; platforms: string[]; released?: string | null; rating?: number | null; current?: Deal["current"]; url?: string | null }>(`/steam/games/${appid}`);
+  return apiRequest<{
+    appid: number;
+    name: string;
+    background_image?: string | null;
+    description_raw?: string | null;
+    genres: string[];
+    platforms: string[];
+    released?: string | null;
+    rating?: number | null;
+    current?: Deal["current"];
+    url?: string | null;
+  }>(`/steam/games/${appid}`);
 }
 
 export function getDeals(country: string, pageSize = 12) {
@@ -423,7 +436,12 @@ export function getPriceHistory(id: string | number, country = "US") {
     current?: Deal["current"];
     deals: Deal["current"][];
     history_low_all?: Money | null;
-    history: Array<{ timestamp?: string | null; shop?: string | null; price?: Money | null; regular?: Money | null }>;
+    history: Array<{
+      timestamp?: string | null;
+      shop?: string | null;
+      price?: Money | null;
+      regular?: Money | null;
+    }>;
   }>(`/prices/games/${id}?country=${encodeURIComponent(country)}`);
 }
 
@@ -432,7 +450,12 @@ export function getSteamPriceHistory(appid: string | number, country = "US") {
     current?: Deal["current"];
     deals: Deal["current"][];
     history_low_all?: Money | null;
-    history: Array<{ timestamp?: string | null; shop?: string | null; price?: Money | null; regular?: Money | null }>;
+    history: Array<{
+      timestamp?: string | null;
+      shop?: string | null;
+      price?: Money | null;
+      regular?: Money | null;
+    }>;
   }>(`/prices/steam-games/${appid}?country=${encodeURIComponent(country)}`);
 }
 
@@ -465,7 +488,10 @@ export function addWishlist(game: CatalogGame) {
 }
 
 export function addSteamWishlist(appid: string | number) {
-  return apiRequest<CollectionGame>(`/wishlist/steam-games/${appid}`, { auth: true, method: "POST" });
+  return apiRequest<CollectionGame>(`/wishlist/steam-games/${appid}`, {
+    auth: true,
+    method: "POST",
+  });
 }
 
 export function removeWishlist(id: string) {

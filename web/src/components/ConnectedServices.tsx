@@ -164,11 +164,19 @@ export function ConnectedServices() {
           }
         >
           {telegram?.linked ? (
-            <button className={btn} disabled={telegramAction.isPending} onClick={() => telegramAction.mutate("unlink")}>
+            <button
+              className={btn}
+              disabled={telegramAction.isPending}
+              onClick={() => telegramAction.mutate("unlink")}
+            >
               <Unlink className="size-3.5" /> Disconnect
             </button>
           ) : (
-            <button className={btnPrimary} disabled={!telegram?.configured || telegramAction.isPending} onClick={() => telegramAction.mutate("link")}>
+            <button
+              className={btnPrimary}
+              disabled={!telegram?.configured || telegramAction.isPending}
+              onClick={() => telegramAction.mutate("link")}
+            >
               Connect Telegram
             </button>
           )}

@@ -21,7 +21,7 @@ def upgrade() -> None:
     with op.batch_alter_table("wishlist_items") as batch:
         batch.add_column(sa.Column("source", sa.String(length=16), nullable=True))
         batch.add_column(sa.Column("external_id", sa.String(length=255), nullable=True))
-    op.execute("UPDATE wishlist_items SET source = 'catalog', external_id = 'rawg:' || catalog_game_id")
+    op.execute("UPDATE wishlist_items SET source = 'catalog', external_id = 'catalog:' || catalog_game_id")
     with op.batch_alter_table("wishlist_items") as batch:
         batch.alter_column("source", nullable=False, existing_type=sa.String(length=16))
         batch.alter_column("external_id", nullable=False, existing_type=sa.String(length=255))

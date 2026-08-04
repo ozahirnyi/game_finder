@@ -42,7 +42,6 @@ def test_get_backend_public_url_uses_request_url_without_public_override(monkeyp
         base_url = "http://internal.example/"
 
     monkeypatch.delenv("BACKEND_PUBLIC_URL", raising=False)
-    monkeypatch.delenv("RAILWAY_PUBLIC_DOMAIN", raising=False)
 
     assert get_backend_public_url(Request()) == "http://internal.example"
 
