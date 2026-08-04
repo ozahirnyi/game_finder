@@ -30,6 +30,7 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     assert "source" not in response.json()["results"][0]
     fetch_igdb.assert_awaited_once_with("hades", page=2)
     assert cached.await_count == 1
+    assert "igdb_search_v2" in cached.await_args.args[0]
 
 
 @pytest.mark.parametrize("params", [{"q": "   "}, {"q": "hades", "page": 0}])
