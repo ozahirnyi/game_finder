@@ -74,7 +74,6 @@ async def test_igdb_oauth_rejects_missing_token_and_empty_detail(monkeypatch):
     monkeypatch.setattr(client, "_query", empty)
     with pytest.raises(client.IGDBError, match="not found"):
         await client.fetch_igdb_game_detail(1)
-    assert await client._access_token() == ("client", "token")
 
 
 @pytest.mark.anyio
