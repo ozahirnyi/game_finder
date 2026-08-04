@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 
 from app.openai_client import get_recommendation
-from app.integrations.rawg import fetch_rawg_games
+from app.integrations.igdb import fetch_igdb_games as fetch_igdb_games
 from app.redis_client import cache_get, cache_set
 
 CACHE_TTL_SECONDS = 6 * 60 * 60
@@ -39,12 +39,12 @@ async def normalize_recommendations(result: dict, owned_titles: set[str]) -> lis
         if not title or key in owned_titles or key in seen:
             continue
         seen.add(key)
-        enriched = {"title": title, "reason": item.get("reason") or "", "tags": item.get("tags") or [], "rawg_id": None, "cover_url": None}
+        enriched = {"title": title, "reason": item.get("reason") or "", "tags": item.get("tags") or [], "igdb_id": None, "cover_url": None}
         try:
-            matches = await fetch_rawg_games(title, page=1)
+            matches = await fetch_igdb_games(title, page=1)
             match = next((game for game in matches.get("results", []) if str(game.get("name") or "").casefold() == key), None)
             if match:
-                enriched.update(title=match["name"], rawg_id=match.get("id"), cover_url=match.get("background_image"))
+                enriched.update(title=match["name"], igdb_id=match.get("id"), cover_url=match.get("background_image"))
         except Exception:
             pass
         normalized.append(enriched)

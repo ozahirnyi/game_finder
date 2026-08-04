@@ -1,23 +1,23 @@
-from app.integrations.rawg import get_float_env
+from app.integrations.igdb import get_float_env
 from app.main import get_allowed_origins, get_backend_public_url, get_frontend_url
 from app.openai_client import fallback_or_raise, fallback_recommendations, get_recommendation
 from fastapi import HTTPException
 
 
 def test_get_float_env_uses_default_for_missing_empty_or_invalid_values(monkeypatch):
-    monkeypatch.delenv("RAWG_TIMEOUT_SECONDS", raising=False)
-    assert get_float_env("RAWG_TIMEOUT_SECONDS", 12.0) == 12.0
+    monkeypatch.delenv("IGDB_TIMEOUT_SECONDS", raising=False)
+    assert get_float_env("IGDB_TIMEOUT_SECONDS", 12.0) == 12.0
 
-    monkeypatch.setenv("RAWG_TIMEOUT_SECONDS", "")
-    assert get_float_env("RAWG_TIMEOUT_SECONDS", 12.0) == 12.0
+    monkeypatch.setenv("IGDB_TIMEOUT_SECONDS", "")
+    assert get_float_env("IGDB_TIMEOUT_SECONDS", 12.0) == 12.0
 
-    monkeypatch.setenv("RAWG_TIMEOUT_SECONDS", "not-a-number")
-    assert get_float_env("RAWG_TIMEOUT_SECONDS", 12.0) == 12.0
+    monkeypatch.setenv("IGDB_TIMEOUT_SECONDS", "not-a-number")
+    assert get_float_env("IGDB_TIMEOUT_SECONDS", 12.0) == 12.0
 
 
 def test_get_float_env_parses_valid_float(monkeypatch):
-    monkeypatch.setenv("RAWG_TIMEOUT_SECONDS", "3.5")
-    assert get_float_env("RAWG_TIMEOUT_SECONDS", 12.0) == 3.5
+    monkeypatch.setenv("IGDB_TIMEOUT_SECONDS", "3.5")
+    assert get_float_env("IGDB_TIMEOUT_SECONDS", 12.0) == 3.5
 
 
 def test_get_allowed_origins_reads_comma_separated_frontend_origins(monkeypatch):

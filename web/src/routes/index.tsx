@@ -130,8 +130,8 @@ export function Dashboard() {
                 {recommendations.map((item) => (
                   <Link
                     key={item.title}
-                    to={item.rawg_id ? "/games/$gameId" : "/search"}
-                    params={item.rawg_id ? { gameId: String(item.rawg_id) } : undefined}
+                    to={item.igdb_id ? "/games/$gameId" : "/search"}
+                    params={item.igdb_id ? { gameId: String(item.igdb_id) } : undefined}
                     className="overflow-hidden rounded-xl border border-border bg-surface transition hover:border-white/20"
                     >
                       <GameCover

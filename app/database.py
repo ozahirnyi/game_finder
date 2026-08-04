@@ -25,6 +25,15 @@ class Base(DeclarativeBase):
     pass
 
 
+class CatalogGameCache(Base):
+    __tablename__ = "catalog_game_cache"
+
+    igdb_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    steam_appid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, unique=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
 class Game(Base):
     __tablename__ = "games"
 

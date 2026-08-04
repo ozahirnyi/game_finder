@@ -65,7 +65,7 @@ export function CatalogGameActions({ game }: { game: CatalogActionGame }) {
   if (!authenticated) return null;
 
   const inLibrary = savedGames.data?.some(
-    (saved) => saved.source === "catalog" && saved.external_id === `rawg:${game.id}`,
+    (saved) => saved.source === "catalog" && saved.external_id === `igdb:${game.id}`,
   ) || libraryMutation.isSuccess;
   const inWishlist = wishlist.data?.some(
     (item) => item.catalog_game_id === game.id,

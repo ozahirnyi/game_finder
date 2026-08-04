@@ -58,7 +58,7 @@ describe("API requests", () => {
     );
   });
 
-  it("posts a RAWG id to the server-authoritative favorites endpoint", async () => {
+  it("posts a IGDB id to the server-authoritative favorites endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({

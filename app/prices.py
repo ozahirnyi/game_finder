@@ -47,7 +47,7 @@ def _itad_error_message(response: httpx.Response) -> str:
     return "request failed"
 
 
-async def fetch_game_price_history(title: str, country: str = "US") -> dict[str, Any]:
+async def fetch_game_price_history(title: str | None = None, country: str = "US", steam_appid: int | None = None) -> dict[str, Any]:
     api_key = get_itad_api_key()
     if not api_key:
         raise HTTPException(status_code=503, detail="ITAD_API_KEY is not configured")
@@ -55,9 +55,13 @@ async def fetch_game_price_history(title: str, country: str = "US") -> dict[str,
     headers = {"ITAD-API-Key": api_key}
     try:
         async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
+            if steam_appid is None and not title:
+                raise HTTPException(status_code=404, detail="A confirmed Steam appid is required for catalog price data")
             lookup = await client.get(
                 f"{ITAD_BASE_URL}/games/lookup/v1",
-                params={"title": title},
+                # Catalog games must use the exact Store identity.  A title is
+                # retained only for non-catalog/manual callers.
+                params={"appid": steam_appid, "shop": "steam"} if steam_appid is not None else {"title": title},
             )
             lookup.raise_for_status()
             lookup_data = lookup.json()
@@ -95,7 +99,7 @@ async def fetch_game_price_history(title: str, country: str = "US") -> dict[str,
 
     return {
         "itad_id": game_id,
-        "title": game.get("title") or title,
+        "title": game.get("title") or title or str(steam_appid),
         "url": (game.get("urls") or {}).get("game") or f"https://isthereanydeal.com/game/id:{game_id}/",
         "current": _deal((item.get("deals") or [None])[0]) if item.get("deals") else None,
         "history_low_all": _money(history_low.get("all")),

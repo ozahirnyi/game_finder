@@ -18,12 +18,13 @@ from slowapi.errors import RateLimitExceeded
 from app.openai_client import get_recommendation
 from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations
 from app.cache import build_cache_key, get_json_cached
-from app.integrations.rawg import (
-    fetch_rawg_game_detail,
-    fetch_rawg_games,
-    fetch_rawg_trending_games,
-    fetch_rawg_upcoming_games,
-    RAWGError,
+from app.catalog_cache import get_cached_snapshot
+from app.integrations.igdb import (
+    fetch_igdb_game_detail as fetch_igdb_game_detail,
+    fetch_igdb_games as fetch_igdb_games,
+    fetch_igdb_trending_games as fetch_igdb_trending_games,
+    fetch_igdb_upcoming_games as fetch_igdb_upcoming_games,
+    IGDBError as IGDBError,
 )
 from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
@@ -372,17 +373,17 @@ def create_game_route(game: GameCreate,db: Session = Depends(get_db),current_use
     return created
 
 
-@app.post("/library/catalog-games/{rawg_id}", response_model=GameRead)
+@app.post("/library/catalog-games/{igdb_id}", response_model=GameRead)
 async def save_catalog_library_game(
-    rawg_id: int,
+    igdb_id: int,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if rawg_id < 1:
-        raise HTTPException(status_code=400, detail="rawg_id must be >= 1")
+    if igdb_id < 1:
+        raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
 
-    external_id = f"rawg:{rawg_id}"
+    external_id = f"igdb:{igdb_id}"
     existing = (
         db.query(Game)
         .filter(
@@ -397,8 +398,8 @@ async def save_catalog_library_game(
         return existing
 
     try:
-        detail = await fetch_rawg_game_detail(rawg_id)
-    except RAWGError as exc:
+        detail = await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
+    except IGDBError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
     game = Game(
@@ -1382,21 +1383,21 @@ def add_favorite(
     return collection_response(item)
 
 
-@app.post("/favorites/catalog-games/{rawg_id}", response_model=CatalogCollectionRead)
+@app.post("/favorites/catalog-games/{igdb_id}", response_model=CatalogCollectionRead)
 async def save_catalog_favorite_game(
-    rawg_id: int,
+    igdb_id: int,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if rawg_id < 1:
-        raise HTTPException(status_code=400, detail="rawg_id must be >= 1")
+    if igdb_id < 1:
+        raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
 
     existing = (
         db.query(Favorite)
         .filter(
             Favorite.user_id == current_user.id,
-            Favorite.catalog_game_id == rawg_id,
+            Favorite.catalog_game_id == igdb_id,
         )
         .first()
     )
@@ -1405,13 +1406,13 @@ async def save_catalog_favorite_game(
         return collection_response(existing)
 
     try:
-        detail = await fetch_rawg_game_detail(rawg_id)
-    except RAWGError as exc:
+        detail = await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
+    except IGDBError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
     item = Favorite(
         user_id=current_user.id,
-        catalog_game_id=rawg_id,
+        catalog_game_id=igdb_id,
         title=detail["name"],
         cover_url=detail.get("background_image"),
     )
@@ -1424,7 +1425,7 @@ async def save_catalog_favorite_game(
             db.query(Favorite)
             .filter(
                 Favorite.user_id == current_user.id,
-                Favorite.catalog_game_id == rawg_id,
+                Favorite.catalog_game_id == igdb_id,
             )
             .first()
         )
@@ -1477,21 +1478,21 @@ def add_wishlist_item(
     return collection_response(item)
 
 
-@app.post("/wishlist/catalog-games/{rawg_id}", response_model=CatalogCollectionRead)
+@app.post("/wishlist/catalog-games/{igdb_id}", response_model=CatalogCollectionRead)
 async def save_catalog_wishlist_game(
-    rawg_id: int,
+    igdb_id: int,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if rawg_id < 1:
-        raise HTTPException(status_code=400, detail="rawg_id must be >= 1")
+    if igdb_id < 1:
+        raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
 
     existing = (
         db.query(WishlistItem)
         .filter(
             WishlistItem.user_id == current_user.id,
-            WishlistItem.catalog_game_id == rawg_id,
+            WishlistItem.catalog_game_id == igdb_id,
         )
         .first()
     )
@@ -1500,13 +1501,13 @@ async def save_catalog_wishlist_game(
         return collection_response(existing)
 
     try:
-        detail = await fetch_rawg_game_detail(rawg_id)
-    except RAWGError as exc:
+        detail = await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
+    except IGDBError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
     item = WishlistItem(
         user_id=current_user.id,
-        catalog_game_id=rawg_id,
+        catalog_game_id=igdb_id,
         title=detail["name"],
         cover_url=detail.get("background_image"),
     )
@@ -2172,27 +2173,22 @@ async def search(request: Request, q: str, page: int = 1):
         raise HTTPException(status_code=400, detail="page must be >= 1")
     key = build_cache_key("search", q=q, page=page)
     async def fetch():
-        return await fetch_rawg_games(q, page=page)
+        return await fetch_igdb_games(q, page=page)
     try:
         return await get_json_cached(key,CACHE_TTL,fetch)
-    except RAWGError as e:
+    except IGDBError as e:
         raise HTTPException(
             status_code=e.status_code,
             detail=str(e))
 
 
-@app.get("/catalog/games/{rawg_id}", response_model=GameCatalogDetail)
-async def catalog_game_detail(rawg_id: int):
-    if rawg_id < 1:
-        raise HTTPException(status_code=400, detail="rawg_id must be >= 1")
-    key = build_cache_key("catalog_game", rawg_id=rawg_id)
-
-    async def fetch():
-        return await fetch_rawg_game_detail(rawg_id)
-
+@app.get("/catalog/games/{igdb_id}", response_model=GameCatalogDetail)
+async def catalog_game_detail(igdb_id: int, db: Session = Depends(get_db)):
+    if igdb_id < 1:
+        raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
     try:
-        return await get_json_cached(key, CACHE_TTL, fetch)
-    except RAWGError as e:
+        return await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
+    except IGDBError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
@@ -2206,11 +2202,11 @@ async def upcoming_games(request: Request, page: int = 1, page_size: int = 8):
     key = build_cache_key("upcoming_games", page=page, page_size=page_size)
 
     async def fetch():
-        return await fetch_rawg_upcoming_games(page=page, page_size=page_size)
+        return await fetch_igdb_upcoming_games(page=page, page_size=page_size)
 
     try:
         return await get_json_cached(key, CACHE_TTL, fetch)
-    except RAWGError as e:
+    except IGDBError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
@@ -2224,40 +2220,35 @@ async def trending_games(request: Request, page: int = 1, page_size: int = 8):
     key = build_cache_key("trending_games", page=page, page_size=page_size)
 
     async def fetch():
-        return await fetch_rawg_trending_games(page=page, page_size=page_size)
+        return await fetch_igdb_trending_games(page=page, page_size=page_size)
 
     try:
         return await get_json_cached(key, CACHE_TTL, fetch)
-    except RAWGError as e:
+    except IGDBError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
-@app.get("/prices/games/{rawg_id}", response_model=GamePriceHistory)
-async def game_price_history(rawg_id: int, country: str = "US"):
-    if rawg_id < 1:
-        raise HTTPException(status_code=400, detail="rawg_id must be >= 1")
+@app.get("/prices/games/{igdb_id}", response_model=GamePriceHistory)
+async def game_price_history(igdb_id: int, country: str = "US", db: Session = Depends(get_db)):
+    if igdb_id < 1:
+        raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
     normalized_country = country.strip().upper()
     if len(normalized_country) != 2:
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
 
-    detail_key = build_cache_key("catalog_game", rawg_id=rawg_id)
-
-    async def fetch_detail():
-        return await fetch_rawg_game_detail(rawg_id)
-
     try:
-        game = await get_json_cached(detail_key, CACHE_TTL, fetch_detail)
-    except RAWGError as e:
+        game = await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
+    except IGDBError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
-    title = (game.get("name") or "").strip()
-    if not title:
-        raise HTTPException(status_code=404, detail="Game title not available")
+    steam_appid = game.get("steam_appid")
+    if not isinstance(steam_appid, int) or steam_appid < 1:
+        raise HTTPException(status_code=404, detail="No confirmed Steam appid is available for this catalog game")
 
-    price_key = build_cache_key("price_history", title=title, country=normalized_country)
+    price_key = build_cache_key("price_history", steam_appid=steam_appid, country=normalized_country)
 
     async def fetch_price():
-        return await fetch_game_price_history(title, country=normalized_country)
+        return await fetch_game_price_history(country=normalized_country, steam_appid=steam_appid)
 
     return await get_json_cached(price_key, CACHE_TTL, fetch_price)
 
@@ -2275,11 +2266,11 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
     async def fetch():
         steam_deals = await fetch_steam_store_deals(country=normalized_country, page_size=page_size)
 
-        async def attach_rawg_id(deal: dict):
+        async def attach_igdb_id(deal: dict):
             try:
-                rawg = await fetch_rawg_games(deal["name"], page=1)
-                match = next((game for game in rawg.get("results", []) if game.get("id")), None)
-            except RAWGError:
+                igdb = await fetch_igdb_games(deal["name"], page=1)
+                match = next((game for game in igdb.get("results", []) if game.get("id")), None)
+            except IGDBError:
                 match = None
             return {
                 "id": match.get("id") if match else None,
@@ -2291,7 +2282,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
                 "history_low_all": deal.get("history_low_all"),
             }
 
-        return {"results": await asyncio.gather(*(attach_rawg_id(deal) for deal in steam_deals))}
+        return {"results": await asyncio.gather(*(attach_igdb_id(deal) for deal in steam_deals))}
 
     return await get_json_cached(key, CACHE_TTL, fetch)
 
@@ -2311,7 +2302,7 @@ async def genre_deals(current_user: User = Depends(get_current_user)):
             country,
             genres,
             fetch_steam_store_deal_candidates,
-            fetch_rawg_games,
+            fetch_igdb_games,
         )
 
     return await get_json_cached(key, CACHE_TTL, fetch)

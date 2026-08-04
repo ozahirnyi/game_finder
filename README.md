@@ -2,7 +2,7 @@
 
 A learning **full-stack** project: **game search**, user collections, external API integration, authentication, caching, and (later) AI-powered recommendations. The backend is written **by hand in FastAPI**; the frontend can be scaffolded with AI assistance (e.g. Next.js).
 
-It is conceptually similar to **movie_finder** (Django + PostgreSQL + external APIs), but this stack is **FastAPI + PostgreSQL + Redis** and the domain is **video games** (e.g. [RAWG API](https://rawg.io/apidocs)).
+It is conceptually similar to **movie_finder** (Django + PostgreSQL + external APIs), but this stack is **FastAPI + PostgreSQL + Redis** and the domain is **video games** (using [IGDB](https://api-docs.igdb.com/)).
 
 ---
 
@@ -21,7 +21,7 @@ The project grows **incrementally** in a single repo (not a chain of throwaway e
 | **API** | REST with FastAPI, Pydantic validation, OpenAPI `/docs` |
 | **Data** | PostgreSQL, SQLAlchemy, Alembic migrations |
 | **Users** | Register / login, password hashing, JWT, protected mutations |
-| **Search** | Calls to RAWG (or similar), normalized JSON for clients |
+| **Search** | Calls to IGDB, normalized JSON for clients |
 | **Cache** | Redis with TTL for repeated searches |
 | **Product** | Catalog / collections (favorites, wishlist) — API shape is yours |
 | **AI (later)** | Recommendation endpoint via OpenAI (or compatible API) |
@@ -32,11 +32,11 @@ The project grows **incrementally** in a single repo (not a chain of throwaway e
 
 ## Development phases (overview)
 
-1. **Standalone CLI script** — `httpx` + RAWG, key in `.env`, error handling.
+1. **Standalone CLI script** — `httpx` + IGDB, Twitch OAuth credentials in `.env`, error handling.
 2. **FastAPI + in-memory** — CRUD for placeholder games, no DB yet.
 3. **PostgreSQL** — replace in-memory store + Alembic.
 4. **Authentication** — users, JWT, resource ownership.
-5. **RAWG + Redis** — external search + cache.
+5. **IGDB + PostgreSQL cache** — external search + persistent metadata cache.
 6. **Production-style backend** — AI endpoint, rate limiting, Docker, deploy.
 7. **Frontend** — UI on top of your API.
 8. **Interview prep** — algorithms, SQL, architecture narrative (track hours in progression_bot if you like).
@@ -107,7 +107,7 @@ python -m venv .venv
 
 pip install -r requirements.txt   # appears after you bootstrap FastAPI
 cp .env.example .env
-# Fill in: RAWG, DATABASE_URL, REDIS_URL, SECRET_KEY, …
+# Fill in: IGDB, DATABASE_URL, REDIS_URL, SECRET_KEY, …
 ```
 
 ---
@@ -160,8 +160,9 @@ FRONTEND_PUBLIC_URL=https://playfinder.cc
 BACKEND_PUBLIC_URL=https://playfinder.cc/api
 DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/gamefinder
 REDIS_URL=redis://redis:6379/0
-RAWG_API_KEY=your-rawg-key
-RAWG_TIMEOUT_SECONDS=12
+IGDB_CLIENT_ID=your-twitch-client-id
+IGDB_CLIENT_SECRET=your-twitch-client-secret
+IGDB_TIMEOUT_SECONDS=12
 STEAM_API_KEY=your-steam-web-api-key
 ITAD_API_KEY=your-isthereanydeal-api-key
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
@@ -232,7 +233,7 @@ Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy.
 | GOOGLE_CLIENT_ID | Google OAuth web-client ID |
 | GOOGLE_CLIENT_SECRET | Google OAuth web-client secret |
 | GOOGLE_REDIRECT_URI | Exact Google OAuth callback URL, usually `<BACKEND_PUBLIC_URL>/auth/google/callback` |
-| RAWG_API_KEY | Game API key |
+| IGDB_CLIENT_ID / IGDB_CLIENT_SECRET | Twitch credentials for IGDB |
 | STEAM_API_KEY | Steam Web API key for owned-game library import |
 | ITAD_API_KEY | IsThereAnyDeal API key for current prices and historical lows |
 | TELEGRAM_BOT_TOKEN | Telegram bot token from BotFather |

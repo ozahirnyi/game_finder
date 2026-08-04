@@ -57,13 +57,13 @@ def test_catalog_library_save_is_idempotent_and_server_authoritative(monkeypatch
     owner_id = uuid.uuid4()
     db = CatalogGameDb()
 
-    async def fake_fetch(rawg_id: int):
-        assert rawg_id == 274755
-        return {"id": rawg_id, "name": "Hades II", "description_raw": "Fight beyond the Underworld."}
+    async def fake_fetch(igdb_id: int):
+        assert igdb_id == 274755
+        return {"id": igdb_id, "name": "Hades II", "description_raw": "Fight beyond the Underworld."}
 
     main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
     main.app.dependency_overrides[main.get_db] = lambda: db
-    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch)
 
     try:
         first = client.post("/library/catalog-games/274755")
@@ -75,7 +75,7 @@ def test_catalog_library_save_is_idempotent_and_server_authoritative(monkeypatch
     assert first.json()["title"] == "Hades II"
     assert first.json()["info"] == "Fight beyond the Underworld."
     assert first.json()["source"] == "catalog"
-    assert first.json()["external_id"] == "rawg:274755"
+    assert first.json()["external_id"] == "igdb:274755"
     assert again.status_code == 200
     assert again.json()["id"] == first.json()["id"]
     assert len(db.games) == 1
@@ -86,11 +86,11 @@ def test_catalog_library_save_is_isolated_by_owner(monkeypatch):
     second_owner_id = uuid.uuid4()
     db = CatalogGameDb()
 
-    async def fake_fetch(rawg_id: int):
-        return {"id": rawg_id, "name": "Hades II", "description_raw": None}
+    async def fake_fetch(igdb_id: int):
+        return {"id": igdb_id, "name": "Hades II", "description_raw": None}
 
     main.app.dependency_overrides[main.get_db] = lambda: db
-    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch)
 
     try:
         main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
@@ -116,17 +116,17 @@ def test_catalog_wishlist_save_is_idempotent_and_server_authoritative(monkeypatc
     owner_id = uuid.uuid4()
     db = CatalogGameDb()
 
-    async def fake_fetch(rawg_id: int):
-        assert rawg_id == 274755
+    async def fake_fetch(igdb_id: int):
+        assert igdb_id == 274755
         return {
-            "id": rawg_id,
+            "id": igdb_id,
             "name": "Hades II",
             "background_image": "https://example.com/hades-ii.jpg",
         }
 
     main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
     main.app.dependency_overrides[main.get_db] = lambda: db
-    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch)
 
     try:
         first = client.post("/wishlist/catalog-games/274755")
@@ -148,11 +148,11 @@ def test_catalog_wishlist_save_is_isolated_by_owner(monkeypatch):
     second_owner_id = uuid.uuid4()
     db = CatalogGameDb()
 
-    async def fake_fetch(rawg_id: int):
-        return {"id": rawg_id, "name": "Hades II", "background_image": None}
+    async def fake_fetch(igdb_id: int):
+        return {"id": igdb_id, "name": "Hades II", "background_image": None}
 
     main.app.dependency_overrides[main.get_db] = lambda: db
-    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch)
 
     try:
         main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
@@ -178,17 +178,17 @@ def test_catalog_favorite_save_is_idempotent_and_server_authoritative(monkeypatc
     owner_id = uuid.uuid4()
     db = CatalogGameDb()
 
-    async def fake_fetch(rawg_id: int):
-        assert rawg_id == 274755
+    async def fake_fetch(igdb_id: int):
+        assert igdb_id == 274755
         return {
-            "id": rawg_id,
+            "id": igdb_id,
             "name": "Hades II",
             "background_image": "https://example.com/hades-ii.jpg",
         }
 
     main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
     main.app.dependency_overrides[main.get_db] = lambda: db
-    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch)
 
     try:
         first = client.post("/favorites/catalog-games/274755")
@@ -210,11 +210,11 @@ def test_catalog_favorite_save_is_isolated_by_owner(monkeypatch):
     second_owner_id = uuid.uuid4()
     db = CatalogGameDb()
 
-    async def fake_fetch(rawg_id: int):
-        return {"id": rawg_id, "name": "Hades II", "background_image": None}
+    async def fake_fetch(igdb_id: int):
+        return {"id": igdb_id, "name": "Hades II", "background_image": None}
 
     main.app.dependency_overrides[main.get_db] = lambda: db
-    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch)
 
     try:
         main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=first_owner_id)
@@ -236,7 +236,7 @@ def test_catalog_favorite_save_requires_authentication():
     assert response.status_code == 401
 
 
-def test_catalog_favorite_save_rejects_invalid_rawg_id():
+def test_catalog_favorite_save_rejects_invalid_igdb_id():
     main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=uuid.uuid4())
     main.app.dependency_overrides[main.get_db] = lambda: CatalogGameDb()
 
@@ -246,7 +246,7 @@ def test_catalog_favorite_save_rejects_invalid_rawg_id():
         main.app.dependency_overrides.clear()
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "rawg_id must be >= 1"
+    assert response.json()["detail"] == "igdb_id must be >= 1"
 
 
 def test_catalog_favorite_save_recovers_from_concurrent_duplicate(monkeypatch):
@@ -292,16 +292,16 @@ def test_catalog_favorite_save_recovers_from_concurrent_duplicate(monkeypatch):
 
     db = RaceFavoriteDb()
 
-    async def fake_fetch(rawg_id: int):
+    async def fake_fetch(igdb_id: int):
         return {
-            "id": rawg_id,
+            "id": igdb_id,
             "name": "Hades II",
             "background_image": "https://example.com/hades-ii.jpg",
         }
 
     main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(id=owner_id)
     main.app.dependency_overrides[main.get_db] = lambda: db
-    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch)
 
     try:
         response = client.post("/favorites/catalog-games/274755")
@@ -313,13 +313,13 @@ def test_catalog_favorite_save_recovers_from_concurrent_duplicate(monkeypatch):
     assert db.rollback_called is True
 
 
-def test_catalog_game_detail_returns_normalized_rawg_data(monkeypatch):
+def test_catalog_game_detail_returns_normalized_igdb_data(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
 
-    async def fake_fetch_rawg_game_detail(rawg_id: int):
+    async def fake_fetch_igdb_game_detail(igdb_id: int):
         return {
-            "id": rawg_id,
+            "id": igdb_id,
             "name": "Hades",
             "released": "2020-09-17",
             "background_image": "https://example.com/hades.jpg",
@@ -330,7 +330,7 @@ def test_catalog_game_detail_returns_normalized_rawg_data(monkeypatch):
         }
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
-    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch_rawg_game_detail)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch_igdb_game_detail)
 
     response = client.get("/catalog/games/274755")
 
@@ -347,11 +347,11 @@ def test_catalog_game_detail_returns_normalized_rawg_data(monkeypatch):
     }
 
 
-def test_upcoming_games_returns_rawg_results(monkeypatch):
+def test_upcoming_games_returns_igdb_results(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
 
-    async def fake_fetch_rawg_upcoming_games(page: int, page_size: int):
+    async def fake_fetch_igdb_upcoming_games(page: int, page_size: int):
         assert page == 1
         assert page_size == 4
         return {
@@ -366,7 +366,7 @@ def test_upcoming_games_returns_rawg_results(monkeypatch):
         }
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
-    monkeypatch.setattr(main, "fetch_rawg_upcoming_games", fake_fetch_rawg_upcoming_games)
+    monkeypatch.setattr(main, "fetch_igdb_upcoming_games", fake_fetch_igdb_upcoming_games)
 
     response = client.get("/catalog/upcoming-games?page_size=4")
 
@@ -383,11 +383,11 @@ def test_upcoming_games_returns_rawg_results(monkeypatch):
     }
 
 
-def test_trending_games_returns_rawg_results(monkeypatch):
+def test_trending_games_returns_igdb_results(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
 
-    async def fake_fetch_rawg_trending_games(page: int, page_size: int):
+    async def fake_fetch_igdb_trending_games(page: int, page_size: int):
         assert page == 1
         assert page_size == 4
         return {
@@ -402,7 +402,7 @@ def test_trending_games_returns_rawg_results(monkeypatch):
         }
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
-    monkeypatch.setattr(main, "fetch_rawg_trending_games", fake_fetch_rawg_trending_games)
+    monkeypatch.setattr(main, "fetch_igdb_trending_games", fake_fetch_igdb_trending_games)
 
     response = client.get("/catalog/trending-games?page_size=4")
 
@@ -414,9 +414,9 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
 
-    async def fake_fetch_rawg_game_detail(rawg_id: int):
+    async def fake_fetch_igdb_game_detail(igdb_id: int):
         return {
-            "id": rawg_id,
+            "id": igdb_id,
             "name": "Hades",
             "released": "2020-09-17",
             "background_image": None,
@@ -424,14 +424,15 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
             "rating": None,
             "genres": [],
             "platforms": [],
+            "steam_appid": 1145350,
         }
 
-    async def fake_fetch_game_price_history(title: str, country: str):
-        assert title == "Hades"
+    async def fake_fetch_game_price_history(country: str, steam_appid: int):
+        assert steam_appid == 1145350
         assert country == "US"
         return {
             "itad_id": "018d937f-0000-7000-8000-000000000000",
-            "title": title,
+            "title": "Hades",
             "url": "https://isthereanydeal.com/game/hades/",
             "current": {
                 "shop": "Steam",
@@ -448,7 +449,7 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
         }
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
-    monkeypatch.setattr(main, "fetch_rawg_game_detail", fake_fetch_rawg_game_detail)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch_igdb_game_detail)
     monkeypatch.setattr(main, "fetch_game_price_history", fake_fetch_game_price_history)
 
     response = client.get("/prices/games/274755")
@@ -483,7 +484,7 @@ def test_homepage_deals_returns_steam_store_deals(monkeypatch):
             }
         ]
 
-    async def fake_fetch_rawg_games(query: str, page: int):
+    async def fake_fetch_igdb_games(query: str, page: int):
         assert query == "Palworld"
         assert page == 1
         return {
@@ -499,7 +500,7 @@ def test_homepage_deals_returns_steam_store_deals(monkeypatch):
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_steam_store_deals", fake_fetch_steam_store_deals)
-    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+    monkeypatch.setattr(main, "fetch_igdb_games", fake_fetch_igdb_games)
 
     response = client.get("/prices/deals?page_size=1")
 
@@ -530,12 +531,12 @@ def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch
             ],
         }
 
-    async def fake_fetch_rawg_games(query: str, page: int):
+    async def fake_fetch_igdb_games(query: str, page: int):
         assert page == 1
         return {
             "results": {
-                "Hades": [{"id": 1, "name": "Hades", "released": "2020-09-17", "background_image": "rawg-hades", "genres": ["Action", "RPG"]}],
-                "Civilization VII": [{"id": 2, "name": "Civilization VII", "released": "2025-02-11", "background_image": "rawg-civ", "genres": ["Strategy"]}],
+                "Hades": [{"id": 1, "name": "Hades", "released": "2020-09-17", "background_image": "igdb-hades", "genres": ["Action", "RPG"]}],
+                "Civilization VII": [{"id": 2, "name": "Civilization VII", "released": "2025-02-11", "background_image": "igdb-civ", "genres": ["Strategy"]}],
             }.get(query, [])
         }
 
@@ -544,7 +545,7 @@ def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch
     )
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
-    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+    monkeypatch.setattr(main, "fetch_igdb_games", fake_fetch_igdb_games)
 
     try:
         response = client.get("/prices/genre-deals")
@@ -581,14 +582,14 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
             ],
         }
 
-    async def fake_fetch_rawg_games(query: str, _page: int):
+    async def fake_fetch_igdb_games(query: str, _page: int):
         return {"results": [{"id": int(query.split()[-1]), "name": query, "released": None, "background_image": None, "genres": ["ACTION"]}]}
 
     user = SimpleNamespace(favorite_genres=[" Action "], steam_country_code="us")
     main.app.dependency_overrides[main.get_current_user] = lambda: user
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
-    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+    monkeypatch.setattr(main, "fetch_igdb_games", fake_fetch_igdb_games)
 
     try:
         first = client.get("/prices/genre-deals")
@@ -620,7 +621,7 @@ def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
             ],
         }
 
-    async def fake_fetch_rawg_games(query: str, _page: int):
+    async def fake_fetch_igdb_games(query: str, _page: int):
         genre = query.split()[0]
         return {"results": [{"id": hash(query), "name": query, "released": None, "background_image": None, "genres": [genre]}]}
 
@@ -629,7 +630,7 @@ def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
     )
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
-    monkeypatch.setattr(main, "fetch_rawg_games", fake_fetch_rawg_games)
+    monkeypatch.setattr(main, "fetch_igdb_games", fake_fetch_igdb_games)
 
     try:
         response = client.get("/prices/genre-deals")

@@ -328,7 +328,7 @@ describe("catalog routes", () => {
       notes: null,
       info: null,
       source: "catalog",
-      external_id: "rawg:274755",
+      external_id: "igdb:274755",
       playtime_forever: null,
       playtime_2weeks: null,
       img_icon_url: null,

@@ -115,7 +115,7 @@ export type RecommendationItem = {
   title: string;
   reason: string;
   tags: string[];
-  rawg_id: number | null;
+  igdb_id: number | null;
   cover_url: string | null;
 };
 
@@ -654,9 +654,9 @@ export function createSavedGame(title: string, info?: string, notes = "") {
   });
 }
 
-export function saveCatalogGameToLibrary(rawgId: number) {
+export function saveCatalogGameToLibrary(igdbId: number) {
   return request<SavedGame>(
-    `/library/catalog-games/${encodeURIComponent(rawgId)}`,
+    `/library/catalog-games/${encodeURIComponent(igdbId)}`,
     { method: "POST", auth: true },
   );
 }
@@ -999,9 +999,9 @@ export function removeFavorite(catalogGameId: number) {
   });
 }
 
-export function saveCatalogGameToFavorites(rawgId: number) {
+export function saveCatalogGameToFavorites(igdbId: number) {
   return request<CatalogCollectionItem>(
-    `/favorites/catalog-games/${encodeURIComponent(rawgId)}`,
+    `/favorites/catalog-games/${encodeURIComponent(igdbId)}`,
     { method: "POST", auth: true },
   );
 }
@@ -1022,9 +1022,9 @@ export function addWishlistItem(
   });
 }
 
-export function saveCatalogGameToWishlist(rawgId: number) {
+export function saveCatalogGameToWishlist(igdbId: number) {
   return request<CatalogCollectionItem>(
-    `/wishlist/catalog-games/${encodeURIComponent(rawgId)}`,
+    `/wishlist/catalog-games/${encodeURIComponent(igdbId)}`,
     { method: "POST", auth: true },
   );
 }
