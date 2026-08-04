@@ -2474,6 +2474,25 @@ async def steam_recommendations(
     return await get_cached_steam_recommendations(current_user.id, games, data.prompt)
 
 
+SEARCH_ALIASES = {"cs2": "counter-strike 2", "csgo": "counter-strike: global offensive"}
+
+
+def _search_title_key(value: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", value.casefold()).split())
+
+
+def _rank_search_results(query: str, results: list[dict]) -> list[dict]:
+    query_key = _search_title_key(query)
+
+    def rank(game: dict) -> tuple[int, float]:
+        title_key = _search_title_key(str(game.get("name") or ""))
+        match_rank = 0 if title_key == query_key else 1 if title_key.startswith(query_key) else 2
+        rating = game.get("rating")
+        return match_rank, -float(rating) if isinstance(rating, (int, float)) else 0.0
+
+    return sorted(results, key=rank)
+
+
 @app.get("/search/games", response_model=GameSearchResponse, response_model_exclude_unset=True)
 @limiter.limit("30/minute")
 async def search(request: Request, q: str, page: int = 1):
@@ -2482,10 +2501,12 @@ async def search(request: Request, q: str, page: int = 1):
         raise HTTPException(status_code=400, detail="q cannot be empty")
     if page < 1:
         raise HTTPException(status_code=400, detail="page must be >= 1")
-    key = build_cache_key("igdb_search", q=q, page=page)
+    catalog_query = SEARCH_ALIASES.get(q, q)
+    key = build_cache_key("igdb_search", q=catalog_query, page=page)
 
     async def fetch():
-        return await fetch_igdb_games(q, page=page)
+        payload = await fetch_igdb_games(catalog_query, page=page)
+        return {**payload, "results": _rank_search_results(q, payload.get("results", []))}
 
     try:
         return JSONResponse(content=await get_json_cached(key, CACHE_TTL, fetch))
@@ -2628,21 +2649,17 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
         steam_deals = await fetch_steam_store_deals(country=normalized_country, page_size=page_size)
 
         async def attach_igdb_id(deal: dict):
-            try:
-                igdb = await asyncio.wait_for(
-                    fetch_igdb_games(deal["name"], page=1),
-                    timeout=DEAL_IGDB_ENRICHMENT_TIMEOUT_SECONDS,
-                )
-                match = next(
-                    (
-                        game
-                        for game in igdb.get("results", [])
-                        if game.get("id") and game.get("name", "").casefold() == deal["name"].casefold()
-                    ),
-                    None,
-                )
-            except (IGDBError, asyncio.TimeoutError):
+            steam_appid = deal.get("steam_appid")
+            if not isinstance(steam_appid, int) or steam_appid < 1:
                 match = None
+            else:
+                try:
+                    match = await asyncio.wait_for(
+                        fetch_igdb_game_by_steam_appid(steam_appid),
+                        timeout=DEAL_IGDB_ENRICHMENT_TIMEOUT_SECONDS,
+                    )
+                except (IGDBError, asyncio.TimeoutError):
+                    match = None
             return {
                 "id": match.get("id") if match else None,
                 "steam_appid": deal.get("steam_appid"),
