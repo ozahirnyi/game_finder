@@ -651,23 +651,18 @@ def test_homepage_deals_returns_steam_store_deals(monkeypatch):
             }
         ]
 
-    async def fake_fetch_igdb_games(query: str, page: int):
-        assert query == "Palworld"
-        assert page == 1
+    async def fake_fetch_igdb_by_steam_appid(appid: int):
+        assert appid == 1623730
         return {
-            "results": [
-                {
-                    "id": 960575,
-                    "name": "Palworld",
-                    "released": "2024-01-19",
-                    "background_image": "https://example.com/palworld.jpg",
-                }
-            ]
+            "id": 960575,
+            "name": "Palworld",
+            "released": "2024-01-19",
+            "background_image": "https://example.com/palworld.jpg",
         }
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_steam_store_deals", fake_fetch_steam_store_deals)
-    monkeypatch.setattr(main, "fetch_igdb_games", fake_fetch_igdb_games)
+    monkeypatch.setattr(main, "fetch_igdb_game_by_steam_appid", fake_fetch_igdb_by_steam_appid)
 
     response = client.get("/prices/deals?page_size=1")
 
@@ -694,12 +689,12 @@ def test_homepage_deals_exposes_a_stable_cache_creation_time(monkeypatch):
         calls += 1
         return [{"steam_appid": 1145360, "name": "Hades", "background_image": "steam-cover", "url": "https://store.test/hades"}]
 
-    async def fake_igdb_games(*_args, **_kwargs):
-        return {"results": []}
+    async def fake_igdb_by_steam_appid(*_args, **_kwargs):
+        return None
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_steam_store_deals", fake_fetch_steam_store_deals)
-    monkeypatch.setattr(main, "fetch_igdb_games", fake_igdb_games)
+    monkeypatch.setattr(main, "fetch_igdb_game_by_steam_appid", fake_igdb_by_steam_appid)
 
     first = client.get("/prices/deals?page_size=13")
     second = client.get("/prices/deals?page_size=13")
@@ -717,13 +712,12 @@ def test_homepage_deals_does_not_attach_a_different_igdb_game(monkeypatch):
     async def fake_fetch_steam_store_deals(**_kwargs):
         return [{"name": "Company of Heroes 3: Final Stand", "url": "https://store.test/final-stand"}]
 
-    async def fake_fetch_igdb_games(_query: str, page: int):
-        assert page == 1
-        return {"results": [{"id": 635275, "name": "Company of Heroes 3 - Pre-Alpha Preview"}]}
+    async def unexpected_mapping(*_args, **_kwargs):
+        raise AssertionError("deals without a Steam appid must not use a title lookup")
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_steam_store_deals", fake_fetch_steam_store_deals)
-    monkeypatch.setattr(main, "fetch_igdb_games", fake_fetch_igdb_games)
+    monkeypatch.setattr(main, "fetch_igdb_game_by_steam_appid", unexpected_mapping)
 
     response = client.get("/prices/deals?page_size=1")
 
@@ -739,13 +733,13 @@ def test_homepage_deals_returns_steam_results_when_igdb_enrichment_is_slow(monke
     async def fake_fetch_steam_store_deals(**_kwargs):
         return [{"steam_appid": 1145360, "name": "Hades", "background_image": "steam-cover", "url": "https://store.test/hades"}]
 
-    async def slow_igdb_games(*_args, **_kwargs):
+    async def slow_igdb_by_steam_appid(*_args, **_kwargs):
         await asyncio.sleep(0.1)
-        return {"results": [{"id": 1, "name": "Hades"}]}
+        return {"id": 1, "name": "Hades"}
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_steam_store_deals", fake_fetch_steam_store_deals)
-    monkeypatch.setattr(main, "fetch_igdb_games", slow_igdb_games)
+    monkeypatch.setattr(main, "fetch_igdb_game_by_steam_appid", slow_igdb_by_steam_appid)
     monkeypatch.setattr(main, "DEAL_IGDB_ENRICHMENT_TIMEOUT_SECONDS", 0.001, raising=False)
 
     response = client.get("/prices/deals?page_size=1")
