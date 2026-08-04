@@ -68,3 +68,22 @@ async def test_catalog_cache_returns_stale_snapshot_when_igdb_is_down():
         def commit(self): raise AssertionError("stale fallback must not write")
     async def unavailable(_id): raise IGDBError("offline")
     assert await get_cached_snapshot(Db(), 7, unavailable) == {"id": 7, "name": "Cached"}
+
+
+@pytest.mark.anyio
+async def test_catalog_cache_uses_fresh_and_refreshes_stale_entries():
+    from app.catalog_cache import get_cached_snapshot
+    from app.database import CatalogGameCache
+    fresh = CatalogGameCache(igdb_id=8, snapshot={"id": 8}, fetched_at=datetime.now(timezone.utc))
+    class Db:
+        def __init__(self, cached): self.cached, self.commits = cached, 0
+        def get(self, *_): return self.cached
+        def commit(self): self.commits += 1
+        def add(self, value): self.cached = value
+    async def unexpected(_): raise AssertionError("fresh cache must be used")
+    assert await get_cached_snapshot(Db(fresh), 8, unexpected) == {"id": 8}
+    stale = CatalogGameCache(igdb_id=9, snapshot={"id": 9}, fetched_at=datetime.now(timezone.utc) - timedelta(days=2))
+    db = Db(stale)
+    async def fetch(_): return {"id": 9, "steam_appid": 10}
+    assert await get_cached_snapshot(db, 9, fetch) == {"id": 9, "steam_appid": 10}
+    assert db.commits == 1 and stale.steam_appid == 10
