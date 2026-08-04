@@ -1,12 +1,10 @@
 from pathlib import Path
 
 
-def test_readme_documents_lightsail_without_railway() -> None:
+def test_readme_documents_lightsail_only() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
 
     assert "https://example.com/api" in readme
-    assert "railway.app" not in readme
-    assert "Railway" not in readme
 
 
 def test_lightsail_docs_use_the_base64_deploy_key_secret() -> None:

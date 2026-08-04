@@ -27,7 +27,9 @@ describe("NotificationsPanel", () => {
 
   it("turns friend-request payloads into a readable notification", async () => {
     render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
         <NotificationsPanel />
       </QueryClientProvider>,
     );

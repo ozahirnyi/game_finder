@@ -5,14 +5,21 @@ import { getFriendProfile } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
 import { ArrowLeft } from "lucide-react";
 
-export function formatFriendPlaytime(games: Array<{ playtime?: number | null; playtime_forever?: number | null }>) {
-  const minutes = games.reduce((total, game) => total + Math.max(0, game.playtime ?? game.playtime_forever ?? 0), 0);
+export function formatFriendPlaytime(
+  games: Array<{ playtime?: number | null; playtime_forever?: number | null }>,
+) {
+  const minutes = games.reduce(
+    (total, game) => total + Math.max(0, game.playtime ?? game.playtime_forever ?? 0),
+    0,
+  );
   return minutes > 0 ? `${Math.floor(minutes / 60)}h` : "—";
 }
 
 export const Route = createFileRoute("/friends/$friendId")({
   validateSearch: (search: Record<string, unknown>): { compose?: "message" | "invite" } => ({
-    ...(search.compose === "message" || search.compose === "invite" ? { compose: search.compose } : {}),
+    ...(search.compose === "message" || search.compose === "invite"
+      ? { compose: search.compose }
+      : {}),
   }),
   loader: async ({ params }) => {
     let profile;

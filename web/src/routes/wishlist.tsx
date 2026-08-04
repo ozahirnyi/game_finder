@@ -4,7 +4,13 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
-import { createPriceAlert, getPriceAlerts, getWishlist, removeWishlist, type PriceAlertCreate } from "@/lib/api";
+import {
+  createPriceAlert,
+  getPriceAlerts,
+  getWishlist,
+  removeWishlist,
+  type PriceAlertCreate,
+} from "@/lib/api";
 import { wishlistPriceLabel } from "@/lib/collectionPresentation";
 import { Bell, Heart, Trash2 } from "lucide-react";
 
@@ -74,15 +80,24 @@ function WishlistPage() {
       />
 
       {showAlerts && (
-        <section aria-label="Price alerts" className="mb-6 rounded-2xl border border-border bg-surface p-5">
+        <section
+          aria-label="Price alerts"
+          className="mb-6 rounded-2xl border border-border bg-surface p-5"
+        >
           <h2 className="text-lg font-bold">Price alerts</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {alertsQuery.data?.length ?? 0} active alert{(alertsQuery.data?.length ?? 0) === 1 ? "" : "s"}.
+            {alertsQuery.data?.length ?? 0} active alert
+            {(alertsQuery.data?.length ?? 0) === 1 ? "" : "s"}.
           </p>
           {!!alertsQuery.data?.length && (
             <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
               {alertsQuery.data.map((alert) => (
-                <li key={alert.id}>Game #{alert.wishlist_catalog_game_id}: {alert.target_price != null ? `alert below ${alert.target_price}` : `alert at ${alert.target_discount}% off`}</li>
+                <li key={alert.id}>
+                  Game #{alert.wishlist_catalog_game_id}:{" "}
+                  {alert.target_price != null
+                    ? `alert below ${alert.target_price}`
+                    : `alert at ${alert.target_discount}% off`}
+                </li>
               ))}
             </ul>
           )}
@@ -99,18 +114,53 @@ function WishlistPage() {
               });
             }}
           >
-            <label className="grid gap-1 text-sm font-semibold">Game
-              <select value={catalogGameId} onChange={(event) => setCatalogGameId(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2">
-                {wl.map((game) => <option key={game.id} value={game.catalog_game_id}>{game.title}</option>)}
+            <label className="grid gap-1 text-sm font-semibold">
+              Game
+              <select
+                value={catalogGameId}
+                onChange={(event) => setCatalogGameId(event.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2"
+              >
+                {wl.map((game) => (
+                  <option key={game.id} value={game.catalog_game_id}>
+                    {game.title}
+                  </option>
+                ))}
               </select>
             </label>
-            <label className="grid gap-1 text-sm font-semibold">Target price
-              <input aria-label="Target price" type="number" min="0.01" step="0.01" required value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2" />
+            <label className="grid gap-1 text-sm font-semibold">
+              Target price
+              <input
+                aria-label="Target price"
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                value={targetPrice}
+                onChange={(event) => setTargetPrice(event.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2"
+              />
             </label>
-            <button type="submit" disabled={alertMutation.isPending} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Save alert</button>
-            <button type="button" onClick={() => setShowAlerts(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-bold">Cancel</button>
+            <button
+              type="submit"
+              disabled={alertMutation.isPending}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+            >
+              Save alert
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAlerts(false)}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-bold"
+            >
+              Cancel
+            </button>
           </form>
-          {alertMutation.isError && <p role="alert" className="mt-3 text-sm text-destructive">Could not save this alert. It may already exist.</p>}
+          {alertMutation.isError && (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              Could not save this alert. It may already exist.
+            </p>
+          )}
         </section>
       )}
 
@@ -138,16 +188,30 @@ function WishlistPage() {
               data-testid={`wishlist-card-${g.id}`}
               role="link"
               tabIndex={0}
-              onClick={() => navigate({ to: "/games/$gameId", params: { gameId: String(g.catalog_game_id) }, search: g.source === "steam" ? { source: "steam", title: g.title } : {} })}
+              onClick={() =>
+                navigate({
+                  to: "/games/$gameId",
+                  params: { gameId: String(g.catalog_game_id) },
+                  search: g.source === "steam" ? { source: "steam", title: g.title } : {},
+                })
+              }
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  navigate({ to: "/games/$gameId", params: { gameId: String(g.catalog_game_id) }, search: g.source === "steam" ? { source: "steam", title: g.title } : {} });
+                  navigate({
+                    to: "/games/$gameId",
+                    params: { gameId: String(g.catalog_game_id) },
+                    search: g.source === "steam" ? { source: "steam", title: g.title } : {},
+                  });
                 }
               }}
               className="hover-lift grid cursor-pointer grid-cols-1 gap-6 rounded-2xl border border-border bg-surface p-5 hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
             >
-              <Link to="/games/$gameId" params={{ gameId: String(g.catalog_game_id) }} search={g.source === "steam" ? { source: "steam", title: g.title } : {}}>
+              <Link
+                to="/games/$gameId"
+                params={{ gameId: String(g.catalog_game_id) }}
+                search={g.source === "steam" ? { source: "steam", title: g.title } : {}}
+              >
                 <GameCover
                   from="#7c3aed"
                   to="#111827"

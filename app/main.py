@@ -2608,10 +2608,6 @@ async def steam_game_price_history(appid: int, country: str = "US"):
         return await fetch_steam_store_game_detail(appid, country=normalized_country)
 
 
-@app.get("/steam/games/resolve", response_model=SteamStoreGameDetail)
-async def resolve_steam_game(title: str, country: str = "US"):
-    return await fetch_steam_store_game_price(title, country=country.strip().upper())
-
 
 @app.get("/steam/games/{appid}", response_model=SteamStoreGameDetail)
 async def get_steam_game(appid: int, country: str = "US"):

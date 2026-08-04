@@ -56,7 +56,11 @@ describe("ProfileView library visibility", () => {
     fireEvent.click(screen.getByRole("button", { name: "RPG" }));
     fireEvent.click(screen.getByRole("button", { name: "PC" }));
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
-    await waitFor(() => expect(api.updateProfile.mock.calls[0][0]).toEqual(expect.objectContaining({ favorite_genres: ["RPG"], platforms: ["PC"] })));
+    await waitFor(() =>
+      expect(api.updateProfile.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ favorite_genres: ["RPG"], platforms: ["PC"] }),
+      ),
+    );
   });
   it("formats friend game playtime from minutes", () => {
     profile.games[0].playtime = 125;

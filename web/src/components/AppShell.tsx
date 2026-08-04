@@ -5,7 +5,12 @@ import { Home, Search, Library, Heart, Tag, Users, Palette } from "lucide-react"
 import { ThemeSelector } from "./ThemeSelector";
 import { Avatar } from "./GameCover";
 import { getAuthSnapshot, getDeals, getProfile, subscribeToAuthChanges } from "@/lib/api";
-import { friendsQueryOptions, incomingFriendRequestsQueryOptions, libraryOverviewQueryOptions, steamSocialInfiniteQueryOptions } from "@/lib/navigationQueries";
+import {
+  friendsQueryOptions,
+  incomingFriendRequestsQueryOptions,
+  libraryOverviewQueryOptions,
+  steamSocialInfiniteQueryOptions,
+} from "@/lib/navigationQueries";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -127,7 +132,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {deals.length} price drops tracked{dealsAge ? ` · ${dealsAge}` : ""}
                 </p>
               </>
-            ) : <p className="label-mono relative text-primary">Live deals · loading</p>}
+            ) : (
+              <p className="label-mono relative text-primary">Live deals · loading</p>
+            )}
           </div>
 
           {signedIn && profile ? (

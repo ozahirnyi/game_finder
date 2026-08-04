@@ -92,7 +92,10 @@ function LibraryPage() {
       </div>
 
       {libraryQuery.isPending && !libraryQuery.data && (
-        <div data-testid="library-loading" className="rounded-2xl border border-border bg-surface p-6 text-sm text-muted-foreground">
+        <div
+          data-testid="library-loading"
+          className="rounded-2xl border border-border bg-surface p-6 text-sm text-muted-foreground"
+        >
           Loading your library…
         </div>
       )}

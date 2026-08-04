@@ -24,7 +24,12 @@ export const steamSocialInfiniteQueryOptions = () => ({
   queryKey: ["steam-social"] as const,
   queryFn: ({ pageParam }: { pageParam: number }) => getSteamSocial(12, pageParam),
   initialPageParam: 0,
-  getNextPageParam: (lastPage: Awaited<ReturnType<typeof getSteamSocial>>, pages: Awaited<ReturnType<typeof getSteamSocial>>[]) =>
-    lastPage.friends_has_more ? pages.reduce((total, page) => total + page.friends.length, 0) : undefined,
+  getNextPageParam: (
+    lastPage: Awaited<ReturnType<typeof getSteamSocial>>,
+    pages: Awaited<ReturnType<typeof getSteamSocial>>[],
+  ) =>
+    lastPage.friends_has_more
+      ? pages.reduce((total, page) => total + page.friends.length, 0)
+      : undefined,
   staleTime: NAVIGATION_STALE_TIME,
 });

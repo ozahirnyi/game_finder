@@ -5,7 +5,6 @@ const api = vi.hoisted(() => ({
   getCatalogGame: vi.fn(),
   searchGames: vi.fn(),
   getSteamGame: vi.fn(),
-  getSteamGameByTitle: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -16,7 +15,6 @@ vi.mock("@/lib/api", () => ({
   getSteamGame: api.getSteamGame,
   getSteamPriceHistory: vi.fn(),
   searchGames: api.searchGames,
-  getSteamGameByTitle: api.getSteamGameByTitle,
 }));
 
 import { mergeGamePrice, Route } from "./games.$gameId";
@@ -60,7 +58,12 @@ describe("Steam library game loader", () => {
   });
 
   it("keeps a Steam price when no IGDB price history is requested", () => {
-    expect(mergeGamePrice({ price: 25, originalPrice: 30, discount: 17, currency: "USD", store: "Steam" }, undefined)).toMatchObject({
+    expect(
+      mergeGamePrice(
+        { price: 25, originalPrice: 30, discount: 17, currency: "USD", store: "Steam" },
+        undefined,
+      ),
+    ).toMatchObject({
       price: 25,
       originalPrice: 30,
       discount: 17,
@@ -94,19 +97,18 @@ describe("Steam library game loader", () => {
     );
   });
 
-  it("keeps a title-bearing recommendation on a detail page when IGDB is unavailable", async () => {
+  it("does not resolve a Steam game by title when IGDB is unavailable", async () => {
     api.getCatalogGame.mockRejectedValue(new Error("IGDB timeout"));
     api.searchGames.mockRejectedValue(new Error("IGDB timeout"));
-    api.getSteamGameByTitle.mockResolvedValue({ appid: 1145360, name: "Hades", background_image: "https://steam.example/hades.jpg", description_raw: "Escape the Underworld.", genres: ["Action"], platforms: ["PC"], current: { shop: "Steam", price: { amount: 25, currency: "USD" }, url: "https://store.steampowered.com/app/1145360/" } });
 
     const loader = Route.options.loader;
     if (typeof loader !== "function") throw new Error("Expected a route loader");
 
-    const result = await loader({
-      params: { gameId: "0" },
-      deps: { title: "Hades" },
-    } as never);
-
-    expect(result.game).toMatchObject({ id: "1145360", title: "Hades", coverUrl: "https://steam.example/hades.jpg", genres: ["Action"], store: "Steam", isSteamLibrary: true });
+    await expect(
+      loader({
+        params: { gameId: "0" },
+        deps: { title: "Hades" },
+      } as never),
+    ).rejects.toBeDefined();
   });
 });

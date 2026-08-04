@@ -141,7 +141,9 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-bold">{titleFor[n.type] ?? "Notification"}</p>
+                    <p className="truncate text-sm font-bold">
+                      {titleFor[n.type] ?? "Notification"}
+                    </p>
                     {isUnread && <Chip tone="primary">New</Chip>}
                   </div>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">
