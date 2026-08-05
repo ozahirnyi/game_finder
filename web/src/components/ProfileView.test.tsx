@@ -102,6 +102,26 @@ describe("ProfileView library visibility", () => {
     expect(screen.getByText("Shared games")).toBeInTheDocument();
     expect(screen.getByText("This library is private.")).toBeInTheDocument();
   });
+  it("explains when Steam must be connected before shared games can be compared", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{
+            ...profile,
+            friendId: "friend-1",
+            sharedLibrary: {
+              status: "disconnected",
+              data: [],
+              message: "Both players must connect Steam to compare Steam libraries.",
+            },
+          }}
+          isSelf={false}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Steam connection required")).toBeInTheDocument();
+  });
   it("creates an invite from the selected shared game's canonical identity", async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
