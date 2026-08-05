@@ -1362,7 +1362,7 @@ def list_friends(
 
 
 @app.get("/friends/{user_id}/shared-games", response_model=SharedLibraryRead)
-def get_friend_shared_games(
+async def get_friend_shared_games(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -1373,31 +1373,81 @@ def get_friend_shared_games(
     if not can_view_section(friend, current_user, friend.library_visibility, db):
         return SharedLibraryRead(status="private", message="This library is private.")
 
+    steam_visible = can_view_section(friend, current_user, friend.steam_visibility, db)
+    friend_game_query = db.query(Game).filter(
+        Game.owner_id == friend.id,
+        Game.source.is_not(None),
+        Game.source != "",
+        Game.external_id.is_not(None),
+        Game.external_id != "",
+    )
+    own_game_query = db.query(Game).filter(
+        Game.owner_id == current_user.id,
+        Game.source.is_not(None),
+        Game.source != "",
+        Game.external_id.is_not(None),
+        Game.external_id != "",
+    )
+    if not steam_visible:
+        friend_game_query = friend_game_query.filter(Game.source != "steam")
+        own_game_query = own_game_query.filter(Game.source != "steam")
+
     friend_games = {
-        (game.source, game.external_id): game
-        for game in db.query(Game).filter(
-            Game.owner_id == friend.id,
-            Game.external_id.is_not(None),
-            Game.external_id != "",
-        )
-    }
-    matches = [
-        SharedGameRead(
+        (game.source, game.external_id): SharedGameRead(
             source=game.source,
             external_id=game.external_id,
-            title=friend_games[(game.source, game.external_id)].title,
-            cover_url=friend_games[(game.source, game.external_id)].img_icon_url,
+            title=game.title,
+            cover_url=game.img_icon_url,
         )
-        for game in db.query(Game).filter(
-            Game.owner_id == current_user.id,
-            Game.external_id.is_not(None),
-            Game.external_id != "",
-        )
+        for game in friend_game_query
+    }
+    matches = {
+        (game.source, game.external_id): friend_games[(game.source, game.external_id)]
+        for game in own_game_query
         if (game.source, game.external_id) in friend_games
-    ]
+    }
+
+    if friend.steam_id and not steam_visible and not matches:
+        return SharedLibraryRead(status="private", message="This Steam library is private.")
+    if steam_visible and current_user.steam_id and friend.steam_id:
+        try:
+            own_steam_games, friend_steam_games = await asyncio.gather(
+                fetch_owned_games(current_user.steam_id),
+                fetch_owned_games(friend.steam_id),
+            )
+        except HTTPException as exc:
+            if not matches:
+                return SharedLibraryRead(
+                    status="private" if exc.status_code == 409 else "error",
+                    message=str(exc.detail),
+                )
+        else:
+            friend_steam_by_appid = {
+                str(game["appid"]): game for game in friend_steam_games if game.get("appid") is not None
+            }
+            for game in own_steam_games:
+                appid = str(game.get("appid") or "")
+                friend_game = friend_steam_by_appid.get(appid)
+                if friend_game is None:
+                    continue
+                matches[("steam", appid)] = SharedGameRead(
+                    source="steam",
+                    external_id=appid,
+                    title=str(friend_game.get("name") or f"Steam app {appid}"),
+                    cover_url=steam_library_cover_url(appid, friend_game.get("img_icon_url")),
+                )
+    elif steam_visible and not matches and (current_user.steam_id or friend.steam_id):
+        return SharedLibraryRead(
+            status="disconnected",
+            message="Both players must connect Steam to compare Steam libraries.",
+        )
+
     if not matches:
         return SharedLibraryRead(status="empty", message="No shared saved games yet.")
-    return SharedLibraryRead(status="ready", data=matches)
+    return SharedLibraryRead(
+        status="ready",
+        data=sorted(matches.values(), key=lambda game: (game.title.casefold(), game.source, game.external_id)),
+    )
 
 
 def friend_social_context(db: Session, current_user: User, user_id: uuid.UUID) -> tuple[User, Friendship]:

@@ -215,6 +215,80 @@ def test_friend_shared_games_match_saved_source_and_external_id_only(social_db):
     assert use_social_api(alice, social_db).get(f"/friends/{charlie.id}/shared-games").status_code == 404
 
 
+def test_friend_shared_games_include_matching_connected_steam_libraries(monkeypatch, social_db):
+    alice, bob, *_ = create_users(social_db)
+    bob.steam_id = "bob-steam"
+    social_db.add(Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)))
+    social_db.commit()
+
+    async def fake_owned_games(steam_id):
+        if steam_id == alice.steam_id:
+            return [{"appid": 620, "name": "Portal Two", "img_icon_url": "alice-cover"}]
+        assert steam_id == bob.steam_id
+        return [{"appid": 620, "name": "Portal 2", "img_icon_url": "bob-cover"}]
+
+    monkeypatch.setattr(main, "fetch_owned_games", fake_owned_games)
+
+    response = use_social_api(alice, social_db).get(f"/friends/{bob.id}/shared-games")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ready",
+        "data": [{
+            "source": "steam",
+            "external_id": "620",
+            "title": "Portal 2",
+            "cover_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900.jpg",
+        }],
+        "message": None,
+    }
+
+
+def test_friend_shared_games_reports_private_steam_library(monkeypatch, social_db):
+    alice, bob, *_ = create_users(social_db)
+    bob.steam_id = "bob-steam"
+    social_db.add(Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)))
+    social_db.commit()
+
+    async def private_friend_library(steam_id):
+        if steam_id == alice.steam_id:
+            return []
+        raise main.HTTPException(status_code=409, detail="Steam library is private or unavailable.")
+
+    monkeypatch.setattr(main, "fetch_owned_games", private_friend_library)
+
+    response = use_social_api(alice, social_db).get(f"/friends/{bob.id}/shared-games")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "private",
+        "data": [],
+        "message": "Steam library is private or unavailable.",
+    }
+
+
+def test_friend_shared_games_respects_steam_visibility(monkeypatch, social_db):
+    alice, bob, *_ = create_users(social_db)
+    bob.steam_id = "bob-steam"
+    bob.steam_visibility = "private"
+    social_db.add(Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)))
+    social_db.commit()
+
+    async def unexpected_steam_request(_steam_id):
+        raise AssertionError("private Steam libraries must not be requested")
+
+    monkeypatch.setattr(main, "fetch_owned_games", unexpected_steam_request)
+
+    response = use_social_api(alice, social_db).get(f"/friends/{bob.id}/shared-games")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "private",
+        "data": [],
+        "message": "This Steam library is private.",
+    }
+
+
 def test_friend_shared_games_respects_library_visibility(social_db):
     alice, bob, *_ = create_users(social_db)
     bob.library_visibility = "private"

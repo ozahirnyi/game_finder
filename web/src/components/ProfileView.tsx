@@ -511,7 +511,11 @@ export function ProfileView({
                 title={
                   profile.sharedLibrary?.status === "private"
                     ? "Shared library unavailable"
-                    : "No shared saved games"
+                    : profile.sharedLibrary?.status === "disconnected"
+                      ? "Steam connection required"
+                      : profile.sharedLibrary?.status === "error"
+                        ? "Shared games unavailable"
+                        : "No shared saved games"
                 }
                 description={profile.sharedLibrary?.message ?? "No shared saved games yet."}
               />
