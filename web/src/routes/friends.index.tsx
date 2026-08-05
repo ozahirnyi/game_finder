@@ -8,10 +8,10 @@ import {
   acceptFriendRequest,
   ApiError,
   createFriendRequest,
-  getFriendActivity,
+  getConversationMessages,
+  getConversations,
   getFriendSocialSummary,
   getGameInvites,
-  getSharedGames,
   getSteamSocial,
   respondToGameInvite,
   searchUsers,
@@ -60,6 +60,10 @@ function FriendsPage() {
     queryKey: ["game-invites", "incoming"],
     queryFn: () => getGameInvites("incoming"),
   });
+  const allGameInvitesQuery = useQuery({
+    queryKey: ["game-invites", "all"],
+    queryFn: () => getGameInvites("all"),
+  });
   const searchQuery = useQuery({
     queryKey: ["user-search", searchTerm],
     queryFn: () => searchUsers(searchTerm),
@@ -107,16 +111,21 @@ function FriendsPage() {
     queryFn: () => getFriendSocialSummary(selectedId!),
     enabled: !!selectedId,
   });
-  const selectedSharedQuery = useQuery({
-    queryKey: ["friend-shared-games", selectedId],
-    queryFn: () => getSharedGames(selectedId!),
-    enabled: !!selectedId,
+  const conversationsQuery = useQuery({
+    queryKey: ["conversations"],
+    queryFn: getConversations,
   });
-  const selectedActivityQuery = useQuery({
-    queryKey: ["friend-activity", selectedId],
-    queryFn: () => getFriendActivity(selectedId!),
-    enabled: !!selectedId,
+  const selectedConversation = conversationsQuery.data?.find(
+    (conversation) => conversation.participant.id === selectedId,
+  );
+  const selectedMessagesQuery = useQuery({
+    queryKey: ["conversation-messages", selectedConversation?.id],
+    queryFn: () => getConversationMessages(selectedConversation!.id),
+    enabled: !!selectedConversation,
   });
+  const selectedInvites = (allGameInvitesQuery.data ?? []).filter(
+    (invite) => invite.sender.id === selectedId || invite.recipient.id === selectedId,
+  );
   const steamFriends = (steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? []).sort(
     (a, b) =>
       b.taste_match_percent - a.taste_match_percent || b.common_games_count - a.common_games_count,
@@ -528,42 +537,30 @@ function FriendsPage() {
                 </div>
               </section>
               <section>
-                <SectionHeader title="Shared games" />
-                {selectedSharedQuery.data?.status === "ready" ? (
+                <SectionHeader title="Messages" />
+                {selectedInvites.length || selectedMessagesQuery.data?.length ? (
                   <div className="space-y-2">
-                    {selectedSharedQuery.data.data.map((game) => (
+                    {selectedInvites.map((invite) => (
                       <p
-                        key={`${game.source}:${game.external_id}`}
-                        className="rounded-xl border border-border bg-surface p-3 text-sm font-semibold"
-                      >
-                        {game.title}
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="No shared games"
-                    description={selectedSharedQuery.data?.message ?? "Loading shared games…"}
-                  />
-                )}
-              </section>
-              <section>
-                <SectionHeader title="Activity" />
-                {selectedActivityQuery.data?.length ? (
-                  <div className="space-y-3">
-                    {selectedActivityQuery.data.map((item) => (
-                      <p
-                        key={`${item.type}:${item.created_at}`}
+                        key={`invite:${invite.id}`}
                         className="rounded-xl border border-border bg-surface p-3 text-sm"
                       >
-                        {item.text}
+                        Game invitation: {invite.game_name}
+                      </p>
+                    ))}
+                    {selectedMessagesQuery.data?.map((message) => (
+                      <p
+                        key={`message:${message.id}`}
+                        className="rounded-xl border border-border bg-surface p-3 text-sm"
+                      >
+                        {message.body}
                       </p>
                     ))}
                   </div>
                 ) : (
                   <EmptyState
-                    title="No activity yet"
-                    description="Messages and invitations with this friend will appear here."
+                    title="No messages yet"
+                    description="Start a conversation or send a game invitation."
                   />
                 )}
               </section>

@@ -26,6 +26,8 @@ const api = vi.hoisted(() => ({
   getGameInvites: vi.fn(),
   getFriendActivity: vi.fn(),
   getFriendSocialSummary: vi.fn(),
+  getConversationMessages: vi.fn(),
+  getConversations: vi.fn(),
   getIncomingFriendRequests: vi.fn(),
   getSharedGames: vi.fn(),
   getSteamSocial: vi.fn(),
@@ -74,7 +76,8 @@ describe("FriendsPage", () => {
     api.getFriends.mockResolvedValue([]);
     api.getIncomingFriendRequests.mockResolvedValue([]);
     api.getGameInvites.mockResolvedValue([]);
-    api.getFriendActivity.mockResolvedValue([]);
+    api.getConversations.mockResolvedValue([]);
+    api.getConversationMessages.mockResolvedValue([]);
     api.getFriendSocialSummary.mockResolvedValue({
       shared_games: 0,
       compatibility_percent: 0,
@@ -165,22 +168,40 @@ describe("FriendsPage", () => {
     expect(screen.queryByTitle("Messaging is coming soon")).not.toBeInTheDocument();
   });
 
-  it("restores the selected friend rail with server-backed summary and shared games", async () => {
+  it("shows real messages and game invitations for the selected friend in the rail", async () => {
     api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
     api.getFriendSocialSummary.mockResolvedValue({
       shared_games: 1,
       compatibility_percent: 100,
       wishlist_count: 2,
     });
-    api.getSharedGames.mockResolvedValue({
-      status: "ready",
-      data: [{ source: "steam", external_id: "620", title: "Portal 2" }],
-    });
+    api.getGameInvites.mockResolvedValue([
+      {
+        id: "invite-1",
+        sender: { id: "player-1", display_name: "Sam" },
+        recipient: { id: "me", display_name: "Me" },
+        game_name: "Portal 2",
+        status: "pending",
+      },
+    ]);
+    api.getConversations.mockResolvedValue([
+      { id: "conversation-1", participant: { id: "player-1", display_name: "Sam" } },
+    ]);
+    api.getConversationMessages.mockResolvedValue([
+      {
+        id: "message-1",
+        sender_id: "player-1",
+        body: "Ready tonight?",
+        created_at: "2026-08-05T12:00:00Z",
+      },
+    ]);
     renderFriends();
 
     expect(await screen.findByText("Selected friend")).toBeInTheDocument();
     expect(await screen.findByText("100%")).toBeInTheDocument();
-    expect(screen.getByText("Portal 2")).toBeInTheDocument();
+    expect(screen.getByText("Game invitation: Portal 2")).toBeInTheDocument();
+    expect(screen.getByText("Ready tonight?")).toBeInTheDocument();
+    expect(screen.queryByText("Activity")).not.toBeInTheDocument();
     expect(api.getFriendSocialSummary).toHaveBeenCalledWith("player-1");
   });
 

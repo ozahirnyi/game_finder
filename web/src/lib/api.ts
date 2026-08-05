@@ -176,7 +176,20 @@ export type FriendProfile = {
   };
 };
 
-export type Conversation = { id: string };
+export type Conversation = {
+  id: string;
+  participant: Friend["user"];
+  updated_at: string;
+  unread_count?: number;
+  last_message?: string | null;
+};
+
+export type ConversationMessage = {
+  id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+};
 
 export type Profile = {
   id: string;
@@ -564,6 +577,16 @@ export function createConversation(recipient_id: string) {
     auth: true,
     method: "POST",
     body: { recipient_id },
+  });
+}
+
+export function getConversations() {
+  return apiRequest<Conversation[]>("/conversations", { auth: true });
+}
+
+export function getConversationMessages(conversationId: string) {
+  return apiRequest<ConversationMessage[]>(`/conversations/${conversationId}/messages`, {
+    auth: true,
   });
 }
 
