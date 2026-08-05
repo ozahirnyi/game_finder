@@ -13,7 +13,10 @@ export const Route = createFileRoute("/search")({ component: SearchPage });
 const filters = ["All", "Co-op", "PC", "PS5", "On sale", "Roguelike", "RPG", "Multiplayer"];
 
 function SearchPage() {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("q") ?? "";
+  });
   const [active, setActive] = useState("All");
   const [mode, setMode] = useState<"catalog" | "ai">("catalog");
   const searchQuery = useQuery({
