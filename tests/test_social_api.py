@@ -235,6 +235,30 @@ def test_friend_shared_games_respects_library_visibility(social_db):
     }
 
 
+def test_friend_social_summary_and_activity_use_persisted_social_records(social_db):
+    alice, bob, *_ = create_users(social_db)
+    friendship = Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id))
+    social_db.add(friendship)
+    social_db.commit()
+    social_db.add_all([
+        Game(owner_id=alice.id, title="Portal 2", source="steam", external_id="620"),
+        Game(owner_id=bob.id, title="Portal 2", source="steam", external_id="620"),
+        Game(owner_id=bob.id, title="Hades", source="steam", external_id="1145360"),
+        WishlistItem(user_id=bob.id, catalog_game_id=1, source="igdb", external_id="igdb:1", title="Wishlist"),
+        DirectMessage(friendship_id=friendship.id, author_id=bob.id, text="Want to play?"),
+        GameInvite(sender_id=alice.id, recipient_id=bob.id, game_name="Portal 2", source="steam", external_id="620"),
+    ])
+    social_db.commit()
+
+    summary = use_social_api(alice, social_db).get(f"/friends/{bob.id}/social-summary")
+    activity = use_social_api(alice, social_db).get(f"/friends/{bob.id}/activity")
+
+    assert summary.status_code == 200
+    assert summary.json() == {"shared_games": 1, "compatibility_percent": 100, "wishlist_count": 1}
+    assert activity.status_code == 200
+    assert {item["type"] for item in activity.json()} == {"message", "game_invite"}
+
+
 def test_game_invite_preserves_canonical_identity_and_notifies_both_parties(social_db):
     alice, bob, charlie, _ = create_users(social_db)
     social_db.add(Friendship(user_low_id=alice.id, user_high_id=bob.id))

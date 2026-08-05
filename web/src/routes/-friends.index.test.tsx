@@ -24,7 +24,10 @@ const api = vi.hoisted(() => ({
   createFriendRequest: vi.fn(),
   getFriends: vi.fn(),
   getGameInvites: vi.fn(),
+  getFriendActivity: vi.fn(),
+  getFriendSocialSummary: vi.fn(),
   getIncomingFriendRequests: vi.fn(),
+  getSharedGames: vi.fn(),
   getSteamSocial: vi.fn(),
   searchUsers: vi.fn(),
   respondToGameInvite: vi.fn(),
@@ -71,6 +74,17 @@ describe("FriendsPage", () => {
     api.getFriends.mockResolvedValue([]);
     api.getIncomingFriendRequests.mockResolvedValue([]);
     api.getGameInvites.mockResolvedValue([]);
+    api.getFriendActivity.mockResolvedValue([]);
+    api.getFriendSocialSummary.mockResolvedValue({
+      shared_games: 0,
+      compatibility_percent: 0,
+      wishlist_count: null,
+    });
+    api.getSharedGames.mockResolvedValue({
+      status: "empty",
+      data: [],
+      message: "No shared saved games yet.",
+    });
     api.respondToGameInvite.mockResolvedValue({});
     api.getSteamSocial.mockResolvedValue({
       friends: [
@@ -149,6 +163,25 @@ describe("FriendsPage", () => {
     expect(screen.queryByText("Compatibility")).not.toBeInTheDocument();
     expect(screen.queryByText("Shared: вЂ”")).not.toBeInTheDocument();
     expect(screen.queryByTitle("Messaging is coming soon")).not.toBeInTheDocument();
+  });
+
+  it("restores the selected friend rail with server-backed summary and shared games", async () => {
+    api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
+    api.getFriendSocialSummary.mockResolvedValue({
+      shared_games: 1,
+      compatibility_percent: 100,
+      wishlist_count: 2,
+    });
+    api.getSharedGames.mockResolvedValue({
+      status: "ready",
+      data: [{ source: "steam", external_id: "620", title: "Portal 2" }],
+    });
+    renderFriends();
+
+    expect(await screen.findByText("Selected friend")).toBeInTheDocument();
+    expect(await screen.findByText("100%")).toBeInTheDocument();
+    expect(screen.getByText("Portal 2")).toBeInTheDocument();
+    expect(api.getFriendSocialSummary).toHaveBeenCalledWith("player-1");
   });
 
   it("shows Steam friends with taste match and a Steam profile link", async () => {

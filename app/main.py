@@ -39,7 +39,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
-    PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
+    PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead
 from app.steam import (
@@ -1398,6 +1398,65 @@ def get_friend_shared_games(
     if not matches:
         return SharedLibraryRead(status="empty", message="No shared saved games yet.")
     return SharedLibraryRead(status="ready", data=matches)
+
+
+def friend_social_context(db: Session, current_user: User, user_id: uuid.UUID) -> tuple[User, Friendship]:
+    friend = db.query(User).filter(User.id == user_id).first()
+    if friend is None or not are_friends(db, current_user.id, friend.id):
+        raise HTTPException(status_code=404, detail="Friend not found")
+    low_id, high_id = user_pair(current_user.id, friend.id)
+    friendship = db.query(Friendship).filter(
+        Friendship.user_low_id == low_id, Friendship.user_high_id == high_id
+    ).first()
+    if friendship is None:
+        raise HTTPException(status_code=404, detail="Friend not found")
+    return friend, friendship
+
+
+@app.get("/friends/{user_id}/social-summary", response_model=FriendSocialSummaryRead)
+def get_friend_social_summary(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friend, _ = friend_social_context(db, current_user, user_id)
+    own_ids = {
+        (game.source, game.external_id)
+        for game in db.query(Game).filter(Game.owner_id == current_user.id, Game.external_id.is_not(None), Game.external_id != "")
+    }
+    friend_ids = {
+        (game.source, game.external_id)
+        for game in db.query(Game).filter(Game.owner_id == friend.id, Game.external_id.is_not(None), Game.external_id != "")
+    }
+    shared_games = len(own_ids & friend_ids)
+    compatibility_percent = round(shared_games / max(1, min(len(own_ids), len(friend_ids))) * 100)
+    wishlist_count = db.query(WishlistItem).filter(WishlistItem.user_id == friend.id).count() if can_view_section(friend, current_user, friend.wishlist_visibility, db) else None
+    return FriendSocialSummaryRead(
+        shared_games=shared_games,
+        compatibility_percent=compatibility_percent,
+        wishlist_count=wishlist_count,
+    )
+
+
+@app.get("/friends/{user_id}/activity", response_model=list[FriendActivityRead])
+def get_friend_activity(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friend, friendship = friend_social_context(db, current_user, user_id)
+    messages = [
+        FriendActivityRead(type="message", text=f"{notification_actor_name(friend if message.author_id == friend.id else current_user)} sent a message", created_at=message.created_at)
+        for message in db.query(DirectMessage).filter(DirectMessage.friendship_id == friendship.id).all()
+    ]
+    invites = [
+        FriendActivityRead(type="game_invite", text=f"{notification_actor_name(friend if invite.sender_id == friend.id else current_user)} invited you to play {invite.game_name}", created_at=invite.created_at)
+        for invite in db.query(GameInvite).filter(
+            (GameInvite.sender_id == current_user.id) & (GameInvite.recipient_id == friend.id)
+            | (GameInvite.sender_id == friend.id) & (GameInvite.recipient_id == current_user.id)
+        ).all()
+    ]
+    return sorted([*messages, *invites], key=lambda item: item.created_at, reverse=True)[:20]
 
 
 @app.get("/friends/{user_id}/profile", response_model=FriendProfileRead)

@@ -123,6 +123,18 @@ export type SharedLibrary = {
   message?: string | null;
 };
 
+export type FriendSocialSummary = {
+  shared_games: number;
+  compatibility_percent: number;
+  wishlist_count?: number | null;
+};
+
+export type FriendActivity = {
+  type: "message" | "game_invite";
+  text: string;
+  created_at: string;
+};
+
 export type GameInvite = {
   id: string;
   sender: Friend["user"];
@@ -537,6 +549,14 @@ export function getFriendProfile(id: string) {
 
 export function getSharedGames(friendId: string) {
   return apiRequest<SharedLibrary>(`/friends/${friendId}/shared-games`, { auth: true });
+}
+
+export function getFriendSocialSummary(friendId: string) {
+  return apiRequest<FriendSocialSummary>(`/friends/${friendId}/social-summary`, { auth: true });
+}
+
+export function getFriendActivity(friendId: string) {
+  return apiRequest<FriendActivity[]>(`/friends/${friendId}/activity`, { auth: true });
 }
 
 export function createConversation(recipient_id: string) {

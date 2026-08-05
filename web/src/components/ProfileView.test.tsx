@@ -132,4 +132,23 @@ describe("ProfileView library visibility", () => {
       }),
     );
   });
+  it("opens an invite for the shared game card", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{
+            ...profile,
+            friendId: "friend-1",
+            sharedLibrary: {
+              status: "ready",
+              data: [{ source: "steam", external_id: "620", title: "Portal 2" }],
+            },
+          }}
+          isSelf={false}
+        />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Invite Portal 2" }));
+    expect(screen.getByRole("dialog", { name: "Invite Player" })).toBeVisible();
+  });
 });
