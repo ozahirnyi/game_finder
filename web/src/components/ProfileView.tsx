@@ -491,6 +491,17 @@ export function ProfileView({
                   >
                     <p className="truncate text-sm font-bold">{game.title}</p>
                     <p className="label-mono mt-1.5 text-muted-foreground">{game.source}</p>
+                    <button
+                      type="button"
+                      aria-label={`Invite ${game.title}`}
+                      onClick={() => {
+                        setSelectedGameKey(`${game.source}:${game.external_id}`);
+                        setInviteOpen(true);
+                      }}
+                      className="mt-3 w-full rounded-md bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground"
+                    >
+                      Invite
+                    </button>
                   </div>
                 ))}
               </div>

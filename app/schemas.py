@@ -503,6 +503,18 @@ class SharedLibraryRead(BaseModel):
     message: str | None = None
 
 
+class FriendSocialSummaryRead(BaseModel):
+    shared_games: int
+    compatibility_percent: int
+    wishlist_count: int | None = None
+
+
+class FriendActivityRead(BaseModel):
+    type: Literal["message", "game_invite"]
+    text: str
+    created_at: datetime
+
+
 class FriendProfileRead(BaseModel):
     user: PublicUserRead
     library: PublicDataBlock

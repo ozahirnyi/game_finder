@@ -8,7 +8,10 @@ import {
   acceptFriendRequest,
   ApiError,
   createFriendRequest,
+  getFriendActivity,
+  getFriendSocialSummary,
   getGameInvites,
+  getSharedGames,
   getSteamSocial,
   respondToGameInvite,
   searchUsers,
@@ -49,6 +52,7 @@ function FriendsPage() {
   const [steamExpanded, setSteamExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("");
+  const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
   const friendsQuery = useQuery(friendsQueryOptions());
   const steamSocialQuery = useInfiniteQuery({ ...steamSocialInfiniteQueryOptions(), retry: false });
   const incomingQuery = useQuery(incomingFriendRequestsQueryOptions());
@@ -96,6 +100,23 @@ function FriendsPage() {
     avatarTo: "#111827",
   }));
   const list = friends;
+  const selectedFriend = list.find((friend) => friend.id === selectedFriendId) ?? list[0];
+  const selectedId = selectedFriend?.id;
+  const selectedSummaryQuery = useQuery({
+    queryKey: ["friend-social-summary", selectedId],
+    queryFn: () => getFriendSocialSummary(selectedId!),
+    enabled: !!selectedId,
+  });
+  const selectedSharedQuery = useQuery({
+    queryKey: ["friend-shared-games", selectedId],
+    queryFn: () => getSharedGames(selectedId!),
+    enabled: !!selectedId,
+  });
+  const selectedActivityQuery = useQuery({
+    queryKey: ["friend-activity", selectedId],
+    queryFn: () => getFriendActivity(selectedId!),
+    enabled: !!selectedId,
+  });
   const steamFriends = (steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? []).sort(
     (a, b) =>
       b.taste_match_percent - a.taste_match_percent || b.common_games_count - a.common_games_count,
@@ -382,6 +403,7 @@ function FriendsPage() {
                       key={f.id}
                       to="/friends/$friendId"
                       params={{ friendId: f.id }}
+                      onClick={() => setSelectedFriendId(f.id)}
                       className="hover-lift grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
                     >
                       <div className="relative shrink-0">
@@ -432,6 +454,128 @@ function FriendsPage() {
               ))}
           </div>
         </div>
+        <aside className="space-y-8 lg:col-span-4">
+          {selectedFriend ? (
+            <>
+              <section className="rounded-3xl border border-border bg-surface p-6">
+                <p className="label-mono text-muted-foreground">Selected friend</p>
+                <Link
+                  to="/friends/$friendId"
+                  params={{ friendId: selectedFriend.id }}
+                  className="mt-3 flex items-center gap-4"
+                >
+                  <Avatar
+                    from={selectedFriend.avatarFrom}
+                    to={selectedFriend.avatarTo}
+                    name={selectedFriend.name}
+                    className="size-16 rounded-2xl"
+                  />
+                  <div>
+                    <p className="font-bold">{selectedFriend.name}</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      @{selectedFriend.handle}
+                    </p>
+                  </div>
+                </Link>
+                <div className="my-6 grid grid-cols-3 gap-3 border-y border-border py-4 text-center font-mono">
+                  <div>
+                    <p className="label-mono text-muted-foreground">Compat</p>
+                    <p className="text-xl font-black text-primary">
+                      {selectedSummaryQuery.data
+                        ? `${selectedSummaryQuery.data.compatibility_percent}%`
+                        : "…"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="label-mono text-muted-foreground">Shared</p>
+                    <p className="text-xl font-black">
+                      {selectedSummaryQuery.data?.shared_games ?? "…"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="label-mono text-muted-foreground">Wishlist</p>
+                    <p className="text-xl font-black">
+                      {selectedSummaryQuery.data?.wishlist_count ?? "Private"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      navigate({
+                        to: "/friends/$friendId",
+                        params: { friendId: selectedFriend.id },
+                        search: { compose: "invite" },
+                      })
+                    }
+                    className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground"
+                  >
+                    Invite to play
+                  </button>
+                  <button
+                    aria-label="Quick message"
+                    onClick={() =>
+                      navigate({
+                        to: "/friends/$friendId",
+                        params: { friendId: selectedFriend.id },
+                        search: { compose: "message" },
+                      })
+                    }
+                    className="grid size-10 place-items-center rounded-lg border border-border"
+                  >
+                    <MessageCircle className="size-4" />
+                  </button>
+                </div>
+              </section>
+              <section>
+                <SectionHeader title="Shared games" />
+                {selectedSharedQuery.data?.status === "ready" ? (
+                  <div className="space-y-2">
+                    {selectedSharedQuery.data.data.map((game) => (
+                      <p
+                        key={`${game.source}:${game.external_id}`}
+                        className="rounded-xl border border-border bg-surface p-3 text-sm font-semibold"
+                      >
+                        {game.title}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No shared games"
+                    description={selectedSharedQuery.data?.message ?? "Loading shared games…"}
+                  />
+                )}
+              </section>
+              <section>
+                <SectionHeader title="Activity" />
+                {selectedActivityQuery.data?.length ? (
+                  <div className="space-y-3">
+                    {selectedActivityQuery.data.map((item) => (
+                      <p
+                        key={`${item.type}:${item.created_at}`}
+                        className="rounded-xl border border-border bg-surface p-3 text-sm"
+                      >
+                        {item.text}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No activity yet"
+                    description="Messages and invitations with this friend will appear here."
+                  />
+                )}
+              </section>
+            </>
+          ) : (
+            <EmptyState
+              icon={<Users className="size-5" />}
+              title="No friend selected"
+              description="Add a friend to compare libraries."
+            />
+          )}
+        </aside>
       </div>
     </AppShell>
   );
