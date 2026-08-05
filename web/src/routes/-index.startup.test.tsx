@@ -50,6 +50,7 @@ function renderHome() {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+  return router;
 }
 
 beforeEach(() => {
@@ -71,5 +72,16 @@ describe("home startup", () => {
       await screen.findByRole("heading", { name: "Play with friends tonight" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Live deals · loading")).toBeInTheDocument();
+  });
+
+  it("uses a GET form so keyboard submit preserves the search query", async () => {
+    renderHome();
+
+    const input = screen.getByPlaceholderText("Search games by title");
+    const form = input.closest("form")!;
+    expect(form).toHaveAttribute("action", "/search");
+    expect(form).toHaveAttribute("method", "get");
+    expect(input).toHaveAttribute("name", "q");
+    expect(screen.getByRole("button", { name: "Search games" })).toHaveAttribute("type", "submit");
   });
 });

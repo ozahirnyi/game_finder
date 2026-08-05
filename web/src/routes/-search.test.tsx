@@ -7,6 +7,17 @@ vi.mock("@/components/AppShell", () => ({
 }));
 import { Route } from "./search";
 
+function renderSearch() {
+  const SearchPage = Route.options.component!;
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <SearchPage />
+    </QueryClientProvider>,
+  );
+}
+
 describe("SearchPage", () => {
   afterEach(() => {
     cleanup();
@@ -18,14 +29,7 @@ describe("SearchPage", () => {
       "fetch",
       vi.fn(() => new Promise<Response>(() => {})),
     );
-    const SearchPage = Route.options.component!;
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <SearchPage />
-      </QueryClientProvider>,
-    );
+    renderSearch();
 
     fireEvent.change(screen.getByPlaceholderText(/search by title/i), {
       target: { value: "Hades" },
@@ -47,14 +51,7 @@ describe("SearchPage", () => {
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const SearchPage = Route.options.component!;
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <SearchPage />
-      </QueryClientProvider>,
-    );
+    renderSearch();
     fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
     const prompt = await screen.findByPlaceholderText(/describe what you want/i);
     fireEvent.change(prompt, { target: { value: "co-op games for two" } });

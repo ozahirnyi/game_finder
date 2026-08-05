@@ -73,24 +73,26 @@ function Home() {
             : "Search games, discover new favourites, and catch live price drops — before you even sign in."}
         </p>
         <form
+          action="/search"
           className="relative mt-7 flex flex-col gap-3 sm:flex-row"
-          onSubmit={(event) => event.preventDefault()}
+          method="get"
         >
           <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border bg-background/70 px-5 py-4 backdrop-blur focus-within:border-primary/60">
             <Search className="size-4 text-muted-foreground" />
             <input
+              name="q"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search games by title"
               className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
-          <Link
-            to="/search"
+          <button
+            type="submit"
             className="grid shrink-0 place-items-center rounded-2xl bg-primary px-7 py-4 text-sm font-bold text-primary-foreground shadow-[0_14px_40px_-16px_var(--primary)] transition hover:opacity-90"
           >
             Search games
-          </Link>
+          </button>
         </form>
         {query.trim() !== "" && (
           <div className="animate-pop relative mt-4 overflow-hidden rounded-2xl border border-border bg-background/80 backdrop-blur">
