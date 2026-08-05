@@ -2,9 +2,17 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { Avatar, GameCover } from "@/components/GameCover";
-import { Chip, EmptyState, PresenceDot, SectionHeader } from "@/components/ui-bits";
-import { acceptFriendRequest, createFriendRequest, getSteamSocial, searchUsers } from "@/lib/api";
+import { Avatar } from "@/components/GameCover";
+import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
+import {
+  acceptFriendRequest,
+  ApiError,
+  createFriendRequest,
+  getGameInvites,
+  getSteamSocial,
+  respondToGameInvite,
+  searchUsers,
+} from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
 import {
   friendsQueryOptions,
@@ -19,13 +27,12 @@ export const Route = createFileRoute("/friends/")({
       { title: "Friends — Playfinder" },
       {
         name: "description",
-        content:
-          "Your gaming circle: shared libraries, who's online, and quick invites to play together.",
+        content: "Your Playfinder friends, shared libraries, and game invitations.",
       },
       { property: "og:title", content: "Friends — Playfinder" },
       {
         property: "og:description",
-        content: "See who's online, what you both own, and invite friends to play.",
+        content: "Browse friends, compare saved libraries, and invite friends to play.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -45,6 +52,10 @@ function FriendsPage() {
   const friendsQuery = useQuery(friendsQueryOptions());
   const steamSocialQuery = useInfiniteQuery({ ...steamSocialInfiniteQueryOptions(), retry: false });
   const incomingQuery = useQuery(incomingFriendRequestsQueryOptions());
+  const gameInvitesQuery = useQuery({
+    queryKey: ["game-invites", "incoming"],
+    queryFn: () => getGameInvites("incoming"),
+  });
   const searchQuery = useQuery({
     queryKey: ["user-search", searchTerm],
     queryFn: () => searchUsers(searchTerm),
@@ -65,20 +76,24 @@ function FriendsPage() {
       setStatus("Friend added");
     },
   });
+  const respondInviteMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "accepted" | "declined" }) =>
+      respondToGameInvite(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["game-invites"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      setStatus("Invite response sent");
+    },
+  });
+  const incomingInvites = (gameInvitesQuery.data ?? []).filter(
+    (invite) => invite.status === "pending",
+  );
   const friends = (friendsQuery.data ?? []).map(({ user }) => ({
     id: user.id,
     name: friendDisplayName(user),
     handle: friendDisplayName(user),
     avatarFrom: "#7c3aed",
     avatarTo: "#111827",
-    avatarUrl: user.avatar ?? undefined,
-    online: false,
-    lft: false,
-    compatibility: undefined as number | undefined,
-    sharedGames: undefined as number | undefined,
-    activity: undefined as string | undefined,
-    genres: [],
-    platforms: [],
   }));
   const list = friends;
   const steamFriends = (steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? []).sort(
@@ -87,16 +102,14 @@ function FriendsPage() {
   );
   const visibleSteamFriends = steamExpanded ? steamFriends : steamFriends.slice(0, 12);
   const steamFriendsTotal = steamSocialQuery.data?.pages[0]?.friends_total ?? 0;
-  const focus = list[0];
-  const sharedGames: Array<{
-    id: string;
-    title: string;
-    coverFrom: string;
-    coverTo: string;
-    coverUrl?: string;
-  }> = [];
-  const activity: Array<{ id: string; who: string; verb: string; target: string; time: string }> =
-    [];
+  const steamState =
+    steamSocialQuery.error instanceof ApiError
+      ? steamSocialQuery.error.status === 409
+        ? "disconnected"
+        : steamSocialQuery.error.status === 403
+          ? "private"
+          : "error"
+      : null;
 
   if (friendsQuery.isPending && !friendsQuery.data) {
     return (
@@ -118,7 +131,7 @@ function FriendsPage() {
           <div>
             <SectionHeader
               title="Friends"
-              hint={`${friends.length} friends · ${friends.filter((f) => f.online).length} online now`}
+              hint={`${friends.length} friends`}
               action={
                 <div className="flex items-center gap-2">
                   <button
@@ -215,6 +228,39 @@ function FriendsPage() {
                 ))}
               </section>
             ) : null}
+            {incomingInvites.length ? (
+              <section
+                aria-label="Game invites"
+                className="mb-6 space-y-2 rounded-2xl border border-border bg-surface p-4"
+              >
+                <h2 className="text-base font-bold">Game invites</h2>
+                {incomingInvites.map((invite) => (
+                  <div key={invite.id} className="flex items-center justify-between gap-3">
+                    <span className="text-sm">
+                      {friendDisplayName(invite.sender)} invited you to play {invite.game_name}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() =>
+                          respondInviteMutation.mutate({ id: invite.id, status: "accepted" })
+                        }
+                        className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
+                      >
+                        Accept {invite.game_name}
+                      </button>
+                      <button
+                        onClick={() =>
+                          respondInviteMutation.mutate({ id: invite.id, status: "declined" })
+                        }
+                        className="rounded-md border border-border px-3 py-1.5 text-xs font-bold"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </section>
+            ) : null}
             {status && (
               <p role="status" className="mb-4 text-sm font-semibold text-primary">
                 {status}
@@ -282,9 +328,13 @@ function FriendsPage() {
                   icon={<Users className="size-5" />}
                   title="No Steam friends available"
                   description={
-                    steamSocialQuery.isError
-                      ? "Steam friends list is private or unavailable."
-                      : "Connect Steam to compare libraries and taste match."
+                    steamState === "disconnected"
+                      ? "Steam is not connected. Connect Steam to view friends."
+                      : steamState === "private"
+                        ? "Steam friends list is private. Make it public in Steam to compare libraries."
+                        : steamState === "error"
+                          ? "Steam could not be reached. Try again shortly."
+                          : "Connect Steam to compare libraries and taste match."
                   }
                 />
               )}
@@ -341,9 +391,6 @@ function FriendsPage() {
                           name={f.name}
                           className="size-14 rounded-full"
                         />
-                        <span className="absolute -bottom-0.5 -right-0.5">
-                          <PresenceDot online={f.online} />
-                        </span>
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
@@ -351,30 +398,7 @@ function FriendsPage() {
                           <span className="font-mono text-[10px] text-muted-foreground">
                             @{f.handle}
                           </span>
-                          {f.lft && <Chip tone="primary">LFG</Chip>}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {f.online ? f.activity : "Offline"}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {f.genres.map((g) => (
-                            <Chip key={g}>{g}</Chip>
-                          ))}
-                          {f.platforms.map((p) => (
-                            <Chip key={p} tone="outline">
-                              {p}
-                            </Chip>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="hidden text-right sm:block">
-                        <p className="label-mono text-muted-foreground">Compatibility</p>
-                        <p className="font-mono text-lg font-black text-primary">
-                          {f.compatibility != null ? `${f.compatibility}%` : "—"}
-                        </p>
-                        <p className="label-mono mt-0.5 text-muted-foreground">
-                          {f.sharedGames != null ? `${f.sharedGames} shared` : "Shared: —"}
-                        </p>
                       </div>
                       <div className="flex flex-col gap-2" onClick={(e) => e.preventDefault()}>
                         <button
@@ -406,144 +430,6 @@ function FriendsPage() {
                   ))}
                 </div>
               ))}
-          </div>
-
-          <div className={friendSource === "playfinder" ? "" : "hidden"}>
-            <SectionHeader
-              title="Games you can play together"
-              hint="Titles owned by you and your friends"
-            />
-            {sharedGames.length === 0 ? (
-              <EmptyState
-                icon={<Gamepad2 className="size-5" />}
-                title="Nothing shared yet"
-                description="Once libraries are connected, shared games will show up here."
-              />
-            ) : (
-              <div className="stagger grid grid-cols-2 gap-4 md:grid-cols-3">
-                {sharedGames.map((g) => (
-                  <div
-                    key={g.id}
-                    className="hover-lift overflow-hidden rounded-xl border border-border bg-surface hover:border-primary/40"
-                  >
-                    <Link to="/games/$gameId" params={{ gameId: g.id }}>
-                      <GameCover
-                        from={g.coverFrom}
-                        to={g.coverTo}
-                        title={g.title}
-                        image={g.coverUrl}
-                        bare
-                        className="aspect-video w-full"
-                      />
-                    </Link>
-                    <div className="p-3">
-                      <Link
-                        to="/games/$gameId"
-                        params={{ gameId: g.id }}
-                        className="block truncate text-sm font-bold transition-colors hover:text-primary"
-                      >
-                        {g.title}
-                      </Link>
-                      <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-secondary py-1.5 text-xs font-bold">
-                        <Gamepad2 className="size-3.5" /> Invite
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right rail */}
-        <div className="space-y-8 lg:col-span-4">
-          {focus ? (
-            <div className="hidden rounded-3xl border border-border bg-surface p-6">
-              <Link
-                to="/friends/$friendId"
-                params={{ friendId: focus.id }}
-                className="flex items-center gap-4 transition hover:opacity-80"
-              >
-                <Avatar
-                  from={focus.avatarFrom}
-                  to={focus.avatarTo}
-                  name={focus.name}
-                  className="size-16 rounded-2xl"
-                />
-                <div>
-                  <p className="font-bold">{focus.name}</p>
-                  <p className="font-mono text-xs text-muted-foreground">@{focus.handle}</p>
-                </div>
-              </Link>
-
-              <div className="my-6 grid grid-cols-3 gap-3 border-y border-border py-4 text-center font-mono">
-                <div>
-                  <p className="label-mono text-muted-foreground">Compat</p>
-                  <p className="text-xl font-black text-primary">
-                    {focus.compatibility != null ? `${focus.compatibility}%` : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="label-mono text-muted-foreground">Shared</p>
-                  <p className="text-xl font-black">{focus.sharedGames ?? "—"}</p>
-                </div>
-                <div>
-                  <p className="label-mono text-muted-foreground">Wishlist</p>
-                  <p className="text-xl font-black">—</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  disabled
-                  title="Invites are coming soon"
-                  className="flex-1 cursor-not-allowed rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground opacity-50"
-                >
-                  Invite to play
-                </button>
-                <button
-                  disabled
-                  aria-label="Messaging is coming soon"
-                  title="Messaging is coming soon"
-                  className="grid size-10 cursor-not-allowed place-items-center rounded-lg border border-border opacity-50"
-                >
-                  <MessageCircle className="size-4" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <EmptyState
-              icon={<Users className="size-5" />}
-              title="No friend selected"
-              description="Pick a friend to see compatibility details."
-            />
-          )}
-
-          <div>
-            <SectionHeader title="Activity" />
-            {activity.length === 0 ? (
-              <EmptyState title="No activity" description="Recent activity will appear here." />
-            ) : (
-              <div className="space-y-4 font-mono text-[11px] leading-relaxed">
-                {activity.map((a) => {
-                  const f = friends.find((x) => x.id === a.who)!;
-                  return (
-                    <div key={a.id} className="flex gap-3">
-                      <Avatar
-                        from={f.avatarFrom}
-                        to={f.avatarTo}
-                        name={f.name}
-                        className="size-7 shrink-0 rounded-full"
-                      />
-                      <p className="text-muted-foreground">
-                        <span className="text-primary">{f.name}</span> {a.verb}{" "}
-                        <span className="text-foreground">{a.target}</span>{" "}
-                        <span className="text-muted-foreground/60">{a.time}</span>
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -132,6 +132,8 @@ describe("GameDetail actions", () => {
         recipient_id: "friend-1",
         game_name: "Hades II",
         game_id: 274755,
+        source: "igdb",
+        external_id: "274755",
       }),
     );
   });

@@ -180,6 +180,8 @@ class GameInvite(Base):
     sender_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     recipient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     game_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    external_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     game_name: Mapped[str] = mapped_column(String(255), nullable=False)
     note: Mapped[Optional[str]] = mapped_column(String(280), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")

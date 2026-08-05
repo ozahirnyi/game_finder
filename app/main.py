@@ -3,6 +3,7 @@ import os
 import uuid
 import contextlib
 import re
+from typing import Literal
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
@@ -38,7 +39,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
-    PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
+    PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead
 from app.steam import (
@@ -228,6 +229,8 @@ def game_invite_response(db: Session, invite: GameInvite) -> GameInviteRead:
         recipient=public_user_response(recipient),
         game_name=invite.game_name,
         game_id=invite.game_id,
+        source=invite.source,
+        external_id=invite.external_id,
         note=invite.note,
         status=invite.status,
         created_at=invite.created_at,
@@ -1358,6 +1361,45 @@ def list_friends(
     return result
 
 
+@app.get("/friends/{user_id}/shared-games", response_model=SharedLibraryRead)
+def get_friend_shared_games(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friend = db.query(User).filter(User.id == user_id).first()
+    if friend is None or not are_friends(db, current_user.id, friend.id):
+        raise HTTPException(status_code=404, detail="Friend not found")
+    if not can_view_section(friend, current_user, friend.library_visibility, db):
+        return SharedLibraryRead(status="private", message="This library is private.")
+
+    friend_games = {
+        (game.source, game.external_id): game
+        for game in db.query(Game).filter(
+            Game.owner_id == friend.id,
+            Game.external_id.is_not(None),
+            Game.external_id != "",
+        )
+    }
+    matches = [
+        SharedGameRead(
+            source=game.source,
+            external_id=game.external_id,
+            title=friend_games[(game.source, game.external_id)].title,
+            cover_url=friend_games[(game.source, game.external_id)].img_icon_url,
+        )
+        for game in db.query(Game).filter(
+            Game.owner_id == current_user.id,
+            Game.external_id.is_not(None),
+            Game.external_id != "",
+        )
+        if (game.source, game.external_id) in friend_games
+    ]
+    if not matches:
+        return SharedLibraryRead(status="empty", message="No shared saved games yet.")
+    return SharedLibraryRead(status="ready", data=matches)
+
+
 @app.get("/friends/{user_id}/profile", response_model=FriendProfileRead)
 async def get_friend_profile(
     user_id: uuid.UUID,
@@ -1499,14 +1541,20 @@ def create_message(
 
 @app.get("/game-invites", response_model=list[GameInviteRead])
 def list_game_invites(
+    direction: Literal["incoming", "outgoing", "all"] = "all",
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    invites = db.query(GameInvite).filter(
-        (GameInvite.sender_id == current_user.id) | (GameInvite.recipient_id == current_user.id)
-    ).order_by(GameInvite.created_at.desc()).offset(offset).limit(limit).all()
+    query = db.query(GameInvite)
+    if direction == "incoming":
+        query = query.filter(GameInvite.recipient_id == current_user.id)
+    elif direction == "outgoing":
+        query = query.filter(GameInvite.sender_id == current_user.id)
+    else:
+        query = query.filter((GameInvite.sender_id == current_user.id) | (GameInvite.recipient_id == current_user.id))
+    invites = query.order_by(GameInvite.created_at.desc()).offset(offset).limit(limit).all()
     return [game_invite_response(db, invite) for invite in invites]
 
 
@@ -1519,7 +1567,7 @@ def create_game_invite(
     if data.recipient_id == current_user.id or not are_friends(db, current_user.id, data.recipient_id):
         raise HTTPException(status_code=403, detail="You can only invite PlayFinder friends")
     recipient = db.query(User).filter(User.id == data.recipient_id).first()
-    invite = GameInvite(sender_id=current_user.id, recipient_id=recipient.id, game_id=data.game_id, game_name=data.game_name.strip(), note=data.note)
+    invite = GameInvite(sender_id=current_user.id, recipient_id=recipient.id, game_id=data.game_id, game_name=data.game_name.strip(), source=data.source, external_id=data.external_id, note=data.note)
     db.add(invite)
     db.flush()
     create_notification(db, recipient.id, "game_invite", {"invite_id": str(invite.id), "from": notification_actor_name(current_user), "game_name": invite.game_name})
