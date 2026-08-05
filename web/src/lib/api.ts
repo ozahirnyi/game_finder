@@ -105,7 +105,36 @@ export type GameInviteCreate = {
   recipient_id: string;
   game_name: string;
   game_id?: number;
+  source?: string;
+  external_id?: string;
   note?: string;
+};
+
+export type SharedGame = {
+  source: string;
+  external_id: string;
+  title: string;
+  cover_url?: string | null;
+};
+
+export type SharedLibrary = {
+  status: "ready" | "empty" | "private" | "disconnected" | "error";
+  data: SharedGame[];
+  message?: string | null;
+};
+
+export type GameInvite = {
+  id: string;
+  sender: Friend["user"];
+  recipient: Friend["user"];
+  game_name: string;
+  game_id?: number | null;
+  source?: string | null;
+  external_id?: string | null;
+  note?: string | null;
+  status: "pending" | "accepted" | "declined";
+  created_at: string;
+  responded_at?: string | null;
 };
 
 export type Friend = {
@@ -506,6 +535,10 @@ export function getFriendProfile(id: string) {
   return apiRequest<FriendProfile>(`/friends/${id}/profile`, { auth: true });
 }
 
+export function getSharedGames(friendId: string) {
+  return apiRequest<SharedLibrary>(`/friends/${friendId}/shared-games`, { auth: true });
+}
+
 export function createConversation(recipient_id: string) {
   return apiRequest<Conversation>("/conversations", {
     auth: true,
@@ -542,6 +575,18 @@ export function acceptFriendRequest(id: string) {
 
 export function createGameInvite(data: GameInviteCreate) {
   return apiRequest("/game-invites", { auth: true, method: "POST", body: data });
+}
+
+export function getGameInvites(direction: "incoming" | "outgoing" | "all" = "all") {
+  return apiRequest<GameInvite[]>(`/game-invites?direction=${direction}`, { auth: true });
+}
+
+export function respondToGameInvite(id: string, status: "accepted" | "declined") {
+  return apiRequest<GameInvite>(`/game-invites/${id}/response`, {
+    auth: true,
+    method: "POST",
+    body: { status },
+  });
 }
 
 export function getPriceAlerts() {

@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.main as main
-from app.database import Base, DirectMessage, Favorite, FriendRequest, Friendship, Game, Notification, OAuthIdentity, User, WishlistItem
+from app.database import Base, DirectMessage, Favorite, FriendRequest, Friendship, Game, GameInvite, Notification, OAuthIdentity, User, WishlistItem
 
 
 client = TestClient(main.app)
@@ -30,6 +30,7 @@ def social_db():
             FriendRequest.__table__,
             Friendship.__table__,
             DirectMessage.__table__,
+            GameInvite.__table__,
             Notification.__table__,
             OAuthIdentity.__table__,
             Game.__table__,
@@ -190,6 +191,82 @@ def test_friend_profile_returns_friend_bio_avatar_and_library(monkeypatch, socia
     assert payload["library"]["status"] == "ready"
     assert payload["library"]["data"][0]["title"] == "Portal 2"
     assert use_social_api(charlie, social_db).get(f"/friends/{bob.id}/profile").status_code == 404
+
+
+def test_friend_shared_games_match_saved_source_and_external_id_only(social_db):
+    alice, bob, charlie, _ = create_users(social_db)
+    social_db.add_all([
+        Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)),
+        Game(owner_id=alice.id, title="Portal Two", source="steam", external_id="620"),
+        Game(owner_id=bob.id, title="Portal 2", source="steam", external_id="620"),
+        Game(owner_id=alice.id, title="Same title", source="manual", external_id="first"),
+        Game(owner_id=bob.id, title="Same title", source="manual", external_id="second"),
+    ])
+    social_db.commit()
+
+    response = use_social_api(alice, social_db).get(f"/friends/{bob.id}/shared-games")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ready",
+        "data": [{"source": "steam", "external_id": "620", "title": "Portal 2", "cover_url": None}],
+        "message": None,
+    }
+    assert use_social_api(alice, social_db).get(f"/friends/{charlie.id}/shared-games").status_code == 404
+
+
+def test_friend_shared_games_respects_library_visibility(social_db):
+    alice, bob, *_ = create_users(social_db)
+    bob.library_visibility = "private"
+    social_db.add_all([
+        Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)),
+        Game(owner_id=alice.id, title="Portal 2", source="steam", external_id="620"),
+        Game(owner_id=bob.id, title="Portal 2", source="steam", external_id="620"),
+    ])
+    social_db.commit()
+
+    response = use_social_api(alice, social_db).get(f"/friends/{bob.id}/shared-games")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "private",
+        "data": [],
+        "message": "This library is private.",
+    }
+
+
+def test_game_invite_preserves_canonical_identity_and_notifies_both_parties(social_db):
+    alice, bob, charlie, _ = create_users(social_db)
+    social_db.add(Friendship(user_low_id=alice.id, user_high_id=bob.id))
+    social_db.commit()
+
+    created = use_social_api(alice, social_db).post(
+        "/game-invites",
+        json={
+            "recipient_id": str(bob.id),
+            "game_name": "Portal 2",
+            "source": "steam",
+            "external_id": "620",
+        },
+    )
+
+    assert created.status_code == 201
+    assert created.json()["source"] == "steam"
+    assert created.json()["external_id"] == "620"
+    incoming = use_social_api(bob, social_db).get("/game-invites")
+    assert [invite["id"] for invite in incoming.json()] == [created.json()["id"]]
+    assert use_social_api(charlie, social_db).post(
+        f"/game-invites/{created.json()['id']}/response",
+        json={"status": "accepted"},
+    ).status_code == 404
+    accepted = use_social_api(bob, social_db).post(
+        f"/game-invites/{created.json()['id']}/response",
+        json={"status": "accepted"},
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "accepted"
+    assert any(item["type"] == "game_invite" for item in use_social_api(bob, social_db).get("/notifications").json())
+    assert any(item["type"] == "game_invite_response" for item in use_social_api(alice, social_db).get("/notifications").json())
 
 
 def test_social_profile_nickname_and_player_search_are_public_but_private_fields_are_not(social_db):

@@ -6,7 +6,13 @@ import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { ConnectedServices } from "@/components/ConnectedServices";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
-import { createConversation, createGameInvite, createMessage, updateProfile } from "@/lib/api";
+import {
+  createConversation,
+  createGameInvite,
+  createMessage,
+  type SharedLibrary,
+  updateProfile,
+} from "@/lib/api";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
 const GENRE_OPTIONS = [
@@ -56,6 +62,7 @@ export type ProfileData = {
     source?: string;
   }[];
   activity?: { id: number | string; text: string; time: string }[];
+  sharedLibrary?: SharedLibrary;
   friendId?: string;
   settings?: {
     displayName: string;
@@ -86,7 +93,7 @@ export function ProfileView({
   const [messageOpen, setMessageOpen] = useState(initialComposer === "message");
   const [messageBody, setMessageBody] = useState("");
   const [inviteOpen, setInviteOpen] = useState(initialComposer === "invite");
-  const [gameName, setGameName] = useState("");
+  const [selectedGameKey, setSelectedGameKey] = useState("");
   const queryClient = useQueryClient();
   const saveSettings = useMutation({
     mutationFn: updateProfile,
@@ -111,10 +118,19 @@ export function ProfileView({
   const sendInvite = useMutation({
     mutationFn: () => {
       if (!profile.friendId) throw new Error("Friend not available");
-      return createGameInvite({ recipient_id: profile.friendId, game_name: gameName.trim() });
+      const game = profile.sharedLibrary?.data.find(
+        (item) => `${item.source}:${item.external_id}` === selectedGameKey,
+      );
+      if (!game) throw new Error("Select a shared game");
+      return createGameInvite({
+        recipient_id: profile.friendId,
+        game_name: game.title,
+        source: game.source,
+        external_id: game.external_id,
+      });
     },
     onSuccess: () => {
-      setGameName("");
+      setSelectedGameKey("");
       setInviteOpen(false);
     },
   });
@@ -134,7 +150,7 @@ export function ProfileView({
           />
           {!isSelf && (
             <span className="absolute -bottom-1 -right-1">
-              <PresenceDot online={!!profile.online} />
+              {profile.online != null && <PresenceDot online={profile.online} />}
             </span>
           )}
         </div>
@@ -178,7 +194,14 @@ export function ProfileView({
           ) : (
             <>
               <button
-                onClick={() => setInviteOpen(true)}
+                onClick={() => {
+                  setSelectedGameKey(
+                    profile.sharedLibrary?.data[0]
+                      ? `${profile.sharedLibrary.data[0].source}:${profile.sharedLibrary.data[0].external_id}`
+                      : "",
+                  );
+                  setInviteOpen(true);
+                }}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
               >
                 <UserPlus className="size-4" /> Invite to play
@@ -346,20 +369,36 @@ export function ProfileView({
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                if (gameName.trim()) sendInvite.mutate();
+                if (selectedGameKey) sendInvite.mutate();
               }}
               className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl"
             >
               <h2 className="text-xl font-bold">Invite {profile.name} to play</h2>
-              <input
-                aria-label="Game name"
-                value={gameName}
-                onChange={(event) => setGameName(event.target.value)}
-                required
-                maxLength={255}
-                placeholder="Game name"
-                className="mt-4 w-full rounded-lg border border-border bg-surface-2 p-3"
-              />
+              <label className="mt-4 grid gap-2 text-sm font-semibold">
+                Game
+                <select
+                  aria-label="Game"
+                  value={selectedGameKey}
+                  onChange={(event) => setSelectedGameKey(event.target.value)}
+                  required
+                  className="rounded-lg border border-border bg-surface-2 p-3"
+                >
+                  <option value="">Choose a shared game</option>
+                  {profile.sharedLibrary?.data.map((game) => (
+                    <option
+                      key={`${game.source}:${game.external_id}`}
+                      value={`${game.source}:${game.external_id}`}
+                    >
+                      {game.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!profile.sharedLibrary?.data.length && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  A shared saved game is required before you can send an invite.
+                </p>
+              )}
               {sendInvite.isError && (
                 <p role="alert" className="mt-2 text-sm text-destructive">
                   Could not send invite.
@@ -375,7 +414,7 @@ export function ProfileView({
                 </button>
                 <button
                   type="submit"
-                  disabled={sendInvite.isPending}
+                  disabled={sendInvite.isPending || !selectedGameKey}
                   className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground"
                 >
                   Send invite
@@ -414,25 +453,59 @@ export function ProfileView({
           </>
         ) : (
           <>
-            <Panel className="p-6 lg:col-span-12">
-              <SectionHeader title="Recent activity" />
-              {profile.activity && profile.activity.length > 0 ? (
-                <div className="space-y-3">
-                  {profile.activity.map((a) => (
-                    <div
-                      key={a.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3"
-                    >
-                      <span className="min-w-0 truncate text-sm">{a.text}</span>
-                      <span className="label-mono shrink-0 text-muted-foreground">{a.time}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="No recent activity" description="Nothing to show yet." />
-              )}
-            </Panel>
+            {profile.activity && (
+              <Panel className="p-6 lg:col-span-12">
+                <SectionHeader title="Recent activity" />
+                {profile.activity && profile.activity.length > 0 ? (
+                  <div className="space-y-3">
+                    {profile.activity.map((a) => (
+                      <div
+                        key={a.id}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3"
+                      >
+                        <span className="min-w-0 truncate text-sm">{a.text}</span>
+                        <span className="label-mono shrink-0 text-muted-foreground">{a.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState title="No recent activity" description="Nothing to show yet." />
+                )}
+              </Panel>
+            )}
           </>
+        )}
+
+        {!isSelf && (
+          <Panel className="p-6 lg:col-span-12">
+            <SectionHeader
+              title="Shared games"
+              hint={`${profile.sharedLibrary?.data.length ?? 0} saved matches`}
+            />
+            {profile.sharedLibrary?.status === "ready" ? (
+              <div className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {profile.sharedLibrary.data.map((game) => (
+                  <div
+                    key={`${game.source}:${game.external_id}`}
+                    className="rounded-xl border border-border bg-surface-2 p-3"
+                  >
+                    <p className="truncate text-sm font-bold">{game.title}</p>
+                    <p className="label-mono mt-1.5 text-muted-foreground">{game.source}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={<Gamepad2 className="size-5" />}
+                title={
+                  profile.sharedLibrary?.status === "private"
+                    ? "Shared library unavailable"
+                    : "No shared saved games"
+                }
+                description={profile.sharedLibrary?.message ?? "No shared saved games yet."}
+              />
+            )}
+          </Panel>
         )}
 
         {!isSelf && (

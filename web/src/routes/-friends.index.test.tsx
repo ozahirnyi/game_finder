@@ -15,9 +15,11 @@ const api = vi.hoisted(() => ({
   acceptFriendRequest: vi.fn(),
   createFriendRequest: vi.fn(),
   getFriends: vi.fn(),
+  getGameInvites: vi.fn(),
   getIncomingFriendRequests: vi.fn(),
   getSteamSocial: vi.fn(),
   searchUsers: vi.fn(),
+  respondToGameInvite: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => api);
@@ -60,6 +62,8 @@ describe("FriendsPage", () => {
     cleanup();
     api.getFriends.mockResolvedValue([]);
     api.getIncomingFriendRequests.mockResolvedValue([]);
+    api.getGameInvites.mockResolvedValue([]);
+    api.respondToGameInvite.mockResolvedValue({});
     api.getSteamSocial.mockResolvedValue({
       friends: [
         {
@@ -103,12 +107,40 @@ describe("FriendsPage", () => {
     await waitFor(() => expect(api.acceptFriendRequest).toHaveBeenCalledWith("request-1"));
   });
 
+  it("accepts an incoming game invite", async () => {
+    api.getGameInvites.mockResolvedValue([
+      {
+        id: "invite-1",
+        sender: { id: "player-1", display_name: "Sam" },
+        recipient: { id: "me", display_name: "Me" },
+        game_name: "Portal 2",
+        status: "pending",
+      },
+    ]);
+    renderFriends();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Accept Portal 2" }));
+    await waitFor(() =>
+      expect(api.respondToGameInvite).toHaveBeenCalledWith("invite-1", "accepted"),
+    );
+  });
+
   it("enables message and invite actions for an existing friend", async () => {
     api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
     renderFriends();
 
     expect(await screen.findByRole("button", { name: "Message" })).toBeEnabled();
     expect(screen.getAllByRole("button", { name: "Invite to play" })[0]).toBeEnabled();
+  });
+
+  it("does not present unavailable social metrics as statistics", async () => {
+    api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
+    renderFriends();
+
+    await screen.findByRole("button", { name: "Message" });
+    expect(screen.queryByText("Compatibility")).not.toBeInTheDocument();
+    expect(screen.queryByText("Shared: вЂ”")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Messaging is coming soon")).not.toBeInTheDocument();
   });
 
   it("shows Steam friends with taste match and a Steam profile link", async () => {

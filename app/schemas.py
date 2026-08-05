@@ -490,6 +490,19 @@ class FriendshipRead(BaseModel):
     created_at: datetime
 
 
+class SharedGameRead(BaseModel):
+    source: str
+    external_id: str
+    title: str
+    cover_url: str | None = None
+
+
+class SharedLibraryRead(BaseModel):
+    status: Literal["ready", "empty", "private", "disconnected", "error"]
+    data: list[SharedGameRead] = Field(default_factory=list)
+    message: str | None = None
+
+
 class FriendProfileRead(BaseModel):
     user: PublicUserRead
     library: PublicDataBlock
@@ -524,6 +537,8 @@ class GameInviteCreate(BaseModel):
     recipient_id: uuid.UUID
     game_name: str = Field(min_length=1, max_length=255)
     game_id: int | None = None
+    source: str | None = Field(default=None, min_length=1, max_length=32)
+    external_id: str | None = Field(default=None, min_length=1, max_length=255)
     note: str | None = Field(default=None, max_length=280)
 
 
@@ -533,6 +548,8 @@ class GameInviteRead(BaseModel):
     recipient: PublicUserRead
     game_name: str
     game_id: int | None = None
+    source: str | None = None
+    external_id: str | None = None
     note: str | None = None
     status: str
     created_at: datetime

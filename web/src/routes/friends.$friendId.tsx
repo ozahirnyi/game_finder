@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView, type ProfileData } from "@/components/ProfileView";
-import { getFriendProfile } from "@/lib/api";
+import { ApiError, getFriendProfile, getSharedGames, type SharedLibrary } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
 import { ArrowLeft } from "lucide-react";
 
@@ -28,6 +28,17 @@ export const Route = createFileRoute("/friends/$friendId")({
     } catch {
       throw notFound();
     }
+    let sharedLibrary: SharedLibrary;
+    try {
+      sharedLibrary = await getSharedGames(params.friendId);
+    } catch (error) {
+      sharedLibrary = {
+        status: "error",
+        data: [],
+        message:
+          error instanceof ApiError ? error.message : "Shared games are unavailable right now.",
+      };
+    }
     const friend = profile.user;
     return {
       friend: {
@@ -39,6 +50,7 @@ export const Route = createFileRoute("/friends/$friendId")({
         avatarUrl: friend.avatar ?? undefined,
         bio: friend.bio ?? undefined,
         library: profile.library,
+        sharedLibrary,
       },
     };
   },
@@ -117,8 +129,8 @@ function FriendProfilePage() {
           avatarUrl: friend.avatarUrl,
           bio: friend.bio,
           friendId: friend.id,
+          sharedLibrary: friend.sharedLibrary,
           region: "Global",
-          online: false,
           hours: formatFriendPlaytime(owned),
           games: owned,
           stores: [
@@ -133,7 +145,6 @@ function FriendProfilePage() {
               note: friend.library.status === "hidden" ? "Library is private" : "Synced games",
             },
           ],
-          activity: [],
         }}
       />
     </AppShell>

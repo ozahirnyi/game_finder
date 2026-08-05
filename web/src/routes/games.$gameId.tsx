@@ -273,6 +273,8 @@ function GameDetail() {
         recipient_id,
         game_name: catalogGame.title,
         game_id: Number(catalogGame.id),
+        source: catalogGame.isSteamLibrary ? "steam" : "igdb",
+        external_id: String(catalogGame.id),
       }),
     onSuccess: () => {
       setShowInviteForm(false);
