@@ -30,7 +30,7 @@ from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTr
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, PriceAlertCreate
+    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, PriceAlertCreate, WishlistItemCreate
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -41,7 +41,7 @@ from app.steam import (
     verify_steam_openid,
 )
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
-from app.retention import create_price_alert
+from app.retention import create_price_alert, create_wishlist_item, delete_price_alert, delete_wishlist_item, list_price_alerts, list_wishlist_items
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -237,6 +237,30 @@ def create_game_route(game: GameCreate,db: Session = Depends(get_db),current_use
     return created
 
 
+@app.get("/wishlist")
+def list_wishlist_route(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return list_wishlist_items(db, current_user.id)
+
+
+@app.post("/wishlist", status_code=201)
+def create_wishlist_route(
+    data: WishlistItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return create_wishlist_item(db, current_user, data)
+
+
+@app.delete("/wishlist/{item_id}", status_code=204)
+def delete_wishlist_route(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not delete_wishlist_item(db, current_user.id, item_id):
+        raise HTTPException(status_code=404, detail="Wishlist item not found")
+
+
 @app.post("/price-alerts", status_code=201)
 def create_price_alert_route(
     data: PriceAlertCreate,
@@ -244,6 +268,21 @@ def create_price_alert_route(
     current_user: User = Depends(get_current_user),
 ):
     return create_price_alert(db, current_user, data, telegram_account_response(current_user))
+
+
+@app.get("/price-alerts")
+def list_price_alerts_route(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return list_price_alerts(db, current_user.id)
+
+
+@app.delete("/price-alerts/{alert_id}", status_code=204)
+def delete_price_alert_route(
+    alert_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not delete_price_alert(db, current_user.id, alert_id):
+        raise HTTPException(status_code=404, detail="Price alert not found")
 
 
 @app.patch("/games/{id}", response_model=GameRead)

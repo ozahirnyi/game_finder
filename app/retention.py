@@ -38,6 +38,19 @@ def create_wishlist_item(
     return item
 
 
+def delete_wishlist_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> bool:
+    item = (
+        db.query(WishlistItem)
+        .filter(WishlistItem.id == item_id, WishlistItem.user_id == user_id)
+        .first()
+    )
+    if item is None:
+        return False
+    db.delete(item)
+    db.commit()
+    return True
+
+
 def create_price_alert(
     db: Session, user: User, data: PriceAlertCreate, telegram
 ) -> PriceAlert:
@@ -65,3 +78,25 @@ def create_price_alert(
     db.commit()
     db.refresh(alert)
     return alert
+
+
+def list_price_alerts(db: Session, user_id: uuid.UUID) -> list[PriceAlert]:
+    return (
+        db.query(PriceAlert)
+        .filter(PriceAlert.user_id == user_id)
+        .order_by(PriceAlert.created_at.desc())
+        .all()
+    )
+
+
+def delete_price_alert(db: Session, user_id: uuid.UUID, alert_id: uuid.UUID) -> bool:
+    alert = (
+        db.query(PriceAlert)
+        .filter(PriceAlert.id == alert_id, PriceAlert.user_id == user_id)
+        .first()
+    )
+    if alert is None:
+        return False
+    db.delete(alert)
+    db.commit()
+    return True

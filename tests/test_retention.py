@@ -110,3 +110,49 @@ def test_alert_duplicate_route_returns_readable_owner_scoped_conflict():
         assert response.json()["detail"] == "You already have this price alert."
     finally:
         main.app.dependency_overrides.clear()
+
+
+def test_wishlist_routes_only_expose_and_delete_the_current_users_item():
+    import app.main as main
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    user = User(email="wishlist-owner@example.test")
+    db.add(user)
+    db.commit()
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    client = TestClient(main.app)
+    payload = {"identity_kind": "rawg", "identity_value": "30", "title": "Hades"}
+    try:
+        created = client.post("/wishlist", json=payload)
+        assert created.status_code == 201
+        assert client.get("/wishlist").json()[0]["title"] == "Hades"
+        assert client.delete(f"/wishlist/{created.json()['id']}").status_code == 204
+        assert client.get("/wishlist").json() == []
+    finally:
+        main.app.dependency_overrides.clear()
+
+
+def test_price_alert_routes_list_and_delete_current_users_alert():
+    import app.main as main
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    user = User(email="alert-list-owner@example.test")
+    db.add(user)
+    db.commit()
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    client = TestClient(main.app)
+    payload = {"identity_kind": "rawg", "identity_value": "30", "title": "Hades", "mode": "any_discount", "in_app": True, "telegram": False}
+    try:
+        created = client.post("/price-alerts", json=payload)
+        assert created.status_code == 201
+        assert client.get("/price-alerts").json()[0]["title"] == "Hades"
+        assert client.delete(f"/price-alerts/{created.json()['id']}").status_code == 204
+        assert client.get("/price-alerts").json() == []
+    finally:
+        main.app.dependency_overrides.clear()
