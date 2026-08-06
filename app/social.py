@@ -3,7 +3,7 @@ import uuid
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import FriendRequest, Friendship, Notification, User
+from app.database import DirectMessage, FriendRequest, Friendship, GameInvite, Notification, User
 
 
 def canonical_pair(first: uuid.UUID, second: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
@@ -119,3 +119,52 @@ def social_me(db: Session, user: User) -> dict:
         "incoming": [{"id": str(item.id), **profile_payload(db, user.id, db.query(User).filter(User.id == item.sender_id).one())} for item in requests if item.recipient_id == user.id],
         "outgoing": [{"id": str(item.id), **profile_payload(db, user.id, db.query(User).filter(User.id == item.recipient_id).one())} for item in requests if item.sender_id == user.id],
     }
+
+
+def send_message(db: Session, author_id: uuid.UUID, friend_id: uuid.UUID, text: str) -> DirectMessage:
+    text = text.strip()
+    if not text or len(text) > 2000:
+        raise HTTPException(status_code=422, detail="Message must contain 1 to 2000 characters")
+    friendship = require_friendship(db, author_id, friend_id)
+    message = DirectMessage(friendship_id=friendship.id, author_id=author_id, text=text)
+    db.add(message); db.flush()
+    db.add(Notification(user_id=friend_id, event_type="message", target_kind="message", friendship_id=friendship.id, direct_message_id=message.id))
+    db.commit(); db.refresh(message)
+    return message
+
+
+def list_messages(db: Session, user_id: uuid.UUID, friend_id: uuid.UUID) -> list[DirectMessage]:
+    friendship = require_friendship(db, user_id, friend_id)
+    return db.query(DirectMessage).filter(DirectMessage.friendship_id == friendship.id).order_by(DirectMessage.created_at).limit(50).all()
+
+
+def create_invite(db: Session, sender_id: uuid.UUID, recipient_id: uuid.UUID, game_id: str, game_title: str) -> GameInvite:
+    friendship = require_friendship(db, sender_id, recipient_id)
+    if not game_id or not game_title.strip():
+        raise HTTPException(status_code=422, detail="A game is required")
+    existing = db.query(GameInvite).filter_by(friendship_id=friendship.id, sender_id=sender_id, recipient_id=recipient_id, game_id=str(game_id), status="pending").first()
+    if existing:
+        raise HTTPException(status_code=409, detail="A game invite is already pending")
+    invite = GameInvite(friendship_id=friendship.id, sender_id=sender_id, recipient_id=recipient_id, game_id=str(game_id), game_title=game_title.strip())
+    db.add(invite); db.flush()
+    db.add(Notification(user_id=recipient_id, event_type="game_invite", target_kind="game_invite", friendship_id=friendship.id, game_invite_id=invite.id))
+    db.commit(); db.refresh(invite)
+    return invite
+
+
+def transition_invite(db: Session, actor_id: uuid.UUID, invite_id: uuid.UUID, action: str) -> GameInvite:
+    invite = db.query(GameInvite).filter(GameInvite.id == invite_id).first()
+    if invite is None or actor_id not in (invite.sender_id, invite.recipient_id):
+        raise HTTPException(status_code=404, detail="Game invite not found")
+    allowed = {"accept", "decline"} if actor_id == invite.recipient_id else {"cancel"}
+    if action not in allowed:
+        raise HTTPException(status_code=403, detail="You cannot perform this action")
+    target = {"accept": "accepted", "decline": "declined", "cancel": "cancelled"}[action]
+    if invite.status != "pending":
+        if invite.status == target: return invite
+        raise HTTPException(status_code=409, detail="Game invite is no longer pending")
+    invite.status = target
+    if action in {"accept", "decline"}:
+        db.add(Notification(user_id=invite.sender_id, event_type="game_invite_response", target_kind="game_invite", friendship_id=invite.friendship_id, game_invite_id=invite.id))
+    db.commit(); db.refresh(invite)
+    return invite

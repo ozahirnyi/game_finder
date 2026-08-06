@@ -104,3 +104,23 @@ def test_social_routes_hide_email_and_allow_request_by_profile_id():
         assert request.status_code == 201
     finally:
         main.app.dependency_overrides.clear()
+
+
+def test_confirmed_friends_can_send_messages_and_invites():
+    social = importlib.import_module("app.social")
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    sender = User(email="message-sender@example.test", display_name="Sender")
+    recipient = User(email="message-recipient@example.test", display_name="Recipient")
+    db.add_all([sender, recipient]); db.commit()
+    request = social.create_friend_request(db, sender, profile_id=recipient.profile_id, friend_code=None)
+    social.transition_friend_request(db, recipient.id, request.id, "accept")
+
+    message = social.send_message(db, sender.id, recipient.id, "  Ready?  ")
+    invite = social.create_invite(db, sender.id, recipient.id, "30", "Hades")
+    social.transition_invite(db, recipient.id, invite.id, "accept")
+
+    assert message.text == "Ready?"
+    assert social.list_messages(db, recipient.id, sender.id)[0].id == message.id
+    assert social.list_notifications(db, sender.id)[0].event_type == "game_invite_response"
