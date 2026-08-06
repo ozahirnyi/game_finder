@@ -73,6 +73,15 @@ class FriendRequestCreate(BaseModel):
         return self
 
 
+class MessageCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class GameInviteCreate(BaseModel):
+    game_id: str = Field(min_length=1, max_length=64)
+    game_title: str = Field(min_length=1, max_length=255)
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

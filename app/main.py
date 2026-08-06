@@ -30,7 +30,7 @@ from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTr
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, PriceAlertCreate, WishlistItemCreate, FriendRequestCreate
+    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, PriceAlertCreate, WishlistItemCreate, FriendRequestCreate, MessageCreate, GameInviteCreate
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -42,7 +42,7 @@ from app.steam import (
 )
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
 from app.retention import create_price_alert, create_wishlist_item, delete_price_alert, delete_wishlist_item, list_price_alerts, list_price_notifications, list_wishlist_items, mark_price_notification_read
-from app.social import create_friend_request, profile_payload, search_profiles, social_me, transition_friend_request
+from app.social import create_friend_request, create_invite, list_messages, profile_payload, search_profiles, send_message, social_me, transition_friend_request, transition_invite
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -331,6 +331,28 @@ def transition_social_friend_request(request_id: uuid.UUID, action: str, db: Ses
     if action not in {"accept", "reject", "cancel"}:
         raise HTTPException(status_code=404, detail="Action not found")
     return transition_friend_request(db, current_user.id, request_id, action)
+
+
+@app.get("/social/friends/{friend_id}/messages")
+def list_social_messages(friend_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return list_messages(db, current_user.id, friend_id)
+
+
+@app.post("/social/friends/{friend_id}/messages", status_code=201)
+def send_social_message(friend_id: uuid.UUID, data: MessageCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return send_message(db, current_user.id, friend_id, data.text)
+
+
+@app.post("/social/friends/{friend_id}/invites", status_code=201)
+def create_social_invite(friend_id: uuid.UUID, data: GameInviteCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return create_invite(db, current_user.id, friend_id, data.game_id, data.game_title)
+
+
+@app.post("/social/invites/{invite_id}/{action}")
+def transition_social_invite(invite_id: uuid.UUID, action: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if action not in {"accept", "decline", "cancel"}:
+        raise HTTPException(status_code=404, detail="Action not found")
+    return transition_invite(db, current_user.id, invite_id, action)
 
 
 @app.patch("/games/{id}", response_model=GameRead)

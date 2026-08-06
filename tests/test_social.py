@@ -124,3 +124,18 @@ def test_confirmed_friends_can_send_messages_and_invites():
     assert message.text == "Ready?"
     assert social.list_messages(db, recipient.id, sender.id)[0].id == message.id
     assert social.list_notifications(db, sender.id)[0].event_type == "game_invite_response"
+
+
+def test_message_route_denies_non_friend():
+    import app.main as main
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine); db = sessionmaker(bind=engine)()
+    alice = User(email="route-alice@example.test", display_name="Alice")
+    bob = User(email="route-bob@example.test", display_name="Bob")
+    db.add_all([alice, bob]); db.commit()
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    main.app.dependency_overrides[main.get_current_user] = lambda: alice
+    try:
+        assert TestClient(main.app).post(f"/social/friends/{bob.id}/messages", json={"text": "Hi"}).status_code == 403
+    finally:
+        main.app.dependency_overrides.clear()
