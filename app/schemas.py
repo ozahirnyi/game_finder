@@ -1,6 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 import uuid
 
 
@@ -8,6 +8,32 @@ class GameCreate(BaseModel):
     title: str = Field(max_length=255)
     notes: Optional[str] = Field(default=None, max_length=255)
     info: Optional[str] = Field(default=None, max_length=500)
+
+
+class PriceAlertCreate(BaseModel):
+    identity_kind: Literal["rawg", "steam"]
+    identity_value: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=255)
+    mode: Literal["target_price", "target_discount", "any_discount"]
+    threshold: float | None = Field(default=None, gt=0)
+    in_app: bool = True
+    telegram: bool = False
+
+    @model_validator(mode="after")
+    def validate_threshold(self):
+        if self.mode == "any_discount" and self.threshold is not None:
+            raise ValueError("any_discount must not have a threshold")
+        if self.mode != "any_discount" and self.threshold is None:
+            raise ValueError("A target price or discount is required")
+        if not self.in_app and not self.telegram:
+            raise ValueError("Choose at least one delivery channel")
+        return self
+
+
+class WishlistItemCreate(BaseModel):
+    identity_kind: Literal["rawg", "steam"]
+    identity_value: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=255)
 
 
 class GameRead(BaseModel):

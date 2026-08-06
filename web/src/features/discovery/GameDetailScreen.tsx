@@ -6,9 +6,14 @@ import { StatePanel } from "@/components/ui";
 import {
   getCatalogGame,
   getGamePriceHistory,
+  getTelegramAccount,
+  listPriceAlerts,
   type CatalogGame,
   type GamePriceHistory,
+  type PriceAlert,
+  type TelegramAccount,
 } from "@/lib/api";
+import { AlertControls } from "@/features/retention/AlertControls";
 type RemoteState<T> =
   | { status: "loading" }
   | { status: "error"; message: string }
@@ -23,6 +28,14 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
   });
   const [gameRetry, setGameRetry] = useState(0);
   const [priceRetry, setPriceRetry] = useState(0);
+  const [alerts, setAlerts] = useState<PriceAlert[]>([]);
+  const [telegram, setTelegram] = useState<TelegramAccount>({
+    linked: false,
+    configured: false,
+    username: null,
+    linked_at: null,
+  });
+  const [alertsRetry, setAlertsRetry] = useState(0);
   useEffect(() => {
     let active = true;
     void getCatalogGame(gameId)
@@ -55,6 +68,14 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
       active = false;
     };
   }, [gameId, priceRetry]);
+  useEffect(() => {
+    void Promise.all([listPriceAlerts(), getTelegramAccount()])
+      .then(([alertData, telegramData]) => {
+        setAlerts(alertData);
+        setTelegram(telegramData);
+      })
+      .catch(() => undefined);
+  }, [alertsRetry]);
   return (
     <section className="stack">
       <section>
@@ -116,6 +137,16 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
           </p>
         ) : null}
       </section>
+      {game.status === "success" && price.status === "success" ? (
+        <AlertControls
+          identity={{ kind: "rawg", value: String(game.data.id) }}
+          title={game.data.name}
+          alerts={alerts}
+          telegram={telegram}
+          supported={Boolean(price.data.itad_id)}
+          onChanged={() => setAlertsRetry((value) => value + 1)}
+        />
+      ) : null}
     </section>
   );
 }
