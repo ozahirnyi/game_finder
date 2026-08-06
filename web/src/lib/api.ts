@@ -189,7 +189,7 @@ export type TelegramLink = {
   message: string | null;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://playfinder.cc/api";
+const API_URL = import.meta.env.VITE_API_URL || "https://playfinder.cc/api";
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
 
