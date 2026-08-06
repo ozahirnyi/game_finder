@@ -1,7 +1,11 @@
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearToken, getToken, setToken } from "./api";
-import { completeLogin, currentUserQueryOptions, signOut } from "./auth-session";
+import {
+  completeLogin,
+  currentUserQueryOptions,
+  signOut,
+} from "./auth-session";
 
 afterEach(() => clearToken());
 
@@ -24,7 +28,9 @@ describe("auth session", () => {
     completeLogin("header.eyJleHAiOjQxMDI0NDQ4MDB9.signature", queryClient);
 
     expect(getToken()).not.toBeNull();
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["auth", "me"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["auth", "me"],
+    });
   });
 
   it("clears the token and authenticated query data on logout", () => {
@@ -37,6 +43,8 @@ describe("auth session", () => {
 
     expect(getToken()).toBeNull();
     expect(queryClient.getQueryData(["auth", "me"])).toBeUndefined();
-    expect(queryClient.getQueryData(["catalog", "search", "Hades"])).toEqual({ results: [] });
+    expect(queryClient.getQueryData(["catalog", "search", "Hades"])).toEqual({
+      results: [],
+    });
   });
 });

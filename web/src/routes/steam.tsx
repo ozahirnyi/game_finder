@@ -8,7 +8,11 @@ export const Route = createFileRoute("/steam")({
   head: () => ({
     meta: [
       { title: "Steam Integration — GameFinder" },
-      { name: "description", content: "Connect Steam to unlock shared-game tracking, friend compatibility, and co-op matchmaking." },
+      {
+        name: "description",
+        content:
+          "Connect Steam to unlock shared-game tracking, friend compatibility, and co-op matchmaking.",
+      },
     ],
   }),
   component: SteamPage,
@@ -36,8 +40,8 @@ function SteamPage() {
               {currentUser.stats.library} games synced
             </h3>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              We refresh every 15 minutes. Your library, wishlist, and playtime feed
-              the shared-games engine and AI recommendations.
+              We refresh every 15 minutes. Your library, wishlist, and playtime
+              feed the shared-games engine and AI recommendations.
             </p>
             <div className="mt-8 grid grid-cols-3 gap-6 border-t border-border pt-6 font-mono">
               {[
@@ -70,20 +74,20 @@ function SteamPage() {
           <h4 className="mb-2 font-bold">Privacy in plain words</h4>
           <ul className="space-y-3 text-sm text-muted-foreground">
             <li className="flex gap-2">
-              <Check className="mt-0.5 size-4 shrink-0 text-primary" /> Read-only.
-              We never post or modify anything on Steam.
+              <Check className="mt-0.5 size-4 shrink-0 text-primary" />{" "}
+              Read-only. We never post or modify anything on Steam.
             </li>
             <li className="flex gap-2">
-              <Check className="mt-0.5 size-4 shrink-0 text-primary" /> Only your
-              library, wishlist, and playtime are used.
+              <Check className="mt-0.5 size-4 shrink-0 text-primary" /> Only
+              your library, wishlist, and playtime are used.
             </li>
             <li className="flex gap-2">
               <Check className="mt-0.5 size-4 shrink-0 text-primary" /> Friends
               only see what you allow in your privacy settings.
             </li>
             <li className="flex gap-2">
-              <Lock className="mt-0.5 size-4 shrink-0 text-primary" /> Disconnect
-              anytime — we wipe your synced data within 24 hours.
+              <Lock className="mt-0.5 size-4 shrink-0 text-primary" />{" "}
+              Disconnect anytime — we wipe your synced data within 24 hours.
             </li>
           </ul>
         </div>

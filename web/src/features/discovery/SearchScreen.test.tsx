@@ -8,7 +8,12 @@ vi.mock("@/lib/api", () => ({ searchGames: vi.fn() }));
 describe("SearchScreen", () => {
   it("keeps loading and unavailable states distinct", async () => {
     let rejectSearch: (reason?: unknown) => void = () => undefined;
-    vi.mocked(searchGames).mockImplementationOnce(() => new Promise((_, reject) => { rejectSearch = reject; }));
+    vi.mocked(searchGames).mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectSearch = reject;
+        }),
+    );
 
     render(<SearchScreen initialQuery="hades" />);
 
@@ -20,11 +25,23 @@ describe("SearchScreen", () => {
 
   it("renders Steam fallback search results as store links", async () => {
     vi.mocked(searchGames).mockResolvedValue({
-      results: [{ id: null, name: "Hades", released: null, background_image: "https://cdn.example/hades.jpg", source: "steam", steam_appid: 1145360, url: "https://store.steampowered.com/app/1145360/" }],
+      results: [
+        {
+          id: null,
+          name: "Hades",
+          released: null,
+          background_image: "https://cdn.example/hades.jpg",
+          source: "steam",
+          steam_appid: 1145360,
+          url: "https://store.steampowered.com/app/1145360/",
+        },
+      ],
     });
 
     render(<SearchScreen initialQuery="hades" />);
 
-    expect(await screen.findByRole("link", { name: "View on Steam" })).toHaveAttribute("href", "https://store.steampowered.com/app/1145360/");
+    expect(
+      await screen.findByRole("link", { name: "View on Steam" }),
+    ).toHaveAttribute("href", "https://store.steampowered.com/app/1145360/");
   });
 });

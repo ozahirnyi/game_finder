@@ -9,7 +9,11 @@ export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
       { title: "Profile — GameFinder" },
-      { name: "description", content: "Your GameFinder profile: stats, favorite games, integrations, and privacy controls." },
+      {
+        name: "description",
+        content:
+          "Your GameFinder profile: stats, favorite games, integrations, and privacy controls.",
+      },
     ],
   }),
   component: ProfilePage,
@@ -19,7 +23,9 @@ function ProfilePage() {
   const favs = games.filter((g) =>
     ["hades2", "eldenring", "bg3", "drg"].includes(g.id),
   );
-  const wl = games.filter((g) => g.status === "Want to Play" || g.discount).slice(0, 3);
+  const wl = games
+    .filter((g) => g.status === "Want to Play" || g.discount)
+    .slice(0, 3);
 
   return (
     <AppShell>
@@ -161,12 +167,27 @@ function ProfilePage() {
           <div className="rounded-2xl border border-border bg-surface p-6">
             <SectionHeader title="Integrations" />
             {[
-              { name: "Steam", connected: currentUser.integrations.steam, note: "342 games synced" },
-              { name: "PlayStation Network", connected: currentUser.integrations.psn, note: "128 games · 47 platinums" },
-              { name: "Telegram", connected: currentUser.integrations.telegram, note: "Price-drop alerts" },
-              { name: "Google", connected: currentUser.integrations.google, note: "Sign-in" },
+              {
+                name: "Steam",
+                connected: currentUser.integrations.steam,
+                note: "342 games synced",
+              },
+              {
+                name: "PlayStation Network",
+                connected: currentUser.integrations.psn,
+                note: "128 games · 47 platinums",
+              },
+              {
+                name: "Telegram",
+                connected: currentUser.integrations.telegram,
+                note: "Price-drop alerts",
+              },
+              {
+                name: "Google",
+                connected: currentUser.integrations.google,
+                note: "Sign-in",
+              },
             ].map((i) => (
-
               <div
                 key={i.name}
                 className="flex items-center justify-between border-t border-border py-3 first:border-t-0"

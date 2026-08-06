@@ -10,7 +10,11 @@ import {
 } from "./api";
 
 export function useAuthenticated() {
-  return useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
+  return useSyncExternalStore(
+    subscribeToAuthChanges,
+    getAuthSnapshot,
+    () => false,
+  );
 }
 
 export function currentUserQueryOptions() {
@@ -30,6 +34,7 @@ export function completeLogin(token: string, queryClient: QueryClient) {
 export function signOut(queryClient: QueryClient) {
   clearToken();
   queryClient.removeQueries({
-    predicate: (query) => query.queryKey[0] === "auth" || query.meta?.auth === true,
+    predicate: (query) =>
+      query.queryKey[0] === "auth" || query.meta?.auth === true,
   });
 }

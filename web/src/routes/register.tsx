@@ -6,5 +6,11 @@ export const Route = createFileRoute("/register")({ component: RegisterPage });
 function RegisterPage() {
   const navigate = Route.useNavigate();
   const { queryClient } = Route.useRouteContext();
-  return <AuthScreen mode="register" queryClient={queryClient} onSuccess={() => navigate({ to: "/" })} />;
+  return (
+    <AuthScreen
+      mode="register"
+      queryClient={queryClient}
+      onSuccess={() => navigate({ to: "/" })}
+    />
+  );
 }

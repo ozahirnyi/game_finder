@@ -26,11 +26,54 @@ export function AuthScreen({ mode, queryClient, onSuccess }: Props) {
       completeLogin(token.access_token, queryClient);
       onSuccess();
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Unable to sign in. Please try again.");
+      setError(
+        reason instanceof ApiError
+          ? reason.message
+          : "Unable to sign in. Please try again.",
+      );
     } finally {
       setPending(false);
     }
   }
 
-  return <main className="auth-page"><section className="auth-panel"><h1>{isRegister ? "Create account" : "Sign in"}</h1>{error ? <p role="alert">{error}</p> : null}<form onSubmit={submit}><label>Email<input aria-label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Password<input aria-label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label><button type="submit" disabled={pending}>{pending ? "Please wait" : isRegister ? "Create account" : "Sign in"}</button></form><a href={isRegister ? "/login" : "/register"}>{isRegister ? "Sign in" : "Create an account"}</a></section></main>;
+  return (
+    <main className="auth-page">
+      <section className="auth-panel">
+        <h1>{isRegister ? "Create account" : "Sign in"}</h1>
+        {error ? <p role="alert">{error}</p> : null}
+        <form onSubmit={submit}>
+          <label>
+            Email
+            <input
+              aria-label="Email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Password
+            <input
+              aria-label="Password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </label>
+          <button type="submit" disabled={pending}>
+            {pending
+              ? "Please wait"
+              : isRegister
+                ? "Create account"
+                : "Sign in"}
+          </button>
+        </form>
+        <a href={isRegister ? "/login" : "/register"}>
+          {isRegister ? "Sign in" : "Create an account"}
+        </a>
+      </section>
+    </main>
+  );
 }

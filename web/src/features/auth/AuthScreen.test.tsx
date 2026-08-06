@@ -20,39 +20,81 @@ describe("AuthScreen", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("logs in and navigates home", async () => {
-    api.loginUser.mockResolvedValue({ access_token: "token", token_type: "bearer" });
-    render(<AuthScreen mode="login" queryClient={queryClient} onSuccess={onSuccess} />);
+    api.loginUser.mockResolvedValue({
+      access_token: "token",
+      token_type: "bearer",
+    });
+    render(
+      <AuthScreen
+        mode="login"
+        queryClient={queryClient}
+        onSuccess={onSuccess}
+      />,
+    );
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.test" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "user@example.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "secret" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    await waitFor(() => expect(session.completeLogin).toHaveBeenCalledWith("token", queryClient));
+    await waitFor(() =>
+      expect(session.completeLogin).toHaveBeenCalledWith("token", queryClient),
+    );
     expect(onSuccess).toHaveBeenCalledOnce();
   });
 
   it("shows the API error and re-enables the form", async () => {
     api.loginUser.mockRejectedValue(new api.ApiError("Invalid credentials"));
-    render(<AuthScreen mode="login" queryClient={queryClient} onSuccess={onSuccess} />);
+    render(
+      <AuthScreen
+        mode="login"
+        queryClient={queryClient}
+        onSuccess={onSuccess}
+      />,
+    );
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.test" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "user@example.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "secret" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid credentials");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Invalid credentials",
+    );
     expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
   });
 
   it("registers before logging in", async () => {
     api.registerUser.mockResolvedValue({});
-    api.loginUser.mockResolvedValue({ access_token: "token", token_type: "bearer" });
-    render(<AuthScreen mode="register" queryClient={queryClient} onSuccess={onSuccess} />);
+    api.loginUser.mockResolvedValue({
+      access_token: "token",
+      token_type: "bearer",
+    });
+    render(
+      <AuthScreen
+        mode="register"
+        queryClient={queryClient}
+        onSuccess={onSuccess}
+      />,
+    );
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.test" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "user@example.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "secret" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => expect(api.loginUser).toHaveBeenCalled());
-    expect(api.registerUser.mock.invocationCallOrder[0]).toBeLessThan(api.loginUser.mock.invocationCallOrder[0]);
+    expect(api.registerUser.mock.invocationCallOrder[0]).toBeLessThan(
+      api.loginUser.mock.invocationCallOrder[0],
+    );
   });
 });
