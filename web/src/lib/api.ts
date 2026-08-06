@@ -214,14 +214,34 @@ export type PriceAlert = {
 };
 export type Notification = {
   id: string;
-  event_type: "price_alert";
+  event_type:
+    | "price_alert"
+    | "friend_request"
+    | "message"
+    | "game_invite"
+    | "game_invite_response";
   target_kind: string;
   game_id: string | null;
   saved_game_id: string | null;
   price_alert_id: string | null;
   offer_url: string | null;
+  friend_request_id?: string | null;
+  friendship_id?: string | null;
+  direct_message_id?: string | null;
+  game_invite_id?: string | null;
   read_at: string | null;
   created_at: string;
+};
+export type SocialProfile = {
+  profile_id: string;
+  display_name: string;
+  relationship: string;
+};
+export type SocialMe = SocialProfile & {
+  friend_code: string;
+  friends: SocialProfile[];
+  incoming: (SocialProfile & { id: string })[];
+  outgoing: (SocialProfile & { id: string })[];
 };
 
 const API_URL = import.meta.env.VITE_API_URL || "https://playfinder.cc/api";
@@ -527,6 +547,25 @@ export function markNotificationRead(id: string) {
   return request<Notification>(`/notifications/${id}/read`, {
     method: "POST",
     auth: true,
+  });
+}
+export function getSocialMe() {
+  return request<SocialMe>("/social/me", { auth: true });
+}
+export function searchProfiles(query: string) {
+  return request<SocialProfile[]>(
+    `/social/profiles?query=${encodeURIComponent(query)}`,
+    { auth: true },
+  );
+}
+export function sendFriendRequest(data: {
+  profile_id?: string;
+  friend_code?: string;
+}) {
+  return request<unknown>("/social/friend-requests", {
+    method: "POST",
+    auth: true,
+    body: data,
   });
 }
 

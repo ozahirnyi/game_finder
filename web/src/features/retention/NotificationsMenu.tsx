@@ -12,6 +12,19 @@ type Props = {
 };
 
 function targetFor(notification: Notification) {
+  if (
+    notification.event_type === "friend_request" &&
+    notification.friend_request_id
+  )
+    return `/friends?request=${notification.friend_request_id}`;
+  if (notification.event_type === "message" && notification.friendship_id)
+    return `/friends/${notification.friendship_id}/messages`;
+  if (
+    (notification.event_type === "game_invite" ||
+      notification.event_type === "game_invite_response") &&
+    notification.game_invite_id
+  )
+    return `/friends/invites?invite=${notification.game_invite_id}`;
   const gameId = Number(notification.game_id);
   if (
     notification.target_kind === "catalog_game" &&
@@ -54,6 +67,14 @@ export function NotificationsMenu({
       ),
     );
   };
+  const labelFor = (notification: Notification) =>
+    ({
+      price_alert: "Price alert",
+      friend_request: "Friend request",
+      message: "New message",
+      game_invite: "Game invite",
+      game_invite_response: "Game invite response",
+    })[notification.event_type];
   return (
     <section aria-label="Notifications">
       <h2>Notifications</h2>
@@ -63,10 +84,14 @@ export function NotificationsMenu({
         notifications.map((notification) => (
           <div key={notification.id}>
             <button type="button" onClick={() => void open(notification)}>
-              Price alert
+              {labelFor(notification)}
             </button>
             {unavailable === notification.id ? (
-              <p role="alert">This price alert is no longer available.</p>
+              <p role="alert">
+                {notification.event_type === "price_alert"
+                  ? "This price alert is no longer available."
+                  : "This notification is no longer available."}
+              </p>
             ) : null}
           </div>
         ))
