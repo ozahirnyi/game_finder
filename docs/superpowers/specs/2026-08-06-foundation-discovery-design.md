@@ -14,22 +14,23 @@ It does not add notifications, price-alert changes, favorites, public profiles, 
 
 `web/src/routes` is the only active application surface. It uses Vite, TanStack Router, and TanStack Query. `web/src/lib/api.ts` is the sole browser HTTP and JWT client and reads `VITE_API_URL`.
 
-Feature-specific modules in `web/src/lib/` own FastAPI DTO mapping and query options for auth, catalog search, recommendations, and game detail. The routes and shared shell touched by this delivery consume those modules rather than importing prototype data or directly constructing HTTP requests. Other OpenSpecs routes are not silently represented as complete by this delivery.
+Feature-specific modules in `web/src/lib/` own FastAPI DTO mapping and query options for auth, catalog search, recommendations, and game detail. `currentUserQueryOptions()` exclusively owns `/auth/me`: it uses `["auth", "me"]`, is enabled only with a stored token, and is marked as authenticated query data. The routes and shared shell touched by this delivery consume those modules rather than importing prototype data or directly constructing HTTP requests. Other OpenSpecs routes are not silently represented as complete by this delivery.
 
 The remaining Next-oriented files under `web/src/app` and components importing `next/*` are not runtime dependencies. Reusable authentication behavior is migrated into the active routes; dead duplicates are removed or isolated so Vite builds do not depend on them.
 
 ## Data and Navigation Flow
 
-1. The sign-in and sign-up routes submit through the API client. A successful login stores the JWT, notifies auth subscribers, invalidates authenticated queries, and navigates to the canonical authenticated route.
-2. Signing out clears the JWT, notifies subscribers, clears authenticated query data, and routes to a signed-out screen. No protected view may remain rendered with stale data.
+1. The sign-in and sign-up routes submit through the API client. A successful login stores the JWT, notifies auth subscribers, invalidates `["auth", "me"]`, and navigates to the canonical authenticated route.
+2. Signing out clears the JWT, notifies subscribers, clears authenticated query data, and routes to a signed-out screen. No protected view may remain rendered with stale data. The shared shell obtains its account label only through `currentUserQueryOptions()`.
 3. Search suggestions update the search query and perform a real catalog search. A selected suggestion is represented in route state so the active visual state and empty copy reflect the submitted query.
-4. AI recommendations are matched to a catalog or Steam identity before rendering a game-detail link. Matching uses authoritative IDs when supplied, then normalized exact-title matches. An unmatched recommendation stays non-linking and offers a title search.
+4. AI recommendations expose optional `rawg_id`, `steam_appid`, and `steam_url` fields. Matching prefers a positive `rawg_id` for an internal catalog link; otherwise, a positive `steam_appid` together with a nonempty `steam_url` yields an external Steam link; otherwise it uses a normalized exact-title catalog match with a non-null catalog ID. It never infers an identity through fuzzy matching. An unmatched recommendation stays non-linking and offers a title search.
 5. Game detail loads real catalog or Steam data. Store, price, wishlist, alert, recommendation, and social sections appear only when their underlying resource and action are implemented. Sections that are in scope render useful empty states; out-of-scope prototype promises are removed from the active UI.
 
 ## Error and State Rules
 
 - Every query renders explicit pending, empty, and retryable error states.
 - A 401 from an authenticated request clears the stored token and changes the auth snapshot.
+- Recommendation IDs are trusted only when valid and explicitly supplied by FastAPI; response schemas preserve every supplied optional identity field.
 - No game link may use a placeholder, missing, or zero identity.
 - Search-result absence distinguishes an empty query from no matching results.
 - A game-detail resource that is missing, private, or unavailable renders a controlled route state rather than crashing.
@@ -37,8 +38,8 @@ The remaining Next-oriented files under `web/src/app` and components importing `
 
 ## Testing Strategy
 
-- Vitest tests the API client, auth form success/failure/pending behavior, sign-out state clearing, search suggestions, AI match/unmatched states, and game-detail pending/empty/error states.
-- Pytest covers any new or changed FastAPI contract used by this delivery, including response identity fields necessary for AI links.
+- Vitest tests the API client, `currentUserQueryOptions`, auth form success/failure/pending behavior, sign-out state clearing, search suggestions, AI link-precedence and unmatched states, and game-detail pending/empty/error states.
+- Pytest covers FastAPI recommendation schema and response preservation for rawg/Steam identity fields.
 - Route-integration tests assert that the shared shell and auth/discovery routes changed by this delivery are free of `mockData` imports.
 - The focused frontend suites, backend suites, lint, and production build must pass before the delivery is considered ready.
 

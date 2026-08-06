@@ -15,6 +15,8 @@
 - Every changed query has explicit pending, empty, error, and retry behavior.
 - Never render mock data, a fake presence state, or a game link with a missing or placeholder identity in the shared shell or auth/discovery flow.
 - Preserve FastAPI auth methods and response schemas; clear the token on an authenticated 401.
+- `currentUserQueryOptions()` exclusively owns `/auth/me` with query key `["auth", "me"]`, `enabled: Boolean(getToken())`, and authenticated-query metadata. `AppShell` must not call `getCurrentUser` directly.
+- `RecommendationItem` carries optional `rawg_id`, `steam_appid`, and `steam_url`. Resolve only valid supplied identities: rawg first for an internal link, then a Steam app ID plus URL for an external link, then an exact normalized catalog-title match; otherwise render title search. Never fuzzy-match an identity.
 - Keep user-owned changes in `web/src/features/discovery/discovery.test.tsx` and `docs/superpowers/plans/2026-07-22-production-web-release.md` out of commits.
 
 ## File Structure
@@ -52,7 +54,7 @@
 
 **Interfaces:**
 - Consumes: FastAPI `/auth/register`, `/auth/login`, `/auth/me`, `/search/games`, `/catalog/games/{id}`, `/prices/games/{id}`, and `/recommendations`.
-- Produces: `getToken()`, `setToken(token)`, `clearToken()`, `useAuthenticated()`, `completeLogin(token, queryClient)`, and `signOut(queryClient)`.
+- Produces: `getToken()`, `setToken(token)`, `clearToken()`, `useAuthenticated()`, `currentUserQueryOptions()`, `completeLogin(token, queryClient)`, and `signOut(queryClient)`.
 
 - [ ] **Step 1: Write the failing API-origin and logout tests**
 
@@ -64,12 +66,21 @@ it("uses VITE_API_URL", async () => {
   expect(fetch).toHaveBeenCalledWith("https://api.example.test/search/games?q=Hades", expect.any(Object))
 })
 
-it("clears the token and cache on logout", () => {
+it("clears the token and authenticated cache on logout", () => {
   const queryClient = new QueryClient()
   setToken("header.payload.signature")
   signOut(queryClient)
   expect(getToken()).toBeNull()
-  expect(queryClient.getQueryCache().getAll()).toHaveLength(0)
+  expect(queryClient.getQueryCache().find({ queryKey: ["auth", "me"] })).toBeUndefined()
+})
+
+it("enables the current-user query only with a token", () => {
+  clearToken()
+  expect(currentUserQueryOptions().enabled).toBe(false)
+  setToken("header.payload.signature")
+  expect(currentUserQueryOptions().enabled).toBe(true)
+  expect(currentUserQueryOptions().queryKey).toEqual(["auth", "me"])
+  expect(currentUserQueryOptions().meta).toMatchObject({ auth: true })
 })
 ```
 
@@ -85,7 +96,7 @@ const API_URL = import.meta.env.VITE_API_URL || "https://playfinder.cc/api"
 
 export function completeLogin(token: string, queryClient: QueryClient) {
   setToken(token)
-  void queryClient.invalidateQueries({ queryKey: ["auth"] })
+  void queryClient.invalidateQueries({ queryKey: ["auth", "me"] })
 }
 
 export function signOut(queryClient: QueryClient) {
@@ -94,7 +105,7 @@ export function signOut(queryClient: QueryClient) {
 }
 ```
 
-Implement `useAuthenticated` with `useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false)` so shell rendering reacts to token changes.
+Implement `useAuthenticated` with `useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false)` so shell rendering reacts to token changes. Implement `currentUserQueryOptions()` with `queryKey: ["auth", "me"]`, `queryFn: getCurrentUser`, `enabled: Boolean(getToken())`, and `meta: { auth: true }`.
 
 - [ ] **Step 4: Run the focused tests and verify GREEN**
 
@@ -112,7 +123,6 @@ Run: `rtk git add web/src/lib/api.ts web/src/lib/api-url.test.ts web/src/lib/api
 - Create: `web/src/features/auth/AuthScreen.test.tsx`
 - Create: `web/src/routes/login.tsx`
 - Create: `web/src/routes/register.tsx`
-- Modify: `web/src/components/AppShell.tsx:1-170`
 - Delete: `web/src/features/auth/AuthPanel.tsx`
 - Delete: `web/src/features/auth/auth.test.tsx`
 - Delete: `web/src/app/login/page.tsx`
@@ -120,7 +130,7 @@ Run: `rtk git add web/src/lib/api.ts web/src/lib/api-url.test.ts web/src/lib/api
 
 **Interfaces:**
 - Consumes: `loginUser(email, password)`, `registerUser(email, password)`, `completeLogin(token, queryClient)`, and `Route.useRouteContext().queryClient`.
-- Produces: `/login` and `/register`, plus a shell that exposes a working sign-in/sign-out action.
+- Produces: `/login` and `/register`. Task 6 exclusively owns `AppShell` account-query rendering and sign-out UI.
 
 - [ ] **Step 1: Write failing route-form tests**
 
@@ -162,7 +172,7 @@ async function submit(event: FormEvent<HTMLFormElement>) {
 }
 ```
 
-Each route renders `AuthScreen`, takes `queryClient` from route context, and calls `navigate({ to: "/" })` after success. In `AppShell`, render the current email from `getCurrentUser` only when authenticated; otherwise render a `/login` link. The sign-out control calls `signOut(queryClient)` and `navigate({ to: "/login" })`.
+Each route renders `AuthScreen`, takes `queryClient` from route context, and calls `navigate({ to: "/" })` after success. `AppShell` changes are deferred to Task 6, where it reads account state solely through `currentUserQueryOptions()`.
 
 - [ ] **Step 4: Delete duplicate Next-only auth entrypoints after active-route tests pass**
 
@@ -174,7 +184,7 @@ Expected: only unused Next authentication entrypoints are removed; no active Vit
 Run: `rtk npm.cmd --prefix web test -- --run src/features/auth/AuthScreen.test.tsx; rtk npm.cmd --prefix web run lint; rtk npm.cmd --prefix web run build`  
 Expected: PASS.
 
-Run: `rtk git add web/src/features/auth/AuthScreen.tsx web/src/features/auth/AuthScreen.test.tsx web/src/routes/login.tsx web/src/routes/register.tsx web/src/components/AppShell.tsx web/src/app web/src/features/auth; rtk git commit -m "feat: add TanStack email auth flow"`
+Run: `rtk git add web/src/features/auth/AuthScreen.tsx web/src/features/auth/AuthScreen.test.tsx web/src/routes/login.tsx web/src/routes/register.tsx web/src/app web/src/features/auth; rtk git commit -m "feat: add TanStack email auth flow"`
 
 ### Task 3: Connect URL-backed catalog search and query suggestions
 
@@ -232,6 +242,10 @@ Run: `rtk git add web/src/features/discovery/catalog-queries.ts web/src/features
 ### Task 4: Resolve AI recommendation identities before navigation
 
 **Files:**
+- Modify: `app/schemas.py:68-75`
+- Modify: `app/openai_client.py:57-205`
+- Modify: `app/main.py:776-980`
+- Modify: `tests/test_api_contracts.py:515-589`
 - Create: `web/src/features/discovery/recommendation-resolver.ts`
 - Create: `web/src/features/discovery/recommendation-resolver.test.ts`
 - Create: `web/src/features/discovery/RecommendationResults.tsx`
@@ -239,10 +253,12 @@ Run: `rtk git add web/src/features/discovery/catalog-queries.ts web/src/features
 - Modify: `web/src/routes/search.tsx`
 
 **Interfaces:**
-- Consumes: `RecommendationItem { title, reason, tags }` and `searchGames(title)`.
-- Produces: `ResolvedRecommendation = { item: RecommendationItem; game: SearchGame | null }` and `resolveRecommendations(items)`.
+- Consumes: `RecommendationItem { title, reason, tags, rawg_id?, steam_appid?, steam_url? }` and `searchGames(title)`.
+- Produces: `ResolvedRecommendation = { item: RecommendationItem; game: SearchGame | null; href?: string; external?: boolean }` and `resolveRecommendations(items)`.
 
 - [ ] **Step 1: Write failing resolution tests**
+
+Add pytest response-contract cases that verify `/recommendations` and `/steam/recommendations` preserve supplied `rawg_id`, `steam_appid`, and `steam_url` fields (including `null` values). Add Vitest cases that prove the resolver/card precedence: a positive `rawg_id` produces only `/games/$id`; otherwise a positive `steam_appid` plus nonempty `steam_url` produces only an external Steam link; otherwise an exact normalized title match produces a catalog link; an unmatched item exposes only title search.
 
 ```ts
 it("uses the exact normalized catalog-title match", async () => {
@@ -276,14 +292,14 @@ export async function resolveRecommendation(item: RecommendationItem): Promise<R
 }
 ```
 
-`RecommendationResults` links only when `game?.id != null`; otherwise it renders the reason and tags plus a button that calls `onSearchTitle(item.title)`. Use `useQueries` or a single `Promise.all` query function keyed by prompt to resolve all results once per recommendation request.
+Extend the Pydantic and TypeScript `RecommendationItem` contracts with nullable `rawg_id`, `steam_appid`, and `steam_url`, and ensure recommendation-generation paths preserve supplied values rather than fabricating them. `RecommendationResults` first uses a positive rawg ID for an internal game link, then a positive Steam app ID only with a nonempty Steam URL for an external link, then `game?.id != null` for an exact catalog link; otherwise it renders the reason and tags plus a button that calls `onSearchTitle(item.title)`. Use `useQueries` or a single `Promise.all` query function keyed by prompt to resolve only title-only recommendations once per recommendation request.
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `rtk npm.cmd --prefix web test -- --run src/features/discovery/recommendation-resolver.test.ts src/features/discovery/RecommendationResults.test.tsx; rtk npm.cmd --prefix web run lint`  
+Run: `rtk npm.cmd --prefix web test -- --run src/features/discovery/recommendation-resolver.test.ts src/features/discovery/RecommendationResults.test.tsx; rtk npm.cmd --prefix web run lint; rtk pytest -q tests/test_api_contracts.py`  
 Expected: PASS.
 
-Run: `rtk git add web/src/features/discovery/recommendation-resolver.ts web/src/features/discovery/recommendation-resolver.test.ts web/src/features/discovery/RecommendationResults.tsx web/src/features/discovery/RecommendationResults.test.tsx web/src/routes/search.tsx; rtk git commit -m "feat: make AI recommendations actionable"`
+Run: `rtk git add app/schemas.py app/openai_client.py app/main.py tests/test_api_contracts.py web/src/lib/api.ts web/src/features/discovery/recommendation-resolver.ts web/src/features/discovery/recommendation-resolver.test.ts web/src/features/discovery/RecommendationResults.tsx web/src/features/discovery/RecommendationResults.test.tsx web/src/routes/search.tsx; rtk git commit -m "feat: make AI recommendations actionable"`
 
 ### Task 5: Replace prototype game detail with real catalog and price states
 
@@ -338,7 +354,7 @@ Run: `rtk git add web/src/features/discovery/GameDetailScreen.tsx web/src/featur
 - Modify: `web/src/routes/index.tsx` only if it imports `AppShell` props changed by Task 2
 
 **Interfaces:**
-- Consumes: `useAuthenticated`, `getCurrentUser`, and `/login` route.
+- Consumes: `useAuthenticated`, `currentUserQueryOptions()`, and `/login` route.
 - Produces: a shell with no `mockData` import or fake Steam-sync/user status.
 
 - [ ] **Step 1: Expand the static regression test**
@@ -366,7 +382,7 @@ Expected: FAIL because `AppShell` imports `currentUser` from `mockData`.
 
 - [ ] **Step 3: Replace mock shell state with auth state**
 
-Render a signed-out `/login` call to action. For signed-in users, load `/auth/me` with query key `["auth", "me"]`, display the returned email as the account label, and offer an explicit sign-out button. Remove the hard-coded synced Steam card and fake notification button; neither has a real action in this delivery.
+Render a signed-out `/login` call to action. For signed-in users, call `useQuery(currentUserQueryOptions())`, display the returned email as the account label, and offer an explicit sign-out button. The query is enabled only when a token exists and has authenticated-query metadata so `signOut` removes it. `AppShell` must not call `getCurrentUser` directly. Remove the hard-coded synced Steam card and fake notification button; neither has a real action in this delivery.
 
 - [ ] **Step 4: Verify complete frontend and backend contracts**
 
@@ -404,7 +420,7 @@ Expected: create this commit only if Task 7 changed the design specification; ot
 
 - [ ] **Step 4: Push and open a review PR**
 
-Run: `rtk git push -u origin codex/foundation-discovery-design`  
+Run: `rtk git push -u origin codex/foundation-discovery-design-66e9`  
 Expected: branch is published. Create a draft PR summarizing auth, search, AI matching, game detail, the tests run, and the explicitly deferred OpenSpecs.
 
 ## Plan Self-Review
