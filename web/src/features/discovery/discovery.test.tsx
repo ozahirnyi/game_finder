@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getCatalogGame,
   getGamePriceHistory,
+  getTelegramAccount,
   getHomepageDeals,
   getTrendingGames,
   getUpcomingGames,
+  listPriceAlerts,
   searchGames,
 } from "@/lib/api";
 import { DealsScreen } from "./DealsScreen";
@@ -21,9 +23,11 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/lib/api", () => ({
   getCatalogGame: vi.fn(),
   getGamePriceHistory: vi.fn(),
+  getTelegramAccount: vi.fn(),
   getHomepageDeals: vi.fn(),
   getTrendingGames: vi.fn(),
   getUpcomingGames: vi.fn(),
+  listPriceAlerts: vi.fn(),
   searchGames: vi.fn(),
 }));
 
@@ -40,6 +44,13 @@ describe("discovery API regions", () => {
       history_low_1y: null,
       history_low_3m: null,
       deals: [],
+    });
+    vi.mocked(listPriceAlerts).mockResolvedValue([]);
+    vi.mocked(getTelegramAccount).mockResolvedValue({
+      linked: false,
+      configured: false,
+      username: null,
+      linked_at: null,
     });
   });
 
@@ -151,6 +162,9 @@ describe("discovery API regions", () => {
       await screen.findByRole("heading", { name: "Hades II" }),
     ).toBeVisible();
     expect(await screen.findByText("Current price")).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Price alerts" }),
+    ).toBeVisible();
   });
 
   it("keeps successful price history visible when the catalog request fails", async () => {

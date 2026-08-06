@@ -30,13 +30,21 @@ describe("retention API", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("loads the authenticated wishlist", async () => {
-    window.localStorage.setItem("game_finder_token", "header.eyJleHAiOjQxMDE0NDQ4MDB9.signature");
+    window.localStorage.setItem(
+      "game_finder_token",
+      "header.eyJleHAiOjQxMDE0NDQ4MDB9.signature",
+    );
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } }),
+      new Response(JSON.stringify([]), {
+        headers: { "Content-Type": "application/json" },
+      }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(listWishlist()).resolves.toEqual([]);
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/wishlist"), expect.objectContaining({ method: "GET" }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/wishlist"),
+      expect.objectContaining({ method: "GET" }),
+    );
   });
 });

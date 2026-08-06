@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
+import { NotificationsMenu } from "@/features/retention/NotificationsMenu";
 import {
   currentUserQueryOptions,
   signOut,
@@ -66,6 +67,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <nav className="space-y-3">{links(visibleNav)}</nav>
         <div className="mt-auto space-y-4">
+          {authenticated ? (
+            <NotificationsMenu
+              navigate={(target) => {
+                void navigate({ to: target as "/games/$gameId" });
+              }}
+              openExternal={(target) => window.location.assign(target)}
+            />
+          ) : null}
           <ThemeSelector />
           {authenticated ? (
             <div>
