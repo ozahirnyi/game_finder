@@ -1,4 +1,13 @@
 from app.price_alerts import build_price_alert_key, format_price_alert_message
+from types import SimpleNamespace
+
+
+def test_any_discount_matches_only_positive_cut():
+    from app.price_alerts import alert_matches_deal
+
+    alert = SimpleNamespace(mode="any_discount", threshold=None)
+    assert alert_matches_deal(alert, {"cut": 25, "price": {"amount": 10, "currency": "USD"}})
+    assert not alert_matches_deal(alert, {"cut": 0, "price": {"amount": 10, "currency": "USD"}})
 
 
 def test_price_alert_message_includes_current_discount(monkeypatch):

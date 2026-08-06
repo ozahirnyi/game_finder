@@ -48,6 +48,18 @@ def build_price_alert_key(deal: dict[str, Any]) -> str | None:
     return f"{shop}|{amount}|{currency}|{cut}|{url}"
 
 
+def alert_matches_deal(alert, deal: dict[str, Any]) -> bool:
+    price = (deal.get("price") or {}).get("amount")
+    cut = deal.get("cut") or 0
+    if price is None:
+        return False
+    if alert.mode == "any_discount":
+        return cut > 0
+    if alert.mode == "target_price":
+        return price <= alert.threshold
+    return cut >= alert.threshold
+
+
 def format_price_alert_message(game_title: str, price_data: dict[str, Any]) -> str | None:
     deal = price_data.get("current")
     if not deal:
