@@ -3,10 +3,10 @@
 ## Goal
 
 Deliver private, owner-scoped friendships, direct messages, game invites, and
-typed actionable notifications.  A person becomes visible to another person
-only through an exchanged opaque friend code or an accepted friendship; no
-presence, compatibility, activity, public profile, or game-library data is
-created or exposed.
+typed actionable notifications.  A person can be added through an exchanged
+opaque friend code or from their minimal public profile.  Display nicknames are
+deliberately non-unique; no presence, compatibility, activity, or private
+game-library data is created or exposed.
 
 ## Baseline and Scope
 
@@ -14,31 +14,36 @@ The retention branch already persists owner-scoped price notifications, but
 its notification record only represents price targets and the active
 `/friends` route is mock data with inert controls.  A previous social design
 is useful for canonical relationship and messaging rules, but its public
-profile pages are outside this delivery's explicitly excluded scope.
+profile pages are outside this delivery's explicitly excluded scope.  This
+phase supersedes that exclusion with a deliberately minimal public profile:
+it is only a durable friend-request entry point and must not grow into a social
+feed or privacy surface.
 
-This phase adds a private friend-code exchange, friend-request lifecycle,
-confirmed friendship, one-to-one HTTP conversations, game invites for a
-confirmed friend, and notifications for request, message, invite, and invite
-response events.  It does not add public profiles, favourites, online status,
-compatibility, social activity, Party Finder, Groups, Discord, privacy
-settings, or onboarding.
+This phase adds a private friend-code exchange, minimal public-profile link,
+friend-request lifecycle, confirmed friendship, one-to-one HTTP conversations,
+game invites for a confirmed friend, and notifications for request, message,
+invite, and invite-response events.  It does not add favourites, online
+status, compatibility, social activity, Party Finder, Groups, Discord,
+privacy settings, or onboarding.
 
 ## Considered Approaches
 
-1. **Opaque friend code (recommended).** Each account receives a permanent,
-   random, URL-safe code.  The Friends screen lets its owner copy it and lets
-   another signed-in owner paste it to request friendship.  This has no search
-   or public page, does not expose email, and makes discovery deliberate.
+1. **Opaque profile id plus friend code (recommended).** Each account receives
+   a permanent, random, URL-safe profile id and friend code.  The Friends
+   screen lets its owner copy the code, while a minimal profile link lets an
+   authenticated visitor request friendship.  Nicknames remain non-unique and
+   are display-only.  Neither entry point exposes email or private data.
 2. **Email-based request.** This removes a new code but enables account
    enumeration and makes private account email part of the social boundary.
-3. **Public profile URL.** This is ergonomic but explicitly excluded from the
-   requested outcome and would expand privacy requirements.
+3. **Searchable public directory.** This is more discoverable but would make
+   nickname collisions ambiguous and expands enumeration and privacy risks.
 
 ## Data Model and Integrity
 
-The migration adds a unique, non-null `users.friend_code`, generated with a
-collision-safe random default and backfilled for existing accounts.  It also
-adds:
+The migration adds unique, non-null `users.profile_id` and `users.friend_code`,
+generated with collision-safe random defaults and backfilled for existing
+accounts.  A nickname is a non-unique display field: it is never accepted as
+an authorization or lookup key.  It also adds:
 
 - `friend_requests`: sender, recipient, `pending`/`accepted`/`rejected`/
   `cancelled`, timestamps, and a directional uniqueness constraint.  The
@@ -67,11 +72,15 @@ and safe display text, never an email or another user's private data.
 All social endpoints require authentication and derive ownership from the
 session, never from a client-supplied user id.
 
-- `GET /social/me` returns the caller's friend code, confirmed friends, and
-  incoming/outgoing requests with safe display labels.
-- `POST /social/friend-requests` accepts an exact friend code; list, accept,
-  reject, and sender-cancel operations are owner-scoped and idempotent where
-  retrying a completed response can safely return its current result.
+- `GET /social/me` returns the caller's profile link, friend code, confirmed
+  friends, and incoming/outgoing requests with safe display labels.
+- `GET /social/profiles/{profile_id}` returns only the non-unique nickname and
+  caller-specific relationship state; it never exposes email, friendship lists,
+  games, requests belonging to others, or any private account information.
+- `POST /social/friend-requests` accepts either an exact friend code or a
+  profile id, but not a nickname.  List, accept, reject, and sender-cancel
+  operations are owner-scoped and idempotent where retrying a completed
+  response can safely return its current result.
 - `GET/POST /social/friends/{friend_id}/messages` requires canonical
   friendship; history is oldest-first, cursor-paged, and a failed friendship
   check returns a controlled 403 without revealing message existence.
@@ -91,10 +100,13 @@ and its notification remains unread.
 ## Browser Routes and Interaction
 
 The Vite/TanStack `/friends` route is replaced with a TanStack Query-backed
-Friends screen: copy friend code, send request by code, incoming/outgoing
-requests, confirmed friends, and real Message/Invite actions.  It has explicit
-loading, signed-out, empty, error, retry, pending, and mutation-error states.
-No Steam social summary or mock-data card remains in this delivered route.
+Friends screen: copy friend code and profile link, send request by code,
+incoming/outgoing requests, confirmed friends, and real Message/Invite
+actions.  The minimal `/users/$profileId` route presents the nickname and the
+single relationship-appropriate action (send, pending, accept/reject, or
+already friends).  It has explicit loading, signed-out, empty, error, retry,
+pending, and mutation-error states.  No Steam social summary or mock-data card
+remains in this delivered route.
 
 `/friends/$friendId/messages` renders an authorized conversation and sends a
 real message.  `/friends/invites` lists incoming and outgoing real invites and
@@ -126,8 +138,9 @@ lint, build, and Alembic upgrade against an isolated temporary database.
 
 ## Success Criteria
 
-- A user can exchange a private code, create a request, and accept, reject, or
-  cancel it without data leaking beyond the involved accounts.
+- A user can exchange a private code or open another user's profile, create a
+  request, and accept, reject, or cancel it without data leaking beyond the
+  involved accounts.
 - Only confirmed friends can list or send direct messages and game invites.
 - Every social notification has durable identifiers, opens real action
   context, and is read only after navigation begins.
