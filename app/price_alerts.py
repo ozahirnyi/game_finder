@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import Game, SessionLocal, User
+from app.database import Notification, PriceAlert, SessionLocal, User
 from app.prices import fetch_game_price_history
 from app.telegram import send_telegram_message
 
@@ -95,41 +95,49 @@ def format_price_alert_message(game_title: str, price_data: dict[str, Any]) -> s
 
 async def check_price_alerts(db: Session) -> PriceAlertRunResult:
     result = PriceAlertRunResult()
-    users = db.query(User).filter(User.telegram_chat_id.isnot(None)).all()
-    result.users_checked = len(users)
+    alerts = db.query(PriceAlert).all()
+    result.users_checked = len({alert.user_id for alert in alerts})
 
-    for user in users:
+    for alert in alerts:
+        user = db.get(User, alert.user_id)
+        if user is None:
+            continue
         country = (user.steam_country_code or "US").strip().upper()
         if len(country) != 2:
             country = "US"
+        result.games_checked += 1
+        try:
+            price_data = await fetch_game_price_history(alert.title, country=country)
+            deal = price_data.get("current")
+            alert_key = build_price_alert_key(deal) if deal else None
+            if not deal or not alert_key or alert_key == alert.last_deal_key or not alert_matches_deal(alert, deal):
+                continue
 
-        games = db.query(Game).filter(Game.owner_id == user.id, Game.source == "manual").all()
-        for game in games:
-            result.games_checked += 1
-            game.price_alert_checked_at = datetime.now(timezone.utc)
-            try:
-                price_data = await fetch_game_price_history(game.title, country=country)
-                deal = price_data.get("current")
-                message = format_price_alert_message(game.title, price_data)
-                alert_key = build_price_alert_key(deal) if deal else None
-
-                if message and alert_key and alert_key != game.price_alert_last_key:
-                    sent = send_telegram_message(user.telegram_chat_id, message)
-                    if sent:
-                        game.price_alert_last_key = alert_key
-                        game.price_alert_last_at = datetime.now(timezone.utc)
-                        game.price_alert_last_cut = deal.get("cut")
-                        price = deal.get("price") or {}
-                        game.price_alert_last_amount = price.get("amount")
-                        game.price_alert_last_currency = price.get("currency")
-                        result.alerts_sent += 1
-                db.commit()
-            except HTTPException:
-                result.errors += 1
-                db.rollback()
-            except Exception:
-                result.errors += 1
-                db.rollback()
+            delivered = False
+            if alert.in_app:
+                db.add(Notification(
+                    user_id=user.id,
+                    event_type="price_alert",
+                    target_kind="catalog_game" if alert.identity_kind == "rawg" else "offer",
+                    game_id=alert.identity_value if alert.identity_kind == "rawg" else None,
+                    price_alert_id=alert.id,
+                    offer_url=deal.get("url") or price_data.get("url"),
+                ))
+                delivered = True
+            if alert.telegram and user.telegram_chat_id:
+                message = format_price_alert_message(alert.title, price_data)
+                if message and send_telegram_message(user.telegram_chat_id, message):
+                    delivered = True
+            if delivered:
+                alert.last_deal_key = alert_key
+                result.alerts_sent += 1
+            db.commit()
+        except HTTPException:
+            result.errors += 1
+            db.rollback()
+        except Exception:
+            result.errors += 1
+            db.rollback()
 
     return result
 
