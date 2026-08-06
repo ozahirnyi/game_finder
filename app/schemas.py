@@ -62,6 +62,17 @@ class UserCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=64)
 
 
+class FriendRequestCreate(BaseModel):
+    profile_id: str | None = Field(default=None, min_length=8, max_length=64)
+    friend_code: str | None = Field(default=None, min_length=8, max_length=64)
+
+    @model_validator(mode="after")
+    def requires_one_target(self):
+        if bool(self.profile_id) == bool(self.friend_code):
+            raise ValueError("Provide exactly one friend code or profile id")
+        return self
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

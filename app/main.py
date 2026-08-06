@@ -30,7 +30,7 @@ from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTr
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, PriceAlertCreate, WishlistItemCreate
+    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, PriceAlertCreate, WishlistItemCreate, FriendRequestCreate
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -42,6 +42,7 @@ from app.steam import (
 )
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
 from app.retention import create_price_alert, create_wishlist_item, delete_price_alert, delete_wishlist_item, list_price_alerts, list_price_notifications, list_wishlist_items, mark_price_notification_read
+from app.social import create_friend_request, profile_payload, search_profiles, social_me, transition_friend_request
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -300,6 +301,36 @@ def mark_notification_read_route(
     if notification is None:
         raise HTTPException(status_code=404, detail="Notification not found")
     return notification
+
+
+@app.get("/social/me")
+def social_me_route(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return social_me(db, current_user)
+
+
+@app.get("/social/profiles")
+def search_social_profiles(query: str = "", db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return [profile_payload(db, current_user.id, item) for item in search_profiles(db, current_user.id, query)]
+
+
+@app.get("/social/profiles/{profile_id}")
+def social_profile(profile_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.profile_id == profile_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return profile_payload(db, current_user.id, user)
+
+
+@app.post("/social/friend-requests", status_code=201)
+def create_social_friend_request(data: FriendRequestCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return create_friend_request(db, current_user, profile_id=data.profile_id, friend_code=data.friend_code)
+
+
+@app.post("/social/friend-requests/{request_id}/{action}")
+def transition_social_friend_request(request_id: uuid.UUID, action: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if action not in {"accept", "reject", "cancel"}:
+        raise HTTPException(status_code=404, detail="Action not found")
+    return transition_friend_request(db, current_user.id, request_id, action)
 
 
 @app.patch("/games/{id}", response_model=GameRead)
