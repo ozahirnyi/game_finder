@@ -405,7 +405,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Password hashing failed")
-    new_user = create_user(db, email, hashed_password)
+    new_user = create_user(db, email, hashed_password, user.display_name)
     return user_response(new_user, google_linked=False)
 
 

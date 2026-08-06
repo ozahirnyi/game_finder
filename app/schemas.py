@@ -59,6 +59,7 @@ class GameUpdate(BaseModel):
 class UserCreate(BaseModel):
     email: str
     password: str
+    display_name: str = Field(min_length=1, max_length=64)
 
 
 class UserRead(BaseModel):

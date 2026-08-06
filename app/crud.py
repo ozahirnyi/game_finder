@@ -50,8 +50,8 @@ def get_user_by_email(db, email: str):
     return db.query(User).filter(User.email == email.strip().lower()).first()
 
 
-def create_user(db, email: str, password_hash: str):
-    user = User(email=email.strip().lower(), password_hash=password_hash)
+def create_user(db, email: str, password_hash: str, display_name: str):
+    user = User(email=email.strip().lower(), password_hash=password_hash, display_name=display_name.strip())
     db.add(user)
     db.commit()
     db.refresh(user)
