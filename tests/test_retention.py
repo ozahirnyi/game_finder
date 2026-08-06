@@ -40,6 +40,11 @@ def test_price_alert_migration_has_owner_scoped_duplicate_index():
     assert "ix_price_alerts_owner_identity_mode_threshold" in migration
 
 
+def test_retention_migration_follows_current_migration_head():
+    migration = Path("alembic/versions/8c1d9e7f6a02_add_retention_models.py").read_text()
+    assert 'down_revision = "c3d4e5f6a7b8"' in migration
+
+
 def test_wishlist_service_never_lists_other_owner_items():
     retention = importlib.import_module("app.retention")
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
