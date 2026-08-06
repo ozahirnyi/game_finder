@@ -108,6 +108,9 @@ export type RecommendationItem = {
   title: string;
   reason: string;
   tags: string[];
+  rawg_id?: number | null;
+  steam_appid?: number | null;
+  steam_url?: string | null;
 };
 
 export type RecommendationResponse = {

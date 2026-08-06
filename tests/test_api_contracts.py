@@ -5,9 +5,16 @@ import uuid
 from fastapi.testclient import TestClient
 
 import app.main as main
+from app.schemas import RecommendationResponse
 
 
 client = TestClient(main.app)
+
+
+def test_recommendation_contract_preserves_catalog_and_steam_identity():
+    result = RecommendationResponse.model_validate({"recommendations": [{"title": "Hades", "reason": "fast", "rawg_id": 30, "steam_appid": 1145360, "steam_url": "https://store.steampowered.com/app/1145360/"}]})
+
+    assert result.recommendations[0].model_dump() == {"title": "Hades", "reason": "fast", "tags": [], "rawg_id": 30, "steam_appid": 1145360, "steam_url": "https://store.steampowered.com/app/1145360/"}
 
 
 def test_search_uses_steam_results_when_rawg_times_out(monkeypatch):

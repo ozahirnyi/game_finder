@@ -1,12 +1,20 @@
 type Props = {
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
+  src?: string | null;
   title: string;
   className?: string;
   compact?: boolean;
 };
 
-export function GameCover({ from, to, title, className = "", compact = false }: Props) {
+export function GameCover({
+  from = "#334155",
+  to = "#0f172a",
+  src = null,
+  title,
+  className = "",
+  compact = false,
+}: Props) {
   const initials = title
     .split(/\s|:/)
     .filter(Boolean)
@@ -20,11 +28,20 @@ export function GameCover({ from, to, title, className = "", compact = false }: 
         background: `radial-gradient(120% 90% at 15% 10%, ${from}55 0%, transparent 55%), linear-gradient(135deg, ${to} 0%, ${from}22 100%), ${to}`,
       }}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_90%,rgba(255,255,255,0.08),transparent_50%)]" />
+      {src ? (
+        <img
+          src={src}
+          alt={title}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div
+          aria-label={`${title} cover unavailable`}
+          className="absolute inset-0 bg-[radial-gradient(circle_at_80%_90%,rgba(255,255,255,0.08),transparent_50%)]"
+        />
+      )}
       <div className="absolute inset-0 flex flex-col justify-between p-3">
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/50"
-        >
+        <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/50">
           GF · {title.split(" ")[0].slice(0, 4).toUpperCase()}
         </span>
         {compact ? (
