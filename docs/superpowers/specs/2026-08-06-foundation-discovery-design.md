@@ -6,7 +6,7 @@ Make the active Vite and TanStack frontend deliver real, end-to-end authenticati
 
 ## Scope
 
-This delivery covers the API foundation and OpenSpecs user-flow fixes for email auth and sign-out, actionable AI recommendations, truthful search suggestions, and truthful game-detail sections.
+This delivery covers the API foundation and OpenSpecs user-flow fixes for email auth and sign-out, actionable AI recommendations, truthful search suggestions, and truthful game-detail sections. It also completes the Vite/TanStack migration: active application code, shared components, and tests must not depend on Next.js modules or Next-only entrypoints.
 
 It does not add notifications, price-alert changes, favorites, public profiles, privacy controls, onboarding, Party Finder, Groups, or Discord. Those features remain separate deliveries.
 
@@ -16,7 +16,7 @@ It does not add notifications, price-alert changes, favorites, public profiles, 
 
 Feature-specific modules in `web/src/lib/` own FastAPI DTO mapping and query options for auth, catalog search, recommendations, and game detail. `currentUserQueryOptions()` exclusively owns `/auth/me`: it uses `["auth", "me"]`, is enabled only with a stored token, and is marked as authenticated query data. The routes and shared shell touched by this delivery consume those modules rather than importing prototype data or directly constructing HTTP requests. Other OpenSpecs routes are not silently represented as complete by this delivery.
 
-The remaining Next-oriented files under `web/src/app` and components importing `next/*` are not runtime dependencies. Reusable authentication behavior is migrated into the active routes; dead duplicates are removed or isolated so Vite builds do not depend on them.
+`web/src/app`, `next/*` imports, and their tests are legacy artifacts, not a second application surface. Reusable behavior is migrated into `web/src/routes` and shared Vite-compatible components; obsolete files are removed. Vitest covers the TanStack runtime and must not discover tests for deleted/archived Next entrypoints.
 
 ## Data and Navigation Flow
 
@@ -40,7 +40,7 @@ The remaining Next-oriented files under `web/src/app` and components importing `
 
 - Vitest tests the API client, `currentUserQueryOptions`, auth form success/failure/pending behavior, sign-out state clearing, search suggestions, AI link-precedence and unmatched states, and game-detail pending/empty/error states.
 - Pytest covers FastAPI recommendation schema and response preservation for rawg/Steam identity fields.
-- Route-integration tests assert that the shared shell and auth/discovery routes changed by this delivery are free of `mockData` imports.
+- Route-integration tests assert that active routes and their shared shell are free of `mockData` and `next/` imports. The full Vitest suite runs only Vite/TanStack-supported source and tests.
 - The focused frontend suites, backend suites, lint, and production build must pass before the delivery is considered ready.
 
 ## Delivery Sequence
@@ -50,6 +50,7 @@ The remaining Next-oriented files under `web/src/app` and components importing `
 3. Add AI recommendation identity matching and safe navigation.
 4. Connect game detail and replace prototype sections with real in-scope states.
 5. Remove remaining prototype data from the shared shell and auth/discovery routes and run the full focused verification suite.
+6. Remove the remaining Next-only components, entrypoints, and tests; migrate any reusable component to TanStack APIs and make the complete Vite build, lint, and Vitest suite pass.
 
 ## Success Criteria
 
@@ -58,3 +59,4 @@ The remaining Next-oriented files under `web/src/app` and components importing `
 - Every AI recommendation either opens the correct game detail or offers a safe title search.
 - Game detail contains only real data and real actions, with clear states for absent data.
 - The shared shell and auth/discovery routes do not import `mockData`.
+- No production or executed test source imports `next/*`; the complete frontend runs under Vite/TanStack.

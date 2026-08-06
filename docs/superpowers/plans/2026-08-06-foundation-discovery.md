@@ -18,6 +18,7 @@
 - `currentUserQueryOptions()` exclusively owns `/auth/me` with query key `["auth", "me"]`, `enabled: Boolean(getToken())`, and authenticated-query metadata. `AppShell` must not call `getCurrentUser` directly.
 - `RecommendationItem` carries optional `rawg_id`, `steam_appid`, and `steam_url`. Resolve only valid supplied identities: rawg first for an internal link, then a Steam app ID plus URL for an external link, then an exact normalized catalog-title match; otherwise render title search. Never fuzzy-match an identity.
 - Keep user-owned changes in `web/src/features/discovery/discovery.test.tsx` and `docs/superpowers/plans/2026-07-22-production-web-release.md` out of commits.
+- Complete the Vite/TanStack migration: remove `web/src/app` and every active `next/*` dependency; migrate reusable legacy code to TanStack Router or plain browser primitives. Full Vitest must not discover obsolete Next-only suites.
 
 ## File Structure
 
@@ -393,7 +394,40 @@ Expected: all selected frontend tests, lint, production build, and backend tests
 
 Run: `rtk git add web/src/components/AppShell.tsx web/src/test/routes.integration.test.ts web/src/routes/index.tsx; rtk git commit -m "test: lock truthful discovery route boundary"`
 
-### Task 7: Final review, documentation, and PR handoff
+### Task 7: Complete the Vite/TanStack migration
+
+**Files:**
+- Delete: `web/src/app/**` and Next-only test files.
+- Modify: every reusable component that imports `next/*`, `web/src/components/GameCover.tsx`, `web/src/components/AppShell.test.tsx`, `web/src/test/setup.ts`, and Vitest configuration as required.
+- Modify: `web/src/test/routes.integration.test.ts`.
+
+**Interfaces:**
+- Consumes: the active `web/src/routes` TanStack application surface.
+- Produces: a Vite-only runtime and test suite with no `next/*` imports.
+
+- [ ] **Step 1: Add failing migration-boundary tests**
+
+Add a static test that scans active `web/src` production files and fails for `from "next/"` or `from 'next/'`. Retain explicit behavioral tests for any migrated reusable component.
+
+- [ ] **Step 2: Verify RED**
+
+Run: `rtk npm.cmd --prefix web test -- --run src/test/routes.integration.test.ts`
+Expected: FAIL while active/legacy sources still import Next or `mockData`.
+
+- [ ] **Step 3: Migrate and remove legacy surfaces**
+
+Replace Next links/navigation with TanStack Router equivalents in retained runtime components; use normal anchors only for external navigation. Delete obsolete `web/src/app` entrypoints and tests rather than masking missing Next dependencies. Update `GameCover` to accept the image URL API used by active catalog screens and preserve a labelled fallback. Ensure component tests render router-dependent code inside a TanStack router provider.
+
+- [ ] **Step 4: Verify migration boundary**
+
+Run: `rtk npm.cmd --prefix web test; rtk npm.cmd --prefix web run lint; rtk npm.cmd --prefix web run build`
+Expected: all frontend checks PASS without a Next dependency.
+
+- [ ] **Step 5: Commit**
+
+Run: `rtk git add web/src web/vite.config.ts web/package.json; rtk git commit -m "refactor: complete Vite TanStack migration"`
+
+### Task 8: Final review, documentation, and PR handoff
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-08-06-foundation-discovery-design.md` only if verification exposes a contract change.
