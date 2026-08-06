@@ -1,9 +1,10 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import PriceAlert, User, WishlistItem
+from app.database import Notification, PriceAlert, User, WishlistItem
 from app.schemas import PriceAlertCreate, WishlistItemCreate
 
 
@@ -100,3 +101,29 @@ def delete_price_alert(db: Session, user_id: uuid.UUID, alert_id: uuid.UUID) -> 
     db.delete(alert)
     db.commit()
     return True
+
+
+def list_price_notifications(db: Session, user_id: uuid.UUID) -> list[Notification]:
+    return (
+        db.query(Notification)
+        .filter(Notification.user_id == user_id)
+        .order_by(Notification.created_at.desc())
+        .all()
+    )
+
+
+def mark_price_notification_read(
+    db: Session, user_id: uuid.UUID, notification_id: uuid.UUID
+) -> Notification | None:
+    notification = (
+        db.query(Notification)
+        .filter(Notification.id == notification_id, Notification.user_id == user_id)
+        .first()
+    )
+    if notification is None:
+        return None
+    if notification.read_at is None:
+        notification.read_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(notification)
+    return notification

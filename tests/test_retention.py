@@ -156,3 +156,28 @@ def test_price_alert_routes_list_and_delete_current_users_alert():
         assert client.get("/price-alerts").json() == []
     finally:
         main.app.dependency_overrides.clear()
+
+
+def test_notification_routes_list_and_reject_foreign_mark_read():
+    import app.main as main
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    alice = User(email="notification-alice@example.test")
+    bob = User(email="notification-bob@example.test")
+    db.add_all([alice, bob])
+    db.commit()
+    own = Notification(user_id=alice.id, event_type="price_alert", target_kind="catalog_game", game_id="30")
+    foreign = Notification(user_id=bob.id, event_type="price_alert", target_kind="catalog_game", game_id="31")
+    db.add_all([own, foreign])
+    db.commit()
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    main.app.dependency_overrides[main.get_current_user] = lambda: alice
+    client = TestClient(main.app)
+    try:
+        assert [item["id"] for item in client.get("/notifications").json()] == [str(own.id)]
+        assert client.post(f"/notifications/{foreign.id}/read").status_code == 404
+        assert client.post(f"/notifications/{own.id}/read").json()["read_at"] is not None
+    finally:
+        main.app.dependency_overrides.clear()
