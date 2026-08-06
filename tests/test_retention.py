@@ -5,6 +5,8 @@ from pydantic import ValidationError
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+from fastapi.testclient import TestClient
 
 import app.schemas as schemas
 from app.schemas import PriceAlertCreate
@@ -40,7 +42,7 @@ def test_price_alert_migration_has_owner_scoped_duplicate_index():
 
 def test_wishlist_service_never_lists_other_owner_items():
     retention = importlib.import_module("app.retention")
-    engine = create_engine("sqlite://")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     db = sessionmaker(bind=engine)()
     alice = User(email="alice@example.test")
@@ -78,3 +80,33 @@ def test_price_alert_service_reports_owner_duplicate():
     with pytest.raises(Exception, match="You already have this price alert.") as error:
         retention.create_price_alert(db, user, alert, SimpleNamespace(configured=True, linked=True))
     assert error.value.status_code == 409
+
+
+def test_alert_duplicate_route_returns_readable_owner_scoped_conflict():
+    import app.main as main
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    user = User(email="route-owner@example.test")
+    db.add(user)
+    db.commit()
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    client = TestClient(main.app)
+    payload = {
+        "identity_kind": "rawg",
+        "identity_value": "30",
+        "title": "Hades",
+        "mode": "target_discount",
+        "threshold": 35,
+        "in_app": True,
+        "telegram": False,
+    }
+    try:
+        assert client.post("/price-alerts", json=payload).status_code == 201
+        response = client.post("/price-alerts", json=payload)
+        assert response.status_code == 409
+        assert response.json()["detail"] == "You already have this price alert."
+    finally:
+        main.app.dependency_overrides.clear()

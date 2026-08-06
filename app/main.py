@@ -30,7 +30,7 @@ from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTr
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest
+    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, PriceAlertCreate
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -41,6 +41,7 @@ from app.steam import (
     verify_steam_openid,
 )
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
+from app.retention import create_price_alert
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -234,6 +235,15 @@ def create_game_route(game: GameCreate,db: Session = Depends(get_db),current_use
     created = create_game(db, game.model_dump(), current_user.id)
     notify_saved_game(current_user, created.title)
     return created
+
+
+@app.post("/price-alerts", status_code=201)
+def create_price_alert_route(
+    data: PriceAlertCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return create_price_alert(db, current_user, data, telegram_account_response(current_user))
 
 
 @app.patch("/games/{id}", response_model=GameRead)
