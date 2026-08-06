@@ -192,6 +192,10 @@ export type TelegramLink = {
   message: string | null;
 };
 
+export type WishlistItem = { id: string; identity_kind: "rawg" | "steam"; identity_value: string; title: string; created_at: string; updated_at: string };
+export type PriceAlert = { id: string; identity_kind: "rawg" | "steam"; identity_value: string; title: string; mode: "target_price" | "target_discount" | "any_discount"; threshold: number | null; in_app: boolean; telegram: boolean; created_at: string; updated_at: string };
+export type Notification = { id: string; event_type: "price_alert"; target_kind: string; game_id: string | null; saved_game_id: string | null; price_alert_id: string | null; offer_url: string | null; read_at: string | null; created_at: string };
+
 const API_URL = import.meta.env.VITE_API_URL || "https://playfinder.cc/api";
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
@@ -457,6 +461,15 @@ export function deleteSavedGame(id: string) {
     auth: true,
   });
 }
+
+export function listWishlist() { return request<WishlistItem[]>("/wishlist", { auth: true }); }
+export function createWishlistItem(data: Pick<WishlistItem, "identity_kind" | "identity_value" | "title">) { return request<WishlistItem>("/wishlist", { method: "POST", auth: true, body: data }); }
+export function deleteWishlistItem(id: string) { return request<void>(`/wishlist/${id}`, { method: "DELETE", auth: true }); }
+export function listPriceAlerts() { return request<PriceAlert[]>("/price-alerts", { auth: true }); }
+export function createPriceAlert(data: Omit<PriceAlert, "id" | "created_at" | "updated_at">) { return request<PriceAlert>("/price-alerts", { method: "POST", auth: true, body: data }); }
+export function deletePriceAlert(id: string) { return request<void>(`/price-alerts/${id}`, { method: "DELETE", auth: true }); }
+export function listNotifications() { return request<Notification[]>("/notifications", { auth: true }); }
+export function markNotificationRead(id: string) { return request<Notification>(`/notifications/${id}/read`, { method: "POST", auth: true }); }
 
 export function previewPsnImport(file: File) {
   const formBody = new FormData();
