@@ -30,6 +30,12 @@ class PriceAlertCreate(BaseModel):
         return self
 
 
+class WishlistItemCreate(BaseModel):
+    identity_kind: Literal["rawg", "steam"]
+    identity_value: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=255)
+
+
 class GameRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

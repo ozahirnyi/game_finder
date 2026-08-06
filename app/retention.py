@@ -1,0 +1,67 @@
+import uuid
+
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
+from app.database import PriceAlert, User, WishlistItem
+from app.schemas import PriceAlertCreate, WishlistItemCreate
+
+
+def list_wishlist_items(db: Session, user_id: uuid.UUID) -> list[WishlistItem]:
+    return (
+        db.query(WishlistItem)
+        .filter(WishlistItem.user_id == user_id)
+        .order_by(WishlistItem.created_at.desc())
+        .all()
+    )
+
+
+def create_wishlist_item(
+    db: Session, user: User, data: WishlistItemCreate
+) -> WishlistItem:
+    existing = (
+        db.query(WishlistItem)
+        .filter(
+            WishlistItem.user_id == user.id,
+            WishlistItem.identity_kind == data.identity_kind,
+            WishlistItem.identity_value == data.identity_value,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="This game is already in your wishlist.")
+
+    item = WishlistItem(user_id=user.id, **data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def create_price_alert(
+    db: Session, user: User, data: PriceAlertCreate, telegram
+) -> PriceAlert:
+    if data.telegram and not (telegram.configured and telegram.linked):
+        raise HTTPException(
+            status_code=409,
+            detail="Connect Telegram in Profile before enabling Telegram alerts.",
+        )
+
+    query = db.query(PriceAlert).filter(
+        PriceAlert.user_id == user.id,
+        PriceAlert.identity_kind == data.identity_kind,
+        PriceAlert.identity_value == data.identity_value,
+        PriceAlert.mode == data.mode,
+    )
+    if data.threshold is None:
+        query = query.filter(PriceAlert.threshold.is_(None))
+    else:
+        query = query.filter(PriceAlert.threshold == data.threshold)
+    if query.first():
+        raise HTTPException(status_code=409, detail="You already have this price alert.")
+
+    alert = PriceAlert(user_id=user.id, **data.model_dump())
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return alert

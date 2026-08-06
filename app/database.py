@@ -79,6 +79,63 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
 
 
+class WishlistItem(Base):
+    __tablename__ = "wishlist_items"
+    __table_args__ = (UniqueConstraint("user_id", "identity_kind", "identity_value", name="uq_wishlist_owner_identity"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    identity_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    identity_value: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class PriceAlert(Base):
+    __tablename__ = "price_alerts"
+    __table_args__ = (
+        Index(
+            "ix_price_alerts_owner_identity_mode_threshold",
+            "user_id",
+            "identity_kind",
+            "identity_value",
+            "mode",
+            "threshold",
+            unique=True,
+            postgresql_where=text("threshold IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    identity_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    identity_value: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    mode: Mapped[str] = mapped_column(String(32), nullable=False)
+    threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    in_app: Mapped[bool] = mapped_column(nullable=False, default=True)
+    telegram: Mapped[bool] = mapped_column(nullable=False, default=False)
+    last_deal_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    game_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    saved_game_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    price_alert_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("price_alerts.id", ondelete="SET NULL"), nullable=True)
+    offer_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class OAuthIdentity(Base):
     __tablename__ = "oauth_identities"
     __table_args__ = (
