@@ -41,7 +41,13 @@ describe("integration screens", () => {
       google_linked: false,
     });
     api.getGoogleStatus.mockResolvedValue({ configured: true });
-    api.getProfileSettings.mockResolvedValue({ profile_id: "safe-player", library_visibility: "public", favorites_visibility: "friends", wishlist_visibility: "private", steam_visibility: "public" });
+    api.getProfileSettings.mockResolvedValue({
+      profile_id: "safe-player",
+      library_visibility: "public",
+      favorites_visibility: "friends",
+      wishlist_visibility: "private",
+      steam_visibility: "public",
+    });
     api.listFavorites.mockResolvedValue([]);
     api.getTelegramAccount.mockResolvedValue({
       linked: false,
@@ -89,8 +95,17 @@ describe("integration screens", () => {
 
   it("saves all privacy controls", async () => {
     render(<ProfileScreen />);
-    fireEvent.click(await screen.findByRole("button", { name: "Save privacy" }));
-    await waitFor(() => expect(api.updateProfileSettings).toHaveBeenCalledWith({ library_visibility: "public", favorites_visibility: "friends", wishlist_visibility: "private", steam_visibility: "public" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Save privacy" }),
+    );
+    await waitFor(() =>
+      expect(api.updateProfileSettings).toHaveBeenCalledWith({
+        library_visibility: "public",
+        favorites_visibility: "friends",
+        wishlist_visibility: "private",
+        steam_visibility: "public",
+      }),
+    );
   });
 
   it("shows a sign-in state without requesting Steam data", () => {

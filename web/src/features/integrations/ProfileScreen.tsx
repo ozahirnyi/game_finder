@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FavoriteItem, GoogleStatus, ProfileSettings, TelegramAccount, UserRead } from "@/lib/api";
+import type {
+  FavoriteItem,
+  GoogleStatus,
+  ProfileSettings,
+  TelegramAccount,
+  UserRead,
+} from "@/lib/api";
 import {
   getCurrentUser,
   getGoogleStatus,
@@ -72,13 +78,27 @@ export function ProfileScreen() {
           failureMessage(reason, "Could not load Telegram alerts."),
         ),
       );
-    void listFavorites().then(setFavorites).catch(() => undefined);
-    void getProfileSettings().then(setPrivacy).catch(() => undefined);
+    void listFavorites()
+      .then(setFavorites)
+      .catch(() => undefined);
+    void getProfileSettings()
+      .then(setPrivacy)
+      .catch(() => undefined);
   }, [authenticated]);
   async function savePrivacy() {
     if (!privacy) return;
-    try { setPrivacy(await updateProfileSettings({ library_visibility: privacy.library_visibility, favorites_visibility: privacy.favorites_visibility, wishlist_visibility: privacy.wishlist_visibility, steam_visibility: privacy.steam_visibility })); }
-    catch (reason) { setError(failureMessage(reason, "Could not save privacy.")); }
+    try {
+      setPrivacy(
+        await updateProfileSettings({
+          library_visibility: privacy.library_visibility,
+          favorites_visibility: privacy.favorites_visibility,
+          wishlist_visibility: privacy.wishlist_visibility,
+          steam_visibility: privacy.steam_visibility,
+        }),
+      );
+    } catch (reason) {
+      setError(failureMessage(reason, "Could not save privacy."));
+    }
   }
   async function connectTelegram() {
     setBusy(true);
@@ -128,11 +148,62 @@ export function ProfileScreen() {
         <h1>{user?.email ?? "Your account"}</h1>
       </header>
       {message ? <p className="alert success">{message}</p> : null}
-      <Section title="Favorites" detail="Games you like and that represent your taste.">
-        <Panel>{favorites.length ? favorites.map((favorite) => <p key={favorite.id}>{favorite.title}</p>) : <p>No favorites yet.</p>}</Panel>
+      <Section
+        title="Favorites"
+        detail="Games you like and that represent your taste."
+      >
+        <Panel>
+          {favorites.length ? (
+            favorites.map((favorite) => (
+              <p key={favorite.id}>{favorite.title}</p>
+            ))
+          ) : (
+            <p>No favorites yet.</p>
+          )}
+        </Panel>
       </Section>
-      <Section title="Privacy" detail="Choose who can see each part of your profile.">
-        <Panel>{privacy ? <><p><a href={`/users/${privacy.profile_id}`}>View public profile</a></p>{(["library_visibility", "favorites_visibility", "wishlist_visibility", "steam_visibility"] as const).map((name) => <label key={name}>{name.replace("_visibility", "")} <select value={privacy[name]} onChange={(event) => setPrivacy({ ...privacy, [name]: event.target.value as ProfileSettings[typeof name] })}><option value="public">Public</option><option value="friends">Friends</option><option value="private">Only me</option></select></label>)}<Button onClick={savePrivacy}>Save privacy</Button></> : <p>Loading privacy settings…</p>}</Panel>
+      <Section
+        title="Privacy"
+        detail="Choose who can see each part of your profile."
+      >
+        <Panel>
+          {privacy ? (
+            <>
+              <p>
+                <a href={`/users/${privacy.profile_id}`}>View public profile</a>
+              </p>
+              {(
+                [
+                  "library_visibility",
+                  "favorites_visibility",
+                  "wishlist_visibility",
+                  "steam_visibility",
+                ] as const
+              ).map((name) => (
+                <label key={name}>
+                  {name.replace("_visibility", "")}{" "}
+                  <select
+                    value={privacy[name]}
+                    onChange={(event) =>
+                      setPrivacy({
+                        ...privacy,
+                        [name]: event.target
+                          .value as ProfileSettings[typeof name],
+                      })
+                    }
+                  >
+                    <option value="public">Public</option>
+                    <option value="friends">Friends</option>
+                    <option value="private">Only me</option>
+                  </select>
+                </label>
+              ))}
+              <Button onClick={savePrivacy}>Save privacy</Button>
+            </>
+          ) : (
+            <p>Loading privacy settings…</p>
+          )}
+        </Panel>
       </Section>
       <Section
         title="Google"

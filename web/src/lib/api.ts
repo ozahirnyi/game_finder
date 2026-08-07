@@ -253,8 +253,23 @@ export type ProfileSettings = {
   wishlist_visibility: Visibility;
   steam_visibility: Visibility;
 };
-export type PublicProfileBlock = { state: "ready" | "empty" | "hidden"; message?: string; items?: { id?: string; title?: string; cover_url?: string | null; persona_name?: string | null; avatar?: string | null }[] };
-export type PublicProfile = SocialProfile & { library: PublicProfileBlock; favorites: PublicProfileBlock; wishlist: PublicProfileBlock; steam: PublicProfileBlock };
+export type PublicProfileBlock = {
+  state: "ready" | "empty" | "hidden";
+  message?: string;
+  items?: {
+    id?: string;
+    title?: string;
+    cover_url?: string | null;
+    persona_name?: string | null;
+    avatar?: string | null;
+  }[];
+};
+export type PublicProfile = SocialProfile & {
+  library: PublicProfileBlock;
+  favorites: PublicProfileBlock;
+  wishlist: PublicProfileBlock;
+  steam: PublicProfileBlock;
+};
 export type SocialMe = SocialProfile & {
   friend_code: string;
   friends: SocialProfile[];
@@ -557,12 +572,41 @@ export function createWishlistItem(
 export function deleteWishlistItem(id: string) {
   return request<void>(`/wishlist/${id}`, { method: "DELETE", auth: true });
 }
-export function listFavorites() { return request<FavoriteItem[]>("/favorites", { auth: true }); }
-export function createFavorite(data: Pick<FavoriteItem, "identity_kind" | "identity_value" | "title" | "cover_url">) { return request<FavoriteItem>("/favorites", { method: "POST", auth: true, body: data }); }
-export function deleteFavorite(id: string) { return request<void>(`/favorites/${id}`, { method: "DELETE", auth: true }); }
-export function getProfileSettings() { return request<ProfileSettings>("/profile/settings", { auth: true }); }
-export function updateProfileSettings(data: Omit<ProfileSettings, "profile_id">) { return request<ProfileSettings>("/profile/settings", { method: "PATCH", auth: true, body: data }); }
-export function getPublicProfile(profileId: string) { return request<PublicProfile>(`/profiles/${encodeURIComponent(profileId)}`, { auth: true }); }
+export function listFavorites() {
+  return request<FavoriteItem[]>("/favorites", { auth: true });
+}
+export function createFavorite(
+  data: Pick<
+    FavoriteItem,
+    "identity_kind" | "identity_value" | "title" | "cover_url"
+  >,
+) {
+  return request<FavoriteItem>("/favorites", {
+    method: "POST",
+    auth: true,
+    body: data,
+  });
+}
+export function deleteFavorite(id: string) {
+  return request<void>(`/favorites/${id}`, { method: "DELETE", auth: true });
+}
+export function getProfileSettings() {
+  return request<ProfileSettings>("/profile/settings", { auth: true });
+}
+export function updateProfileSettings(
+  data: Omit<ProfileSettings, "profile_id">,
+) {
+  return request<ProfileSettings>("/profile/settings", {
+    method: "PATCH",
+    auth: true,
+    body: data,
+  });
+}
+export function getPublicProfile(profileId: string) {
+  return request<PublicProfile>(`/profiles/${encodeURIComponent(profileId)}`, {
+    auth: true,
+  });
+}
 export function listPriceAlerts() {
   return request<PriceAlert[]>("/price-alerts", { auth: true });
 }

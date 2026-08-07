@@ -175,11 +175,34 @@ describe("discovery API regions", () => {
   });
 
   it("adds a catalog game to favorites", async () => {
-    vi.mocked(getCatalogGame).mockResolvedValue({ id: 1, name: "Hades II", released: null, background_image: null, description_raw: null, rating: null, genres: [], platforms: [] });
-    vi.mocked(createFavorite).mockResolvedValue({ id: "fav", identity_kind: "rawg", identity_value: "1", title: "Hades II", cover_url: null, created_at: "now" });
+    vi.mocked(getCatalogGame).mockResolvedValue({
+      id: 1,
+      name: "Hades II",
+      released: null,
+      background_image: null,
+      description_raw: null,
+      rating: null,
+      genres: [],
+      platforms: [],
+    });
+    vi.mocked(createFavorite).mockResolvedValue({
+      id: "fav",
+      identity_kind: "rawg",
+      identity_value: "1",
+      title: "Hades II",
+      cover_url: null,
+      created_at: "now",
+    });
     render(<GameDetailScreen gameId="1" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Add to favorites" }));
-    expect(createFavorite).toHaveBeenCalledWith({ identity_kind: "rawg", identity_value: "1", title: "Hades II", cover_url: null });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add to favorites" }),
+    );
+    expect(createFavorite).toHaveBeenCalledWith({
+      identity_kind: "rawg",
+      identity_value: "1",
+      title: "Hades II",
+      cover_url: null,
+    });
   });
 
   it("keeps successful price history visible when the catalog request fails", async () => {
