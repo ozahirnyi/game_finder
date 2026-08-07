@@ -4,6 +4,9 @@ import {
   getCatalogGame,
   getGamePriceHistory,
   getTelegramAccount,
+  isAuthenticated,
+  listFavorites,
+  createFavorite,
   getHomepageDeals,
   getTrendingGames,
   getUpcomingGames,
@@ -24,6 +27,9 @@ vi.mock("@/lib/api", () => ({
   getCatalogGame: vi.fn(),
   getGamePriceHistory: vi.fn(),
   getTelegramAccount: vi.fn(),
+  isAuthenticated: vi.fn(() => true),
+  listFavorites: vi.fn(),
+  createFavorite: vi.fn(),
   getHomepageDeals: vi.fn(),
   getTrendingGames: vi.fn(),
   getUpcomingGames: vi.fn(),
@@ -46,6 +52,7 @@ describe("discovery API regions", () => {
       deals: [],
     });
     vi.mocked(listPriceAlerts).mockResolvedValue([]);
+    vi.mocked(listFavorites).mockResolvedValue([]);
     vi.mocked(getTelegramAccount).mockResolvedValue({
       linked: false,
       configured: false,
@@ -165,6 +172,37 @@ describe("discovery API regions", () => {
     expect(
       await screen.findByRole("heading", { name: "Price alerts" }),
     ).toBeVisible();
+  });
+
+  it("adds a catalog game to favorites", async () => {
+    vi.mocked(getCatalogGame).mockResolvedValue({
+      id: 1,
+      name: "Hades II",
+      released: null,
+      background_image: null,
+      description_raw: null,
+      rating: null,
+      genres: [],
+      platforms: [],
+    });
+    vi.mocked(createFavorite).mockResolvedValue({
+      id: "fav",
+      identity_kind: "rawg",
+      identity_value: "1",
+      title: "Hades II",
+      cover_url: null,
+      created_at: "now",
+    });
+    render(<GameDetailScreen gameId="1" />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add to favorites" }),
+    );
+    expect(createFavorite).toHaveBeenCalledWith({
+      identity_kind: "rawg",
+      identity_value: "1",
+      title: "Hades II",
+      cover_url: null,
+    });
   });
 
   it("keeps successful price history visible when the catalog request fails", async () => {

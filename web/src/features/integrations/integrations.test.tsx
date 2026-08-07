@@ -8,6 +8,8 @@ const api = vi.hoisted(() => ({
   confirmPsnImport: vi.fn(),
   getCurrentUser: vi.fn(),
   getGoogleStatus: vi.fn(),
+  getProfileSettings: vi.fn(),
+  listFavorites: vi.fn(),
   getSteamAccount: vi.fn(),
   getSteamLibrary: vi.fn(),
   getSteamLoginUrl: vi.fn(),
@@ -19,6 +21,7 @@ const api = vi.hoisted(() => ({
   previewPsnImport: vi.fn(),
   sendTelegramTestAlert: vi.fn(),
   unlinkTelegramAccount: vi.fn(),
+  updateProfileSettings: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => api);
@@ -38,6 +41,14 @@ describe("integration screens", () => {
       google_linked: false,
     });
     api.getGoogleStatus.mockResolvedValue({ configured: true });
+    api.getProfileSettings.mockResolvedValue({
+      profile_id: "safe-player",
+      library_visibility: "public",
+      favorites_visibility: "friends",
+      wishlist_visibility: "private",
+      steam_visibility: "public",
+    });
+    api.listFavorites.mockResolvedValue([]);
     api.getTelegramAccount.mockResolvedValue({
       linked: false,
       configured: true,
@@ -80,6 +91,21 @@ describe("integration screens", () => {
       public_libraries: 0,
       private_libraries: 0,
     });
+  });
+
+  it("saves all privacy controls", async () => {
+    render(<ProfileScreen />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Save privacy" }),
+    );
+    await waitFor(() =>
+      expect(api.updateProfileSettings).toHaveBeenCalledWith({
+        library_visibility: "public",
+        favorites_visibility: "friends",
+        wishlist_visibility: "private",
+        steam_visibility: "public",
+      }),
+    );
   });
 
   it("shows a sign-in state without requesting Steam data", () => {
