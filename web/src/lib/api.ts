@@ -214,14 +214,48 @@ export type PriceAlert = {
 };
 export type Notification = {
   id: string;
-  event_type: "price_alert";
+  event_type:
+    | "price_alert"
+    | "friend_request"
+    | "message"
+    | "game_invite"
+    | "game_invite_response";
   target_kind: string;
   game_id: string | null;
   saved_game_id: string | null;
   price_alert_id: string | null;
   offer_url: string | null;
+  friend_request_id?: string | null;
+  friendship_id?: string | null;
+  direct_message_id?: string | null;
+  game_invite_id?: string | null;
   read_at: string | null;
   created_at: string;
+};
+export type SocialProfile = {
+  profile_id: string;
+  display_name: string;
+  relationship: string;
+};
+export type SocialMe = SocialProfile & {
+  friend_code: string;
+  friends: SocialProfile[];
+  incoming: (SocialProfile & { id: string })[];
+  outgoing: (SocialProfile & { id: string })[];
+};
+export type DirectMessage = {
+  id: string;
+  author_id: string;
+  text: string;
+  created_at: string;
+};
+export type GameInvite = {
+  id: string;
+  friend_id: string;
+  game_id: string;
+  game_title: string;
+  status: "pending" | "accepted" | "declined" | "cancelled";
+  direction: "incoming" | "outgoing";
 };
 
 const API_URL = import.meta.env.VITE_API_URL || "https://playfinder.cc/api";
@@ -528,6 +562,91 @@ export function markNotificationRead(id: string) {
     method: "POST",
     auth: true,
   });
+}
+export function getSocialMe() {
+  return request<SocialMe>("/social/me", { auth: true });
+}
+export function searchProfiles(query: string) {
+  return request<SocialProfile[]>(
+    `/social/profiles?query=${encodeURIComponent(query)}`,
+    { auth: true },
+  );
+}
+export function getSocialProfile(profileId: string) {
+  return request<SocialProfile>(
+    `/social/profiles/${encodeURIComponent(profileId)}`,
+    {
+      auth: true,
+    },
+  );
+}
+export function sendFriendRequest(data: {
+  profile_id?: string;
+  friend_code?: string;
+}) {
+  return request<unknown>("/social/friend-requests", {
+    method: "POST",
+    auth: true,
+    body: data,
+  });
+}
+export function transitionFriendRequest(
+  id: string,
+  action: "accept" | "reject" | "cancel",
+) {
+  return request<unknown>(
+    `/social/friend-requests/${encodeURIComponent(id)}/${action}`,
+    {
+      method: "POST",
+      auth: true,
+    },
+  );
+}
+export function listMessages(friendId: string) {
+  return request<DirectMessage[]>(
+    `/social/friends/${encodeURIComponent(friendId)}/messages`,
+    {
+      auth: true,
+    },
+  );
+}
+export function sendMessage(friendId: string, data: { text: string }) {
+  return request<DirectMessage>(
+    `/social/friends/${encodeURIComponent(friendId)}/messages`,
+    {
+      method: "POST",
+      auth: true,
+      body: data,
+    },
+  );
+}
+export function createGameInvite(
+  friendId: string,
+  data: { game_id: string; game_title: string },
+) {
+  return request<GameInvite>(
+    `/social/friends/${encodeURIComponent(friendId)}/invites`,
+    {
+      method: "POST",
+      auth: true,
+      body: data,
+    },
+  );
+}
+export function listInvites() {
+  return request<GameInvite[]>("/social/invites", { auth: true });
+}
+export function respondToInvite(
+  id: string,
+  action: "accept" | "decline" | "cancel",
+) {
+  return request<GameInvite>(
+    `/social/invites/${encodeURIComponent(id)}/${action}`,
+    {
+      method: "POST",
+      auth: true,
+    },
+  );
 }
 
 export function previewPsnImport(file: File) {

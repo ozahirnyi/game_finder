@@ -20,7 +20,10 @@ import { Route as LibraryRouteImport } from './routes/library'
 import { Route as FriendsRouteImport } from './routes/friends'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as UsersProfileIdRouteImport } from './routes/users.$profileId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as FriendsInvitesRouteImport } from './routes/friends.invites'
+import { Route as FriendsFriendIdMessagesRouteImport } from './routes/friends.$friendId.messages'
 
 const WishlistRoute = WishlistRouteImport.update({
   id: '/wishlist',
@@ -77,16 +80,31 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UsersProfileIdRoute = UsersProfileIdRouteImport.update({
+  id: '/users/$profileId',
+  path: '/users/$profileId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
   id: '/games/$gameId',
   path: '/games/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FriendsInvitesRoute = FriendsInvitesRouteImport.update({
+  id: '/invites',
+  path: '/invites',
+  getParentRoute: () => FriendsRoute,
+} as any)
+const FriendsFriendIdMessagesRoute = FriendsFriendIdMessagesRouteImport.update({
+  id: '/$friendId/messages',
+  path: '/$friendId/messages',
+  getParentRoute: () => FriendsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/deals': typeof DealsRoute
-  '/friends': typeof FriendsRoute
+  '/friends': typeof FriendsRouteWithChildren
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
@@ -95,12 +113,15 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/friends/invites': typeof FriendsInvitesRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/users/$profileId': typeof UsersProfileIdRoute
+  '/friends/$friendId/messages': typeof FriendsFriendIdMessagesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/deals': typeof DealsRoute
-  '/friends': typeof FriendsRoute
+  '/friends': typeof FriendsRouteWithChildren
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
@@ -109,13 +130,16 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/friends/invites': typeof FriendsInvitesRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/users/$profileId': typeof UsersProfileIdRoute
+  '/friends/$friendId/messages': typeof FriendsFriendIdMessagesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/deals': typeof DealsRoute
-  '/friends': typeof FriendsRoute
+  '/friends': typeof FriendsRouteWithChildren
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
@@ -124,7 +148,10 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/steam': typeof SteamRoute
   '/wishlist': typeof WishlistRoute
+  '/friends/invites': typeof FriendsInvitesRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/users/$profileId': typeof UsersProfileIdRoute
+  '/friends/$friendId/messages': typeof FriendsFriendIdMessagesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -140,7 +167,10 @@ export interface FileRouteTypes {
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/friends/invites'
     | '/games/$gameId'
+    | '/users/$profileId'
+    | '/friends/$friendId/messages'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -154,7 +184,10 @@ export interface FileRouteTypes {
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/friends/invites'
     | '/games/$gameId'
+    | '/users/$profileId'
+    | '/friends/$friendId/messages'
   id:
     | '__root__'
     | '/'
@@ -168,13 +201,16 @@ export interface FileRouteTypes {
     | '/search'
     | '/steam'
     | '/wishlist'
+    | '/friends/invites'
     | '/games/$gameId'
+    | '/users/$profileId'
+    | '/friends/$friendId/messages'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DealsRoute: typeof DealsRoute
-  FriendsRoute: typeof FriendsRoute
+  FriendsRoute: typeof FriendsRouteWithChildren
   LibraryRoute: typeof LibraryRoute
   LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
@@ -184,6 +220,7 @@ export interface RootRouteChildren {
   SteamRoute: typeof SteamRoute
   WishlistRoute: typeof WishlistRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
+  UsersProfileIdRoute: typeof UsersProfileIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -265,6 +302,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/users/$profileId': {
+      id: '/users/$profileId'
+      path: '/users/$profileId'
+      fullPath: '/users/$profileId'
+      preLoaderRoute: typeof UsersProfileIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/games/$gameId': {
       id: '/games/$gameId'
       path: '/games/$gameId'
@@ -272,13 +316,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/friends/invites': {
+      id: '/friends/invites'
+      path: '/invites'
+      fullPath: '/friends/invites'
+      preLoaderRoute: typeof FriendsInvitesRouteImport
+      parentRoute: typeof FriendsRoute
+    }
+    '/friends/$friendId/messages': {
+      id: '/friends/$friendId/messages'
+      path: '/$friendId/messages'
+      fullPath: '/friends/$friendId/messages'
+      preLoaderRoute: typeof FriendsFriendIdMessagesRouteImport
+      parentRoute: typeof FriendsRoute
+    }
   }
 }
+
+interface FriendsRouteChildren {
+  FriendsInvitesRoute: typeof FriendsInvitesRoute
+  FriendsFriendIdMessagesRoute: typeof FriendsFriendIdMessagesRoute
+}
+
+const FriendsRouteChildren: FriendsRouteChildren = {
+  FriendsInvitesRoute: FriendsInvitesRoute,
+  FriendsFriendIdMessagesRoute: FriendsFriendIdMessagesRoute,
+}
+
+const FriendsRouteWithChildren =
+  FriendsRoute._addFileChildren(FriendsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DealsRoute: DealsRoute,
-  FriendsRoute: FriendsRoute,
+  FriendsRoute: FriendsRouteWithChildren,
   LibraryRoute: LibraryRoute,
   LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
@@ -288,6 +359,7 @@ const rootRouteChildren: RootRouteChildren = {
   SteamRoute: SteamRoute,
   WishlistRoute: WishlistRoute,
   GamesGameIdRoute: GamesGameIdRoute,
+  UsersProfileIdRoute: UsersProfileIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

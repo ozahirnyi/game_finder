@@ -81,4 +81,33 @@ describe("NotificationsMenu", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Price alert" }));
     expect(openExternal).toHaveBeenCalledWith("https://shop.example/hades");
   });
+
+  it("navigates to a message before marking it read", async () => {
+    vi.mocked(listNotifications).mockResolvedValue([
+      {
+        id: "n3",
+        event_type: "message",
+        target_kind: "message",
+        game_id: null,
+        saved_game_id: null,
+        price_alert_id: null,
+        offer_url: null,
+        friend_request_id: null,
+        friendship_id: "friend-1",
+        direct_message_id: "message-1",
+        game_invite_id: null,
+        read_at: null,
+        created_at: "",
+      },
+    ]);
+    const order: string[] = [];
+    render(
+      <NotificationsMenu
+        navigate={(target) => order.push(target)}
+        markRead={async () => order.push("read")}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "New message" }));
+    expect(order).toEqual(["/friends/friend-1/messages", "read"]);
+  });
 });
