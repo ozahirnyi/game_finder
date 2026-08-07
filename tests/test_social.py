@@ -139,3 +139,56 @@ def test_message_route_denies_non_friend():
         assert TestClient(main.app).post(f"/social/friends/{bob.id}/messages", json={"text": "Hi"}).status_code == 403
     finally:
         main.app.dependency_overrides.clear()
+
+
+def test_invites_route_lists_only_the_current_users_invites():
+    import app.main as main
+    social = importlib.import_module("app.social")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    alice = User(email="invite-alice@example.test", display_name="Alice")
+    bob = User(email="invite-bob@example.test", display_name="Bob")
+    carol = User(email="invite-carol@example.test", display_name="Carol")
+    db.add_all([alice, bob, carol]); db.commit()
+    request = social.create_friend_request(db, alice, profile_id=bob.profile_id, friend_code=None)
+    social.transition_friend_request(db, bob.id, request.id, "accept")
+    invite = social.create_invite(db, alice.id, bob.id, "30", "Hades")
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    main.app.dependency_overrides[main.get_current_user] = lambda: bob
+    try:
+        response = TestClient(main.app).get("/social/invites")
+        assert response.status_code == 200
+        assert response.json() == [{
+            "id": str(invite.id),
+            "friend_id": str(alice.id),
+            "game_id": "30",
+            "game_title": "Hades",
+            "status": "pending",
+            "direction": "incoming",
+        }]
+    finally:
+        main.app.dependency_overrides.clear()
+
+
+def test_message_route_uses_confirmed_friends_profile_id_not_internal_user_id():
+    import app.main as main
+    social = importlib.import_module("app.social")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    alice = User(email="profile-alice@example.test", display_name="Alice")
+    bob = User(email="profile-bob@example.test", display_name="Bob")
+    db.add_all([alice, bob]); db.commit()
+    request = social.create_friend_request(db, alice, profile_id=bob.profile_id, friend_code=None)
+    social.transition_friend_request(db, bob.id, request.id, "accept")
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    main.app.dependency_overrides[main.get_current_user] = lambda: alice
+    try:
+        response = TestClient(main.app).post(
+            f"/social/friends/{bob.profile_id}/messages", json={"text": "Ready?"}
+        )
+        assert response.status_code == 201
+        assert response.json()["text"] == "Ready?"
+    finally:
+        main.app.dependency_overrides.clear()

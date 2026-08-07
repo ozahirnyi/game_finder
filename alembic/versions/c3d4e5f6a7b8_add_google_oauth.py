@@ -18,7 +18,8 @@ def upgrade() -> None:
     if duplicates:
         raise RuntimeError("Cannot normalize users.email: case-insensitive duplicate emails exist")
     op.execute("UPDATE users SET email = lower(trim(email))")
-    op.alter_column("users", "password_hash", existing_type=sa.String(length=255), nullable=True)
+    with op.batch_alter_table("users") as batch_op:
+        batch_op.alter_column("password_hash", existing_type=sa.String(length=255), nullable=True)
     op.create_table(
         "oauth_identities",
         sa.Column("id", sa.UUID(), nullable=False), sa.Column("user_id", sa.UUID(), nullable=False),
@@ -44,4 +45,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("oauth_authorization_transactions")
     op.drop_table("oauth_identities")
-    op.alter_column("users", "password_hash", existing_type=sa.String(length=255), nullable=False)
+    with op.batch_alter_table("users") as batch_op:
+        batch_op.alter_column("password_hash", existing_type=sa.String(length=255), nullable=False)

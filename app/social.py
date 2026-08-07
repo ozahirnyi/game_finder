@@ -138,6 +138,23 @@ def list_messages(db: Session, user_id: uuid.UUID, friend_id: uuid.UUID) -> list
     return db.query(DirectMessage).filter(DirectMessage.friendship_id == friendship.id).order_by(DirectMessage.created_at).limit(50).all()
 
 
+def list_invites(db: Session, user_id: uuid.UUID) -> list[dict[str, str]]:
+    invites = db.query(GameInvite).filter(
+        (GameInvite.sender_id == user_id) | (GameInvite.recipient_id == user_id)
+    ).order_by(GameInvite.created_at.desc()).all()
+    return [
+        {
+            "id": str(invite.id),
+            "friend_id": str(invite.sender_id if invite.recipient_id == user_id else invite.recipient_id),
+            "game_id": invite.game_id,
+            "game_title": invite.game_title,
+            "status": invite.status,
+            "direction": "incoming" if invite.recipient_id == user_id else "outgoing",
+        }
+        for invite in invites
+    ]
+
+
 def create_invite(db: Session, sender_id: uuid.UUID, recipient_id: uuid.UUID, game_id: str, game_title: str) -> GameInvite:
     friendship = require_friendship(db, sender_id, recipient_id)
     if not game_id or not game_title.strip():

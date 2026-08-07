@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { getSocialMe, searchProfiles, sendFriendRequest } from "@/lib/api";
+import {
+  getSocialMe,
+  searchProfiles,
+  sendFriendRequest,
+  transitionFriendRequest,
+} from "@/lib/api";
 
 export function FriendsScreen() {
   const client = useQueryClient();
@@ -14,6 +19,16 @@ export function FriendsScreen() {
   });
   const send = useMutation({
     mutationFn: sendFriendRequest,
+    onSuccess: () => client.invalidateQueries({ queryKey: ["social"] }),
+  });
+  const transition = useMutation({
+    mutationFn: ({
+      id,
+      action,
+    }: {
+      id: string;
+      action: "accept" | "reject" | "cancel";
+    }) => transitionFriendRequest(id, action),
     onSuccess: () => client.invalidateQueries({ queryKey: ["social"] }),
   });
   if (me.isLoading) return <p>Loading friends…</p>;
@@ -50,7 +65,10 @@ export function FriendsScreen() {
       <h2>Friends</h2>
       {me.data.friends.length ? (
         me.data.friends.map((friend) => (
-          <p key={friend.profile_id}>{friend.display_name}</p>
+          <p key={friend.profile_id}>
+            <a href={`/users/${friend.profile_id}`}>{friend.display_name}</a>{" "}
+            <a href={`/friends/${friend.profile_id}/messages`}>Messages</a>
+          </p>
         ))
       ) : (
         <p>No friends yet.</p>
@@ -58,11 +76,51 @@ export function FriendsScreen() {
       <h2>Incoming requests</h2>
       {me.data.incoming.length ? (
         me.data.incoming.map((request) => (
-          <p key={request.id}>{request.display_name}</p>
+          <p key={request.id}>
+            <a href={`/users/${request.profile_id}`}>{request.display_name}</a>{" "}
+            <button
+              disabled={transition.isPending}
+              onClick={() =>
+                transition.mutate({ id: request.id, action: "accept" })
+              }
+            >
+              Accept request from {request.display_name}
+            </button>{" "}
+            <button
+              disabled={transition.isPending}
+              onClick={() =>
+                transition.mutate({ id: request.id, action: "reject" })
+              }
+            >
+              Reject request from {request.display_name}
+            </button>
+          </p>
         ))
       ) : (
         <p>No incoming requests.</p>
       )}
+      <h2>Outgoing requests</h2>
+      {me.data.outgoing.length ? (
+        me.data.outgoing.map((request) => (
+          <p key={request.id}>
+            <a href={`/users/${request.profile_id}`}>{request.display_name}</a>{" "}
+            <button
+              disabled={transition.isPending}
+              onClick={() =>
+                transition.mutate({ id: request.id, action: "cancel" })
+              }
+            >
+              Cancel request to {request.display_name}
+            </button>
+          </p>
+        ))
+      ) : (
+        <p>No outgoing requests.</p>
+      )}
+      <a href="/friends/invites">Game invites</a>
+      {send.isError || transition.isError ? (
+        <p role="alert">Could not update friends.</p>
+      ) : null}
     </section>
   );
 }
