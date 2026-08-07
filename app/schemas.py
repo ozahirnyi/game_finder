@@ -36,6 +36,17 @@ class WishlistItemCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
 
 
+class FavoriteItemCreate(WishlistItemCreate):
+    cover_url: str | None = Field(default=None, max_length=1000)
+
+
+class ProfileSettingsUpdate(BaseModel):
+    library_visibility: Literal["public", "friends", "private"]
+    favorites_visibility: Literal["public", "friends", "private"]
+    wishlist_visibility: Literal["public", "friends", "private"]
+    steam_visibility: Literal["public", "friends", "private"]
+
+
 class GameRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

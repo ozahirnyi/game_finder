@@ -80,6 +80,10 @@ class User(Base):
     telegram_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     telegram_link_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True)
     telegram_linked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    library_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public")
+    favorites_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public")
+    wishlist_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public")
+    steam_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
 
 
@@ -94,6 +98,19 @@ class WishlistItem(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class FavoriteItem(Base):
+    __tablename__ = "favorite_items"
+    __table_args__ = (UniqueConstraint("user_id", "identity_kind", "identity_value", name="uq_favorite_owner_identity"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    identity_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    identity_value: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    cover_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class PriceAlert(Base):

@@ -25,12 +25,12 @@ from app.integrations.rawg import (
 from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_search
-from app.auth import hash_password, verify_password, create_access_token, get_current_user
+from app.auth import hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, PriceAlertCreate, WishlistItemCreate, FriendRequestCreate, MessageCreate, GameInviteCreate
+    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, PriceAlertCreate, WishlistItemCreate, FavoriteItemCreate, ProfileSettingsUpdate, FriendRequestCreate, MessageCreate, GameInviteCreate
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -42,7 +42,8 @@ from app.steam import (
 )
 from app.crud import list_games, update_game, create_game, get_game, delete_game, get_user_by_email, create_user
 from app.retention import create_price_alert, create_wishlist_item, delete_price_alert, delete_wishlist_item, list_price_alerts, list_price_notifications, list_wishlist_items, mark_price_notification_read
-from app.social import create_friend_request, create_invite, list_invites, list_messages, profile_payload, search_profiles, send_message, social_me, transition_friend_request, transition_invite
+from app.favorites import create_favorite, delete_favorite, list_favorites
+from app.social import create_friend_request, create_invite, list_invites, list_messages, profile_payload, public_profile_payload, search_profiles, send_message, social_me, transition_friend_request, transition_invite
 from app.telegram import (
     build_telegram_link_url,
     create_telegram_link_token,
@@ -262,6 +263,22 @@ def delete_wishlist_route(
         raise HTTPException(status_code=404, detail="Wishlist item not found")
 
 
+@app.get("/favorites")
+def list_favorites_route(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return list_favorites(db, current_user.id)
+
+
+@app.post("/favorites", status_code=201)
+def create_favorite_route(data: FavoriteItemCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return create_favorite(db, current_user, data)
+
+
+@app.delete("/favorites/{item_id}", status_code=204)
+def delete_favorite_route(item_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not delete_favorite(db, current_user.id, item_id):
+        raise HTTPException(status_code=404, detail="Favorite not found")
+
+
 @app.post("/price-alerts", status_code=201)
 def create_price_alert_route(
     data: PriceAlertCreate,
@@ -319,6 +336,38 @@ def social_profile(profile_id: str, db: Session = Depends(get_db), current_user:
     if user is None:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile_payload(db, current_user.id, user)
+
+
+def optional_current_user(request: Request, db: Session) -> User | None:
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        return None
+    payload = decode_access_token(header[7:])
+    try:
+        return get_user_by_id(db, uuid.UUID(payload["sub"]))
+    except (KeyError, ValueError):
+        return None
+
+
+@app.get("/profiles/{profile_id}")
+def public_profile(profile_id: str, request: Request, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.profile_id == profile_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return public_profile_payload(db, optional_current_user(request, db), user)
+
+
+@app.get("/profile/settings")
+def get_profile_settings(current_user: User = Depends(get_current_user)):
+    return {"profile_id": current_user.profile_id, **{name: getattr(current_user, name) for name in ("library_visibility", "favorites_visibility", "wishlist_visibility", "steam_visibility")}}
+
+
+@app.patch("/profile/settings")
+def update_profile_settings(data: ProfileSettingsUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    for name, value in data.model_dump().items():
+        setattr(current_user, name, value)
+    db.commit(); db.refresh(current_user)
+    return get_profile_settings(current_user)
 
 
 def social_friend(db: Session, profile_or_user_id: str) -> User:

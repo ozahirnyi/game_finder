@@ -3,7 +3,7 @@ import uuid
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import DirectMessage, FriendRequest, Friendship, GameInvite, Notification, User
+from app.database import DirectMessage, FavoriteItem, FriendRequest, Friendship, Game, GameInvite, Notification, User, WishlistItem
 
 
 def canonical_pair(first: uuid.UUID, second: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
@@ -99,6 +99,21 @@ def list_notifications(db: Session, user_id: uuid.UUID) -> list[Notification]:
 
 def profile_payload(db: Session, viewer_id: uuid.UUID, user: User) -> dict[str, str]:
     return {"profile_id": user.profile_id, "display_name": user.display_name, "relationship": relationship_for(db, viewer_id, user.id)}
+
+
+def public_profile_payload(db: Session, viewer: User | None, user: User) -> dict:
+    relationship = "anonymous" if viewer is None else relationship_for(db, viewer.id, user.id)
+    def allowed(visibility: str) -> bool:
+        return relationship == "self" or visibility == "public" or (visibility == "friends" and relationship == "friends")
+    def block(visibility: str, items: list[dict]) -> dict:
+        if not allowed(visibility):
+            return {"state": "hidden", "message": "This section is private."}
+        return {"state": "ready", "items": items} if items else {"state": "empty", "items": []}
+    favorites = [{"id": str(item.id), "title": item.title, "cover_url": item.cover_url} for item in db.query(FavoriteItem).filter_by(user_id=user.id).all()]
+    wishlist = [{"id": str(item.id), "title": item.title} for item in db.query(WishlistItem).filter_by(user_id=user.id).all()]
+    library = [{"id": str(item.id), "title": item.title, "cover_url": item.img_icon_url} for item in db.query(Game).filter_by(owner_id=user.id).all()]
+    steam_items = ([{"persona_name": user.steam_persona_name, "avatar": user.steam_avatar}] if user.steam_id else [])
+    return {"profile_id": user.profile_id, "display_name": user.display_name, "relationship": relationship, "library": block(user.library_visibility, library), "favorites": block(user.favorites_visibility, favorites), "wishlist": block(user.wishlist_visibility, wishlist), "steam": block(user.steam_visibility, steam_items)}
 
 
 def social_me(db: Session, user: User) -> dict:
