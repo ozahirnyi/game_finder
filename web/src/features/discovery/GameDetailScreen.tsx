@@ -7,6 +7,10 @@ import {
   getCatalogGame,
   getGamePriceHistory,
   getTelegramAccount,
+  createFavorite,
+  deleteFavorite,
+  isAuthenticated,
+  listFavorites,
   listPriceAlerts,
   type CatalogGame,
   type GamePriceHistory,
@@ -36,6 +40,9 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
     linked_at: null,
   });
   const [alertsRetry, setAlertsRetry] = useState(0);
+  const [favoriteId, setFavoriteId] = useState<string | null>(null);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
   useEffect(() => {
     let active = true;
     void getCatalogGame(gameId)
@@ -76,6 +83,18 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
       })
       .catch(() => undefined);
   }, [alertsRetry]);
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    void listFavorites().then((items) => setFavoriteId(items.find((item) => item.identity_kind === "rawg" && item.identity_value === gameId)?.id ?? null)).catch(() => setFavoriteError("Could not load favorites."));
+  }, [gameId]);
+  async function toggleFavorite() {
+    if (game.status !== "success") return;
+    setFavoriteBusy(true); setFavoriteError("");
+    try {
+      if (favoriteId) { await deleteFavorite(favoriteId); setFavoriteId(null); }
+      else { const item = await createFavorite({ identity_kind: "rawg", identity_value: String(game.data.id), title: game.data.name, cover_url: game.data.background_image }); setFavoriteId(item.id); }
+    } catch { setFavoriteError("Could not update favorites."); } finally { setFavoriteBusy(false); }
+  }
   return (
     <section className="stack">
       <section>
@@ -106,6 +125,8 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
               <h1>{game.data.name}</h1>
               <p>{game.data.released ?? "Release date unknown"}</p>
             </header>
+            {isAuthenticated() ? <button type="button" disabled={favoriteBusy} onClick={toggleFavorite}>{favoriteId ? "Remove from favorites" : "Add to favorites"}</button> : null}
+            {favoriteError ? <p role="alert">{favoriteError}</p> : null}
             <p>{game.data.description_raw ?? "No description available."}</p>
           </>
         ) : null}
