@@ -8,6 +8,7 @@ const checkedFiles = [
   "routes/games.$gameId.tsx",
   "routes/login.tsx",
   "routes/register.tsx",
+  "routes/profile.tsx",
 ];
 
 describe("active application routes", () => {
