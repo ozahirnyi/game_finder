@@ -71,24 +71,41 @@ describe("SearchPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Co-op" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("q=Co-op"), expect.anything()));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("q=Co-op"), expect.anything()),
+    );
     expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("Co-op");
     expect(screen.getByRole("button", { name: "Co-op" })).toHaveClass("border-primary");
   });
 
   it("links identified AI recommendations and offers a title search fallback", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      recommendations: [
-        { title: "Hades", reason: "Match", tags: [], igdb_id: 30 },
-        { title: "Unknown Game", reason: "Match", tags: [] },
-      ],
-    }))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            recommendations: [
+              { title: "Hades", reason: "Match", tags: [], igdb_id: 30 },
+              { title: "Unknown Game", reason: "Match", tags: [] },
+            ],
+          }),
+        ),
+      ),
+    );
     renderSearch();
     fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
-    fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), { target: { value: "roguelike" } });
+    fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
+      target: { value: "roguelike" },
+    });
     fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
 
-    expect(await screen.findByRole("link", { name: "View Hades" })).toHaveAttribute("href", "/games/30");
-    expect(screen.getByRole("link", { name: "Search for Unknown Game" })).toHaveAttribute("href", "/search?q=Unknown%20Game");
+    expect(await screen.findByRole("link", { name: "View Hades" })).toHaveAttribute(
+      "href",
+      "/games/30",
+    );
+    expect(screen.getByRole("link", { name: "Search for Unknown Game" })).toHaveAttribute(
+      "href",
+      "/search?q=Unknown%20Game",
+    );
   });
 });

@@ -30,7 +30,9 @@ describe("SignUpPage", () => {
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password" } });
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
 
-    await waitFor(() => expect(api.registerUser).toHaveBeenCalledWith("me@example.com", "password"));
+    await waitFor(() =>
+      expect(api.registerUser).toHaveBeenCalledWith("me@example.com", "password"),
+    );
     expect(screen.getByText(/account created/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /sign in/i })).toBeInTheDocument();
   });

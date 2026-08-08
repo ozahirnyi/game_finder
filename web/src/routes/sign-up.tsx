@@ -43,7 +43,9 @@ function SignUpPage() {
       await registerUser(email, password);
       setIsCreated(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Account creation failed. Please try again.");
+      setError(
+        reason instanceof Error ? reason.message : "Account creation failed. Please try again.",
+      );
     } finally {
       setIsPending(false);
     }
@@ -87,9 +89,20 @@ function SignUpPage() {
                 />
               </div>
             </label>
-            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-            {isCreated && <p role="status" className="text-sm text-primary">Account created. Please sign in to continue.</p>}
-            <button disabled={isPending || isCreated} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-60">
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            {isCreated && (
+              <p role="status" className="text-sm text-primary">
+                Account created. Please sign in to continue.
+              </p>
+            )}
+            <button
+              disabled={isPending || isCreated}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+            >
               {isPending ? "Creating account…" : "Create account"} <ArrowRight className="size-4" />
             </button>
           </form>

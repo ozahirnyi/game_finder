@@ -88,8 +88,15 @@ function SignInPage() {
                 />
               </div>
             </label>
-            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-            <button disabled={isPending} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-60">
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            <button
+              disabled={isPending}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+            >
               {isPending ? "Signing in…" : "Sign in"} <ArrowRight className="size-4" />
             </button>
           </form>
