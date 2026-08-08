@@ -27,6 +27,15 @@ function SearchPage() {
   const recommendationMutation = useMutation({ mutationFn: getRecommendations });
   const results = searchQuery.data?.results ?? [];
 
+  function updateQuery(nextQuery: string) {
+    setQuery(nextQuery);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (nextQuery) url.searchParams.set("q", nextQuery);
+    else url.searchParams.delete("q");
+    window.history.replaceState({}, "", url);
+  }
+
   return (
     <AppShell>
       <SectionHeader title="Search" hint="Find games by title or ask AI for recommendations" />
@@ -57,7 +66,7 @@ function SearchPage() {
         <Search className="size-4 text-muted-foreground" />
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => updateQuery(event.target.value)}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           placeholder={
             mode === "ai" ? "Describe what you want to play…" : "Search by title, genre, mood…"
@@ -76,7 +85,7 @@ function SearchPage() {
             {filters.map((filter) => (
               <button
                 key={filter}
-                onClick={() => setQuery(filter === "All" ? "" : filter)}
+                onClick={() => updateQuery(filter === "All" ? "" : filter)}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${filter === active ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
               >
                 {filter}

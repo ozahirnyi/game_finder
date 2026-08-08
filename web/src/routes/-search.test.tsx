@@ -22,6 +22,7 @@ describe("SearchPage", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/search");
   });
 
   it("shows search progress instead of an empty result while catalog search is pending", async () => {
@@ -75,6 +76,7 @@ describe("SearchPage", () => {
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("q=Co-op"), expect.anything()),
     );
     expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("Co-op");
+    expect(window.location.search).toBe("?q=Co-op");
     expect(screen.getByRole("button", { name: "Co-op" })).toHaveClass("border-primary");
   });
 
