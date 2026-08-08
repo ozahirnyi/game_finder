@@ -396,7 +396,7 @@ function GameDetail() {
             </Panel>
           </section>
 
-          <section>
+          {owners.length > 0 && <section>
             <SectionHeader title="Friends who own it" hint="Based on your connected friends" />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {owners.map((f) => (
@@ -431,7 +431,7 @@ function GameDetail() {
                 </div>
               ))}
             </div>
-          </section>
+          </section>}
 
           <section>
             <SectionHeader title="Price history" hint="Trend across storefronts" />
@@ -693,15 +693,6 @@ function GameDetail() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 to-transparent p-6">
-            <div className="mb-2 flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
-              <span className="label-mono text-primary">Why for your squad</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Recommendations based on your library overlap will appear here.
-            </p>
-          </div>
         </div>
       </div>
     </AppShell>

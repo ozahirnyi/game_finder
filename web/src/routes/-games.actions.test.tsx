@@ -151,4 +151,12 @@ describe("GameDetail actions", () => {
     );
     expect(screen.getByText("Link copied")).toBeInTheDocument();
   });
+
+  it("omits unsupported ownership and squad claims when no supporting data is available", async () => {
+    renderGame();
+
+    expect(await screen.findByText("Hades II")).toBeInTheDocument();
+    expect(screen.queryByText("Friends who own it")).not.toBeInTheDocument();
+    expect(screen.queryByText("Why for your squad")).not.toBeInTheDocument();
+  });
 });
