@@ -205,7 +205,13 @@ export type ProfileUpdate = Pick<
   Profile,
   "display_name" | "bio" | "library_visibility" | "platforms" | "favorite_genres"
 >;
-export type RecommendationItem = { title: string; reason: string; tags: string[] };
+export type RecommendationItem = {
+  title: string;
+  reason: string;
+  tags: string[];
+  igdb_id?: number | null;
+  steam_appid?: number | null;
+};
 export type RecommendationResponse = { recommendations: RecommendationItem[] };
 export type DashboardBlock<T> = {
   status: "ready" | "empty" | "error" | "not_connected";

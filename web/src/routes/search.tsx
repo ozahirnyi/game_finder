@@ -17,7 +17,7 @@ function SearchPage() {
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("q") ?? "";
   });
-  const [active, setActive] = useState("All");
+  const active = filters.includes(query) ? query : "All";
   const [mode, setMode] = useState<"catalog" | "ai">("catalog");
   const searchQuery = useQuery({
     queryKey: ["search", query],
@@ -76,7 +76,7 @@ function SearchPage() {
             {filters.map((filter) => (
               <button
                 key={filter}
-                onClick={() => setActive(filter)}
+                onClick={() => setQuery(filter === "All" ? "" : filter)}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${filter === active ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
               >
                 {filter}
@@ -139,6 +139,21 @@ function SearchPage() {
               <h3 className="font-bold">{item.title}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{item.reason}</p>
               <p className="mt-3 text-xs text-primary">{item.tags.join(" · ")}</p>
+              {item.igdb_id != null || item.steam_appid != null ? (
+                <a
+                  className="mt-3 inline-block text-sm font-bold text-primary"
+                  href={`/games/${item.igdb_id ?? item.steam_appid}${item.steam_appid != null && item.igdb_id == null ? "?source=steam" : ""}`}
+                >
+                  View {item.title}
+                </a>
+              ) : (
+                <a
+                  className="mt-3 inline-block text-sm font-bold text-primary"
+                  href={`/search?q=${encodeURIComponent(item.title)}`}
+                >
+                  Search for {item.title}
+                </a>
+              )}
             </article>
           ))}
         </div>
