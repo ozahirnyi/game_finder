@@ -209,8 +209,6 @@ export type RecommendationItem = {
   title: string;
   reason: string;
   tags: string[];
-  igdb_id?: number | null;
-  steam_appid?: number | null;
 };
 export type RecommendationResponse = { recommendations: RecommendationItem[] };
 export type DashboardBlock<T> = {

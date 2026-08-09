@@ -148,21 +148,12 @@ function SearchPage() {
               <h3 className="font-bold">{item.title}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{item.reason}</p>
               <p className="mt-3 text-xs text-primary">{item.tags.join(" · ")}</p>
-              {item.igdb_id != null || item.steam_appid != null ? (
-                <a
-                  className="mt-3 inline-block text-sm font-bold text-primary"
-                  href={`/games/${item.igdb_id ?? item.steam_appid}${item.steam_appid != null && item.igdb_id == null ? "?source=steam" : ""}`}
-                >
-                  View {item.title}
-                </a>
-              ) : (
-                <a
-                  className="mt-3 inline-block text-sm font-bold text-primary"
-                  href={`/search?q=${encodeURIComponent(item.title)}`}
-                >
-                  Search for {item.title}
-                </a>
-              )}
+              <a
+                className="mt-3 inline-block text-sm font-bold text-primary"
+                href={`/search?q=${encodeURIComponent(item.title)}`}
+              >
+                Search for {item.title}
+              </a>
             </article>
           ))}
         </div>

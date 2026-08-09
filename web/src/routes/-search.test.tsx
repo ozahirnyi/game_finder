@@ -80,14 +80,14 @@ describe("SearchPage", () => {
     expect(screen.getByRole("button", { name: "Co-op" })).toHaveClass("border-primary");
   });
 
-  it("links identified AI recommendations and offers a title search fallback", async () => {
+  it("offers a title-search fallback for every AI recommendation", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
             recommendations: [
-              { title: "Hades", reason: "Match", tags: [], igdb_id: 30 },
+              { title: "Hades", reason: "Match", tags: [] },
               { title: "Unknown Game", reason: "Match", tags: [] },
             ],
           }),
@@ -101,9 +101,9 @@ describe("SearchPage", () => {
     });
     fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
 
-    expect(await screen.findByRole("link", { name: "View Hades" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "Search for Hades" })).toHaveAttribute(
       "href",
-      "/games/30",
+      "/search?q=Hades",
     );
     expect(screen.getByRole("link", { name: "Search for Unknown Game" })).toHaveAttribute(
       "href",
