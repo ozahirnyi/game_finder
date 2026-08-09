@@ -17,7 +17,7 @@ function SearchPage() {
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("q") ?? "";
   });
-  const [active, setActive] = useState("All");
+  const active = filters.includes(query) ? query : "All";
   const [mode, setMode] = useState<"catalog" | "ai">("catalog");
   const searchQuery = useQuery({
     queryKey: ["search", query],
@@ -26,6 +26,15 @@ function SearchPage() {
   });
   const recommendationMutation = useMutation({ mutationFn: getRecommendations });
   const results = searchQuery.data?.results ?? [];
+
+  function updateQuery(nextQuery: string) {
+    setQuery(nextQuery);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (nextQuery) url.searchParams.set("q", nextQuery);
+    else url.searchParams.delete("q");
+    window.history.replaceState({}, "", url);
+  }
 
   return (
     <AppShell>
@@ -57,7 +66,7 @@ function SearchPage() {
         <Search className="size-4 text-muted-foreground" />
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => updateQuery(event.target.value)}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           placeholder={
             mode === "ai" ? "Describe what you want to play…" : "Search by title, genre, mood…"
@@ -76,7 +85,7 @@ function SearchPage() {
             {filters.map((filter) => (
               <button
                 key={filter}
-                onClick={() => setActive(filter)}
+                onClick={() => updateQuery(filter === "All" ? "" : filter)}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${filter === active ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
               >
                 {filter}
@@ -139,6 +148,12 @@ function SearchPage() {
               <h3 className="font-bold">{item.title}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{item.reason}</p>
               <p className="mt-3 text-xs text-primary">{item.tags.join(" · ")}</p>
+              <a
+                className="mt-3 inline-block text-sm font-bold text-primary"
+                href={`/search?q=${encodeURIComponent(item.title)}`}
+              >
+                Search for {item.title}
+              </a>
             </article>
           ))}
         </div>

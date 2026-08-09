@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -22,6 +22,7 @@ describe("SearchPage", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/search");
   });
 
   it("shows search progress instead of an empty result while catalog search is pending", async () => {
@@ -61,6 +62,52 @@ describe("SearchPage", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/recommendations"),
       expect.any(Object),
+    );
+  });
+
+  it("turns a query suggestion into the catalog query", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+
+    fireEvent.click(screen.getByRole("button", { name: "Co-op" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("q=Co-op"), expect.anything()),
+    );
+    expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("Co-op");
+    expect(window.location.search).toBe("?q=Co-op");
+    expect(screen.getByRole("button", { name: "Co-op" })).toHaveClass("border-primary");
+  });
+
+  it("offers a title-search fallback for every AI recommendation", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            recommendations: [
+              { title: "Hades", reason: "Match", tags: [] },
+              { title: "Unknown Game", reason: "Match", tags: [] },
+            ],
+          }),
+        ),
+      ),
+    );
+    renderSearch();
+    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
+      target: { value: "roguelike" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
+
+    expect(await screen.findByRole("link", { name: "Search for Hades" })).toHaveAttribute(
+      "href",
+      "/search?q=Hades",
+    );
+    expect(screen.getByRole("link", { name: "Search for Unknown Game" })).toHaveAttribute(
+      "href",
+      "/search?q=Unknown%20Game",
     );
   });
 });
