@@ -74,7 +74,7 @@ export const Route = createFileRoute("/games/$gameId")({
         }
       } catch {
         if (!deps.title) throw new Error("Catalog title unavailable");
-        const results = await searchGames(deps.title);
+        const results = await searchGames({ query: deps.title });
         const match = exactCatalogMatch(results.results, deps.title);
         if (!match) throw new Error("Catalog game unavailable");
         catalog = await getCatalogGame(match.id);

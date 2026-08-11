@@ -45,7 +45,7 @@ function Home() {
   });
   const searchQuery = useQuery({
     queryKey: ["home-search", query],
-    queryFn: () => searchGames(query),
+    queryFn: () => searchGames({ query }),
     enabled: query.trim().length >= 2,
   });
   const dealsQuery = useQuery({ queryKey: ["deals", region], queryFn: () => getDeals(region, 13) });

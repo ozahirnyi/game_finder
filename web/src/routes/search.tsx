@@ -4,36 +4,97 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
-import { getRecommendations, searchGames } from "@/lib/api";
+import {
+  getRecommendations,
+  searchGames,
+  type CatalogFeature,
+  type CatalogGenre,
+  type CatalogPlatform,
+} from "@/lib/api";
 import { gameDetailTarget } from "@/lib/gameRoute";
 import { Search, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/search")({ component: SearchPage });
 
-const filters = ["All", "Co-op", "PC", "PS5", "On sale", "Roguelike", "RPG", "Multiplayer"];
+const filters: Array<{ label: string; type?: "platform" | "feature" | "genre"; value?: string }> = [
+  { label: "All" },
+  { label: "Co-op", type: "feature", value: "co_op" },
+  { label: "PC", type: "platform", value: "pc" },
+  { label: "PS5", type: "platform", value: "ps5" },
+  { label: "Roguelike", type: "genre", value: "roguelike" },
+  { label: "RPG", type: "genre", value: "rpg" },
+  { label: "Multiplayer", type: "feature", value: "multiplayer" },
+];
 
 function SearchPage() {
   const [query, setQuery] = useState(() => {
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("q") ?? "";
   });
-  const active = filters.includes(query) ? query : "All";
+  const [platforms, setPlatforms] = useState<CatalogPlatform[]>([]);
+  const [features, setFeatures] = useState<CatalogFeature[]>([]);
+  const [genres, setGenres] = useState<CatalogGenre[]>([]);
   const [mode, setMode] = useState<"catalog" | "ai">("catalog");
   const searchQuery = useQuery({
-    queryKey: ["search", query],
-    queryFn: () => searchGames(query),
-    enabled: mode === "catalog" && query.trim().length >= 2,
+    queryKey: ["search", query, platforms, features, genres],
+    queryFn: () => searchGames({ query: query.trim(), platforms, features, genres }),
+    enabled: mode === "catalog",
   });
   const recommendationMutation = useMutation({ mutationFn: getRecommendations });
   const results = searchQuery.data?.results ?? [];
 
-  function updateQuery(nextQuery: string) {
-    setQuery(nextQuery);
+  function syncUrl(
+    nextQuery: string,
+    nextPlatforms = platforms,
+    nextFeatures = features,
+    nextGenres = genres,
+  ) {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (nextQuery) url.searchParams.set("q", nextQuery);
     else url.searchParams.delete("q");
+    url.searchParams.delete("platform");
+    nextPlatforms.forEach((value) => url.searchParams.append("platform", value));
+    url.searchParams.delete("feature");
+    nextFeatures.forEach((value) => url.searchParams.append("feature", value));
+    url.searchParams.delete("genre");
+    nextGenres.forEach((value) => url.searchParams.append("genre", value));
     window.history.replaceState({}, "", url);
+  }
+
+  function updateQuery(nextQuery: string) {
+    setQuery(nextQuery);
+    syncUrl(nextQuery);
+  }
+  function toggleFilter(filter: (typeof filters)[number]) {
+    if (!filter.type || !filter.value) {
+      setPlatforms([]);
+      setFeatures([]);
+      setGenres([]);
+      syncUrl(query, [], [], []);
+      return;
+    }
+    if (filter.type === "platform") {
+      const next = platforms.includes(filter.value as CatalogPlatform)
+        ? platforms.filter((item) => item !== filter.value)
+        : [...platforms, filter.value as CatalogPlatform];
+      setPlatforms(next);
+      syncUrl(query, next);
+    }
+    if (filter.type === "feature") {
+      const next = features.includes(filter.value as CatalogFeature)
+        ? features.filter((item) => item !== filter.value)
+        : [...features, filter.value as CatalogFeature];
+      setFeatures(next);
+      syncUrl(query, platforms, next);
+    }
+    if (filter.type === "genre") {
+      const next = genres.includes(filter.value as CatalogGenre)
+        ? genres.filter((item) => item !== filter.value)
+        : [...genres, filter.value as CatalogGenre];
+      setGenres(next);
+      syncUrl(query, platforms, features, next);
+    }
   }
 
   return (
@@ -82,24 +143,34 @@ function SearchPage() {
       {mode === "catalog" && (
         <>
           <div className="mb-8 flex flex-wrap gap-2">
-            {filters.map((filter) => (
-              <button
-                key={filter}
-                onClick={() => updateQuery(filter === "All" ? "" : filter)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${filter === active ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
-              >
-                {filter}
-              </button>
-            ))}
+            {filters.map((filter) => {
+              const active =
+                filter.type === "platform"
+                  ? platforms.includes(filter.value as CatalogPlatform)
+                  : filter.type === "feature"
+                    ? features.includes(filter.value as CatalogFeature)
+                    : filter.type === "genre"
+                      ? genres.includes(filter.value as CatalogGenre)
+                      : !platforms.length && !features.length && !genres.length;
+              return (
+                <button
+                  key={filter.label}
+                  onClick={() => toggleFilter(filter)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
           </div>
-          {query.trim() !== "" && searchQuery.isFetching && (
+          {searchQuery.isFetching && (
             <EmptyState
               icon={<Search className="size-5 animate-pulse" />}
               title="Searching games…"
               description="Checking the catalog and Steam."
             />
           )}
-          {query.trim() !== "" && !searchQuery.isFetching && results.length === 0 && (
+          {!searchQuery.isFetching && results.length === 0 && (
             <EmptyState
               icon={<Search className="size-5" />}
               title="No games match your search"
