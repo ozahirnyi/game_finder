@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { GameCover } from "@/components/GameCover";
 import { Chip, PriceBlock } from "@/components/ui-bits";
+import { summarizePlatforms } from "@/lib/platformPresentation";
 
 export type GameCardData = {
   /** Confirmed internal catalog id. */
@@ -58,9 +59,12 @@ export function GameCard({
         )}
         {game.platforms && game.platforms.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {game.platforms.map((p) => (
+            {summarizePlatforms(game.platforms).visible.map((p) => (
               <Chip key={p}>{p}</Chip>
             ))}
+            {summarizePlatforms(game.platforms).remainingCount > 0 && (
+              <Chip>+{summarizePlatforms(game.platforms).remainingCount}</Chip>
+            )}
           </div>
         )}
         {showPrice && (
