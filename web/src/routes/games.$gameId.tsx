@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
+import { summarizePlatforms } from "@/lib/platformPresentation";
 import {
   Chip,
   EmptyState,
@@ -217,6 +218,7 @@ function GameDetail() {
   });
   const queryClient = useQueryClient();
   const [showAlertForm, setShowAlertForm] = useState(false);
+  const [showAllPlatforms, setShowAllPlatforms] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [targetPrice, setTargetPrice] = useState("");
   const [recipientId, setRecipientId] = useState("");
@@ -313,6 +315,7 @@ function GameDetail() {
     store?: string;
   }> = [];
   const priceUnavailable = game.price == null;
+  const platformSummary = summarizePlatforms(game.platforms);
   const priceHistory = (priceQuery.data?.history ?? [])
     .map((deal, index) => ({
       price: deal?.price?.amount,
@@ -380,7 +383,6 @@ function GameDetail() {
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {[
                   { l: "Genres", v: game.genres.join(", ") },
-                  { l: "Platforms", v: game.platforms.join(", ") },
                   { l: "Rating", v: game.rating > 0 ? `${game.rating} / 100` : "Not rated yet" },
                   { l: "Release date", v: game.releaseDate ?? "Unknown" },
                 ].map((r) => (
@@ -392,6 +394,23 @@ function GameDetail() {
                     <dd className="text-right text-sm font-bold">{r.v}</dd>
                   </div>
                 ))}
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <dt className="label-mono text-muted-foreground">Platforms</dt>
+                  <dd className="text-right text-sm font-bold">
+                    {showAllPlatforms
+                      ? game.platforms.join(", ")
+                      : platformSummary.visible.join(", ")}
+                    {platformSummary.remainingCount > 0 && (
+                      <button
+                        type="button"
+                        className="ml-2 text-xs font-semibold text-primary hover:underline"
+                        onClick={() => setShowAllPlatforms((visible) => !visible)}
+                      >
+                        {showAllPlatforms ? "Show fewer platforms" : "Show all platforms"}
+                      </button>
+                    )}
+                  </dd>
+                </div>
               </dl>
             </Panel>
           </section>

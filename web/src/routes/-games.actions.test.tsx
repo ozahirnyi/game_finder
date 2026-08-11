@@ -159,4 +159,20 @@ describe("GameDetail actions", () => {
     expect(screen.queryByText("Friends who own it")).not.toBeInTheDocument();
     expect(screen.queryByText("Why for your squad")).not.toBeInTheDocument();
   });
+
+  it("reveals every real platform only when requested", async () => {
+    game.platforms = ["Windows", "macOS", "Linux", "PlayStation 5"];
+    renderGame();
+
+    expect(await screen.findByRole("button", { name: "Show all platforms" })).toBeInTheDocument();
+    expect(screen.getByText("Platforms").parentElement).toHaveTextContent("Windows, macOS, Linux");
+    expect(screen.getByText("Platforms").parentElement).not.toHaveTextContent(
+      "Windows, macOS, Linux, PlayStation 5",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Show all platforms" }));
+    expect(screen.getByText("Platforms").parentElement).toHaveTextContent(
+      "Windows, macOS, Linux, PlayStation 5",
+    );
+    game.platforms = ["PC"];
+  });
 });
