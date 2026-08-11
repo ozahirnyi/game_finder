@@ -10,6 +10,43 @@ async def run_cached(_key, _ttl, fetch):
     return await fetch()
 
 
+def test_search_games_accepts_structured_discovery_filters(api_client, app_main, monkeypatch):
+    captured = {}
+
+    async def fetch_igdb(query, page=1, filters=None):
+        captured["query"] = query
+        captured["filters"] = filters
+        return {"results": []}
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", fetch_igdb)
+    monkeypatch.setattr(app_main, "get_json_cached", run_cached)
+
+    response = api_client.get("/search/games", params=[("platform", "pc"), ("feature", "co_op")])
+
+    assert response.status_code == 200
+    assert captured["query"] == ""
+    assert captured["filters"].platforms == ("pc",)
+    assert captured["filters"].features == ("co_op",)
+
+
+def test_search_games_combines_text_and_platform_filter(api_client, app_main, monkeypatch):
+    captured = {}
+
+    async def fetch_igdb(query, page=1, filters=None):
+        captured["query"] = query
+        captured["filters"] = filters
+        return {"results": []}
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", fetch_igdb)
+    monkeypatch.setattr(app_main, "get_json_cached", run_cached)
+
+    response = api_client.get("/search/games", params={"q": "Hades", "platform": "ps5"})
+
+    assert response.status_code == 200
+    assert captured["query"] == "hades"
+    assert captured["filters"].platforms == ("ps5",)
+
+
 def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_main, monkeypatch):
     fetch_igdb = AsyncMock(return_value={"results": [{
         "id": 999,
@@ -28,12 +65,12 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     assert response.json()["results"][0]["name"] == "Hades"
     assert response.json()["results"][0]["id"] == 999
     assert "source" not in response.json()["results"][0]
-    fetch_igdb.assert_awaited_once_with("hades", page=2)
+    fetch_igdb.assert_awaited_once_with("hades", page=2, filters=app_main.CatalogSearchFilters())
     assert cached.await_count == 1
-    assert "igdb_search_v2" in cached.await_args.args[0]
+    assert "igdb_search_v3" in cached.await_args.args[0]
 
 
-@pytest.mark.parametrize("params", [{"q": "   "}, {"q": "hades", "page": 0}])
+@pytest.mark.parametrize("params", [{"q": "hades", "page": 0}, {"platform": "unsupported"}])
 def test_search_games_rejects_invalid_query_or_page(api_client, params):
     response = api_client.get("/search/games", params=params)
     assert response.status_code == 400
@@ -82,7 +119,7 @@ def test_search_expands_known_game_aliases(api_client, app_main, monkeypatch):
     response = api_client.get("/search/games", params={"q": "cs2"})
 
     assert response.status_code == 200
-    fetch_igdb.assert_awaited_once_with("counter-strike 2", page=1)
+    fetch_igdb.assert_awaited_once_with("counter-strike 2", page=1, filters=app_main.CatalogSearchFilters())
 
 
 def test_catalog_detail_normalizes_response(api_client, app_main, monkeypatch):

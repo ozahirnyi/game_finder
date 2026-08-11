@@ -22,6 +22,7 @@ from app.steam_recommendations import build_steam_recommendation_prompt, get_cac
 from app.cache import build_cache_key, get_json_cached
 from app.catalog_cache import get_cached_snapshot
 from app.integrations.igdb import (
+    CatalogSearchFilters,
     fetch_igdb_game_detail,
     fetch_igdb_games,
     fetch_igdb_trending_games,
@@ -2652,18 +2653,29 @@ def _rank_search_results(query: str, results: list[dict]) -> list[dict]:
 
 @app.get("/search/games", response_model=GameSearchResponse, response_model_exclude_unset=True)
 @limiter.limit("30/minute")
-async def search(request: Request, q: str, page: int = 1):
+async def search(
+    request: Request,
+    q: str = "",
+    page: int = 1,
+    platform: list[str] = Query(default=[]),
+    feature: list[str] = Query(default=[]),
+    genre: list[str] = Query(default=[]),
+):
     q = q.strip().lower()
-    if not q:
-        raise HTTPException(status_code=400, detail="q cannot be empty")
     if page < 1:
         raise HTTPException(status_code=400, detail="page must be >= 1")
+    allowed_platforms = {"pc", "ps5", "ps4", "xbox_series", "xbox_one", "switch"}
+    allowed_features = {"co_op", "multiplayer"}
+    allowed_genres = {"rpg", "roguelike"}
+    if set(platform) - allowed_platforms or set(feature) - allowed_features or set(genre) - allowed_genres:
+        raise HTTPException(status_code=400, detail="unknown discovery filter")
+    filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v2", q=catalog_query, page=page)
+    key = build_cache_key("igdb_search_v3", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres)
 
     async def fetch():
-        payload = await fetch_igdb_games(catalog_query, page=page)
-        return {**payload, "results": _rank_search_results(q, payload.get("results", []))}
+        payload = await fetch_igdb_games(catalog_query, page=page, filters=filters)
+        return {**payload, "results": _rank_search_results(q, payload.get("results", [])) if q else payload.get("results", [])}
 
     try:
         return JSONResponse(content=await get_json_cached(key, CACHE_TTL, fetch))
