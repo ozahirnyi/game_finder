@@ -11,7 +11,7 @@ load_dotenv()
 
 
 def fallback_enabled() -> bool:
-    return os.getenv("AI_FALLBACK_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+    return os.getenv("AI_FALLBACK_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def fallback_or_raise(prompt: str, reason: str) -> dict:

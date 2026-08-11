@@ -116,3 +116,20 @@ def test_openai_fallback_disabled_raises_503(monkeypatch):
     monkeypatch.setenv("AI_FALLBACK_ENABLED", "false")
     with pytest.raises(HTTPException, match="rate limit"):
         openai_client.get_recommendation("prompt", [])
+
+
+def test_openai_provider_failure_is_unavailable_by_default(monkeypatch):
+    error_type = type("RateLimitError", (Exception,), {})
+    monkeypatch.setattr(openai_client, "RateLimitError", error_type)
+    monkeypatch.setattr(
+        openai_client,
+        "get_client",
+        lambda: type("C", (), {"responses": type("R", (), {"create": lambda *_a, **_k: (_ for _ in ()).throw(error_type())})()})(),
+    )
+    monkeypatch.delenv("AI_FALLBACK_ENABLED", raising=False)
+
+    with pytest.raises(HTTPException) as exc:
+        openai_client.get_recommendation("prompt", [])
+
+    assert exc.value.status_code == 503
+    assert exc.value.detail["code"] == "ai_recommendations_unavailable"
