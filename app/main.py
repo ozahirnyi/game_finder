@@ -2875,6 +2875,32 @@ async def genre_deals(current_user: User | None = Depends(get_optional_current_u
     return await get_json_cached(key, CACHE_TTL, fetch)
 
 
+async def resolve_recommendation_catalog_matches(result: dict) -> dict:
+    """Attach catalog metadata only when a recommendation title resolves exactly."""
+    resolved: list[dict] = []
+    for recommendation in result.get("recommendations", []):
+        item = dict(recommendation)
+        title = str(item.get("title", "")).strip()
+        if title:
+            try:
+                catalog = await fetch_igdb_games(title)
+            except IGDBError:
+                catalog = {"results": []}
+            exact_match = next(
+                (
+                    game
+                    for game in catalog.get("results", [])
+                    if str(game.get("name", "")).casefold() == title.casefold()
+                ),
+                None,
+            )
+            if exact_match and isinstance(exact_match.get("id"), int):
+                item["igdb_id"] = exact_match["id"]
+                item["cover_url"] = exact_match.get("background_image")
+        resolved.append(item)
+    return {**result, "recommendations": resolved}
+
+
 @app.post("/recommendations",response_model=RecommendationResponse)
 @limiter.limit("5/minute")
 async def recommendations(request: Request, data: RecommendationRequest):
@@ -2884,7 +2910,7 @@ async def recommendations(request: Request, data: RecommendationRequest):
         get_recommendation,
         data.prompt,
         data.liked_game_ids,)
-    return result
+    return await resolve_recommendation_catalog_matches(result)
 
 
 @app.exception_handler(RateLimitExceeded)

@@ -209,6 +209,8 @@ export type RecommendationItem = {
   title: string;
   reason: string;
   tags: string[];
+  igdb_id?: number | null;
+  cover_url?: string | null;
 };
 export type RecommendationResponse = { recommendations: RecommendationItem[] };
 export type DashboardBlock<T> = {

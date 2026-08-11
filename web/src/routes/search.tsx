@@ -226,12 +226,21 @@ function SearchPage() {
               <h3 className="font-bold">{item.title}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{item.reason}</p>
               <p className="mt-3 text-xs text-primary">{item.tags.join(" · ")}</p>
-              <a
-                className="mt-3 inline-block text-sm font-bold text-primary"
-                href={`/search?q=${encodeURIComponent(item.title)}`}
-              >
-                Search for {item.title}
-              </a>
+              {item.igdb_id != null ? (
+                <a
+                  className="mt-3 inline-block text-sm font-bold text-primary"
+                  href={`/games/${item.igdb_id}`}
+                >
+                  View {item.title} details
+                </a>
+              ) : (
+                <a
+                  className="mt-3 inline-block text-sm font-bold text-primary"
+                  href={`/search?q=${encodeURIComponent(item.title)}`}
+                >
+                  Search for {item.title}
+                </a>
+              )}
             </article>
           ))}
         </div>

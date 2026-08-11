@@ -101,7 +101,7 @@ describe("SearchPage", () => {
               url.includes("/recommendations")
                 ? {
                     recommendations: [
-                      { title: "Hades", reason: "Match", tags: [] },
+                      { title: "Hades", reason: "Match", tags: [], igdb_id: 30 },
                       { title: "Unknown Game", reason: "Match", tags: [] },
                     ],
                   }
@@ -118,9 +118,9 @@ describe("SearchPage", () => {
     });
     fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
 
-    expect(await screen.findByRole("link", { name: "Search for Hades" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "View Hades details" })).toHaveAttribute(
       "href",
-      "/search?q=Hades",
+      "/games/30",
     );
     expect(screen.getByRole("link", { name: "Search for Unknown Game" })).toHaveAttribute(
       "href",
