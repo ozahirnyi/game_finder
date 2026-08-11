@@ -214,6 +214,13 @@ function SearchPage() {
               description="Please try again in a moment."
             />
           )}
+          {recommendationMutation.data?.recommendations.length === 0 && (
+            <EmptyState
+              icon={<Sparkles className="size-5" />}
+              title="No AI matches found"
+              description="Try describing a different mood, genre, or platform."
+            />
+          )}
           {recommendationMutation.data?.recommendations.map((item) => (
             <article key={item.title} className="rounded-xl border border-border bg-surface p-4">
               <h3 className="font-bold">{item.title}</h3>

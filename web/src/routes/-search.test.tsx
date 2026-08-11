@@ -127,4 +127,27 @@ describe("SearchPage", () => {
       "/search?q=Unknown%20Game",
     );
   });
+
+  it("distinguishes an AI no-match response from provider unavailability", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(
+              url.includes("/recommendations") ? { recommendations: [] } : { results: [] },
+            ),
+          ),
+        ),
+      ),
+    );
+    renderSearch();
+    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
+      target: { value: "obscure niche" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
+
+    expect(await screen.findByText("No AI matches found")).toBeInTheDocument();
+  });
 });
