@@ -663,6 +663,10 @@ export function createPriceAlert(data: PriceAlertCreate) {
   return apiRequest<PriceAlert>("/price-alerts", { auth: true, method: "POST", body: data });
 }
 
+export function deletePriceAlert(id: string) {
+  return apiRequest<void>(`/price-alerts/${id}`, { auth: true, method: "DELETE" });
+}
+
 export function getNotifications() {
   return apiRequest<Notification[]>("/notifications", { auth: true });
 }
