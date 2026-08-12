@@ -443,9 +443,10 @@ export function confirmPsnImport(games: string[]) {
   });
 }
 
-export type CatalogPlatform = "pc" | "ps5" | "ps4" | "xbox_series" | "xbox_one" | "switch";
-export type CatalogFeature = "co_op" | "multiplayer";
-export type CatalogGenre = "rpg" | "roguelike";
+export type CatalogPlatform =
+  "pc" | "console" | "ps5" | "ps4" | "xbox_series" | "xbox_one" | "switch";
+export type CatalogFeature = "single_player" | "co_op" | "multiplayer";
+export type CatalogGenre = "adventure" | "rpg" | "roguelike" | "shooter" | "strategy";
 export type CatalogSearchOptions = {
   query?: string;
   platforms?: CatalogPlatform[];
@@ -661,6 +662,10 @@ export function getPriceAlerts() {
 
 export function createPriceAlert(data: PriceAlertCreate) {
   return apiRequest<PriceAlert>("/price-alerts", { auth: true, method: "POST", body: data });
+}
+
+export function deletePriceAlert(id: string) {
+  return apiRequest<void>(`/price-alerts/${id}`, { auth: true, method: "DELETE" });
 }
 
 export function getNotifications() {

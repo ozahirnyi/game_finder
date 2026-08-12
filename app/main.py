@@ -2653,6 +2653,10 @@ def _rank_search_results(query: str, results: list[dict]) -> list[dict]:
 
 _PLATFORM_LABELS = {
     "pc": {"windows", "macos", "mac", "linux", "pc (microsoft windows)"},
+    "console": {
+        "playstation 5", "playstation 5 pro", "playstation 4", "xbox series x|s",
+        "xbox series x", "xbox series s", "xbox one", "nintendo switch", "nintendo switch 2",
+    },
     "ps5": {"playstation 5", "playstation 5 pro"},
     "ps4": {"playstation 4"},
     "xbox_series": {"xbox series x|s", "xbox series x", "xbox series s"},
@@ -2670,7 +2674,13 @@ def _matches_catalog_filters(game: dict, filters: CatalogSearchFilters) -> bool:
         return False
     genres = {str(genre).casefold() for genre in game.get("genres") or []}
     keywords = {str(keyword).casefold() for keyword in game.get("keywords") or []}
-    if "rpg" in filters.genres and "role-playing (rpg)" not in genres:
+    genre_labels = {
+        "adventure": "adventure",
+        "rpg": "role-playing (rpg)",
+        "shooter": "shooter",
+        "strategy": "strategy",
+    }
+    if any(label not in genres for genre, label in genre_labels.items() if genre in filters.genres):
         return False
     return "roguelike" not in filters.genres or "roguelike" in keywords
 
@@ -2718,9 +2728,9 @@ async def search(
     q = q.strip().lower()
     if page < 1:
         raise HTTPException(status_code=400, detail="page must be >= 1")
-    allowed_platforms = {"pc", "ps5", "ps4", "xbox_series", "xbox_one", "switch"}
-    allowed_features = {"co_op", "multiplayer"}
-    allowed_genres = {"rpg", "roguelike"}
+    allowed_platforms = {"pc", "console", "ps5", "ps4", "xbox_series", "xbox_one", "switch"}
+    allowed_features = {"single_player", "co_op", "multiplayer"}
+    allowed_genres = {"adventure", "rpg", "roguelike", "shooter", "strategy"}
     if set(platform) - allowed_platforms or set(feature) - allowed_features or set(genre) - allowed_genres:
         raise HTTPException(status_code=400, detail="unknown discovery filter")
     normalized_country = country.strip().upper()

@@ -77,7 +77,7 @@ describe("SearchPage", () => {
     renderSearch();
 
     fireEvent.click(screen.getByRole("button", { name: "Co-op" }));
-    fireEvent.click(screen.getByRole("button", { name: "PS5" }));
+    fireEvent.click(screen.getByRole("button", { name: "Consoles" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -87,8 +87,44 @@ describe("SearchPage", () => {
     );
     expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("");
     expect(window.location.search).toContain("feature=co_op");
-    expect(window.location.search).toContain("platform=ps5");
+    expect(window.location.search).toContain("platform=console");
     expect(screen.getByRole("button", { name: "Co-op" })).toHaveClass("border-primary");
+  });
+
+  it("offers Solo and a console group instead of a single promoted console", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+
+    fireEvent.click(screen.getByRole("button", { name: "Solo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Consoles" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /feature=single_player.*platform=console|platform=console.*feature=single_player/,
+        ),
+        expect.anything(),
+      ),
+    );
+    expect(screen.queryByRole("button", { name: "PS5" })).not.toBeInTheDocument();
+  });
+
+  it("offers additional catalog genres as structured filters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+
+    fireEvent.click(screen.getByRole("button", { name: "Shooter" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("genre=shooter"),
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByRole("button", { name: "Adventure" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Strategy" })).toBeInTheDocument();
   });
 
   it("requests only real sale discovery results alongside selected catalog filters", async () => {
@@ -103,11 +139,11 @@ describe("SearchPage", () => {
         expect.anything(),
       ),
     );
-    fireEvent.click(screen.getByRole("button", { name: "PS5" }));
+    fireEvent.click(screen.getByRole("button", { name: "Consoles" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringMatching(/on_sale=true.*platform=ps5|platform=ps5.*on_sale=true/),
+        expect.stringMatching(/on_sale=true.*platform=console|platform=console.*on_sale=true/),
         expect.anything(),
       ),
     );

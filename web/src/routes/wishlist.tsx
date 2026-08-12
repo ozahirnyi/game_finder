@@ -7,6 +7,7 @@ import { PriceAlertForm } from "@/components/PriceAlertForm";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   createPriceAlert,
+  deletePriceAlert,
   getPriceAlerts,
   getWishlist,
   removeWishlist,
@@ -54,6 +55,10 @@ function WishlistPage() {
       setShowAlerts(false);
     },
   });
+  const deleteAlertMutation = useMutation({
+    mutationFn: deletePriceAlert,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["price-alerts"] }),
+  });
 
   const wl = wishlistQuery.data ?? [];
 
@@ -90,16 +95,32 @@ function WishlistPage() {
           </p>
           {!!alertsQuery.data?.length && (
             <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-              {alertsQuery.data.map((alert) => (
-                <li key={alert.id}>
-                  Game #{alert.wishlist_catalog_game_id}:{" "}
-                  {alert.target_price != null
-                    ? `alert below ${alert.target_price}`
-                    : alert.target_discount === 1
-                      ? "any discount"
-                      : `alert at ${alert.target_discount}% off`}
-                </li>
-              ))}
+              {alertsQuery.data.map((alert) => {
+                const title =
+                  wl.find((game) => game.catalog_game_id === alert.wishlist_catalog_game_id)
+                    ?.title ?? `Game #${alert.wishlist_catalog_game_id}`;
+                return (
+                  <li key={alert.id} className="flex items-center gap-2">
+                    <span>
+                      {title}:{" "}
+                      {alert.target_price != null
+                        ? `alert below ${alert.target_price}`
+                        : alert.target_discount === 1
+                          ? "any discount"
+                          : `alert at ${alert.target_discount}% off`}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Cancel alert for ${title}`}
+                      onClick={() => deleteAlertMutation.mutate(alert.id)}
+                      disabled={deleteAlertMutation.isPending}
+                      className="font-semibold text-destructive hover:underline disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <div className="mt-4 space-y-3">

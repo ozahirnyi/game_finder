@@ -161,19 +161,13 @@ describe("GameDetail actions", () => {
     expect(screen.queryByText("Why for your squad")).not.toBeInTheDocument();
   });
 
-  it("reveals every real platform only when requested", async () => {
+  it("groups desktop operating systems as PC throughout Game Detail", async () => {
     game.platforms = ["Windows", "macOS", "Linux", "PlayStation 5"];
     renderGame();
 
-    expect(await screen.findByRole("button", { name: "Show all platforms" })).toBeInTheDocument();
-    expect(screen.getByText("Platforms").parentElement).toHaveTextContent("Windows, macOS, Linux");
-    expect(screen.getByText("Platforms").parentElement).not.toHaveTextContent(
-      "Windows, macOS, Linux, PlayStation 5",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Show all platforms" }));
-    expect(screen.getByText("Platforms").parentElement).toHaveTextContent(
-      "Windows, macOS, Linux, PlayStation 5",
-    );
+    expect(await screen.findByText("PC · PlayStation 5")).toBeInTheDocument();
+    expect(screen.getByText("Platforms").parentElement).toHaveTextContent("PC, PlayStation 5");
+    expect(screen.queryByText(/Windows/)).not.toBeInTheDocument();
     game.platforms = ["PC"];
   });
 });

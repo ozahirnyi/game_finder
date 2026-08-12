@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
   createPriceAlert: vi.fn(),
+  deletePriceAlert: vi.fn(),
   getPriceAlerts: vi.fn(),
   getTelegramAccount: vi.fn(),
   getWishlist: vi.fn(),
@@ -47,6 +48,7 @@ describe("WishlistPage", () => {
     api.getPriceAlerts.mockResolvedValue([]);
     api.getTelegramAccount.mockResolvedValue({ linked: false, configured: false });
     api.createPriceAlert.mockResolvedValue({ id: "alert-1" });
+    api.deletePriceAlert.mockResolvedValue(undefined);
   });
 
   it("navigates with the catalog ID and removes with the wishlist record UUID", async () => {
@@ -118,5 +120,40 @@ describe("WishlistPage", () => {
         delivery_channels: ["in_app"],
       }),
     );
+  });
+
+  it("cancels an existing price alert", async () => {
+    api.getPriceAlerts.mockResolvedValue([
+      {
+        id: "alert-1",
+        wishlist_catalog_game_id: 274755,
+        target_discount: 1,
+        delivery_channels: ["in_app"],
+      },
+    ]);
+    const rootRoute = createRootRoute({ component: Outlet });
+    const wishlistRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: Route.options.component,
+    });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([wishlistRoute]),
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText("Hades II");
+    fireEvent.click(await screen.findByRole("button", { name: "Price alerts" }));
+    await screen.findByRole("heading", { name: "Price alerts" });
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel alert for Hades II" }));
+
+    await waitFor(() => expect(api.deletePriceAlert.mock.calls[0]?.[0]).toBe("alert-1"));
   });
 });
