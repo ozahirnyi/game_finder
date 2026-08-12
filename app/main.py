@@ -2697,26 +2697,18 @@ async def _fetch_sale_catalog_games(query: str, filters: CatalogSearchFilters, c
         steam_appid = deal.get("steam_appid")
         if not _is_current_deal(deal) or not isinstance(steam_appid, int) or steam_appid < 1:
             return None
-        try:
-            catalog = await asyncio.wait_for(
-                fetch_igdb_game_by_steam_appid(steam_appid),
-                timeout=DEAL_IGDB_ENRICHMENT_TIMEOUT_SECONDS,
-            )
-        except (IGDBError, asyncio.TimeoutError):
+        title = str(deal.get("name") or "").strip()
+        if not title:
             return None
-        if not catalog:
-            title = str(deal.get("name") or "").strip()
-            if not title:
-                return None
-            try:
-                matches = await fetch_igdb_games(title)
-            except IGDBError:
-                return None
-            title_key = _search_title_key(title)
-            catalog = next(
-                (game for game in matches.get("results", []) if _search_title_key(str(game.get("name") or "")) == title_key),
-                None,
-            )
+        try:
+            matches = await fetch_igdb_games(title)
+        except IGDBError:
+            return None
+        title_key = _search_title_key(title)
+        catalog = next(
+            (game for game in matches.get("results", []) if _search_title_key(str(game.get("name") or "")) == title_key),
+            None,
+        )
         if not catalog or not catalog.get("id") or not _matches_catalog_filters(catalog, filters):
             return None
         if query and query not in _search_title_key(str(catalog.get("name") or "")):

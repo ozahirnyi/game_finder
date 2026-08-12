@@ -60,14 +60,14 @@ def test_sale_discovery_returns_only_confirmed_current_deals_matching_all_filter
         ]),
     )
 
-    async def fetch_catalog(steam_appid):
-        return {
-            1: {"id": 30, "name": "Hades", "platforms": ["PlayStation 5"]},
-            2: {"id": 31, "name": "Not on PS5", "platforms": ["Xbox Series X|S"]},
-            3: None,
-        }[steam_appid]
+    async def fetch_catalog(title, *_args, **_kwargs):
+        return {"results": {
+            "Hades": [{"id": 30, "name": "Hades", "platforms": ["PlayStation 5"]}],
+            "Not on PS5": [{"id": 31, "name": "Not on PS5", "platforms": ["Xbox Series X|S"]}],
+            "No catalog mapping": [],
+        }[title]}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", fetch_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games", fetch_catalog)
     monkeypatch.setattr(app_main, "get_json_cached", run_cached)
 
     response = api_client.get(
@@ -122,6 +122,32 @@ def test_sale_discovery_falls_back_to_an_exact_title_catalog_match(api_client, a
     assert [(item["id"], item["name"], item["steam_appid"]) for item in response.json()["results"]] == [
         (333, "Black Myth: Wukong", 2358720),
     ]
+
+
+def test_sale_discovery_uses_exact_title_lookup_without_waiting_for_steam_id_mapping(
+    api_client, app_main, monkeypatch
+):
+    monkeypatch.setattr(
+        app_main,
+        "fetch_steam_store_deals",
+        AsyncMock(return_value=[{"steam_appid": 2358720, "name": "Black Myth: Wukong", "current": {"cut": 20}}]),
+    )
+    external_id_lookup = AsyncMock(return_value=None)
+    monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", external_id_lookup)
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_games",
+        AsyncMock(return_value={"results": [
+            {"id": 333, "name": "Black Myth: Wukong", "platforms": ["PC (Microsoft Windows)"]},
+        ]}),
+    )
+    monkeypatch.setattr(app_main, "get_json_cached", run_cached)
+
+    response = api_client.get("/search/games", params={"on_sale": "true"})
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["id"] == 333
+    external_id_lookup.assert_not_awaited()
 
 
 def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_main, monkeypatch):
