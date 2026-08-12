@@ -117,7 +117,11 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                     {notificationMessage(n.type, n.payload)}
                   </p>
                   {unavailableId === n.id && (
-                    <p role="status" aria-live="polite" className="mt-1 text-xs text-muted-foreground">
+                    <p
+                      role="status"
+                      aria-live="polite"
+                      className="mt-1 text-xs text-muted-foreground"
+                    >
                       This notification action is no longer available.
                     </p>
                   )}

@@ -147,7 +147,9 @@ describe("FriendsPage", () => {
   it("shows one neutral state when a deep-linked action is unavailable", async () => {
     renderFriends(undefined, "/?invite=missing");
 
-    expect(await screen.findByText("This notification action is no longer available.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("This notification action is no longer available."),
+    ).toBeInTheDocument();
   });
 
   it("accepts an incoming game invite", async () => {

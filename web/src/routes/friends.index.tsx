@@ -134,14 +134,20 @@ function FriendsPage() {
   const selectedInvites = (allGameInvitesQuery.data ?? []).filter(
     (invite) => invite.sender.id === selectedId || invite.recipient.id === selectedId,
   );
-  const matchingRequest = incomingQuery.data?.find((request) => request.id === notificationSearch.request);
-  const matchingInvite = (gameInvitesQuery.data ?? []).find((invite) => invite.id === notificationSearch.invite);
+  const matchingRequest = incomingQuery.data?.find(
+    (request) => request.id === notificationSearch.request,
+  );
+  const matchingInvite = (gameInvitesQuery.data ?? []).find(
+    (invite) => invite.id === notificationSearch.invite,
+  );
   const matchingConversation = conversationsQuery.data?.find(
     (conversation) => conversation.id === notificationSearch.conversation,
   );
   const hasNotificationTarget = Boolean(matchingRequest || matchingInvite || matchingConversation);
   const notificationUnavailable =
-    Boolean(notificationSearch.request || notificationSearch.invite || notificationSearch.conversation) &&
+    Boolean(
+      notificationSearch.request || notificationSearch.invite || notificationSearch.conversation,
+    ) &&
     incomingQuery.isSuccess &&
     gameInvitesQuery.isSuccess &&
     conversationsQuery.isSuccess &&

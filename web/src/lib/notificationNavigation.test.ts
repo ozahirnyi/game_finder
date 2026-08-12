@@ -8,10 +8,12 @@ const notification = (type: string, payload: Record<string, unknown>) =>
 describe("notificationDestination", () => {
   it("maps supported payloads to existing routes", () => {
     expect(notificationDestination(notification("message", { conversation_id: "c-1" }))).toEqual({
-      to: "/friends", search: { conversation: "c-1" },
+      to: "/friends",
+      search: { conversation: "c-1" },
     });
     expect(notificationDestination(notification("price_alert", { catalog_game_id: 42 }))).toEqual({
-      to: "/games/$gameId", params: { gameId: "42" },
+      to: "/games/$gameId",
+      params: { gameId: "42" },
     });
   });
 

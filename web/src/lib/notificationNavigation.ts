@@ -8,7 +8,9 @@ export type NotificationDestination =
 const stringField = (payload: Record<string, unknown>, key: string) =>
   typeof payload[key] === "string" && payload[key] ? payload[key] : null;
 
-export function notificationDestination(notification: Notification): NotificationDestination | null {
+export function notificationDestination(
+  notification: Notification,
+): NotificationDestination | null {
   switch (notification.type) {
     case "friend_request": {
       const request = stringField(notification.payload, "request_id");
