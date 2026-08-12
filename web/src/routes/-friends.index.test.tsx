@@ -43,7 +43,7 @@ vi.mock("@/components/GameCover", () => ({ Avatar: () => <div />, GameCover: () 
 
 import { Route } from "./friends.index";
 
-function renderFriends(prefetchedSteamSocial?: unknown) {
+function renderFriends(prefetchedSteamSocial?: unknown, initialEntry = "/") {
   const rootRoute = createRootRoute({ component: Outlet });
   const friendsRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -52,7 +52,7 @@ function renderFriends(prefetchedSteamSocial?: unknown) {
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([friendsRoute]),
-    history: createMemoryHistory({ initialEntries: ["/"] }),
+    history: createMemoryHistory({ initialEntries: [initialEntry] }),
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   if (prefetchedSteamSocial) {
@@ -130,6 +130,24 @@ describe("FriendsPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Accept Sam" }));
 
     await waitFor(() => expect(api.acceptFriendRequest).toHaveBeenCalledWith("request-1"));
+  });
+
+  it("focuses a deep-linked incoming friend request", async () => {
+    api.getIncomingFriendRequests.mockResolvedValue([
+      { id: "request-1", sender: { id: "player-1", display_name: "Sam" } },
+    ]);
+    renderFriends(undefined, "/?request=request-1");
+
+    expect(await screen.findByTestId("notification-request-request-1")).toHaveAttribute(
+      "data-notification-target",
+      "true",
+    );
+  });
+
+  it("shows one neutral state when a deep-linked action is unavailable", async () => {
+    renderFriends(undefined, "/?invite=missing");
+
+    expect(await screen.findByText("This notification action is no longer available.")).toBeInTheDocument();
   });
 
   it("accepts an incoming game invite", async () => {

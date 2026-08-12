@@ -25,6 +25,13 @@ import {
 import { Search, UserPlus, Gamepad2, MessageCircle, Users } from "lucide-react";
 
 export const Route = createFileRoute("/friends/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    ...(typeof search.request === "string" && search.request ? { request: search.request } : {}),
+    ...(typeof search.conversation === "string" && search.conversation
+      ? { conversation: search.conversation }
+      : {}),
+    ...(typeof search.invite === "string" && search.invite ? { invite: search.invite } : {}),
+  }),
   head: () => ({
     meta: [
       { title: "Friends — Playfinder" },
@@ -46,6 +53,7 @@ export const Route = createFileRoute("/friends/")({
 
 function FriendsPage() {
   const navigate = useNavigate();
+  const notificationSearch = Route.useSearch();
   const queryClient = useQueryClient();
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [friendSource, setFriendSource] = useState<"playfinder" | "steam">("playfinder");
@@ -126,6 +134,18 @@ function FriendsPage() {
   const selectedInvites = (allGameInvitesQuery.data ?? []).filter(
     (invite) => invite.sender.id === selectedId || invite.recipient.id === selectedId,
   );
+  const matchingRequest = incomingQuery.data?.find((request) => request.id === notificationSearch.request);
+  const matchingInvite = (gameInvitesQuery.data ?? []).find((invite) => invite.id === notificationSearch.invite);
+  const matchingConversation = conversationsQuery.data?.find(
+    (conversation) => conversation.id === notificationSearch.conversation,
+  );
+  const hasNotificationTarget = Boolean(matchingRequest || matchingInvite || matchingConversation);
+  const notificationUnavailable =
+    Boolean(notificationSearch.request || notificationSearch.invite || notificationSearch.conversation) &&
+    incomingQuery.isSuccess &&
+    gameInvitesQuery.isSuccess &&
+    conversationsQuery.isSuccess &&
+    !hasNotificationTarget;
   const steamFriends = (steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? []).sort(
     (a, b) =>
       b.taste_match_percent - a.taste_match_percent || b.common_games_count - a.common_games_count,
@@ -245,7 +265,12 @@ function FriendsPage() {
               >
                 <h2 className="text-base font-bold">Friend requests</h2>
                 {incomingQuery.data.map((request) => (
-                  <div key={request.id} className="flex items-center justify-between gap-3">
+                  <div
+                    key={request.id}
+                    data-testid={`notification-request-${request.id}`}
+                    data-notification-target={matchingRequest?.id === request.id || undefined}
+                    className="flex items-center justify-between gap-3"
+                  >
                     <span className="text-sm">{friendDisplayName(request.sender)}</span>
                     <button
                       onClick={() => acceptMutation.mutate(request.id)}
@@ -258,6 +283,11 @@ function FriendsPage() {
                 ))}
               </section>
             ) : null}
+            {notificationUnavailable && (
+              <p role="status" aria-live="polite" className="mb-4 text-sm text-muted-foreground">
+                This notification action is no longer available.
+              </p>
+            )}
             {incomingInvites.length ? (
               <section
                 aria-label="Game invites"
