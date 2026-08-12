@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({
   createPriceAlert: vi.fn(),
   getPriceAlerts: vi.fn(),
+  getTelegramAccount: vi.fn(),
   getWishlist: vi.fn(),
   removeWishlist: vi.fn(),
 }));
@@ -44,6 +45,7 @@ describe("WishlistPage", () => {
     ]);
     api.removeWishlist.mockResolvedValue(undefined);
     api.getPriceAlerts.mockResolvedValue([]);
+    api.getTelegramAccount.mockResolvedValue({ linked: false, configured: false });
     api.createPriceAlert.mockResolvedValue({ id: "alert-1" });
   });
 
@@ -107,13 +109,12 @@ describe("WishlistPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Price alerts" }));
     expect(await screen.findByRole("heading", { name: "Price alerts" })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Target price"), { target: { value: "19.99" } });
     fireEvent.click(screen.getByRole("button", { name: "Save alert" }));
 
     await waitFor(() =>
       expect(api.createPriceAlert).toHaveBeenCalledWith({
         wishlist_catalog_game_id: 274755,
-        target_price: 19.99,
+        target_discount: 1,
         delivery_channels: ["in_app"],
       }),
     );

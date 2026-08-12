@@ -144,6 +144,21 @@ def test_price_alert_crud_persists_changes_and_is_owner_scoped(
     assert db_session.query(PriceAlert).filter_by(id=UUID(alert_id)).one_or_none() is None
 
 
+def test_price_alert_accepts_one_percent_for_the_any_discount_preset(
+    api_client, db_session, user_factory, auth_as
+):
+    user = auth_as(user_factory(email="any-discount-alert@example.com"))
+    api_client.post("/wishlist", json=collection_payload(606, "Hades"))
+
+    response = api_client.post(
+        "/price-alerts",
+        json={"wishlist_catalog_game_id": 606, "target_discount": 1, "delivery_channels": ["in_app"]},
+    )
+
+    assert response.status_code == 201
+    assert db_session.query(PriceAlert).filter_by(user_id=user.id).one().target_discount == 1
+
+
 def test_telegram_delivery_requires_linked_chat_without_persisting_or_updating(
     api_client, db_session, user_factory, auth_as
 ):

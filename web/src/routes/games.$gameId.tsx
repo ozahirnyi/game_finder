@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
+import { PriceAlertForm } from "@/components/PriceAlertForm";
 import { summarizePlatforms } from "@/lib/platformPresentation";
 import {
   Chip,
@@ -26,6 +27,7 @@ import {
   getSteamPriceHistory,
   getWishlist,
   searchGames,
+  type PriceAlertCreate,
 } from "@/lib/api";
 import { exactCatalogMatch } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
@@ -220,7 +222,6 @@ function GameDetail() {
   const [showAlertForm, setShowAlertForm] = useState(false);
   const [showAllPlatforms, setShowAllPlatforms] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
-  const [targetPrice, setTargetPrice] = useState("");
   const [recipientId, setRecipientId] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [wishlistAdded, setWishlistAdded] = useState(false);
@@ -242,7 +243,7 @@ function GameDetail() {
     },
   });
   const alertMutation = useMutation({
-    mutationFn: async (target_price: number) => {
+    mutationFn: async (alert: PriceAlertCreate) => {
       const catalogGameId = Number(catalogGame.id);
       if (!wishlistQuery.data?.some((item) => item.catalog_game_id === catalogGameId)) {
         try {
@@ -255,17 +256,12 @@ function GameDetail() {
           if (!(error instanceof ApiError && error.status === 409)) throw error;
         }
       }
-      return createPriceAlert({
-        wishlist_catalog_game_id: catalogGameId,
-        target_price,
-        delivery_channels: ["in_app"],
-      });
+      return createPriceAlert({ ...alert, wishlist_catalog_game_id: catalogGameId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wishlist"] });
       queryClient.invalidateQueries({ queryKey: ["price-alerts"] });
       setShowAlertForm(false);
-      setTargetPrice("");
       setActionMessage("Alert saved");
     },
   });
@@ -623,49 +619,17 @@ function GameDetail() {
               </p>
             )}
             {showAlertForm && (
-              <form
-                className="mt-4 space-y-3 border-t border-border pt-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const value = Number(targetPrice);
-                  if (Number.isFinite(value) && value > 0) alertMutation.mutate(value);
-                }}
-              >
-                <label className="grid gap-1 text-xs font-bold">
-                  Target price
-                  <input
-                    aria-label="Target price"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    required
-                    value={targetPrice}
-                    onChange={(event) => setTargetPrice(event.target.value)}
-                    className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  />
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={alertMutation.isPending}
-                    className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
-                  >
-                    Save alert
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAlertForm(false)}
-                    className="rounded-md border border-border px-3 py-2 text-xs font-bold"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                {alertMutation.isError && (
-                  <p role="alert" className="text-xs text-destructive">
-                    Could not save this alert.
-                  </p>
-                )}
-              </form>
+              <div className="mt-4 border-t border-border pt-4">
+                <PriceAlertForm
+                  wishlistCatalogGameId={Number(catalogGame.id)}
+                  onSubmit={(data) => alertMutation.mutate(data)}
+                  onCancel={() => setShowAlertForm(false)}
+                  isPending={alertMutation.isPending}
+                  errorMessage={
+                    alertMutation.error instanceof Error ? alertMutation.error.message : undefined
+                  }
+                />
+              </div>
             )}
             {showInviteForm && (
               <form

@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   createPriceAlert: vi.fn(),
   getFriends: vi.fn(),
   getPriceAlerts: vi.fn(),
+  getTelegramAccount: vi.fn(),
   getWishlist: vi.fn(),
   getPriceHistory: vi.fn(),
 }));
@@ -83,22 +84,22 @@ describe("GameDetail actions", () => {
     api.getWishlist.mockResolvedValue([]);
     api.addWishlist.mockResolvedValue({ id: "wishlist-1" });
     api.getPriceAlerts.mockResolvedValue([]);
+    api.getTelegramAccount.mockResolvedValue({ linked: false, configured: false });
     api.createPriceAlert.mockResolvedValue({ id: "alert-1" });
     api.getFriends.mockResolvedValue([{ user: { id: "friend-1", display_name: "Sam" } }]);
     api.createGameInvite.mockResolvedValue({ id: "invite-1" });
   });
 
-  it("adds the game to the wishlist and creates an in-app alert", async () => {
+  it("adds the game to the wishlist and creates an any-discount in-app alert", async () => {
     renderGame();
 
     fireEvent.click(await screen.findByRole("button", { name: "Alert" }));
-    fireEvent.change(await screen.findByLabelText("Target price"), { target: { value: "24" } });
     fireEvent.click(screen.getByRole("button", { name: "Save alert" }));
 
     await waitFor(() =>
       expect(api.createPriceAlert).toHaveBeenCalledWith({
         wishlist_catalog_game_id: 274755,
-        target_price: 24,
+        target_discount: 1,
         delivery_channels: ["in_app"],
       }),
     );

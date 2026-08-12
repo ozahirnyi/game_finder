@@ -91,6 +91,28 @@ describe("SearchPage", () => {
     expect(screen.getByRole("button", { name: "Co-op" })).toHaveClass("border-primary");
   });
 
+  it("requests only real sale discovery results alongside selected catalog filters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+
+    fireEvent.click(screen.getByRole("button", { name: "On sale" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("on_sale=true"),
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "PS5" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(/on_sale=true.*platform=ps5|platform=ps5.*on_sale=true/),
+        expect.anything(),
+      ),
+    );
+  });
+
   it("offers a title-search fallback for every AI recommendation", async () => {
     vi.stubGlobal(
       "fetch",

@@ -2651,6 +2651,58 @@ def _rank_search_results(query: str, results: list[dict]) -> list[dict]:
     return sorted(results, key=rank)
 
 
+_PLATFORM_LABELS = {
+    "pc": {"windows", "macos", "mac", "linux", "pc (microsoft windows)"},
+    "ps5": {"playstation 5", "playstation 5 pro"},
+    "ps4": {"playstation 4"},
+    "xbox_series": {"xbox series x|s", "xbox series x", "xbox series s"},
+    "xbox_one": {"xbox one"},
+    "switch": {"nintendo switch", "nintendo switch 2"},
+}
+
+
+def _matches_catalog_filters(game: dict, filters: CatalogSearchFilters) -> bool:
+    platform_labels = {str(platform).casefold() for platform in game.get("platforms") or []}
+    if any(not platform_labels.intersection(_PLATFORM_LABELS[platform]) for platform in filters.platforms):
+        return False
+    game_modes = {str(mode).casefold() for mode in game.get("game_modes") or []}
+    if any(feature.replace("_", " ") not in game_modes for feature in filters.features):
+        return False
+    genres = {str(genre).casefold() for genre in game.get("genres") or []}
+    keywords = {str(keyword).casefold() for keyword in game.get("keywords") or []}
+    if "rpg" in filters.genres and "role-playing (rpg)" not in genres:
+        return False
+    return "roguelike" not in filters.genres or "roguelike" in keywords
+
+
+def _is_current_deal(deal: dict) -> bool:
+    current = deal.get("current")
+    return isinstance(current, dict) and isinstance(current.get("cut"), (int, float)) and current["cut"] > 0
+
+
+async def _fetch_sale_catalog_games(query: str, filters: CatalogSearchFilters, country: str) -> list[dict]:
+    deals = await fetch_steam_store_deals(country=country, page_size=20)
+
+    async def enrich(deal: dict) -> dict | None:
+        steam_appid = deal.get("steam_appid")
+        if not _is_current_deal(deal) or not isinstance(steam_appid, int) or steam_appid < 1:
+            return None
+        try:
+            catalog = await asyncio.wait_for(
+                fetch_igdb_game_by_steam_appid(steam_appid),
+                timeout=DEAL_IGDB_ENRICHMENT_TIMEOUT_SECONDS,
+            )
+        except (IGDBError, asyncio.TimeoutError):
+            return None
+        if not catalog or not catalog.get("id") or not _matches_catalog_filters(catalog, filters):
+            return None
+        if query and query not in _search_title_key(str(catalog.get("name") or "")):
+            return None
+        return {**catalog, "steam_appid": steam_appid}
+
+    return [game for game in await asyncio.gather(*(enrich(deal) for deal in deals)) if game is not None]
+
+
 @app.get("/search/games", response_model=GameSearchResponse, response_model_exclude_unset=True)
 @limiter.limit("30/minute")
 async def search(
@@ -2660,6 +2712,8 @@ async def search(
     platform: list[str] = Query(default=[]),
     feature: list[str] = Query(default=[]),
     genre: list[str] = Query(default=[]),
+    on_sale: bool = False,
+    country: str = "US",
 ):
     q = q.strip().lower()
     if page < 1:
@@ -2669,11 +2723,17 @@ async def search(
     allowed_genres = {"rpg", "roguelike"}
     if set(platform) - allowed_platforms or set(feature) - allowed_features or set(genre) - allowed_genres:
         raise HTTPException(status_code=400, detail="unknown discovery filter")
+    normalized_country = country.strip().upper()
+    if len(normalized_country) != 2:
+        raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v3", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres)
+    key = build_cache_key("igdb_search_v3", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
+        if on_sale:
+            results = await _fetch_sale_catalog_games(catalog_query, filters, normalized_country)
+            return {"results": _rank_search_results(q, results) if q else results}
         payload = await fetch_igdb_games(catalog_query, page=page, filters=filters)
         return {**payload, "results": _rank_search_results(q, payload.get("results", [])) if q else payload.get("results", [])}
 

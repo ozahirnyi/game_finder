@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
+import { PriceAlertForm } from "@/components/PriceAlertForm";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   createPriceAlert,
@@ -40,7 +41,6 @@ function WishlistPage() {
   const navigate = useNavigate();
   const [showAlerts, setShowAlerts] = useState(false);
   const [catalogGameId, setCatalogGameId] = useState("");
-  const [targetPrice, setTargetPrice] = useState("");
   const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist });
   const removeMutation = useMutation({
     mutationFn: removeWishlist,
@@ -52,7 +52,6 @@ function WishlistPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["price-alerts"] });
       setShowAlerts(false);
-      setTargetPrice("");
     },
   });
 
@@ -96,24 +95,14 @@ function WishlistPage() {
                   Game #{alert.wishlist_catalog_game_id}:{" "}
                   {alert.target_price != null
                     ? `alert below ${alert.target_price}`
-                    : `alert at ${alert.target_discount}% off`}
+                    : alert.target_discount === 1
+                      ? "any discount"
+                      : `alert at ${alert.target_discount}% off`}
                 </li>
               ))}
             </ul>
           )}
-          <form
-            className="mt-4 flex flex-wrap items-end gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = Number(targetPrice);
-              if (!catalogGameId || !Number.isFinite(value) || value <= 0) return;
-              alertMutation.mutate({
-                wishlist_catalog_game_id: Number(catalogGameId),
-                target_price: value,
-                delivery_channels: ["in_app"],
-              });
-            }}
-          >
+          <div className="mt-4 space-y-3">
             <label className="grid gap-1 text-sm font-semibold">
               Game
               <select
@@ -128,39 +117,18 @@ function WishlistPage() {
                 ))}
               </select>
             </label>
-            <label className="grid gap-1 text-sm font-semibold">
-              Target price
-              <input
-                aria-label="Target price"
-                type="number"
-                min="0.01"
-                step="0.01"
-                required
-                value={targetPrice}
-                onChange={(event) => setTargetPrice(event.target.value)}
-                className="rounded-lg border border-border bg-background px-3 py-2"
+            {catalogGameId && (
+              <PriceAlertForm
+                wishlistCatalogGameId={Number(catalogGameId)}
+                onSubmit={(data) => alertMutation.mutate(data)}
+                onCancel={() => setShowAlerts(false)}
+                isPending={alertMutation.isPending}
+                errorMessage={
+                  alertMutation.error instanceof Error ? alertMutation.error.message : undefined
+                }
               />
-            </label>
-            <button
-              type="submit"
-              disabled={alertMutation.isPending}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-            >
-              Save alert
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAlerts(false)}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-bold"
-            >
-              Cancel
-            </button>
-          </form>
-          {alertMutation.isError && (
-            <p role="alert" className="mt-3 text-sm text-destructive">
-              Could not save this alert. It may already exist.
-            </p>
-          )}
+            )}
+          </div>
         </section>
       )}
 

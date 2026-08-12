@@ -25,6 +25,26 @@ def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
 
 
 @pytest.mark.anyio
+async def test_igdb_roguelike_filter_uses_real_keyword_metadata(monkeypatch):
+    import app.integrations.igdb as client
+
+    captured = {}
+
+    async def query(_endpoint, query):
+        captured["query"] = query
+        return []
+
+    monkeypatch.setattr(client, "_query", query)
+
+    await client.fetch_igdb_games(
+        "",
+        filters=client.CatalogSearchFilters(genres=("roguelike",)),
+    )
+
+    assert 'keywords.name = "Roguelike"' in captured["query"]
+
+
+@pytest.mark.anyio
 async def test_igdb_missing_credentials_is_a_service_error(monkeypatch):
     monkeypatch.delenv("IGDB_CLIENT_ID", raising=False)
     monkeypatch.delenv("IGDB_CLIENT_SECRET", raising=False)

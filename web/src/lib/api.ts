@@ -451,6 +451,7 @@ export type CatalogSearchOptions = {
   platforms?: CatalogPlatform[];
   features?: CatalogFeature[];
   genres?: CatalogGenre[];
+  onSale?: boolean;
 };
 
 export function searchGames(options: CatalogSearchOptions) {
@@ -459,6 +460,7 @@ export function searchGames(options: CatalogSearchOptions) {
   options.platforms?.forEach((value) => params.append("platform", value));
   options.features?.forEach((value) => params.append("feature", value));
   options.genres?.forEach((value) => params.append("genre", value));
+  if (options.onSale) params.set("on_sale", "true");
   return apiRequest<{ results: CatalogGame[] }>(`/search/games?${params.toString()}`);
 }
 

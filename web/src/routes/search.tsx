@@ -16,8 +16,13 @@ import { Search, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/search")({ component: SearchPage });
 
-const filters: Array<{ label: string; type?: "platform" | "feature" | "genre"; value?: string }> = [
+const filters: Array<{
+  label: string;
+  type?: "platform" | "feature" | "genre" | "sale";
+  value?: string;
+}> = [
   { label: "All" },
+  { label: "On sale", type: "sale" },
   { label: "Co-op", type: "feature", value: "co_op" },
   { label: "PC", type: "platform", value: "pc" },
   { label: "PS5", type: "platform", value: "ps5" },
@@ -34,10 +39,11 @@ function SearchPage() {
   const [platforms, setPlatforms] = useState<CatalogPlatform[]>([]);
   const [features, setFeatures] = useState<CatalogFeature[]>([]);
   const [genres, setGenres] = useState<CatalogGenre[]>([]);
+  const [onSale, setOnSale] = useState(false);
   const [mode, setMode] = useState<"catalog" | "ai">("catalog");
   const searchQuery = useQuery({
-    queryKey: ["search", query, platforms, features, genres],
-    queryFn: () => searchGames({ query: query.trim(), platforms, features, genres }),
+    queryKey: ["search", query, platforms, features, genres, onSale],
+    queryFn: () => searchGames({ query: query.trim(), platforms, features, genres, onSale }),
     enabled: mode === "catalog",
   });
   const recommendationMutation = useMutation({ mutationFn: getRecommendations });
@@ -48,6 +54,7 @@ function SearchPage() {
     nextPlatforms = platforms,
     nextFeatures = features,
     nextGenres = genres,
+    nextOnSale = onSale,
   ) {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
@@ -59,6 +66,8 @@ function SearchPage() {
     nextFeatures.forEach((value) => url.searchParams.append("feature", value));
     url.searchParams.delete("genre");
     nextGenres.forEach((value) => url.searchParams.append("genre", value));
+    if (nextOnSale) url.searchParams.set("on_sale", "true");
+    else url.searchParams.delete("on_sale");
     window.history.replaceState({}, "", url);
   }
 
@@ -67,11 +76,18 @@ function SearchPage() {
     syncUrl(nextQuery);
   }
   function toggleFilter(filter: (typeof filters)[number]) {
-    if (!filter.type || !filter.value) {
+    if (!filter.type) {
       setPlatforms([]);
       setFeatures([]);
       setGenres([]);
-      syncUrl(query, [], [], []);
+      setOnSale(false);
+      syncUrl(query, [], [], [], false);
+      return;
+    }
+    if (filter.type === "sale") {
+      const next = !onSale;
+      setOnSale(next);
+      syncUrl(query, platforms, features, genres, next);
       return;
     }
     if (filter.type === "platform") {
@@ -151,7 +167,9 @@ function SearchPage() {
                     ? features.includes(filter.value as CatalogFeature)
                     : filter.type === "genre"
                       ? genres.includes(filter.value as CatalogGenre)
-                      : !platforms.length && !features.length && !genres.length;
+                      : filter.type === "sale"
+                        ? onSale
+                        : !platforms.length && !features.length && !genres.length && !onSale;
               return (
                 <button
                   key={filter.label}

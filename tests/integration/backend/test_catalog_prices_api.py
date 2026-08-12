@@ -47,6 +47,59 @@ def test_search_games_combines_text_and_platform_filter(api_client, app_main, mo
     assert captured["filters"].platforms == ("ps5",)
 
 
+def test_sale_discovery_returns_only_confirmed_current_deals_matching_all_filters(
+    api_client, app_main, monkeypatch
+):
+    monkeypatch.setattr(
+        app_main,
+        "fetch_steam_store_deals",
+        AsyncMock(return_value=[
+            {"steam_appid": 1, "name": "Hades", "current": {"cut": 50}},
+            {"steam_appid": 2, "name": "Not on PS5", "current": {"cut": 40}},
+            {"steam_appid": 3, "name": "No catalog mapping", "current": {"cut": 25}},
+        ]),
+    )
+
+    async def fetch_catalog(steam_appid):
+        return {
+            1: {"id": 30, "name": "Hades", "platforms": ["PlayStation 5"]},
+            2: {"id": 31, "name": "Not on PS5", "platforms": ["Xbox Series X|S"]},
+            3: None,
+        }[steam_appid]
+
+    monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", fetch_catalog)
+    monkeypatch.setattr(app_main, "get_json_cached", run_cached)
+
+    response = api_client.get(
+        "/search/games",
+        params=[("q", "hades"), ("on_sale", "true"), ("platform", "ps5")],
+    )
+
+    assert response.status_code == 200
+    assert [(item["id"], item["name"], item["steam_appid"]) for item in response.json()["results"]] == [
+        (30, "Hades", 1),
+    ]
+
+
+def test_sale_discovery_excludes_deals_without_a_current_discount(api_client, app_main, monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "fetch_steam_store_deals",
+        AsyncMock(return_value=[{"steam_appid": 1, "name": "Hades", "current": {"cut": 0}}]),
+    )
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_game_by_steam_appid",
+        AsyncMock(return_value={"id": 30, "name": "Hades", "platforms": ["Windows"]}),
+    )
+    monkeypatch.setattr(app_main, "get_json_cached", run_cached)
+
+    response = api_client.get("/search/games", params={"on_sale": "true"})
+
+    assert response.status_code == 200
+    assert response.json()["results"] == []
+
+
 def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_main, monkeypatch):
     fetch_igdb = AsyncMock(return_value={"results": [{
         "id": 999,
