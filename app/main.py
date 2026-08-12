@@ -2751,7 +2751,7 @@ async def search(
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v3", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
+    key = build_cache_key("igdb_search_v4", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
         if on_sale:
