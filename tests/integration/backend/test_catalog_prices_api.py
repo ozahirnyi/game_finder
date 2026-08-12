@@ -100,6 +100,30 @@ def test_sale_discovery_excludes_deals_without_a_current_discount(api_client, ap
     assert response.json()["results"] == []
 
 
+def test_sale_discovery_falls_back_to_an_exact_title_catalog_match(api_client, app_main, monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "fetch_steam_store_deals",
+        AsyncMock(return_value=[{"steam_appid": 2358720, "name": "Black Myth: Wukong", "current": {"cut": 20}}]),
+    )
+    monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_games",
+        AsyncMock(return_value={"results": [
+            {"id": 333, "name": "Black Myth: Wukong", "platforms": ["PC (Microsoft Windows)"]},
+        ]}),
+    )
+    monkeypatch.setattr(app_main, "get_json_cached", run_cached)
+
+    response = api_client.get("/search/games", params={"on_sale": "true"})
+
+    assert response.status_code == 200
+    assert [(item["id"], item["name"], item["steam_appid"]) for item in response.json()["results"]] == [
+        (333, "Black Myth: Wukong", 2358720),
+    ]
+
+
 def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_main, monkeypatch):
     fetch_igdb = AsyncMock(return_value={"results": [{
         "id": 999,
