@@ -63,6 +63,14 @@ from app.telegram import (
     telegram_linked_at,
 )
 from app.price_alerts import price_alert_watcher_loop, price_alerts_enabled
+from app.notifications import (
+    create_notification,
+    friend_request_accepted_payload,
+    friend_request_payload,
+    game_invite_payload,
+    game_invite_response_payload,
+    message_payload,
+)
 from app.google_auth import (
     build_google_authorization_url,
     exchange_google_code,
@@ -201,12 +209,6 @@ def user_pair(first_id: uuid.UUID, second_id: uuid.UUID) -> tuple[uuid.UUID, uui
 def are_friends(db: Session, first_id: uuid.UUID, second_id: uuid.UUID) -> bool:
     low_id, high_id = user_pair(first_id, second_id)
     return bool(db.query(Friendship.id).filter(Friendship.user_low_id == low_id, Friendship.user_high_id == high_id).first())
-
-
-def create_notification(db: Session, user_id: uuid.UUID, notification_type: str, payload: dict) -> Notification:
-    notification = Notification(user_id=user_id, type=notification_type, payload=payload)
-    db.add(notification)
-    return notification
 
 
 def friend_request_response(db: Session, request: FriendRequest) -> FriendRequestRead:
@@ -1296,7 +1298,7 @@ def create_friend_request(
     request = FriendRequest(sender_id=current_user.id, recipient_id=recipient.id, message=data.message)
     db.add(request)
     db.flush()
-    create_notification(db, recipient.id, "friend_request", {"request_id": str(request.id), "from": notification_actor_name(current_user)})
+    create_notification(db, recipient.id, "friend_request", friend_request_payload(request_id=request.id, from_name=notification_actor_name(current_user)))
     db.commit()
     db.refresh(request)
     return friend_request_response(db, request)
@@ -1319,7 +1321,7 @@ def accept_friend_request(
     friendship = Friendship(user_low_id=low_id, user_high_id=high_id)
     db.add(friendship)
     sender = db.query(User).filter(User.id == request.sender_id).first()
-    create_notification(db, sender.id, "friend_request_accepted", {"by": notification_actor_name(current_user)})
+    create_notification(db, sender.id, "friend_request_accepted", friend_request_accepted_payload(friend_id=current_user.id, by=notification_actor_name(current_user)))
     db.delete(request)
     db.commit()
     db.refresh(friendship)
@@ -1643,7 +1645,7 @@ def create_message(
     conversation.updated_at = datetime.now(timezone.utc)
     recipient_id = conversation.user_high_id if conversation.user_low_id == current_user.id else conversation.user_low_id
     db.add(message)
-    create_notification(db, recipient_id, "message", {"conversation_id": str(conversation.id), "from": notification_actor_name(current_user), "preview": message.body[:120]})
+    create_notification(db, recipient_id, "message", message_payload(conversation_id=conversation.id, from_name=notification_actor_name(current_user), preview=message.body[:120]))
     db.commit()
     db.refresh(message)
     return MessageRead(id=message.id, conversation_id=message.conversation_id, sender_id=message.sender_id, body=message.body, created_at=message.created_at, read_at=message.read_at)
@@ -1680,7 +1682,7 @@ def create_game_invite(
     invite = GameInvite(sender_id=current_user.id, recipient_id=recipient.id, game_id=data.game_id, game_name=data.game_name.strip(), source=data.source, external_id=data.external_id, note=data.note)
     db.add(invite)
     db.flush()
-    create_notification(db, recipient.id, "game_invite", {"invite_id": str(invite.id), "from": notification_actor_name(current_user), "game_name": invite.game_name})
+    create_notification(db, recipient.id, "game_invite", game_invite_payload(invite_id=invite.id, from_name=notification_actor_name(current_user), game_name=invite.game_name))
     db.commit()
     db.refresh(invite)
     return game_invite_response(db, invite)
@@ -1700,7 +1702,7 @@ def respond_to_game_invite(
         raise HTTPException(status_code=409, detail="Game invite has already been answered")
     invite.status = data.status
     invite.responded_at = datetime.now(timezone.utc)
-    create_notification(db, invite.sender_id, "game_invite_response", {"invite_id": str(invite.id), "by": notification_actor_name(current_user), "status": data.status})
+    create_notification(db, invite.sender_id, "game_invite_response", game_invite_response_payload(invite_id=invite.id, by=notification_actor_name(current_user), status=data.status))
     db.commit()
     db.refresh(invite)
     return game_invite_response(db, invite)

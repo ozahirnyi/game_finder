@@ -36,9 +36,13 @@ def test_legacy_friend_requests_cover_lists_create_accept_and_owner_checks(
     auth_as(recipient)
     assert api_client.get("/friends/requests/incoming").json()[0]["id"] == request_id
     assert api_client.get("/friends/requests").json() == []
+    request_notice = db_session.query(Notification).filter(Notification.user_id == recipient.id).one()
+    assert request_notice.payload == {"request_id": request_id, "from": "Sender"}
     assert api_client.post(f"/friends/requests/{request_id}/accept").status_code == 200
     assert db_session.query(FriendRequest).count() == 0
     assert db_session.query(Friendship).count() == 1
+    accepted_notice = db_session.query(Notification).filter(Notification.user_id == sender.id).one()
+    assert accepted_notice.payload == {"friend_id": str(recipient.id), "by": "Recipient"}
 
     auth_as(outsider)
     assert api_client.post(f"/friends/requests/{request_id}/accept").status_code == 404
@@ -95,6 +99,12 @@ def test_legacy_conversations_messages_persist_read_state_and_scope(
     conversation_id = created.json()["id"]
     assert api_client.post("/conversations", json={"recipient_id": str(recipient.id)}).json()["id"] == conversation_id
     assert api_client.post(f"/conversations/{conversation_id}/messages", json={"body": "  hi  "}).status_code == 201
+    message_notice = db_session.query(Notification).filter(Notification.user_id == recipient.id).one()
+    assert message_notice.payload == {
+        "conversation_id": conversation_id,
+        "from": "Sender",
+        "preview": "hi",
+    }
 
     auth_as(recipient)
     assert api_client.get("/conversations").json()[0]["unread_count"] == 1
@@ -118,12 +128,16 @@ def test_legacy_game_invites_persist_response_and_reject_non_owners(
     created = api_client.post("/game-invites", json={"recipient_id": str(recipient.id), "game_name": "  Elden Ring  ", "game_id": 1})
     assert created.status_code == 201
     invite_id = created.json()["id"]
+    invite_notice = db_session.query(Notification).filter(Notification.user_id == recipient.id).one()
+    assert invite_notice.payload == {"invite_id": invite_id, "from": "Sender", "game_name": "Elden Ring"}
     assert api_client.get("/game-invites").json()[0]["status"] == "pending"
     auth_as(outsider)
     assert api_client.post(f"/game-invites/{invite_id}/response", json={"status": "accepted"}).status_code == 404
     auth_as(recipient)
     assert api_client.post(f"/game-invites/{invite_id}/response", json={"status": "accepted"}).status_code == 200
     assert db_session.query(GameInvite).one().status == "accepted"
+    response_notice = db_session.query(Notification).filter(Notification.user_id == sender.id).one()
+    assert response_notice.payload == {"invite_id": invite_id, "by": "Recipient", "status": "accepted"}
     assert api_client.post(f"/game-invites/{invite_id}/response", json={"status": "declined"}).status_code == 409
 
 
