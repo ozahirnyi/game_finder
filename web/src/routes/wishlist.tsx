@@ -96,12 +96,14 @@ function WishlistPage() {
           {!!alertsQuery.data?.length && (
             <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
               {alertsQuery.data.map((alert) => {
-                const title = wl.find((game) => game.catalog_game_id === alert.wishlist_catalog_game_id)?.title
-                  ?? `Game #${alert.wishlist_catalog_game_id}`;
+                const title =
+                  wl.find((game) => game.catalog_game_id === alert.wishlist_catalog_game_id)
+                    ?.title ?? `Game #${alert.wishlist_catalog_game_id}`;
                 return (
                   <li key={alert.id} className="flex items-center gap-2">
                     <span>
-                      {title}: {alert.target_price != null
+                      {title}:{" "}
+                      {alert.target_price != null
                         ? `alert below ${alert.target_price}`
                         : alert.target_discount === 1
                           ? "any discount"

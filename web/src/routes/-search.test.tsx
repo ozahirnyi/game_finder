@@ -101,7 +101,9 @@ describe("SearchPage", () => {
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringMatching(/feature=single_player.*platform=console|platform=console.*feature=single_player/),
+        expect.stringMatching(
+          /feature=single_player.*platform=console|platform=console.*feature=single_player/,
+        ),
         expect.anything(),
       ),
     );
