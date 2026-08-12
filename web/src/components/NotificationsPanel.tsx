@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel, SectionHeader, EmptyState, Chip } from "@/components/ui-bits";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/api";
-import { Bell, Gamepad2, Tag, Users, Settings2, Check } from "lucide-react";
+import { notificationDestination } from "@/lib/notificationNavigation";
+import { Bell, Gamepad2, Tag, Users, Check } from "lucide-react";
 
 const iconFor = {
   invite: Gamepad2,
@@ -39,11 +41,8 @@ function notificationMessage(type: string, payload: Record<string, unknown>) {
 }
 
 export function NotificationsPanel({ className = "" }: { className?: string }) {
-  const [showSettings, setShowSettings] = useState(false);
-  const [prefs, setPrefs] = useState([
-    { id: "price", label: "Price drops", enabled: true },
-    { id: "friends", label: "Friend activity", enabled: true },
-  ]);
+  const [unavailableId, setUnavailableId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const notificationsQuery = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
   const markRead = useMutation({
@@ -73,49 +72,9 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                 <Check className="mr-1 inline size-3.5" /> Mark all read
               </button>
             )}
-            <button
-              aria-label="Notification settings"
-              onClick={() => setShowSettings((s) => !s)}
-              className={`grid size-9 place-items-center rounded-lg border transition ${
-                showSettings
-                  ? "border-primary/60 text-primary"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Settings2 className="size-4" />
-            </button>
           </div>
         }
       />
-
-      {showSettings && (
-        <div className="pop-in mb-5 space-y-2 rounded-xl border border-border bg-surface-2 p-3">
-          {prefs.map((p) => (
-            <button
-              key={p.id}
-              onClick={() =>
-                setPrefs((list) =>
-                  list.map((x) => (x.id === p.id ? { ...x, enabled: !x.enabled } : x)),
-                )
-              }
-              className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-foreground/5"
-            >
-              <span className="text-sm font-semibold">{p.label}</span>
-              <span
-                className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-                  p.enabled ? "bg-primary" : "bg-foreground/15"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 size-4 rounded-full bg-background transition-all ${
-                    p.enabled ? "left-[1.125rem]" : "left-0.5"
-                  }`}
-                />
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
 
       {notifications.length === 0 ? (
         <EmptyState
@@ -131,7 +90,15 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
             return (
               <div
                 key={n.id}
-                onClick={() => isUnread && markRead.mutate(n.id)}
+                onClick={() => {
+                  const destination = notificationDestination(n);
+                  if (!destination) {
+                    setUnavailableId(n.id);
+                    return;
+                  }
+                  void navigate(destination);
+                  if (isUnread) markRead.mutate(n.id);
+                }}
                 className={`flex items-start gap-3 rounded-xl border p-3 transition ${
                   isUnread ? "border-primary/30 bg-primary/5" : "border-border bg-surface-2"
                 }`}
@@ -149,6 +116,11 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">
                     {notificationMessage(n.type, n.payload)}
                   </p>
+                  {unavailableId === n.id && (
+                    <p role="status" aria-live="polite" className="mt-1 text-xs text-muted-foreground">
+                      This notification action is no longer available.
+                    </p>
+                  )}
                 </div>
                 <span className="label-mono shrink-0 text-muted-foreground">
                   {new Date(n.created_at).toLocaleDateString()}
