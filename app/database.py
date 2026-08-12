@@ -241,6 +241,7 @@ class PriceAlert(Base):
     target_discount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     delivery_channels: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=lambda: ["in_app"])
     last_delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_notification_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

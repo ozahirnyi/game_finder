@@ -7,7 +7,8 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import Game, SessionLocal, User
+from app.database import Game, PriceAlert, SessionLocal, User, WishlistItem
+from app.notifications import create_notification, price_alert_payload
 from app.prices import fetch_game_price_history
 from app.telegram import send_telegram_message
 
@@ -17,6 +18,7 @@ class PriceAlertRunResult:
     users_checked: int = 0
     games_checked: int = 0
     alerts_sent: int = 0
+    in_app_notifications_created: int = 0
     errors: int = 0
 
 
@@ -81,6 +83,56 @@ def format_price_alert_message(game_title: str, price_data: dict[str, Any]) -> s
     return "\n".join(lines)
 
 
+def alert_matches(alert: PriceAlert, deal: dict[str, Any]) -> bool:
+    amount = (deal.get("price") or {}).get("amount")
+    cut = deal.get("cut")
+    return (
+        amount is not None
+        and cut is not None
+        and (alert.target_price is None or amount <= alert.target_price)
+        and (alert.target_discount is None or cut >= alert.target_discount)
+    )
+
+
+async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult) -> None:
+    alerts = db.query(PriceAlert).all()
+    for alert in alerts:
+        if "in_app" not in (alert.delivery_channels or []):
+            continue
+        item = db.query(WishlistItem).filter(
+            WishlistItem.id == alert.wishlist_item_id,
+            WishlistItem.user_id == alert.user_id,
+        ).first()
+        user = db.query(User).filter(User.id == alert.user_id).first()
+        if not item or not user:
+            continue
+        country = (user.steam_country_code or "US").strip().upper()
+        if len(country) != 2:
+            country = "US"
+        try:
+            price_data = await fetch_game_price_history(item.title, country=country)
+            deal = price_data.get("current")
+            alert_key = build_price_alert_key(deal) if deal else None
+            if not deal or not alert_key or not alert_matches(alert, deal) or alert.last_notification_key == alert_key:
+                continue
+            create_notification(
+                db,
+                alert.user_id,
+                "price_alert",
+                price_alert_payload(catalog_game_id=item.catalog_game_id),
+            )
+            alert.last_notification_key = alert_key
+            alert.last_delivered_at = datetime.now(timezone.utc)
+            result.in_app_notifications_created += 1
+            db.commit()
+        except HTTPException:
+            result.errors += 1
+            db.rollback()
+        except Exception:
+            result.errors += 1
+            db.rollback()
+
+
 async def check_price_alerts(db: Session) -> PriceAlertRunResult:
     result = PriceAlertRunResult()
     users = db.query(User).filter(User.telegram_chat_id.isnot(None)).all()
@@ -118,6 +170,8 @@ async def check_price_alerts(db: Session) -> PriceAlertRunResult:
             except Exception:
                 result.errors += 1
                 db.rollback()
+
+    await check_persisted_price_alerts(db, result)
 
     return result
 

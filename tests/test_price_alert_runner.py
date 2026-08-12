@@ -128,6 +128,7 @@ def test_check_price_alerts_sends_updates_and_suppresses_duplicate(monkeypatch):
     send = Mock(return_value=True)
     monkeypatch.setattr(runner, "fetch_game_price_history", fetch)
     monkeypatch.setattr(runner, "send_telegram_message", send)
+    monkeypatch.setattr(runner, "check_persisted_price_alerts", AsyncMock())
 
     first = asyncio.run(runner.check_price_alerts(db))
     second = asyncio.run(runner.check_price_alerts(db))
@@ -149,6 +150,7 @@ def test_check_price_alerts_handles_no_deal_failed_delivery_and_provider_error(m
     db.query = Mock(side_effect=[FakeQuery([user]), FakeQuery(games)])
     monkeypatch.setattr(runner, "fetch_game_price_history", AsyncMock(side_effect=[{}, {"current": deal()}, RuntimeError("down")]))
     monkeypatch.setattr(runner, "send_telegram_message", Mock(return_value=False))
+    monkeypatch.setattr(runner, "check_persisted_price_alerts", AsyncMock())
 
     result = asyncio.run(runner.check_price_alerts(db))
     assert (result.users_checked, result.games_checked, result.alerts_sent, result.errors) == (1, 3, 0, 1)
@@ -167,6 +169,7 @@ def test_check_price_alerts_handles_http_exception(monkeypatch):
         "fetch_game_price_history",
         AsyncMock(side_effect=HTTPException(status_code=503, detail="provider unavailable")),
     )
+    monkeypatch.setattr(runner, "check_persisted_price_alerts", AsyncMock())
 
     result = asyncio.run(runner.check_price_alerts(db))
     assert result.errors == 1

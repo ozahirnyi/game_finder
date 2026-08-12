@@ -1,9 +1,11 @@
+import asyncio
 from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
 
-from app.database import Favorite, PriceAlert, WishlistItem
+from app.database import Favorite, Notification, PriceAlert, WishlistItem
+from app import price_alerts as runner
 
 
 pytestmark = pytest.mark.integration
@@ -157,6 +159,38 @@ def test_price_alert_accepts_one_percent_for_the_any_discount_preset(
 
     assert response.status_code == 201
     assert db_session.query(PriceAlert).filter_by(user_id=user.id).one().target_discount == 1
+
+
+def test_in_app_price_alert_notification_is_owner_scoped_and_deduplicated(
+    db_session, user_factory, monkeypatch
+):
+    owner = user_factory(email="notification-alert-owner@example.com")
+    other = user_factory(email="notification-alert-other@example.com")
+    owner_item = WishlistItem(user_id=owner.id, catalog_game_id=707, title="Hades")
+    other_item = WishlistItem(user_id=other.id, catalog_game_id=808, title="Celeste")
+    db_session.add_all([owner_item, other_item])
+    db_session.commit()
+    db_session.add_all([
+        PriceAlert(user_id=owner.id, wishlist_item_id=owner_item.id, target_price=10, target_discount=50, delivery_channels=["in_app"]),
+        PriceAlert(user_id=other.id, wishlist_item_id=other_item.id, target_price=5, delivery_channels=["telegram"]),
+    ])
+    db_session.commit()
+
+    monkeypatch.setattr(
+        runner,
+        "fetch_game_price_history",
+        AsyncMock(return_value={"current": {"shop": "Steam", "price": {"amount": 9.99, "currency": "USD"}, "cut": 60, "url": "https://store.example/hades"}}),
+    )
+
+    first = asyncio.run(runner.check_price_alerts(db_session))
+    second = asyncio.run(runner.check_price_alerts(db_session))
+
+    notices = db_session.query(Notification).all()
+    assert first.in_app_notifications_created == 1
+    assert second.in_app_notifications_created == 0
+    assert [(notice.user_id, notice.type, notice.payload) for notice in notices] == [
+        (owner.id, "price_alert", {"catalog_game_id": 707}),
+    ]
 
 
 def test_telegram_delivery_requires_linked_chat_without_persisting_or_updating(
