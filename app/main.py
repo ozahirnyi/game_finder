@@ -2711,7 +2711,7 @@ async def _fetch_sale_catalog_games(query: str, filters: CatalogSearchFilters, c
         )
         if not catalog or not catalog.get("id") or not _matches_catalog_filters(catalog, filters):
             return None
-        if query and query not in _search_title_key(str(catalog.get("name") or "")):
+        if query and _search_title_key(query) not in _search_title_key(str(catalog.get("name") or "")):
             return None
         return {**catalog, "steam_appid": steam_appid}
 
@@ -2743,7 +2743,7 @@ async def search(
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v4", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
+    key = build_cache_key("igdb_search_v5", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
         if on_sale:
