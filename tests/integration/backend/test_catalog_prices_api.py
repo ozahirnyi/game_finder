@@ -116,7 +116,10 @@ def test_sale_discovery_falls_back_to_an_exact_title_catalog_match(api_client, a
     )
     monkeypatch.setattr(app_main, "get_json_cached", run_cached)
 
-    response = api_client.get("/search/games", params={"on_sale": "true"})
+    response = api_client.get(
+        "/search/games",
+        params={"on_sale": "true", "q": "Black Myth: Wukong"},
+    )
 
     assert response.status_code == 200
     assert [(item["id"], item["name"], item["steam_appid"]) for item in response.json()["results"]] == [
@@ -170,7 +173,7 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     assert "source" not in response.json()["results"][0]
     fetch_igdb.assert_awaited_once_with("hades", page=2, filters=app_main.CatalogSearchFilters())
     assert cached.await_count == 1
-    assert "igdb_search_v4" in cached.await_args.args[0]
+    assert "igdb_search_v5" in cached.await_args.args[0]
 
 
 @pytest.mark.parametrize("params", [{"q": "hades", "page": 0}, {"platform": "unsupported"}])
