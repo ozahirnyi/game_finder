@@ -24,10 +24,14 @@ const filters: Array<{
   { label: "All" },
   { label: "On sale", type: "sale" },
   { label: "Co-op", type: "feature", value: "co_op" },
+  { label: "Solo", type: "feature", value: "single_player" },
   { label: "PC", type: "platform", value: "pc" },
-  { label: "PS5", type: "platform", value: "ps5" },
+  { label: "Consoles", type: "platform", value: "console" },
+  { label: "Adventure", type: "genre", value: "adventure" },
   { label: "Roguelike", type: "genre", value: "roguelike" },
   { label: "RPG", type: "genre", value: "rpg" },
+  { label: "Shooter", type: "genre", value: "shooter" },
+  { label: "Strategy", type: "genre", value: "strategy" },
   { label: "Multiplayer", type: "feature", value: "multiplayer" },
 ];
 

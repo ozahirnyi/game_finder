@@ -24,6 +24,12 @@ def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
     assert result["genres"] == ["RPG"]
 
 
+def test_normalize_igdb_game_uses_total_rating_when_critic_rating_is_missing():
+    from app.integrations.igdb import normalize_igdb_game
+
+    assert normalize_igdb_game({"id": 1, "name": "Rated", "total_rating": 87.5})["rating"] == 87.5
+
+
 @pytest.mark.anyio
 async def test_igdb_roguelike_filter_uses_real_keyword_metadata(monkeypatch):
     import app.integrations.igdb as client
@@ -42,6 +48,28 @@ async def test_igdb_roguelike_filter_uses_real_keyword_metadata(monkeypatch):
     )
 
     assert 'keywords.name = "Roguelike"' in captured["query"]
+
+
+@pytest.mark.anyio
+async def test_igdb_uses_the_real_game_mode_ids(monkeypatch):
+    import app.integrations.igdb as client
+
+    captured = {}
+
+    async def query(_endpoint, statement):
+        captured["statement"] = statement
+        return []
+
+    monkeypatch.setattr(client, "_query", query)
+
+    await client.fetch_igdb_games(
+        "",
+        filters=client.CatalogSearchFilters(features=("single_player", "multiplayer", "co_op")),
+    )
+
+    assert "game_modes = 1" in captured["statement"]
+    assert "game_modes = 2" in captured["statement"]
+    assert "game_modes = 3" in captured["statement"]
 
 
 @pytest.mark.anyio

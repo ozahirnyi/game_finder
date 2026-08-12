@@ -443,9 +443,9 @@ export function confirmPsnImport(games: string[]) {
   });
 }
 
-export type CatalogPlatform = "pc" | "ps5" | "ps4" | "xbox_series" | "xbox_one" | "switch";
-export type CatalogFeature = "co_op" | "multiplayer";
-export type CatalogGenre = "rpg" | "roguelike";
+export type CatalogPlatform = "pc" | "console" | "ps5" | "ps4" | "xbox_series" | "xbox_one" | "switch";
+export type CatalogFeature = "single_player" | "co_op" | "multiplayer";
+export type CatalogGenre = "adventure" | "rpg" | "roguelike" | "shooter" | "strategy";
 export type CatalogSearchOptions = {
   query?: string;
   platforms?: CatalogPlatform[];

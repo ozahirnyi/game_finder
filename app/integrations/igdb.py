@@ -53,14 +53,15 @@ class CatalogSearchFilters:
 
 _PLATFORM_IDS = {
     "pc": (6, 14, 3),
+    "console": (167, 48, 169, 49, 130),
     "ps5": (167,),
     "ps4": (48,),
     "xbox_series": (169,),
     "xbox_one": (49,),
     "switch": (130,),
 }
-_GAME_MODE_IDS = {"multiplayer": 1, "co_op": 2}
-_GENRE_IDS = {"rpg": 12}
+_GAME_MODE_IDS = {"single_player": 1, "multiplayer": 2, "co_op": 3}
+_GENRE_IDS = {"adventure": 31, "rpg": 12, "shooter": 5, "strategy": 15}
 
 
 def _credentials() -> tuple[str, str]:
@@ -141,7 +142,7 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": game.get("id"), "name": game.get("name"), "released": released,
         "background_image": cover, "description_raw": game.get("summary"),
-        "rating": game.get("rating"), "genres": [x["name"] for x in game.get("genres", []) if x.get("name")],
+        "rating": game.get("rating") if game.get("rating") is not None else game.get("total_rating"), "genres": [x["name"] for x in game.get("genres", []) if x.get("name")],
         "platforms": [x.get("name") or (x.get("platform") or {}).get("name") for x in game.get("platforms", []) if x.get("name") or (x.get("platform") or {}).get("name")],
         "game_modes": [x["name"] for x in game.get("game_modes", []) if x.get("name")],
         "keywords": [x["name"] for x in game.get("keywords", []) if x.get("name")],
@@ -149,7 +150,7 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-_FIELDS = "fields id,name,first_release_date,summary,rating,cover.url,genres.name,platforms.name,game_modes.name,keywords.name,external_games.category,external_games.uid;"
+_FIELDS = "fields id,name,first_release_date,summary,rating,total_rating,cover.url,genres.name,platforms.name,game_modes.name,keywords.name,external_games.category,external_games.uid;"
 
 
 async def fetch_igdb_games(
