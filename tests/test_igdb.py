@@ -51,6 +51,28 @@ async def test_igdb_roguelike_filter_uses_real_keyword_metadata(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_igdb_discovery_filters_use_a_single_valid_sort(monkeypatch):
+    import app.integrations.igdb as client
+
+    captured = {}
+
+    async def query(_endpoint, statement):
+        captured["statement"] = statement
+        return []
+
+    monkeypatch.setattr(client, "_query", query)
+
+    await client.fetch_igdb_games(
+        "",
+        filters=client.CatalogSearchFilters(platforms=("pc",), genres=("adventure",)),
+    )
+
+    assert "platforms = (6,14,3) & genres = 31" in captured["statement"]
+    assert "sort total_rating_count desc;" in captured["statement"]
+    assert "sort total_rating_count desc, rating desc;" not in captured["statement"]
+
+
+@pytest.mark.anyio
 async def test_igdb_uses_the_real_game_mode_ids(monkeypatch):
     import app.integrations.igdb as client
 

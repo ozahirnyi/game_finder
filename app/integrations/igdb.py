@@ -173,7 +173,7 @@ async def fetch_igdb_games(
             predicates.append(f"genres = {_GENRE_IDS[genre]}")
     where = f" where {' & '.join(predicates)};" if predicates else ""
     search = f' search "{safe_query}";' if safe_query else ""
-    sort = " sort total_rating_count desc, rating desc;" if not safe_query else ""
+    sort = " sort total_rating_count desc;" if not safe_query else ""
     games = await _query("games", f"{_FIELDS}{search}{where}{sort} limit 20; offset {offset};")
     return {"results": [normalize_igdb_game(game) for game in games]}
 
