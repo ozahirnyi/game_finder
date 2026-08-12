@@ -62,7 +62,13 @@ def test_sale_discovery_returns_only_confirmed_current_deals_matching_all_filter
 
     async def fetch_catalog(title, *_args, **_kwargs):
         return {"results": {
-            "Hades": [{"id": 30, "name": "Hades", "platforms": ["PlayStation 5"]}],
+            "Hades": [{
+                "id": 30,
+                "name": "Hades",
+                "rating": 91.2,
+                "genres": ["Role-playing (RPG)"],
+                "platforms": ["PlayStation 5"],
+            }],
             "Not on PS5": [{"id": 31, "name": "Not on PS5", "platforms": ["Xbox Series X|S"]}],
             "No catalog mapping": [],
         }[title]}
@@ -79,6 +85,11 @@ def test_sale_discovery_returns_only_confirmed_current_deals_matching_all_filter
     assert [(item["id"], item["name"], item["steam_appid"]) for item in response.json()["results"]] == [
         (30, "Hades", 1),
     ]
+    result = response.json()["results"][0]
+    assert result["rating"] == 91.2
+    assert result["genres"] == ["Role-playing (RPG)"]
+    assert result["platforms"] == ["PlayStation 5"]
+    assert result["current"] == {"cut": 50}
 
 
 def test_sale_discovery_excludes_deals_without_a_current_discount(api_client, app_main, monkeypatch):
@@ -314,6 +325,23 @@ def test_price_history_falls_back_to_steam_on_itad_502(api_client, app_main, mon
     fallback.assert_awaited_once_with("1145350", country="US")
 
 
+def test_price_history_uses_catalog_title_when_igdb_has_no_steam_appid(api_client, app_main, monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_game_detail",
+        AsyncMock(return_value={"name": "Black Myth: Wukong", "steam_appid": None}),
+    )
+    fallback = AsyncMock(return_value={"itad_id": "steam:2358720", "title": "Black Myth: Wukong", "deals": []})
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_price", fallback)
+    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+
+    response = api_client.get("/prices/games/136879", params={"country": "ua"})
+
+    assert response.status_code == 200
+    assert response.json()["title"] == "Black Myth: Wukong"
+    fallback.assert_awaited_once_with("Black Myth: Wukong", country="UA")
+
+
 def test_homepage_deals_enriches_and_normalizes_payload(api_client, app_main, monkeypatch):
     deal = {"steam_appid": 1145360, "name": "Hades", "background_image": None, "url": "https://deal.test", "current": None, "history_low_all": None}
     monkeypatch.setattr(app_main, "fetch_steam_store_deals", AsyncMock(return_value=[deal]))
@@ -326,6 +354,23 @@ def test_homepage_deals_enriches_and_normalizes_payload(api_client, app_main, mo
     assert response.status_code == 200
     assert response.json()["results"][0]["id"] == 42
     igdb.assert_awaited_once_with(1145360)
+
+
+def test_homepage_deals_falls_back_to_an_exact_catalog_title(api_client, app_main, monkeypatch):
+    deal = {"steam_appid": 2358720, "name": "Black Myth: Wukong", "background_image": None, "url": "https://deal.test", "current": None, "history_low_all": None}
+    monkeypatch.setattr(app_main, "fetch_steam_store_deals", AsyncMock(return_value=[deal]))
+    monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_games",
+        AsyncMock(return_value={"results": [{"id": 136879, "name": "Black Myth: Wukong"}]}),
+    )
+    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+
+    response = api_client.get("/prices/deals", params={"country": "ua", "page_size": 1})
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["id"] == 136879
 
 
 def test_genre_deals_uses_authenticated_favorite_genres(api_client, app_main, monkeypatch, user_factory, auth_as):

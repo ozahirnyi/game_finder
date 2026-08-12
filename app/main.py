@@ -2713,7 +2713,7 @@ async def _fetch_sale_catalog_games(query: str, filters: CatalogSearchFilters, c
             return None
         if query and _search_title_key(query) not in _search_title_key(str(catalog.get("name") or "")):
             return None
-        return {**catalog, "steam_appid": steam_appid}
+        return {**catalog, "steam_appid": steam_appid, "current": deal.get("current")}
 
     return [game for game in await asyncio.gather(*(enrich(deal) for deal in deals)) if game is not None]
 
@@ -2824,7 +2824,13 @@ async def game_price_history(igdb_id: int, country: str = "US", db: Session = De
 
     steam_appid = game.get("steam_appid")
     if not isinstance(steam_appid, int) or steam_appid < 1:
-        raise HTTPException(status_code=404, detail="No confirmed Steam appid is available for this catalog game")
+        title = str(game.get("name") or "").strip()
+        if not title:
+            raise HTTPException(status_code=404, detail="No price lookup title is available for this catalog game")
+        try:
+            return await fetch_steam_store_game_price(title, country=normalized_country)
+        except HTTPException:
+            raise
 
     price_key = build_cache_key("price_history", steam_appid=steam_appid, country=normalized_country)
 
@@ -2900,6 +2906,22 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
                     )
                 except (IGDBError, asyncio.TimeoutError):
                     match = None
+                if match is None:
+                    title = str(deal.get("name") or "").strip()
+                    if title:
+                        try:
+                            matches = await fetch_igdb_games(title)
+                            title_key = _search_title_key(title)
+                            match = next(
+                                (
+                                    game
+                                    for game in matches.get("results", [])
+                                    if _search_title_key(str(game.get("name") or "")) == title_key
+                                ),
+                                None,
+                            )
+                        except IGDBError:
+                            match = None
             return {
                 "id": match.get("id") if match else None,
                 "steam_appid": deal.get("steam_appid"),

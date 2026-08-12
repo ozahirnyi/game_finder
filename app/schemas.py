@@ -276,6 +276,10 @@ class GameSearchItem(BaseModel):
     source: str | None = None
     steam_appid: int | None = None
     url: str | None = None
+    rating: float | None = None
+    genres: list[str] = Field(default_factory=list)
+    platforms: list[str] = Field(default_factory=list)
+    current: dict | None = None
 
 
 class GameSearchResponse(BaseModel):
