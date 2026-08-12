@@ -112,16 +112,22 @@ function FriendsPage() {
     avatarTo: "#111827",
   }));
   const list = friends;
-  const selectedFriend = list.find((friend) => friend.id === selectedFriendId) ?? list[0];
+  const conversationsQuery = useQuery({
+    queryKey: ["conversations"],
+    queryFn: getConversations,
+  });
+  const matchingConversation = conversationsQuery.data?.find(
+    (conversation) => conversation.id === notificationSearch.conversation,
+  );
+  const selectedFriend =
+    list.find((friend) => friend.id === matchingConversation?.participant.id) ??
+    list.find((friend) => friend.id === selectedFriendId) ??
+    list[0];
   const selectedId = selectedFriend?.id;
   const selectedSummaryQuery = useQuery({
     queryKey: ["friend-social-summary", selectedId],
     queryFn: () => getFriendSocialSummary(selectedId!),
     enabled: !!selectedId,
-  });
-  const conversationsQuery = useQuery({
-    queryKey: ["conversations"],
-    queryFn: getConversations,
   });
   const selectedConversation = conversationsQuery.data?.find(
     (conversation) => conversation.participant.id === selectedId,
@@ -139,9 +145,6 @@ function FriendsPage() {
   );
   const matchingInvite = (gameInvitesQuery.data ?? []).find(
     (invite) => invite.id === notificationSearch.invite,
-  );
-  const matchingConversation = conversationsQuery.data?.find(
-    (conversation) => conversation.id === notificationSearch.conversation,
   );
   const hasNotificationTarget = Boolean(matchingRequest || matchingInvite || matchingConversation);
   const notificationUnavailable =
@@ -301,7 +304,12 @@ function FriendsPage() {
               >
                 <h2 className="text-base font-bold">Game invites</h2>
                 {incomingInvites.map((invite) => (
-                  <div key={invite.id} className="flex items-center justify-between gap-3">
+                  <div
+                    key={invite.id}
+                    data-testid={`notification-invite-${invite.id}`}
+                    data-notification-target={matchingInvite?.id === invite.id || undefined}
+                    className="flex items-center justify-between gap-3"
+                  >
                     <span className="text-sm">
                       {friendDisplayName(invite.sender)} invited you to play {invite.game_name}
                     </span>

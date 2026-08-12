@@ -152,6 +152,31 @@ describe("FriendsPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("selects the message conversation target", async () => {
+    api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
+    api.getConversations.mockResolvedValue([
+      { id: "conversation-1", participant: { id: "player-1", display_name: "Sam" } },
+    ]);
+    api.getConversationMessages.mockResolvedValue([
+      { id: "message-1", sender_id: "player-1", body: "Ready tonight?", created_at: "2026-08-05T12:00:00Z" },
+    ]);
+    renderFriends(undefined, "/?conversation=conversation-1");
+
+    expect(await screen.findByText("Ready tonight?")).toBeInTheDocument();
+  });
+
+  it("focuses a deep-linked incoming invite", async () => {
+    api.getGameInvites.mockResolvedValue([
+      { id: "invite-1", sender: { id: "player-1", display_name: "Sam" }, recipient: { id: "me", display_name: "Me" }, game_name: "Portal 2", status: "pending" },
+    ]);
+    renderFriends(undefined, "/?invite=invite-1");
+
+    expect(await screen.findByTestId("notification-invite-invite-1")).toHaveAttribute(
+      "data-notification-target",
+      "true",
+    );
+  });
+
   it("accepts an incoming game invite", async () => {
     api.getGameInvites.mockResolvedValue([
       {
