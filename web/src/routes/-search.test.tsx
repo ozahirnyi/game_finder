@@ -41,14 +41,20 @@ describe("SearchPage", () => {
   });
 
   it("submits an AI prompt and displays returned recommendations", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          recommendations: [
-            { title: "Recommended title", reason: "Fits your prompt", tags: ["Co-op"] },
-          ],
-        }),
-        { status: 200 },
+    const fetchMock = vi.fn((url: string) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.includes("/recommendations")
+              ? {
+                  recommendations: [
+                    { title: "Recommended title", reason: "Fits your prompt", tags: ["Co-op"] },
+                  ],
+                }
+              : { results: [] },
+          ),
+          { status: 200 },
+        ),
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -65,32 +71,65 @@ describe("SearchPage", () => {
     );
   });
 
-  it("turns a query suggestion into the catalog query", async () => {
+  it("uses chips as multi-select discovery filters without changing the text", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] })));
     vi.stubGlobal("fetch", fetchMock);
     renderSearch();
 
     fireEvent.click(screen.getByRole("button", { name: "Co-op" }));
+    fireEvent.click(screen.getByRole("button", { name: "PS5" }));
 
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("q=Co-op"), expect.anything()),
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("feature=co_op"),
+        expect.anything(),
+      ),
     );
-    expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("Co-op");
-    expect(window.location.search).toBe("?q=Co-op");
+    expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("");
+    expect(window.location.search).toContain("feature=co_op");
+    expect(window.location.search).toContain("platform=ps5");
     expect(screen.getByRole("button", { name: "Co-op" })).toHaveClass("border-primary");
+  });
+
+  it("requests only real sale discovery results alongside selected catalog filters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+
+    fireEvent.click(screen.getByRole("button", { name: "On sale" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("on_sale=true"),
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "PS5" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(/on_sale=true.*platform=ps5|platform=ps5.*on_sale=true/),
+        expect.anything(),
+      ),
+    );
   });
 
   it("offers a title-search fallback for every AI recommendation", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            recommendations: [
-              { title: "Hades", reason: "Match", tags: [] },
-              { title: "Unknown Game", reason: "Match", tags: [] },
-            ],
-          }),
+      vi.fn((url: string) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(
+              url.includes("/recommendations")
+                ? {
+                    recommendations: [
+                      { title: "Hades", reason: "Match", tags: [], igdb_id: 30 },
+                      { title: "Unknown Game", reason: "Match", tags: [] },
+                    ],
+                  }
+                : { results: [] },
+            ),
+          ),
         ),
       ),
     );
@@ -101,13 +140,36 @@ describe("SearchPage", () => {
     });
     fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
 
-    expect(await screen.findByRole("link", { name: "Search for Hades" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "View Hades details" })).toHaveAttribute(
       "href",
-      "/search?q=Hades",
+      "/games/30",
     );
     expect(screen.getByRole("link", { name: "Search for Unknown Game" })).toHaveAttribute(
       "href",
       "/search?q=Unknown%20Game",
     );
+  });
+
+  it("distinguishes an AI no-match response from provider unavailability", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(
+              url.includes("/recommendations") ? { recommendations: [] } : { results: [] },
+            ),
+          ),
+        ),
+      ),
+    );
+    renderSearch();
+    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
+      target: { value: "obscure niche" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
+
+    expect(await screen.findByText("No AI matches found")).toBeInTheDocument();
   });
 });

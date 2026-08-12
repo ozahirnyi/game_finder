@@ -86,9 +86,10 @@ def test_search_uses_igdb_catalog_results(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
 
-    async def fake_igdb(query, *, page):
+    async def fake_igdb(query, *, page, filters):
         assert query == "hades"
         assert page == 1
+        assert filters == main.CatalogSearchFilters()
         return {"results": [{
             "id": 3498,
             "name": "Hades",

@@ -164,3 +164,24 @@ def test_recommendations_empty_and_provider_error(api_client, app_main, monkeypa
     response = api_client.post("/recommendations", json={"prompt": "cozy games"})
     assert response.status_code == 200
     assert response.json()["recommendations"] == []
+
+
+def test_recommendations_expose_detail_link_only_for_an_exact_catalog_match(api_client, app_main, monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "get_recommendation",
+        lambda *_args, **_kwargs: {"recommendations": [{"title": "Hades", "reason": "Fast runs", "tags": ["roguelike"]}]},
+    )
+
+    async def fetch_catalog(title, **_kwargs):
+        assert title == "Hades"
+        return {"results": [{"id": 1, "name": "Hades II"}, {"id": 2, "name": "Hades", "background_image": "https://img.test/hades.jpg"}]}
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", fetch_catalog)
+
+    response = api_client.post("/recommendations", json={"prompt": "fast roguelikes"})
+
+    assert response.status_code == 200
+    assert response.json()["recommendations"] == [
+        {"title": "Hades", "reason": "Fast runs", "tags": ["roguelike"], "igdb_id": 2, "cover_url": "https://img.test/hades.jpg"}
+    ]

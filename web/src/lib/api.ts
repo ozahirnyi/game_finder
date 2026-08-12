@@ -209,6 +209,8 @@ export type RecommendationItem = {
   title: string;
   reason: string;
   tags: string[];
+  igdb_id?: number | null;
+  cover_url?: string | null;
 };
 export type RecommendationResponse = { recommendations: RecommendationItem[] };
 export type DashboardBlock<T> = {
@@ -441,8 +443,25 @@ export function confirmPsnImport(games: string[]) {
   });
 }
 
-export function searchGames(query: string) {
-  return apiRequest<{ results: CatalogGame[] }>(`/search/games?q=${encodeURIComponent(query)}`);
+export type CatalogPlatform = "pc" | "ps5" | "ps4" | "xbox_series" | "xbox_one" | "switch";
+export type CatalogFeature = "co_op" | "multiplayer";
+export type CatalogGenre = "rpg" | "roguelike";
+export type CatalogSearchOptions = {
+  query?: string;
+  platforms?: CatalogPlatform[];
+  features?: CatalogFeature[];
+  genres?: CatalogGenre[];
+  onSale?: boolean;
+};
+
+export function searchGames(options: CatalogSearchOptions) {
+  const params = new URLSearchParams();
+  if (options.query) params.set("q", options.query);
+  options.platforms?.forEach((value) => params.append("platform", value));
+  options.features?.forEach((value) => params.append("feature", value));
+  options.genres?.forEach((value) => params.append("genre", value));
+  if (options.onSale) params.set("on_sale", "true");
+  return apiRequest<{ results: CatalogGame[] }>(`/search/games?${params.toString()}`);
 }
 
 export function getRecommendations(prompt: string) {

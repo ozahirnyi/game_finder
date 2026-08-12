@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   createPriceAlert: vi.fn(),
   getFriends: vi.fn(),
   getPriceAlerts: vi.fn(),
+  getTelegramAccount: vi.fn(),
   getWishlist: vi.fn(),
   getPriceHistory: vi.fn(),
 }));
@@ -83,22 +84,22 @@ describe("GameDetail actions", () => {
     api.getWishlist.mockResolvedValue([]);
     api.addWishlist.mockResolvedValue({ id: "wishlist-1" });
     api.getPriceAlerts.mockResolvedValue([]);
+    api.getTelegramAccount.mockResolvedValue({ linked: false, configured: false });
     api.createPriceAlert.mockResolvedValue({ id: "alert-1" });
     api.getFriends.mockResolvedValue([{ user: { id: "friend-1", display_name: "Sam" } }]);
     api.createGameInvite.mockResolvedValue({ id: "invite-1" });
   });
 
-  it("adds the game to the wishlist and creates an in-app alert", async () => {
+  it("adds the game to the wishlist and creates an any-discount in-app alert", async () => {
     renderGame();
 
     fireEvent.click(await screen.findByRole("button", { name: "Alert" }));
-    fireEvent.change(await screen.findByLabelText("Target price"), { target: { value: "24" } });
     fireEvent.click(screen.getByRole("button", { name: "Save alert" }));
 
     await waitFor(() =>
       expect(api.createPriceAlert).toHaveBeenCalledWith({
         wishlist_catalog_game_id: 274755,
-        target_price: 24,
+        target_discount: 1,
         delivery_channels: ["in_app"],
       }),
     );
@@ -158,5 +159,21 @@ describe("GameDetail actions", () => {
     expect(await screen.findByText("Hades II")).toBeInTheDocument();
     expect(screen.queryByText("Friends who own it")).not.toBeInTheDocument();
     expect(screen.queryByText("Why for your squad")).not.toBeInTheDocument();
+  });
+
+  it("reveals every real platform only when requested", async () => {
+    game.platforms = ["Windows", "macOS", "Linux", "PlayStation 5"];
+    renderGame();
+
+    expect(await screen.findByRole("button", { name: "Show all platforms" })).toBeInTheDocument();
+    expect(screen.getByText("Platforms").parentElement).toHaveTextContent("Windows, macOS, Linux");
+    expect(screen.getByText("Platforms").parentElement).not.toHaveTextContent(
+      "Windows, macOS, Linux, PlayStation 5",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Show all platforms" }));
+    expect(screen.getByText("Platforms").parentElement).toHaveTextContent(
+      "Windows, macOS, Linux, PlayStation 5",
+    );
+    game.platforms = ["PC"];
   });
 });
