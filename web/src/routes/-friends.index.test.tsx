@@ -158,7 +158,12 @@ describe("FriendsPage", () => {
       { id: "conversation-1", participant: { id: "player-1", display_name: "Sam" } },
     ]);
     api.getConversationMessages.mockResolvedValue([
-      { id: "message-1", sender_id: "player-1", body: "Ready tonight?", created_at: "2026-08-05T12:00:00Z" },
+      {
+        id: "message-1",
+        sender_id: "player-1",
+        body: "Ready tonight?",
+        created_at: "2026-08-05T12:00:00Z",
+      },
     ]);
     renderFriends(undefined, "/?conversation=conversation-1");
 
@@ -167,7 +172,13 @@ describe("FriendsPage", () => {
 
   it("focuses a deep-linked incoming invite", async () => {
     api.getGameInvites.mockResolvedValue([
-      { id: "invite-1", sender: { id: "player-1", display_name: "Sam" }, recipient: { id: "me", display_name: "Me" }, game_name: "Portal 2", status: "pending" },
+      {
+        id: "invite-1",
+        sender: { id: "player-1", display_name: "Sam" },
+        recipient: { id: "me", display_name: "Me" },
+        game_name: "Portal 2",
+        status: "pending",
+      },
     ]);
     renderFriends(undefined, "/?invite=invite-1");
 
