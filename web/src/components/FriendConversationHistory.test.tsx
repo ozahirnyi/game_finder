@@ -22,7 +22,9 @@ afterEach(() => {
 
 function renderHistory(friendId = "friend-1") {
   return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <FriendConversationHistory friendId={friendId} />
     </QueryClientProvider>,
   );
@@ -34,7 +36,12 @@ describe("FriendConversationHistory", () => {
       { id: "conversation-1", participant: { id: "friend-1", display_name: "Sam" } },
     ]);
     api.getConversationMessages.mockResolvedValue([
-      { id: "message-1", sender_id: "friend-1", body: "Ready tonight?", created_at: "2026-08-14T12:00:00Z" },
+      {
+        id: "message-1",
+        sender_id: "friend-1",
+        body: "Ready tonight?",
+        created_at: "2026-08-14T12:00:00Z",
+      },
     ]);
     api.getGameInvites.mockResolvedValue([
       {

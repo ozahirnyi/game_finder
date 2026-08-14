@@ -26,9 +26,7 @@ export function FriendConversationHistory({
   title = "Messages",
 }: FriendConversationHistoryProps) {
   const conversationsQuery = useQuery({ queryKey: ["conversations"], queryFn: getConversations });
-  const conversation = conversationsQuery.data?.find(
-    (item) => item.participant.id === friendId,
-  );
+  const conversation = conversationsQuery.data?.find((item) => item.participant.id === friendId);
   const messagesQuery = useQuery({
     queryKey: ["conversation-messages", conversation?.id],
     queryFn: () => getConversationMessages(conversation!.id),
@@ -78,13 +76,17 @@ export function FriendConversationHistory({
                 key={`invite:${event.invite.id}`}
                 className="rounded-xl border border-border bg-surface p-3 text-sm"
               >
-                Game invitation: {event.invite.game_name} · {displayInviteStatus(event.invite.status)}
+                Game invitation: {event.invite.game_name} ·{" "}
+                {displayInviteStatus(event.invite.status)}
               </p>
             ),
           )}
         </div>
       ) : (
-        <EmptyState title="No messages yet" description="Start a conversation or send a game invitation." />
+        <EmptyState
+          title="No messages yet"
+          description="Start a conversation or send a game invitation."
+        />
       )}
     </section>
   );
