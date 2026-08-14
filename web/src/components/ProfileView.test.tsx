@@ -1,13 +1,16 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
   updateProfile: vi.fn().mockResolvedValue({}),
   createConversation: vi.fn().mockResolvedValue({ id: "conversation-1" }),
   createMessage: vi.fn().mockResolvedValue({}),
   createGameInvite: vi.fn().mockResolvedValue({}),
+  getConversations: vi.fn().mockResolvedValue([]),
+  getConversationMessages: vi.fn().mockResolvedValue([]),
+  getGameInvites: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("./ConnectedServices", () => ({ ConnectedServices: () => <div /> }));
@@ -18,6 +21,9 @@ vi.mock("@/lib/api", async () => ({
   createConversation: api.createConversation,
   createMessage: api.createMessage,
   createGameInvite: api.createGameInvite,
+  getConversations: api.getConversations,
+  getConversationMessages: api.getConversationMessages,
+  getGameInvites: api.getGameInvites,
 }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -25,7 +31,20 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { ProfileView, type ProfileData } from "./ProfileView";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+beforeEach(() => {
+  api.updateProfile.mockResolvedValue({});
+  api.createConversation.mockResolvedValue({ id: "conversation-1" });
+  api.createMessage.mockResolvedValue({});
+  api.createGameInvite.mockResolvedValue({});
+  api.getConversations.mockResolvedValue([]);
+  api.getConversationMessages.mockResolvedValue([]);
+  api.getGameInvites.mockResolvedValue([]);
+});
 
 const profile: ProfileData = {
   name: "Player",
@@ -84,6 +103,63 @@ describe("ProfileView library visibility", () => {
     fireEvent.click(screen.getByRole("button", { name: "Message Player" }));
     expect(screen.getByRole("dialog", { name: "Message Player" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Message Player" })).toBeVisible();
+  });
+  it("shows the existing conversation and invitations on a friend profile", async () => {
+    api.getConversations.mockResolvedValue([
+      { id: "conversation-1", participant: { id: "friend-1", display_name: "Player" } },
+    ]);
+    api.getConversationMessages.mockResolvedValue([
+      {
+        id: "message-1",
+        sender_id: "friend-1",
+        body: "Earlier message",
+        created_at: "2026-08-14T12:00:00Z",
+      },
+    ]);
+    api.getGameInvites.mockResolvedValue([
+      {
+        id: "invite-1",
+        sender: { id: "friend-1", display_name: "Player" },
+        recipient: { id: "me", display_name: "Me" },
+        game_name: "Portal 2",
+        status: "pending",
+        created_at: "2026-08-14T11:00:00Z",
+      },
+    ]);
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <ProfileView profile={{ ...profile, friendId: "friend-1" }} isSelf={false} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("Earlier message")).toBeInTheDocument();
+    expect(screen.getByText("Game invitation: Portal 2 · Pending")).toBeInTheDocument();
+  });
+
+  it("refreshes the profile conversation after sending a message", async () => {
+    api.getConversations.mockResolvedValue([
+      { id: "conversation-1", participant: { id: "friend-1", display_name: "Player" } },
+    ]);
+    api.getConversationMessages.mockResolvedValue([]);
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <ProfileView profile={{ ...profile, friendId: "friend-1" }} isSelf={false} />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText("No messages yet");
+    fireEvent.click(screen.getByRole("button", { name: "Message Player" }));
+    fireEvent.change(screen.getByLabelText("Message text"), { target: { value: "New message" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() =>
+      expect(api.createMessage).toHaveBeenCalledWith("conversation-1", "New message"),
+    );
+    await waitFor(() => expect(api.getConversationMessages).toHaveBeenCalledTimes(2));
   });
   it("shows the explicit shared library state for a private library", () => {
     render(

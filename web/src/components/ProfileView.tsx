@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { ConnectedServices } from "@/components/ConnectedServices";
+import { FriendConversationHistory } from "@/components/FriendConversationHistory";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import {
   createConversation,
@@ -113,6 +114,8 @@ export function ProfileView({
     onSuccess: () => {
       setMessageBody("");
       setMessageOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["conversation-messages"] });
     },
   });
   const sendInvite = useMutation({
@@ -132,6 +135,7 @@ export function ProfileView({
     onSuccess: () => {
       setSelectedGameKey("");
       setInviteOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["game-invites"] });
     },
   });
   const steam = profile.stores.find((s) => s.name === "Steam")?.count ?? 0;
@@ -474,6 +478,12 @@ export function ProfileView({
               </Panel>
             )}
           </>
+        )}
+
+        {!isSelf && profile.friendId && (
+          <Panel className="p-6 lg:col-span-12">
+            <FriendConversationHistory friendId={profile.friendId} />
+          </Panel>
         )}
 
         {!isSelf && (
