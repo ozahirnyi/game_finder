@@ -2,13 +2,13 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { FriendConversationHistory } from "@/components/FriendConversationHistory";
 import { Avatar } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   acceptFriendRequest,
   ApiError,
   createFriendRequest,
-  getConversationMessages,
   getConversations,
   getFriendSocialSummary,
   getGameInvites,
@@ -68,10 +68,6 @@ function FriendsPage() {
     queryKey: ["game-invites", "incoming"],
     queryFn: () => getGameInvites("incoming"),
   });
-  const allGameInvitesQuery = useQuery({
-    queryKey: ["game-invites", "all"],
-    queryFn: () => getGameInvites("all"),
-  });
   const searchQuery = useQuery({
     queryKey: ["user-search", searchTerm],
     queryFn: () => searchUsers(searchTerm),
@@ -95,10 +91,14 @@ function FriendsPage() {
   const respondInviteMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: "accepted" | "declined" }) =>
       respondToGameInvite(id, status),
-    onSuccess: () => {
+    onSuccess: (invite, variables) => {
       queryClient.invalidateQueries({ queryKey: ["game-invites"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      setStatus("Invite response sent");
+      setStatus(
+        variables.status === "accepted"
+          ? `You accepted the invitation to ${invite.game_name}.`
+          : `You declined the invitation to ${invite.game_name}.`,
+      );
     },
   });
   const incomingInvites = (gameInvitesQuery.data ?? []).filter(
@@ -129,17 +129,6 @@ function FriendsPage() {
     queryFn: () => getFriendSocialSummary(selectedId!),
     enabled: !!selectedId,
   });
-  const selectedConversation = conversationsQuery.data?.find(
-    (conversation) => conversation.participant.id === selectedId,
-  );
-  const selectedMessagesQuery = useQuery({
-    queryKey: ["conversation-messages", selectedConversation?.id],
-    queryFn: () => getConversationMessages(selectedConversation!.id),
-    enabled: !!selectedConversation,
-  });
-  const selectedInvites = (allGameInvitesQuery.data ?? []).filter(
-    (invite) => invite.sender.id === selectedId || invite.recipient.id === selectedId,
-  );
   const matchingRequest = incomingQuery.data?.find(
     (request) => request.id === notificationSearch.request,
   );
@@ -452,30 +441,43 @@ function FriendsPage() {
               ) : (
                 <div className="stagger space-y-3">
                   {list.map((f) => (
-                    <Link
+                    <div
                       key={f.id}
-                      to="/friends/$friendId"
-                      params={{ friendId: f.id }}
-                      onClick={() => setSelectedFriendId(f.id)}
-                      className="hover-lift grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+                      className="hover-lift grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
                     >
-                      <div className="relative shrink-0">
-                        <Avatar
-                          from={f.avatarFrom}
-                          to={f.avatarTo}
-                          name={f.name}
-                          className="size-14 rounded-full"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate font-bold">{f.name}</p>
-                          <span className="font-mono text-[10px] text-muted-foreground">
-                            @{f.handle}
-                          </span>
+                      <button
+                        type="button"
+                        aria-label={`Select ${f.name}`}
+                        aria-pressed={selectedId === f.id}
+                        onClick={() => setSelectedFriendId(f.id)}
+                        className="flex min-w-0 items-center gap-4 text-left"
+                      >
+                        <div className="relative shrink-0">
+                          <Avatar
+                            from={f.avatarFrom}
+                            to={f.avatarTo}
+                            name={f.name}
+                            className="size-14 rounded-full"
+                          />
                         </div>
-                      </div>
-                      <div className="flex flex-col gap-2" onClick={(e) => e.preventDefault()}>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate font-bold">{f.name}</p>
+                            <span className="font-mono text-[10px] text-muted-foreground">
+                              @{f.handle}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                      <div className="flex flex-col gap-2">
+                        <Link
+                          to="/friends/$friendId"
+                          params={{ friendId: f.id }}
+                          aria-label={`View ${f.name}'s profile`}
+                          className="rounded-md border border-border px-3 py-1.5 text-center text-xs font-bold"
+                        >
+                          View profile
+                        </Link>
                         <button
                           onClick={() =>
                             navigate({
@@ -501,7 +503,7 @@ function FriendsPage() {
                           Message
                         </button>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               ))}
@@ -515,6 +517,7 @@ function FriendsPage() {
                 <Link
                   to="/friends/$friendId"
                   params={{ friendId: selectedFriend.id }}
+                  aria-label="Open selected friend's profile"
                   className="mt-3 flex items-center gap-4"
                 >
                   <Avatar
@@ -580,34 +583,7 @@ function FriendsPage() {
                   </button>
                 </div>
               </section>
-              <section>
-                <SectionHeader title="Messages" />
-                {selectedInvites.length || selectedMessagesQuery.data?.length ? (
-                  <div className="space-y-2">
-                    {selectedInvites.map((invite) => (
-                      <p
-                        key={`invite:${invite.id}`}
-                        className="rounded-xl border border-border bg-surface p-3 text-sm"
-                      >
-                        Game invitation: {invite.game_name}
-                      </p>
-                    ))}
-                    {selectedMessagesQuery.data?.map((message) => (
-                      <p
-                        key={`message:${message.id}`}
-                        className="rounded-xl border border-border bg-surface p-3 text-sm"
-                      >
-                        {message.body}
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="No messages yet"
-                    description="Start a conversation or send a game invitation."
-                  />
-                )}
-              </section>
+              <FriendConversationHistory friendId={selectedFriend.id} />
             </>
           ) : (
             <EmptyState

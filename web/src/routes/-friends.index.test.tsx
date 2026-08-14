@@ -206,6 +206,54 @@ describe("FriendsPage", () => {
     );
   });
 
+  it("confirms the accepted game invitation by name", async () => {
+    api.getGameInvites.mockResolvedValue([
+      {
+        id: "invite-1",
+        sender: { id: "player-1", display_name: "Sam" },
+        recipient: { id: "me", display_name: "Me" },
+        game_name: "Portal 2",
+        status: "pending",
+      },
+    ]);
+    api.respondToGameInvite.mockResolvedValue({ id: "invite-1", game_name: "Portal 2" });
+    renderFriends();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Accept Portal 2" }));
+
+    expect(await screen.findByText("You accepted the invitation to Portal 2.")).toBeInTheDocument();
+  });
+
+  it("selects a friend from the list and keeps profile navigation explicit", async () => {
+    api.getFriends.mockResolvedValue([
+      { user: { id: "player-1", display_name: "Sam" } },
+      { user: { id: "player-2", display_name: "Alex" } },
+    ]);
+    api.getConversations.mockResolvedValue([
+      { id: "conversation-1", participant: { id: "player-1", display_name: "Sam" } },
+      { id: "conversation-2", participant: { id: "player-2", display_name: "Alex" } },
+    ]);
+    api.getConversationMessages.mockImplementation((id: string) =>
+      Promise.resolve([
+        {
+          id: `message-${id}`,
+          sender_id: id === "conversation-1" ? "player-1" : "player-2",
+          body: id === "conversation-1" ? "Sam's message" : "Alex's message",
+          created_at: "2026-08-14T12:00:00Z",
+        },
+      ]),
+    );
+    renderFriends();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Select Alex" }));
+
+    expect(await screen.findByText("Alex's message")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View Alex's profile" })).toHaveAttribute(
+      "href",
+      "/friends/player-2",
+    );
+  });
+
   it("enables message and invite actions for an existing friend", async () => {
     api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
     renderFriends();
@@ -255,7 +303,7 @@ describe("FriendsPage", () => {
 
     expect(await screen.findByText("Selected friend")).toBeInTheDocument();
     expect(await screen.findByText("100%")).toBeInTheDocument();
-    expect(screen.getByText("Game invitation: Portal 2")).toBeInTheDocument();
+    expect(screen.getByText("Game invitation: Portal 2 · Pending")).toBeInTheDocument();
     expect(screen.getByText("Ready tonight?")).toBeInTheDocument();
     expect(screen.queryByText("Activity")).not.toBeInTheDocument();
     expect(api.getFriendSocialSummary).toHaveBeenCalledWith("player-1");
