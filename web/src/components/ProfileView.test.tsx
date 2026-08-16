@@ -104,6 +104,25 @@ describe("ProfileView library visibility", () => {
     expect(screen.getByRole("dialog", { name: "Message Player" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Message Player" })).toBeVisible();
   });
+  it("auto-sizes the message composer without allowing manual resize", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView profile={{ ...profile, friendId: "friend-1" }} isSelf={false} />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Message Player" }));
+    const textarea = screen.getByLabelText("Message text");
+    Object.defineProperty(textarea, "scrollHeight", { configurable: true, value: 480 });
+    fireEvent.change(textarea, { target: { value: "A longer message" } });
+
+    expect(textarea).toHaveClass("resize-none", "overflow-y-auto");
+    expect(textarea).toHaveStyle({ height: "240px" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Message Player" }));
+    expect(screen.getByLabelText("Message text")).not.toHaveStyle({ height: "240px" });
+  });
   it("shows the existing conversation and invitations on a friend profile", async () => {
     api.getConversations.mockResolvedValue([
       { id: "conversation-1", participant: { id: "friend-1", display_name: "Player" } },

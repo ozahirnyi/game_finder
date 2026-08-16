@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, GameCover } from "@/components/GameCover";
@@ -93,9 +93,20 @@ export function ProfileView({
   const [favoriteGenres, setFavoriteGenres] = useState(profile.settings?.favoriteGenres ?? []);
   const [messageOpen, setMessageOpen] = useState(initialComposer === "message");
   const [messageBody, setMessageBody] = useState("");
+  const messageTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [inviteOpen, setInviteOpen] = useState(initialComposer === "invite");
   const [selectedGameKey, setSelectedGameKey] = useState("");
   const queryClient = useQueryClient();
+  const resetMessageComposer = () => {
+    setMessageBody("");
+    if (messageTextareaRef.current) messageTextareaRef.current.style.height = "";
+  };
+  const resizeMessageTextarea = () => {
+    const textarea = messageTextareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 240)}px`;
+  };
   const saveSettings = useMutation({
     mutationFn: updateProfile,
     onSuccess: () => {
@@ -112,7 +123,7 @@ export function ProfileView({
       return createMessage(conversation.id, messageBody.trim());
     },
     onSuccess: () => {
-      setMessageBody("");
+      resetMessageComposer();
       setMessageOpen(false);
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
       queryClient.invalidateQueries({ queryKey: ["conversation-messages"] });
@@ -330,11 +341,15 @@ export function ProfileView({
               <h2 className="text-xl font-bold">Message {profile.name}</h2>
               <textarea
                 aria-label="Message text"
+                ref={messageTextareaRef}
                 value={messageBody}
-                onChange={(event) => setMessageBody(event.target.value)}
+                onChange={(event) => {
+                  setMessageBody(event.target.value);
+                  resizeMessageTextarea();
+                }}
                 required
                 maxLength={2000}
-                className="mt-4 min-h-28 w-full rounded-lg border border-border bg-surface-2 p-3"
+                className="mt-4 min-h-28 w-full resize-none overflow-y-auto rounded-lg border border-border bg-surface-2 p-3"
               />
               {sendMessage.isError && (
                 <p role="alert" className="mt-2 text-sm text-destructive">
@@ -344,7 +359,10 @@ export function ProfileView({
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setMessageOpen(false)}
+                  onClick={() => {
+                    resetMessageComposer();
+                    setMessageOpen(false);
+                  }}
                   className="rounded-lg px-3 py-2 text-sm font-bold"
                 >
                   Cancel
