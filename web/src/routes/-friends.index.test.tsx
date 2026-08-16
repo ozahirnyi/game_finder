@@ -8,7 +8,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -39,7 +39,10 @@ vi.mock("@/lib/api", () => api);
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock("@/components/GameCover", () => ({ Avatar: () => <div />, GameCover: () => <div /> }));
+vi.mock("@/components/GameCover", () => ({
+  Avatar: ({ image, name }: { image?: string; name: string }) => <img alt={name} src={image} />,
+  GameCover: () => <div />,
+}));
 
 import { Route } from "./friends.index";
 
@@ -307,6 +310,49 @@ describe("FriendsPage", () => {
     expect(screen.getByText("Ready tonight?")).toBeInTheDocument();
     expect(screen.queryByText("Activity")).not.toBeInTheDocument();
     expect(api.getFriendSocialSummary).toHaveBeenCalledWith("player-1");
+  });
+
+  it("shows the selected friend's real identity and social summary", async () => {
+    api.getFriends.mockResolvedValue([
+      {
+        user: {
+          id: "player-1",
+          display_name: "Sam",
+          steam_persona_name: "SamOnSteam",
+          bio: "Collects co-op games",
+          avatar: "https://cdn.example/sam.png",
+        },
+      },
+    ]);
+    api.getFriendSocialSummary.mockResolvedValue({
+      shared_games: 3,
+      compatibility_percent: 86,
+      wishlist_count: 4,
+    });
+    renderFriends();
+
+    await screen.findByRole("button", { name: "Select Sam" });
+
+    const selectedFriendLink = screen.getByRole("link", {
+      name: "Open selected friend's profile",
+    });
+    expect(within(selectedFriendLink).getByRole("img", { name: "Sam" })).toHaveAttribute(
+      "src",
+      "https://cdn.example/sam.png",
+    );
+    expect(within(selectedFriendLink).getByText(/SamOnSteam/)).toBeInTheDocument();
+    expect(screen.getByText("Collects co-op games")).toBeInTheDocument();
+    expect(await screen.findByText("86%")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
+  });
+
+  it("shows unavailable rather than fabricated social-summary data", async () => {
+    api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
+    api.getFriendSocialSummary.mockRejectedValue(new Error("Summary unavailable"));
+    renderFriends();
+
+    expect(await screen.findAllByText("Unavailable")).toHaveLength(3);
   });
 
   it("shows Steam friends with taste match and a Steam profile link", async () => {

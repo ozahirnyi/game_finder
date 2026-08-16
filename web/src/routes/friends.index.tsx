@@ -106,8 +106,13 @@ function FriendsPage() {
   );
   const friends = (friendsQuery.data ?? []).map(({ user }) => ({
     id: user.id,
-    name: friendDisplayName(user),
-    handle: friendDisplayName(user),
+    name: user.display_name,
+    steamPersonaName:
+      user.steam_persona_name && user.steam_persona_name !== user.display_name
+        ? user.steam_persona_name
+        : null,
+    bio: user.bio ?? null,
+    avatarUrl: user.avatar ?? null,
     avatarFrom: "#7c3aed",
     avatarTo: "#111827",
   }));
@@ -129,6 +134,11 @@ function FriendsPage() {
     queryFn: () => getFriendSocialSummary(selectedId!),
     enabled: !!selectedId,
   });
+  const summaryValue = (value: number | null | undefined, fallback = "Private") => {
+    if (selectedSummaryQuery.isError) return "Unavailable";
+    if (!selectedSummaryQuery.data) return "…";
+    return value ?? fallback;
+  };
   const matchingRequest = incomingQuery.data?.find(
     (request) => request.id === notificationSearch.request,
   );
@@ -457,15 +467,18 @@ function FriendsPage() {
                             from={f.avatarFrom}
                             to={f.avatarTo}
                             name={f.name}
+                            image={f.avatarUrl ?? undefined}
                             className="size-14 rounded-full"
                           />
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="truncate font-bold">{f.name}</p>
-                            <span className="font-mono text-[10px] text-muted-foreground">
-                              @{f.handle}
-                            </span>
+                            {f.steamPersonaName && (
+                              <span className="font-mono text-[10px] text-muted-foreground">
+                                Steam · {f.steamPersonaName}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -524,34 +537,40 @@ function FriendsPage() {
                     from={selectedFriend.avatarFrom}
                     to={selectedFriend.avatarTo}
                     name={selectedFriend.name}
+                    image={selectedFriend.avatarUrl ?? undefined}
                     className="size-16 rounded-2xl"
                   />
                   <div>
                     <p className="font-bold">{selectedFriend.name}</p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      @{selectedFriend.handle}
-                    </p>
+                    {selectedFriend.steamPersonaName && (
+                      <p className="font-mono text-xs text-muted-foreground">
+                        Steam · {selectedFriend.steamPersonaName}
+                      </p>
+                    )}
                   </div>
                 </Link>
+                {selectedFriend.bio && (
+                  <p className="mt-4 text-sm text-muted-foreground">{selectedFriend.bio}</p>
+                )}
                 <div className="my-6 grid grid-cols-3 gap-3 border-y border-border py-4 text-center font-mono">
                   <div>
                     <p className="label-mono text-muted-foreground">Compat</p>
                     <p className="text-xl font-black text-primary">
                       {selectedSummaryQuery.data
                         ? `${selectedSummaryQuery.data.compatibility_percent}%`
-                        : "…"}
+                        : summaryValue(undefined)}
                     </p>
                   </div>
                   <div>
                     <p className="label-mono text-muted-foreground">Shared</p>
                     <p className="text-xl font-black">
-                      {selectedSummaryQuery.data?.shared_games ?? "…"}
+                      {summaryValue(selectedSummaryQuery.data?.shared_games)}
                     </p>
                   </div>
                   <div>
                     <p className="label-mono text-muted-foreground">Wishlist</p>
                     <p className="text-xl font-black">
-                      {selectedSummaryQuery.data?.wishlist_count ?? "Private"}
+                      {summaryValue(selectedSummaryQuery.data?.wishlist_count)}
                     </p>
                   </div>
                 </div>
