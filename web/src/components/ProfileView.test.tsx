@@ -77,6 +77,23 @@ describe("ProfileView library visibility", () => {
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
     expect(screen.getByRole("dialog", { name: /profile settings/i })).toBeInTheDocument();
   });
+  it("shows the owner's favorites separately from the library", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{
+            ...profile,
+            favorites: [{ catalog_game_id: 274755, title: "Hades II" }],
+          }}
+          isSelf
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Favorites")).toBeInTheDocument();
+    expect(screen.getByText("Hades II")).toBeInTheDocument();
+    expect(screen.getByText(/reflect your taste/i)).toBeInTheDocument();
+  });
   it("saves selected favorite genres and platforms", async () => {
     renderProfile(true);
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
@@ -86,6 +103,32 @@ describe("ProfileView library visibility", () => {
     await waitFor(() =>
       expect(api.updateProfile.mock.calls[0][0]).toEqual(
         expect.objectContaining({ favorite_genres: ["RPG"], platforms: ["PC"] }),
+      ),
+    );
+  });
+  it("saves all public-profile visibility controls", async () => {
+    renderProfile(true);
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    fireEvent.change(screen.getByLabelText("Library visibility"), { target: { value: "friends" } });
+    fireEvent.change(screen.getByLabelText("Favorites visibility"), {
+      target: { value: "private" },
+    });
+    fireEvent.change(screen.getByLabelText("Wishlist visibility"), {
+      target: { value: "friends" },
+    });
+    fireEvent.change(screen.getByLabelText("Steam profile visibility"), {
+      target: { value: "private" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(api.updateProfile.mock.calls[0][0]).toEqual(
+        expect.objectContaining({
+          library_visibility: "friends",
+          favorites_visibility: "private",
+          wishlist_visibility: "friends",
+          steam_visibility: "private",
+        }),
       ),
     );
   });

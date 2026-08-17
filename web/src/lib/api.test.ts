@@ -5,14 +5,19 @@ import {
   apiRequest,
   clearToken,
   confirmPsnImport,
+  createSocialFriendRequest,
   getDashboard,
   getGoogleLoginUrl,
+  getFavorites,
   getLibraryOverview,
+  getPublicProfile,
   getSteamLinkUrl,
   getAuthSnapshot,
   getToken,
   loginUser,
   previewPsnImport,
+  removeFavorite,
+  saveCatalogGameToFavorites,
   setToken,
   syncSteamLibrary,
 } from "./api";
@@ -143,6 +148,57 @@ describe("apiRequest", () => {
       "/api/library/overview",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+  });
+
+  it("uses the existing favorites and public-profile contracts", async () => {
+    setToken("token");
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({}), {
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getFavorites();
+    await saveCatalogGameToFavorites(274755);
+    await removeFavorite(274755);
+    await getPublicProfile("player-1");
+    await createSocialFriendRequest("player-1");
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/favorites",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/favorites/catalog-games/274755",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/favorites/274755",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/users/player-1",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      "/api/social/friend-requests",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ public_id: "player-1" }),
       }),
     );
   });

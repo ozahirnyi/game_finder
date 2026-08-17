@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import Request
 
-from app.database import Favorite, FriendRequest, GameInvite, OAuthIdentity, WishlistItem
+from app.database import Favorite, FriendRequest, Game, GameInvite, OAuthIdentity, WishlistItem
 
 
 pytestmark = pytest.mark.integration
@@ -144,6 +144,60 @@ def test_public_profile_visibility_and_ready_blocks(api_client, user_factory, au
     auth_as(owner)
     assert api_client.get(f"/users/{owner.public_id}").json()["steam"]["status"] == "ready"
     assert viewer.id != owner.id
+
+
+def test_public_profile_hides_every_private_section_without_sensitive_data(
+    api_client, user_factory, auth_as, db_session
+):
+    owner = user_factory(
+        email="private-owner@example.com",
+        public_nickname="PrivateOwner",
+        steam_id="76561198000000000",
+        library_visibility="private",
+        favorites_visibility="private",
+        wishlist_visibility="private",
+        steam_visibility="private",
+    )
+    stranger = auth_as(user_factory(email="private-viewer@example.com", public_nickname="Viewer"))
+    db_session.add_all(
+        [
+            Game(owner_id=owner.id, title="Secret Library", source="manual"),
+            Favorite(
+                user_id=owner.id,
+                catalog_game_id=901,
+                title="Secret Favorite",
+                cover_url="https://cover.test/private-favorite.jpg",
+            ),
+            WishlistItem(
+                user_id=owner.id,
+                catalog_game_id=902,
+                title="Secret Wishlist",
+                cover_url="https://cover.test/private-wishlist.jpg",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = api_client.get(f"/users/{owner.public_id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    for section in ("library", "favorites", "wishlist", "steam"):
+        assert payload[section] == {
+            "status": "hidden",
+            "data": [],
+            "message": "This section is private.",
+        }
+    for sensitive_value in (
+        "Secret Library",
+        "Secret Favorite",
+        "Secret Wishlist",
+        "private-favorite.jpg",
+        "private-wishlist.jpg",
+        "76561198000000000",
+    ):
+        assert sensitive_value not in response.text
+    assert stranger.id != owner.id
 
 
 def test_price_alert_validation(api_client, user_factory, auth_as, db_session):

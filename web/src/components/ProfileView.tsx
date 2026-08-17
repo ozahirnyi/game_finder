@@ -62,6 +62,11 @@ export type ProfileData = {
     playtime?: number | null;
     source?: string;
   }[];
+  favorites?: {
+    catalog_game_id: number;
+    title: string;
+    cover_url?: string | null;
+  }[];
   activity?: { id: number | string; text: string; time: string }[];
   sharedLibrary?: SharedLibrary;
   friendId?: string;
@@ -69,6 +74,9 @@ export type ProfileData = {
     displayName: string;
     bio: string;
     libraryVisibility: "public" | "friends" | "private";
+    favoritesVisibility: "public" | "friends" | "private";
+    wishlistVisibility: "public" | "friends" | "private";
+    steamVisibility: "public" | "friends" | "private";
     platforms: string[];
     favoriteGenres: string[];
   };
@@ -88,6 +96,15 @@ export function ProfileView({
   const [bio, setBio] = useState(profile.settings?.bio ?? profile.bio ?? "");
   const [libraryVisibility, setLibraryVisibility] = useState(
     profile.settings?.libraryVisibility ?? "public",
+  );
+  const [favoritesVisibility, setFavoritesVisibility] = useState(
+    profile.settings?.favoritesVisibility ?? "public",
+  );
+  const [wishlistVisibility, setWishlistVisibility] = useState(
+    profile.settings?.wishlistVisibility ?? "public",
+  );
+  const [steamVisibility, setSteamVisibility] = useState(
+    profile.settings?.steamVisibility ?? "public",
   );
   const [platforms, setPlatforms] = useState(profile.settings?.platforms ?? []);
   const [favoriteGenres, setFavoriteGenres] = useState(profile.settings?.favoriteGenres ?? []);
@@ -246,6 +263,9 @@ export function ProfileView({
                 display_name: displayName.trim(),
                 bio: bio.trim() || null,
                 library_visibility: libraryVisibility,
+                favorites_visibility: favoritesVisibility,
+                wishlist_visibility: wishlistVisibility,
+                steam_visibility: steamVisibility,
                 platforms,
                 favorite_genres: favoriteGenres,
               });
@@ -298,6 +318,31 @@ export function ProfileView({
                 <option value="private">Private</option>
               </select>
             </label>
+            <p className="mt-3 text-xs text-muted-foreground">
+              These settings control what visitors can see on your public profile.
+            </p>
+            {[
+              ["Favorites visibility", favoritesVisibility, setFavoritesVisibility],
+              ["Wishlist visibility", wishlistVisibility, setWishlistVisibility],
+              ["Steam profile visibility", steamVisibility, setSteamVisibility],
+            ].map(([label, value, setValue]) => (
+              <label key={label as string} className="mt-4 block text-sm font-semibold">
+                {label as string}
+                <select
+                  value={value as string}
+                  onChange={(event) =>
+                    (setValue as (value: "public" | "friends" | "private") => void)(
+                      event.target.value as "public" | "friends" | "private",
+                    )
+                  }
+                  className="mt-2 w-full rounded-lg border border-border bg-surface-2 px-3 py-2"
+                >
+                  <option value="public">Public</option>
+                  <option value="friends">Friends only</option>
+                  <option value="private">Only me</option>
+                </select>
+              </label>
+            ))}
             {saveSettings.isError && (
               <p className="mt-3 text-sm text-destructive">
                 Could not save settings. Check that the display name is available.
@@ -496,6 +541,31 @@ export function ProfileView({
               </Panel>
             )}
           </>
+        )}
+
+        {isSelf && (
+          <Panel className="p-6 lg:col-span-12">
+            <SectionHeader title="Favorites" hint="Games that reflect your taste" />
+            {profile.favorites?.length ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {profile.favorites.map((favorite) => (
+                  <Link
+                    key={favorite.catalog_game_id}
+                    to="/games/$gameId"
+                    params={{ gameId: String(favorite.catalog_game_id) }}
+                    className="rounded-xl border border-border bg-surface-2 p-3 text-sm font-bold hover:border-primary/40"
+                  >
+                    {favorite.title}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No favorites yet"
+                description="Favorites reflect your taste, not games you plan to buy."
+              />
+            )}
+          </Panel>
         )}
 
         {!isSelf && profile.friendId && (

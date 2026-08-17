@@ -3,7 +3,7 @@ import { render, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-const { getProfile, getLibraryOverview, profileView } = vi.hoisted(() => ({
+const { getProfile, getLibraryOverview, getFavorites, profileView } = vi.hoisted(() => ({
   getProfile: vi.fn().mockResolvedValue({ display_name: "test1" }),
   getLibraryOverview: vi.fn().mockResolvedValue({
     steam_available: true,
@@ -29,10 +29,20 @@ const { getProfile, getLibraryOverview, profileView } = vi.hoisted(() => ({
       },
     ],
   }),
+  getFavorites: vi.fn().mockResolvedValue([
+    {
+      id: "favorite-1",
+      catalog_game_id: 274755,
+      source: "igdb",
+      external_id: "274755",
+      title: "Hades II",
+      cover_url: null,
+    },
+  ]),
   profileView: vi.fn((_props: unknown) => null),
 }));
 
-vi.mock("@/lib/api", () => ({ getProfile, getLibraryOverview }));
+vi.mock("@/lib/api", () => ({ getProfile, getLibraryOverview, getFavorites }));
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
@@ -52,6 +62,7 @@ describe("AccountPage", () => {
     );
 
     await waitFor(() => expect(getLibraryOverview).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getFavorites).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(profileView).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -62,6 +73,7 @@ describe("AccountPage", () => {
               expect.objectContaining({ id: "steam:620", source: "steam", playtime: 3 }),
             ]),
             stores: expect.arrayContaining([expect.objectContaining({ name: "Steam", count: 1 })]),
+            favorites: [expect.objectContaining({ title: "Hades II", catalog_game_id: 274755 })],
           }),
         }),
       ),
