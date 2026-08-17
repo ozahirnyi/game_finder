@@ -110,9 +110,15 @@ describe("ProfileView library visibility", () => {
     renderProfile(true);
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
     fireEvent.change(screen.getByLabelText("Library visibility"), { target: { value: "friends" } });
-    fireEvent.change(screen.getByLabelText("Favorites visibility"), { target: { value: "private" } });
-    fireEvent.change(screen.getByLabelText("Wishlist visibility"), { target: { value: "friends" } });
-    fireEvent.change(screen.getByLabelText("Steam profile visibility"), { target: { value: "private" } });
+    fireEvent.change(screen.getByLabelText("Favorites visibility"), {
+      target: { value: "private" },
+    });
+    fireEvent.change(screen.getByLabelText("Wishlist visibility"), {
+      target: { value: "friends" },
+    });
+    fireEvent.change(screen.getByLabelText("Steam profile visibility"), {
+      target: { value: "private" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() =>

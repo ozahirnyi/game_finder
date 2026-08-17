@@ -313,9 +313,7 @@ function GameDetail() {
     );
   const isFavorite =
     favoriteAdded ||
-    !!favoritesQuery.data?.some(
-    (item) => item.catalog_game_id === Number(catalogGame.id),
-  );
+    !!favoritesQuery.data?.some((item) => item.catalog_game_id === Number(catalogGame.id));
 
   const owners: Array<{
     id: string;

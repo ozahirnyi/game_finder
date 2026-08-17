@@ -97,9 +97,15 @@ export function ProfileView({
   const [libraryVisibility, setLibraryVisibility] = useState(
     profile.settings?.libraryVisibility ?? "public",
   );
-  const [favoritesVisibility, setFavoritesVisibility] = useState(profile.settings?.favoritesVisibility ?? "public");
-  const [wishlistVisibility, setWishlistVisibility] = useState(profile.settings?.wishlistVisibility ?? "public");
-  const [steamVisibility, setSteamVisibility] = useState(profile.settings?.steamVisibility ?? "public");
+  const [favoritesVisibility, setFavoritesVisibility] = useState(
+    profile.settings?.favoritesVisibility ?? "public",
+  );
+  const [wishlistVisibility, setWishlistVisibility] = useState(
+    profile.settings?.wishlistVisibility ?? "public",
+  );
+  const [steamVisibility, setSteamVisibility] = useState(
+    profile.settings?.steamVisibility ?? "public",
+  );
   const [platforms, setPlatforms] = useState(profile.settings?.platforms ?? []);
   const [favoriteGenres, setFavoriteGenres] = useState(profile.settings?.favoriteGenres ?? []);
   const [messageOpen, setMessageOpen] = useState(initialComposer === "message");
@@ -312,7 +318,9 @@ export function ProfileView({
                 <option value="private">Private</option>
               </select>
             </label>
-            <p className="mt-3 text-xs text-muted-foreground">These settings control what visitors can see on your public profile.</p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              These settings control what visitors can see on your public profile.
+            </p>
             {[
               ["Favorites visibility", favoritesVisibility, setFavoritesVisibility],
               ["Wishlist visibility", wishlistVisibility, setWishlistVisibility],
@@ -322,7 +330,11 @@ export function ProfileView({
                 {label as string}
                 <select
                   value={value as string}
-                  onChange={(event) => (setValue as (value: "public" | "friends" | "private") => void)(event.target.value as "public" | "friends" | "private")}
+                  onChange={(event) =>
+                    (setValue as (value: "public" | "friends" | "private") => void)(
+                      event.target.value as "public" | "friends" | "private",
+                    )
+                  }
                   className="mt-2 w-full rounded-lg border border-border bg-surface-2 px-3 py-2"
                 >
                   <option value="public">Public</option>
