@@ -106,6 +106,26 @@ describe("ProfileView library visibility", () => {
       ),
     );
   });
+  it("saves all public-profile visibility controls", async () => {
+    renderProfile(true);
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    fireEvent.change(screen.getByLabelText("Library visibility"), { target: { value: "friends" } });
+    fireEvent.change(screen.getByLabelText("Favorites visibility"), { target: { value: "private" } });
+    fireEvent.change(screen.getByLabelText("Wishlist visibility"), { target: { value: "friends" } });
+    fireEvent.change(screen.getByLabelText("Steam profile visibility"), { target: { value: "private" } });
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(api.updateProfile.mock.calls[0][0]).toEqual(
+        expect.objectContaining({
+          library_visibility: "friends",
+          favorites_visibility: "private",
+          wishlist_visibility: "friends",
+          steam_visibility: "private",
+        }),
+      ),
+    );
+  });
   it("formats friend game playtime from minutes", () => {
     profile.games[0].playtime = 125;
     renderProfile(false);

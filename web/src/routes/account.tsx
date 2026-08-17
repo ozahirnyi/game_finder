@@ -48,6 +48,9 @@ export function AccountPage() {
                 displayName: profile.display_name,
                 bio: profile.bio ?? "",
                 libraryVisibility: profile.library_visibility ?? "public",
+                favoritesVisibility: profile.favorites_visibility ?? "public",
+                wishlistVisibility: profile.wishlist_visibility ?? "public",
+                steamVisibility: profile.steam_visibility ?? "public",
                 platforms: profile.platforms,
                 favoriteGenres: profile.favorite_genres,
               }
