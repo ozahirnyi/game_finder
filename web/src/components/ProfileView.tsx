@@ -62,6 +62,11 @@ export type ProfileData = {
     playtime?: number | null;
     source?: string;
   }[];
+  favorites?: {
+    catalog_game_id: number;
+    title: string;
+    cover_url?: string | null;
+  }[];
   activity?: { id: number | string; text: string; time: string }[];
   sharedLibrary?: SharedLibrary;
   friendId?: string;
@@ -496,6 +501,31 @@ export function ProfileView({
               </Panel>
             )}
           </>
+        )}
+
+        {isSelf && (
+          <Panel className="p-6 lg:col-span-12">
+            <SectionHeader title="Favorites" hint="Games that reflect your taste" />
+            {profile.favorites?.length ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {profile.favorites.map((favorite) => (
+                  <Link
+                    key={favorite.catalog_game_id}
+                    to="/games/$gameId"
+                    params={{ gameId: String(favorite.catalog_game_id) }}
+                    className="rounded-xl border border-border bg-surface-2 p-3 text-sm font-bold hover:border-primary/40"
+                  >
+                    {favorite.title}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No favorites yet"
+                description="Favorites reflect your taste, not games you plan to buy."
+              />
+            )}
+          </Panel>
         )}
 
         {!isSelf && profile.friendId && (

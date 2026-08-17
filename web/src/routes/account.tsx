@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView } from "@/components/ProfileView";
-import { getLibraryOverview, getProfile } from "@/lib/api";
+import { getFavorites, getLibraryOverview, getProfile } from "@/lib/api";
 import { libraryPlaytime } from "@/lib/collectionPresentation";
 
 export const Route = createFileRoute("/account")({
@@ -29,6 +29,7 @@ export const Route = createFileRoute("/account")({
 export function AccountPage() {
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
   const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview });
+  const favoritesQuery = useQuery({ queryKey: ["favorites"], queryFn: getFavorites });
   const profile = profileQuery.data;
   const owned = libraryQuery.data?.games ?? [];
 
@@ -63,6 +64,7 @@ export function AccountPage() {
             playtime: game.playtime_forever == null ? null : Math.floor(game.playtime_forever / 60),
             source: game.source,
           })),
+          favorites: favoritesQuery.data ?? [],
           stores: [
             {
               name: "Steam",

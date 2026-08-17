@@ -77,6 +77,23 @@ describe("ProfileView library visibility", () => {
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
     expect(screen.getByRole("dialog", { name: /profile settings/i })).toBeInTheDocument();
   });
+  it("shows the owner's favorites separately from the library", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{
+            ...profile,
+            favorites: [{ catalog_game_id: 274755, title: "Hades II" }],
+          }}
+          isSelf
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Favorites")).toBeInTheDocument();
+    expect(screen.getByText("Hades II")).toBeInTheDocument();
+    expect(screen.getByText(/reflect your taste/i)).toBeInTheDocument();
+  });
   it("saves selected favorite genres and platforms", async () => {
     renderProfile(true);
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
