@@ -16,10 +16,13 @@ const api = vi.hoisted(() => ({
   createGameInvite: vi.fn(),
   createPriceAlert: vi.fn(),
   getFriends: vi.fn(),
+  getFavorites: vi.fn(),
   getPriceAlerts: vi.fn(),
   getTelegramAccount: vi.fn(),
   getWishlist: vi.fn(),
   getPriceHistory: vi.fn(),
+  removeFavorite: vi.fn(),
+  saveCatalogGameToFavorites: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -82,12 +85,36 @@ describe("GameDetail actions", () => {
     cleanup();
     api.getPriceHistory.mockResolvedValue({ deals: [] });
     api.getWishlist.mockResolvedValue([]);
+    api.getFavorites.mockResolvedValue([]);
     api.addWishlist.mockResolvedValue({ id: "wishlist-1" });
     api.getPriceAlerts.mockResolvedValue([]);
     api.getTelegramAccount.mockResolvedValue({ linked: false, configured: false });
     api.createPriceAlert.mockResolvedValue({ id: "alert-1" });
     api.getFriends.mockResolvedValue([{ user: { id: "friend-1", display_name: "Sam" } }]);
     api.createGameInvite.mockResolvedValue({ id: "invite-1" });
+    api.saveCatalogGameToFavorites.mockResolvedValue({ id: "favorite-1" });
+    api.removeFavorite.mockResolvedValue(undefined);
+  });
+
+  it("adds and removes a catalog game from favorites", async () => {
+    renderGame();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add to favorites" }));
+    await waitFor(() => expect(api.saveCatalogGameToFavorites).toHaveBeenCalledWith(274755));
+    expect(await screen.findByRole("button", { name: "Remove from favorites" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove from favorites" }));
+    await waitFor(() => expect(api.removeFavorite).toHaveBeenCalledWith(274755));
+    expect(await screen.findByRole("button", { name: "Add to favorites" })).toBeEnabled();
+  });
+
+  it("shows a favorite mutation error", async () => {
+    api.saveCatalogGameToFavorites.mockRejectedValueOnce(new Error("offline"));
+    renderGame();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add to favorites" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not update favorites");
   });
 
   it("adds the game to the wishlist and creates an any-discount in-app alert", async () => {

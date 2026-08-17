@@ -21,11 +21,14 @@ import {
   createGameInvite,
   createPriceAlert,
   getCatalogGame,
+  getFavorites,
   getFriends,
   getPriceHistory,
   getSteamGame,
   getSteamPriceHistory,
   getWishlist,
+  removeFavorite,
+  saveCatalogGameToFavorites,
   searchGames,
   type PriceAlertCreate,
 } from "@/lib/api";
@@ -225,7 +228,13 @@ function GameDetail() {
   const [recipientId, setRecipientId] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [wishlistAdded, setWishlistAdded] = useState(false);
+  const [favoriteAdded, setFavoriteAdded] = useState(false);
   const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist });
+  const favoritesQuery = useQuery({
+    queryKey: ["favorites"],
+    queryFn: getFavorites,
+    enabled: !catalogGame.isSteamLibrary,
+  });
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
   const wishlistMutation = useMutation({
     mutationFn: () =>
@@ -240,6 +249,20 @@ function GameDetail() {
       queryClient.invalidateQueries({ queryKey: ["wishlist"] });
       setWishlistAdded(true);
       setActionMessage("Added to wishlist");
+    },
+  });
+  const favoriteMutation = useMutation({
+    mutationFn: () => saveCatalogGameToFavorites(Number(catalogGame.id)),
+    onSuccess: () => {
+      setFavoriteAdded(true);
+      queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    },
+  });
+  const removeFavoriteMutation = useMutation({
+    mutationFn: () => removeFavorite(Number(catalogGame.id)),
+    onSuccess: () => {
+      setFavoriteAdded(false);
+      queryClient.invalidateQueries({ queryKey: ["favorites"] });
     },
   });
   const alertMutation = useMutation({
@@ -288,6 +311,11 @@ function GameDetail() {
         ? item.source === "steam" && item.external_id === String(catalogGame.id)
         : item.source !== "steam" && item.catalog_game_id === Number(catalogGame.id),
     );
+  const isFavorite =
+    favoriteAdded ||
+    !!favoritesQuery.data?.some(
+    (item) => item.catalog_game_id === Number(catalogGame.id),
+  );
 
   const owners: Array<{
     id: string;
@@ -351,7 +379,7 @@ function GameDetail() {
           </div>
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">{game.title}</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            {game.platforms.join(" · ")}
+            {platformSummary.visible.join(" · ")}
             {game.releaseDate ? ` · ${game.releaseDate}` : ""}
             {game.rating > 0 ? ` · ${game.rating} critic score` : ""}
           </p>
@@ -547,6 +575,30 @@ function GameDetail() {
                   ? "In wishlist"
                   : "Add to wishlist"}
             </button>
+
+            {!catalogGame.isSteamLibrary && (
+              <button
+                type="button"
+                onClick={() =>
+                  isFavorite ? removeFavoriteMutation.mutate() : favoriteMutation.mutate()
+                }
+                disabled={favoriteMutation.isPending || removeFavoriteMutation.isPending}
+                aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-bold transition hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Heart className="size-4" />
+                {favoriteMutation.isPending || removeFavoriteMutation.isPending
+                  ? "Saving…"
+                  : isFavorite
+                    ? "In favorites"
+                    : "Favorite"}
+              </button>
+            )}
+            {(favoriteMutation.isError || removeFavoriteMutation.isError) && (
+              <p role="alert" className="mt-3 text-xs font-semibold text-destructive">
+                Could not update favorites.
+              </p>
+            )}
 
             {/* External action — deliberately separated from the card/CTA above */}
             <div className="mt-4 border-t border-border pt-4">
