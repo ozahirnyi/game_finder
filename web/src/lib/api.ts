@@ -4,6 +4,7 @@ const AUTH_EVENT = "game-finder-auth";
 
 type RequestOptions = {
   auth?: boolean;
+  includeToken?: boolean;
   body?: unknown;
   formBody?: BodyInit;
   method?: string;
@@ -374,7 +375,7 @@ async function toApiError(response: Response, authenticated: boolean) {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {
-  const token = options.auth ? getToken() : null;
+  const token = options.auth || options.includeToken ? getToken() : null;
   if (options.auth && !token) throw new ApiError("Please sign in first.", 401);
   const contentType =
     options.formBody instanceof URLSearchParams
@@ -616,7 +617,9 @@ export function removeFavorite(catalogGameId: number) {
 }
 
 export function getPublicProfile(publicId: string) {
-  return apiRequest<PublicProfile>(`/users/${encodeURIComponent(publicId)}`);
+  return apiRequest<PublicProfile>(`/users/${encodeURIComponent(publicId)}`, {
+    includeToken: true,
+  });
 }
 
 export function createSocialFriendRequest(publicId: string) {

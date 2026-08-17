@@ -186,7 +186,13 @@ describe("apiRequest", () => {
       "/api/favorites/274755",
       expect.objectContaining({ method: "DELETE" }),
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/users/player-1", expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/users/player-1",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
     expect(fetchMock).toHaveBeenNthCalledWith(
       5,
       "/api/social/friend-requests",
