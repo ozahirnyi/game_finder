@@ -88,6 +88,39 @@ export type CollectionGame = {
   cover_url?: string | null;
 };
 
+export type Visibility = "public" | "friends" | "private";
+
+export type PublicDataBlock<T> = {
+  status: "ready" | "empty" | "hidden";
+  data: T;
+  message?: string | null;
+};
+
+export type PublicLibraryGame = Pick<
+  LibraryGame,
+  "id" | "title" | "source" | "cover_url" | "playtime_forever"
+> & {
+  detail_game_id?: string | null;
+};
+
+export type PublicSteamAccount = {
+  linked: boolean;
+  persona_name?: string | null;
+  avatar?: string | null;
+  profile_url?: string | null;
+};
+
+export type PublicProfile = {
+  public_id: string;
+  nickname: string;
+  avatar?: string | null;
+  relationship: "none" | "self" | "friends" | "outgoing_pending" | "incoming_pending";
+  library: PublicDataBlock<PublicLibraryGame[]>;
+  favorites: PublicDataBlock<CollectionGame[]>;
+  wishlist: PublicDataBlock<CollectionGame[]>;
+  steam: PublicDataBlock<PublicSteamAccount | null>;
+};
+
 export type PriceAlertCreate = {
   wishlist_catalog_game_id: number;
   target_price?: number;
@@ -198,12 +231,22 @@ export type Profile = {
   bio?: string | null;
   platforms: string[];
   favorite_genres: string[];
-  library_visibility?: "public" | "friends" | "private";
+  library_visibility?: Visibility;
+  favorites_visibility?: Visibility;
+  wishlist_visibility?: Visibility;
+  steam_visibility?: Visibility;
 };
 
 export type ProfileUpdate = Pick<
   Profile,
-  "display_name" | "bio" | "library_visibility" | "platforms" | "favorite_genres"
+  | "display_name"
+  | "bio"
+  | "library_visibility"
+  | "favorites_visibility"
+  | "wishlist_visibility"
+  | "steam_visibility"
+  | "platforms"
+  | "favorite_genres"
 >;
 export type RecommendationItem = {
   title: string;
@@ -555,6 +598,33 @@ export function getLibraryOverview() {
 
 export function getWishlist() {
   return apiRequest<CollectionGame[]>("/wishlist", { auth: true });
+}
+
+export function getFavorites() {
+  return apiRequest<CollectionGame[]>("/favorites", { auth: true });
+}
+
+export function saveCatalogGameToFavorites(igdbId: number) {
+  return apiRequest<CollectionGame>(`/favorites/catalog-games/${igdbId}`, {
+    auth: true,
+    method: "POST",
+  });
+}
+
+export function removeFavorite(catalogGameId: number) {
+  return apiRequest<void>(`/favorites/${catalogGameId}`, { auth: true, method: "DELETE" });
+}
+
+export function getPublicProfile(publicId: string) {
+  return apiRequest<PublicProfile>(`/users/${encodeURIComponent(publicId)}`);
+}
+
+export function createSocialFriendRequest(publicId: string) {
+  return apiRequest("/social/friend-requests", {
+    auth: true,
+    method: "POST",
+    body: { public_id: publicId },
+  });
 }
 
 export function addWishlist(game: CatalogGame) {
