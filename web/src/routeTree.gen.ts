@@ -22,6 +22,7 @@ import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as FriendsIndexRouteImport } from './routes/friends.index'
 import { Route as FriendsFriendIdRouteImport } from './routes/friends.$friendId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as UsersPublicIdRouteImport } from './routes/users.$publicId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -88,6 +89,11 @@ const GamesGameIdRoute = GamesGameIdRouteImport.update({
   path: '/games/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UsersPublicIdRoute = UsersPublicIdRouteImport.update({
+  id: '/users/$publicId',
+  path: '/users/$publicId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/friends/$friendId': typeof FriendsFriendIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/users/$publicId': typeof UsersPublicIdRoute
   '/friends/': typeof FriendsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/friends/$friendId': typeof FriendsFriendIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/users/$publicId': typeof UsersPublicIdRoute
   '/friends': typeof FriendsIndexRoute
 }
 export interface FileRoutesById {
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/friends/$friendId': typeof FriendsFriendIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/users/$publicId': typeof UsersPublicIdRoute
   '/friends/': typeof FriendsIndexRoute
 }
 export interface FileRouteTypes {
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/friends/$friendId'
     | '/games/$gameId'
+    | '/users/$publicId'
     | '/friends/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/friends/$friendId'
     | '/games/$gameId'
+    | '/users/$publicId'
     | '/friends'
   id:
     | '__root__'
@@ -180,6 +191,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/friends/$friendId'
     | '/games/$gameId'
+    | '/users/$publicId'
     | '/friends/'
   fileRoutesById: FileRoutesById
 }
@@ -196,6 +208,7 @@ export interface RootRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
   FriendsFriendIdRoute: typeof FriendsFriendIdRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
+  UsersPublicIdRoute: typeof UsersPublicIdRoute
   FriendsIndexRoute: typeof FriendsIndexRoute
 }
 
@@ -292,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/users/$publicId': {
+      id: '/users/$publicId'
+      path: '/users/$publicId'
+      fullPath: '/users/$publicId'
+      preLoaderRoute: typeof UsersPublicIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -308,6 +328,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthCallbackRoute: AuthCallbackRoute,
   FriendsFriendIdRoute: FriendsFriendIdRoute,
   GamesGameIdRoute: GamesGameIdRoute,
+  UsersPublicIdRoute: UsersPublicIdRoute,
   FriendsIndexRoute: FriendsIndexRoute,
 }
 export const routeTree = rootRouteImport
