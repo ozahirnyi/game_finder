@@ -496,6 +496,7 @@ function FriendsPage() {
                       <div className="flex flex-col gap-2">
                         <UserProfileLink
                           publicId={f.publicId}
+                          aria-label={`View ${f.name}'s profile`}
                           className="rounded-md border border-border px-3 py-1.5 text-center text-xs font-bold"
                         >
                           View profile
@@ -538,6 +539,7 @@ function FriendsPage() {
                 <p className="label-mono text-muted-foreground">Selected friend</p>
                 <UserProfileLink
                   publicId={selectedFriend.publicId}
+                  aria-label="Open selected friend's profile"
                   className="mt-3 flex items-center gap-4"
                 >
                   <Avatar

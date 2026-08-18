@@ -3,8 +3,18 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, params }: { children: ReactNode; params: { publicId: string } }) => (
-    <a href={`/users/${params.publicId}`}>{children}</a>
+  Link: ({
+    children,
+    params,
+    "aria-label": ariaLabel,
+  }: {
+    children: ReactNode;
+    params: { publicId: string };
+    "aria-label"?: string;
+  }) => (
+    <a href={`/users/${params.publicId}`} aria-label={ariaLabel}>
+      {children}
+    </a>
   ),
 }));
 
@@ -12,9 +22,13 @@ import { UserProfileLink } from "./UserProfileLink";
 
 describe("UserProfileLink", () => {
   it("links a represented user to the canonical public profile", () => {
-    render(<UserProfileLink publicId="owner-public">Owner</UserProfileLink>);
+    render(
+      <UserProfileLink publicId="owner-public" aria-label="Open Owner's profile">
+        Owner
+      </UserProfileLink>,
+    );
 
-    expect(screen.getByRole("link", { name: "Owner" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open Owner's profile" })).toHaveAttribute(
       "href",
       "/users/owner-public",
     );
