@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PublicProfile } from "@/lib/api";
 
 const api = vi.hoisted(() => ({ createSocialFriendRequest: vi.fn().mockResolvedValue({}) }));
@@ -37,6 +37,8 @@ function renderProfile(overrides: Partial<PublicProfile> = {}, isAuthenticated =
 }
 
 describe("PublicProfileView", () => {
+  afterEach(cleanup);
+
   it("sends a friend request only for an eligible authenticated viewer", async () => {
     render(
       <QueryClientProvider
