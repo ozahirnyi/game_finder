@@ -64,6 +64,45 @@ const renderProfile = (isSelf: boolean) =>
   );
 
 describe("ProfileView library visibility", () => {
+  it("shows only Add friend for an eligible stranger", () => {
+    const onAddFriend = vi.fn();
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={profile}
+          isSelf={false}
+          viewer={{
+            canMessage: false,
+            canInvite: false,
+            canAddFriend: true,
+            onAddFriend,
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add friend" }));
+    expect(onAddFriend).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: "Message Player" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Invite to play" })).not.toBeInTheDocument();
+  });
+
+  it("shows friend actions only when the viewer is authorized", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{ ...profile, friendId: "friend-1" }}
+          isSelf={false}
+          viewer={{ canMessage: true, canInvite: true, canAddFriend: false }}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Message Player" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Invite to play" })).toBeInTheDocument();
+  });
+
   it("hides the library from the profile owner", () => {
     renderProfile(true);
     expect(screen.queryByText("Your library")).not.toBeInTheDocument();
