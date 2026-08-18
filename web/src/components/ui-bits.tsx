@@ -67,16 +67,19 @@ export function Panel({
   children,
   className = "",
   interactive = false,
+  testId,
 }: {
   children: ReactNode;
   className?: string;
   interactive?: boolean;
+  testId?: string;
 }) {
   return (
     <div
       className={`panel relative overflow-hidden rounded-2xl ${
         interactive ? "panel-hover" : ""
       } ${className}`}
+      data-testid={testId}
     >
       {children}
     </div>
