@@ -74,7 +74,10 @@ def test_legacy_friends_list_profile_and_delete_with_scoping(
     make_friends(db_session, user, friend)
 
     auth_as(user)
-    assert api_client.get("/friends").json()[0]["user"]["id"] == str(friend.id)
+    friend_payload = api_client.get("/friends").json()[0]["user"]
+    assert friend_payload["id"] == str(friend.id)
+    assert friend_payload["public_id"] == friend.public_id
+    assert "steam_id" not in friend_payload
     profile = api_client.get(f"/friends/{friend.id}/profile")
     assert profile.status_code == 200
     assert profile.json()["library"]["status"] == "empty"
