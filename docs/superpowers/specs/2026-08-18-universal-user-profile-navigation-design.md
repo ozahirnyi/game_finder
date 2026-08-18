@@ -11,6 +11,15 @@ Make a person a single navigable entity across PlayFinder. Selecting a real user
 - Owners use the same route and receive the existing profile-settings path. Other viewers receive only server-authorized data and actions.
 - Privacy rules remain enforced by `GET /users/{public_id}`; navigation itself does not disclose hidden collections or Steam data.
 
+## Viewer-specific behavior
+
+The route never changes by viewer: every source opens `/users/<public_id>`. The public-profile response determines the permitted result for the relationship between the viewer and owner:
+
+- Anonymous visitors see only public sections and no authenticated actions.
+- Authenticated strangers see public sections and the existing friend-request action only when the server marks it eligible.
+- Friends additionally see sections whose visibility is `friends` and do not receive an invalid duplicate friend action.
+- The owner sees the same canonical profile with an obvious path to edit profile and privacy settings, never a self-friend action.
+
 ## API contracts
 
 - Existing social response shapes that represent a user will include `public_id` in addition to any internal `id` and display name.
