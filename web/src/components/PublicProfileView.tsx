@@ -8,7 +8,13 @@ import { createSocialFriendRequest, type PublicDataBlock, type PublicProfile } f
 const coverColors = ["#7c3aed", "#0f766e", "#b45309", "#be123c"];
 
 function CompactState({ title, description }: { title: string; description: string }) {
-  return <EmptyState title={title} description={description} className="border-0 bg-transparent px-0 py-6" />;
+  return (
+    <EmptyState
+      title={title}
+      description={description}
+      className="border-0 bg-transparent px-0 py-6"
+    />
+  );
 }
 
 function PublicSection<T>({
@@ -54,7 +60,9 @@ function CollectionGames({ games }: { games: PublicProfile["favorites"]["data"] 
             bare
             className="h-14 w-10 shrink-0 rounded-lg"
           />
-          <span className="truncate text-sm font-semibold group-hover:text-primary">{game.title}</span>
+          <span className="truncate text-sm font-semibold group-hover:text-primary">
+            {game.title}
+          </span>
         </Link>
       ))}
     </div>
@@ -89,7 +97,10 @@ export function PublicProfileView({
           </div>
         </div>
         {profile.relationship === "self" && (
-          <a className="rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:border-primary/50" href="/account">
+          <a
+            className="rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:border-primary/50"
+            href="/account"
+          >
             Profile settings
           </a>
         )}
@@ -124,7 +135,10 @@ export function PublicProfileView({
                   {content}
                 </Link>
               ) : (
-                <div key={game.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-background/35 p-3">
+                <div
+                  key={game.id}
+                  className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-background/35 p-3"
+                >
                   {content}
                 </div>
               );
@@ -151,9 +165,16 @@ export function PublicProfileView({
                 className="size-10 shrink-0 rounded-xl"
               />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{steam.persona_name ?? "Steam connected"}</p>
+                <p className="truncate text-sm font-semibold">
+                  {steam.persona_name ?? "Steam connected"}
+                </p>
                 {steam.profile_url && (
-                  <a className="text-sm text-primary hover:underline" href={steam.profile_url} target="_blank" rel="noreferrer">
+                  <a
+                    className="text-sm text-primary hover:underline"
+                    href={steam.profile_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     Open Steam profile
                   </a>
                 )}

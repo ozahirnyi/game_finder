@@ -9,7 +9,15 @@ vi.mock("@/lib/api", async () => ({
   ...api,
 }));
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, params, search }: { children: React.ReactNode; params: { gameId: string }; search: { title: string } }) => (
+  Link: ({
+    children,
+    params,
+    search,
+  }: {
+    children: React.ReactNode;
+    params: { gameId: string };
+    search: { title: string };
+  }) => (
     <a href={`/games/${params.gameId}?title=${encodeURIComponent(search.title)}`}>{children}</a>
   ),
 }));
@@ -30,7 +38,9 @@ function profile(overrides: Partial<PublicProfile> = {}): PublicProfile {
 
 function renderProfile(overrides: Partial<PublicProfile> = {}, isAuthenticated = false) {
   return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <PublicProfileView profile={profile(overrides)} isAuthenticated={isAuthenticated} />
     </QueryClientProvider>,
   );
@@ -155,6 +165,9 @@ describe("PublicProfileView", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("link", { name: "Profile settings" })).toHaveAttribute("href", "/account");
+    expect(screen.getByRole("link", { name: "Profile settings" })).toHaveAttribute(
+      "href",
+      "/account",
+    );
   });
 });
