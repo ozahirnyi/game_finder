@@ -504,8 +504,8 @@ function FriendsPage() {
                         <button
                           onClick={() =>
                             navigate({
-                              to: "/friends/$friendId",
-                              params: { friendId: f.id },
+                              to: "/users/$publicId",
+                              params: { publicId: f.publicId },
                               search: { compose: "invite" },
                             })
                           }
@@ -516,8 +516,8 @@ function FriendsPage() {
                         <button
                           onClick={() =>
                             navigate({
-                              to: "/friends/$friendId",
-                              params: { friendId: f.id },
+                              to: "/users/$publicId",
+                              params: { publicId: f.publicId },
                               search: { compose: "message" },
                             })
                           }
@@ -587,8 +587,8 @@ function FriendsPage() {
                   <button
                     onClick={() =>
                       navigate({
-                        to: "/friends/$friendId",
-                        params: { friendId: selectedFriend.id },
+                        to: "/users/$publicId",
+                        params: { publicId: selectedFriend.publicId },
                         search: { compose: "invite" },
                       })
                     }
@@ -600,8 +600,8 @@ function FriendsPage() {
                     aria-label="Quick message"
                     onClick={() =>
                       navigate({
-                        to: "/friends/$friendId",
-                        params: { friendId: selectedFriend.id },
+                        to: "/users/$publicId",
+                        params: { publicId: selectedFriend.publicId },
                         search: { compose: "message" },
                       })
                     }
