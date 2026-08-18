@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FriendConversationHistory } from "@/components/FriendConversationHistory";
 import { Avatar } from "@/components/GameCover";
+import { UserProfileLink } from "@/components/UserProfileLink";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   acceptFriendRequest,
@@ -106,6 +107,7 @@ function FriendsPage() {
   );
   const friends = (friendsQuery.data ?? []).map(({ user }) => ({
     id: user.id,
+    publicId: user.public_id,
     name: user.display_name,
     steamPersonaName:
       user.steam_persona_name && user.steam_persona_name !== user.display_name
@@ -241,7 +243,9 @@ function FriendsPage() {
                       key={player.id}
                       className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
                     >
-                      <span className="font-semibold">{friendDisplayName(player)}</span>
+                      <UserProfileLink publicId={player.public_id} className="font-semibold">
+                        {friendDisplayName(player)}
+                      </UserProfileLink>
                       <button
                         onClick={() => requestMutation.mutate({ recipient_id: player.id })}
                         disabled={requestMutation.isPending}
@@ -279,7 +283,9 @@ function FriendsPage() {
                     data-notification-target={matchingRequest?.id === request.id || undefined}
                     className="flex items-center justify-between gap-3"
                   >
-                    <span className="text-sm">{friendDisplayName(request.sender)}</span>
+                    <UserProfileLink publicId={request.sender.public_id} className="text-sm">
+                      {friendDisplayName(request.sender)}
+                    </UserProfileLink>
                     <button
                       onClick={() => acceptMutation.mutate(request.id)}
                       disabled={acceptMutation.isPending}
@@ -310,7 +316,10 @@ function FriendsPage() {
                     className="flex items-center justify-between gap-3"
                   >
                     <span className="text-sm">
-                      {friendDisplayName(invite.sender)} invited you to play {invite.game_name}
+                      <UserProfileLink publicId={invite.sender.public_id}>
+                        {friendDisplayName(invite.sender)}
+                      </UserProfileLink>{" "}
+                      invited you to play {invite.game_name}
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -473,7 +482,9 @@ function FriendsPage() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate font-bold">{f.name}</p>
+                            <UserProfileLink publicId={f.publicId} className="truncate font-bold">
+                              {f.name}
+                            </UserProfileLink>
                             {f.steamPersonaName && (
                               <span className="font-mono text-[10px] text-muted-foreground">
                                 Steam · {f.steamPersonaName}
@@ -483,14 +494,12 @@ function FriendsPage() {
                         </div>
                       </button>
                       <div className="flex flex-col gap-2">
-                        <Link
-                          to="/friends/$friendId"
-                          params={{ friendId: f.id }}
-                          aria-label={`View ${f.name}'s profile`}
+                        <UserProfileLink
+                          publicId={f.publicId}
                           className="rounded-md border border-border px-3 py-1.5 text-center text-xs font-bold"
                         >
                           View profile
-                        </Link>
+                        </UserProfileLink>
                         <button
                           onClick={() =>
                             navigate({
@@ -527,10 +536,8 @@ function FriendsPage() {
             <>
               <section className="rounded-3xl border border-border bg-surface p-6">
                 <p className="label-mono text-muted-foreground">Selected friend</p>
-                <Link
-                  to="/friends/$friendId"
-                  params={{ friendId: selectedFriend.id }}
-                  aria-label="Open selected friend's profile"
+                <UserProfileLink
+                  publicId={selectedFriend.publicId}
                   className="mt-3 flex items-center gap-4"
                 >
                   <Avatar
@@ -548,7 +555,7 @@ function FriendsPage() {
                       </p>
                     )}
                   </div>
-                </Link>
+                </UserProfileLink>
                 {selectedFriend.bio && (
                   <p className="mt-4 text-sm text-muted-foreground">{selectedFriend.bio}</p>
                 )}

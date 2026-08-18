@@ -124,6 +124,21 @@ describe("FriendsPage", () => {
     expect(await screen.findByText("Request sent")).toBeInTheDocument();
   });
 
+  it("links a search result to that player's canonical public profile", async () => {
+    api.searchUsers.mockResolvedValue([
+      { id: "player-1", public_id: "sam-public", display_name: "Sam" },
+    ]);
+    renderFriends();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Add friend" }))[0]);
+    fireEvent.change(screen.getByLabelText("Player name"), { target: { value: "Sam" } });
+
+    expect(await screen.findByRole("link", { name: "Sam" })).toHaveAttribute(
+      "href",
+      "/users/sam-public",
+    );
+  });
+
   it("accepts an incoming friend request", async () => {
     api.getIncomingFriendRequests.mockResolvedValue([
       { id: "request-1", sender: { id: "player-1", display_name: "Sam" } },
