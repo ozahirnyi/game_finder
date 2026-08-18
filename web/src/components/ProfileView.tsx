@@ -82,14 +82,23 @@ export type ProfileData = {
   };
 };
 
+type ProfileViewer = {
+  canMessage: boolean;
+  canInvite: boolean;
+  canAddFriend: boolean;
+  onAddFriend?: () => void;
+};
+
 export function ProfileView({
   profile,
   isSelf,
   initialComposer,
+  viewer,
 }: {
   profile: ProfileData;
   isSelf: boolean;
   initialComposer?: "message" | "invite";
+  viewer?: ProfileViewer;
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [displayName, setDisplayName] = useState(profile.settings?.displayName ?? profile.name);
@@ -179,6 +188,9 @@ export function ProfileView({
   });
   const steam = profile.stores.find((s) => s.name === "Steam")?.count ?? 0;
   const psn = profile.stores.find((s) => s.name === "PlayStation")?.count ?? 0;
+  const canMessage = viewer?.canMessage ?? Boolean(profile.friendId);
+  const canInvite = viewer?.canInvite ?? Boolean(profile.friendId);
+  const canAddFriend = viewer?.canAddFriend ?? false;
 
   return (
     <>
@@ -236,26 +248,38 @@ export function ProfileView({
             </>
           ) : (
             <>
-              <button
-                onClick={() => {
-                  setSelectedGameKey(
-                    profile.sharedLibrary?.data[0]
-                      ? `${profile.sharedLibrary.data[0].source}:${profile.sharedLibrary.data[0].external_id}`
-                      : "",
-                  );
-                  setInviteOpen(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
-              >
-                <UserPlus className="size-4" /> Invite to play
-              </button>
-              <button
-                onClick={() => setMessageOpen(true)}
-                aria-label={`Message ${profile.name}`}
-                className="grid size-11 place-items-center rounded-xl border border-border transition hover:border-primary/50"
-              >
-                <MessageCircle className="size-4" />
-              </button>
+              {canAddFriend && (
+                <button
+                  onClick={viewer?.onAddFriend}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
+                >
+                  <UserPlus className="size-4" /> Add friend
+                </button>
+              )}
+              {canInvite && profile.friendId && (
+                <button
+                  onClick={() => {
+                    setSelectedGameKey(
+                      profile.sharedLibrary?.data[0]
+                        ? `${profile.sharedLibrary.data[0].source}:${profile.sharedLibrary.data[0].external_id}`
+                        : "",
+                    );
+                    setInviteOpen(true);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
+                >
+                  <UserPlus className="size-4" /> Invite to play
+                </button>
+              )}
+              {canMessage && profile.friendId && (
+                <button
+                  onClick={() => setMessageOpen(true)}
+                  aria-label={`Message ${profile.name}`}
+                  className="grid size-11 place-items-center rounded-xl border border-border transition hover:border-primary/50"
+                >
+                  <MessageCircle className="size-4" />
+                </button>
+              )}
             </>
           )}
         </div>
