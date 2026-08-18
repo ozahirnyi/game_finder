@@ -658,6 +658,12 @@ export function getFriendProfile(id: string) {
   return apiRequest<FriendProfile>(`/friends/${id}/profile`, { auth: true });
 }
 
+export function getFriendProfileByPublicId(publicId: string) {
+  return apiRequest<FriendProfile>(`/users/${encodeURIComponent(publicId)}/friend-profile`, {
+    auth: true,
+  });
+}
+
 export function getSharedGames(friendId: string) {
   return apiRequest<SharedLibrary>(`/friends/${friendId}/shared-games`, { auth: true });
 }
