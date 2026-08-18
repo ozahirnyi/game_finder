@@ -470,6 +470,7 @@ class GenreDealResponse(BaseModel):
 
 class PublicUserRead(BaseModel):
     id: uuid.UUID
+    public_id: str
     display_name: str
     steam_persona_name: str | None = None
     bio: str | None = None

@@ -186,6 +186,7 @@ export type GameInvite = {
 export type Friend = {
   user: {
     id: string;
+    public_id: string;
     display_name: string;
     steam_persona_name?: string | null;
     bio?: string | null;

@@ -124,6 +124,21 @@ describe("FriendsPage", () => {
     expect(await screen.findByText("Request sent")).toBeInTheDocument();
   });
 
+  it("links a search result to that player's canonical public profile", async () => {
+    api.searchUsers.mockResolvedValue([
+      { id: "player-1", public_id: "sam-public", display_name: "Sam" },
+    ]);
+    renderFriends();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Add friend" }))[0]);
+    fireEvent.change(screen.getByLabelText("Player name"), { target: { value: "Sam" } });
+
+    expect(await screen.findByRole("link", { name: "Sam" })).toHaveAttribute(
+      "href",
+      "/users/sam-public",
+    );
+  });
+
   it("accepts an incoming friend request", async () => {
     api.getIncomingFriendRequests.mockResolvedValue([
       { id: "request-1", sender: { id: "player-1", display_name: "Sam" } },
@@ -229,12 +244,18 @@ describe("FriendsPage", () => {
 
   it("selects a friend from the list and keeps profile navigation explicit", async () => {
     api.getFriends.mockResolvedValue([
-      { user: { id: "player-1", display_name: "Sam" } },
-      { user: { id: "player-2", display_name: "Alex" } },
+      { user: { id: "player-1", public_id: "sam-public", display_name: "Sam" } },
+      { user: { id: "player-2", public_id: "alex-public", display_name: "Alex" } },
     ]);
     api.getConversations.mockResolvedValue([
-      { id: "conversation-1", participant: { id: "player-1", display_name: "Sam" } },
-      { id: "conversation-2", participant: { id: "player-2", display_name: "Alex" } },
+      {
+        id: "conversation-1",
+        participant: { id: "player-1", public_id: "sam-public", display_name: "Sam" },
+      },
+      {
+        id: "conversation-2",
+        participant: { id: "player-2", public_id: "alex-public", display_name: "Alex" },
+      },
     ]);
     api.getConversationMessages.mockImplementation((id: string) =>
       Promise.resolve([
@@ -253,7 +274,7 @@ describe("FriendsPage", () => {
     expect(await screen.findByText("Alex's message")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View Alex's profile" })).toHaveAttribute(
       "href",
-      "/friends/player-2",
+      "/users/alex-public",
     );
   });
 
@@ -317,6 +338,7 @@ describe("FriendsPage", () => {
       {
         user: {
           id: "player-1",
+          public_id: "sam-public",
           display_name: "Sam",
           steam_persona_name: "SamOnSteam",
           bio: "Collects co-op games",
