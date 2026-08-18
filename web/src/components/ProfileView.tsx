@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, GameCover } from "@/components/GameCover";
@@ -114,6 +114,17 @@ export function ProfileView({
   const [inviteOpen, setInviteOpen] = useState(initialComposer === "invite");
   const [selectedGameKey, setSelectedGameKey] = useState("");
   const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!profile.settings) return;
+    setDisplayName(profile.settings.displayName);
+    setBio(profile.settings.bio);
+    setLibraryVisibility(profile.settings.libraryVisibility);
+    setFavoritesVisibility(profile.settings.favoritesVisibility);
+    setWishlistVisibility(profile.settings.wishlistVisibility);
+    setSteamVisibility(profile.settings.steamVisibility);
+    setPlatforms(profile.settings.platforms);
+    setFavoriteGenres(profile.settings.favoriteGenres);
+  }, [profile.settings]);
   const resetMessageComposer = () => {
     setMessageBody("");
     if (messageTextareaRef.current) messageTextareaRef.current.style.height = "";

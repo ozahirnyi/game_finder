@@ -132,6 +132,58 @@ describe("ProfileView library visibility", () => {
       ),
     );
   });
+  it("uses refreshed profile visibility settings when reopening the dialog", () => {
+    const queryClient = new QueryClient();
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <ProfileView
+          profile={{
+            ...profile,
+            settings: {
+              displayName: "Player",
+              bio: "",
+              libraryVisibility: "public",
+              favoritesVisibility: "public",
+              wishlistVisibility: "public",
+              steamVisibility: "public",
+              platforms: [],
+              favoriteGenres: [],
+            },
+          }}
+          isSelf
+        />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    expect(screen.getByLabelText("Favorites visibility")).toHaveValue("public");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <ProfileView
+          profile={{
+            ...profile,
+            settings: {
+              displayName: "Player",
+              bio: "",
+              libraryVisibility: "friends",
+              favoritesVisibility: "private",
+              wishlistVisibility: "friends",
+              steamVisibility: "private",
+              platforms: [],
+              favoriteGenres: [],
+            },
+          }}
+          isSelf
+        />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    expect(screen.getByLabelText("Favorites visibility")).toHaveValue("private");
+    expect(screen.getByLabelText("Steam profile visibility")).toHaveValue("private");
+  });
   it("formats friend game playtime from minutes", () => {
     profile.games[0].playtime = 125;
     renderProfile(false);
