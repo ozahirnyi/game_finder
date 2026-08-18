@@ -2,22 +2,24 @@
 
 ## Goal
 
-Make `/users/<publicId>` the only profile URL and restore the complete, known
-working friend-profile experience for friends: shared games, conversation
-history, message composer, and game-invite composer.
+Make `/users/<publicId>` the only profile URL and make the prior, known-working
+`ProfileView` the one profile screen for every viewer role. The server-selected
+data and actions change with the viewer relationship; the visual profile shell
+does not.
 
 ## Route and data design
 
 - `/users/<publicId>` remains the sole public profile route.
-- Its public response continues to drive anonymous, stranger, and owner views.
-- When that response says the viewer is a friend, the page requests a new
-  friend-authorized endpoint keyed by `publicId`. The server validates the
-  viewer relationship and returns the same data needed by the existing full
-  friend profile.
-- The response includes the friend action UUID only after friendship is
-  authorized. The ordinary public-profile response never exposes it.
-- The frontend maps that response into the existing `ProfileView` rather than
-  recreating a second profile UI.
+- Its public response supplies the authorized identity and collection blocks
+  for anonymous visitors, strangers, and owners.
+- When that response says the viewer is a friend, the page additionally
+  requests a friend-authorized endpoint keyed by `publicId`. The server
+  validates friendship and returns shared games, conversation history, and the
+  action UUID needed by the existing profile component.
+- The friend action UUID appears only in this authorized response; the ordinary
+  public-profile response never exposes it.
+- The frontend adapts each authorized response shape into one existing
+  `ProfileView`. It does not render `PublicProfileView` or a second profile UI.
 
 ## Actions and navigation
 
@@ -31,11 +33,13 @@ history, message composer, and game-invite composer.
 
 ## Privacy and roles
 
-- Anonymous visitors receive only existing public data and no actions.
-- Eligible strangers retain only Add friend.
-- Friends receive friend-authorized profile data and actions through the new
-  server-side relationship check.
-- Owners retain the account settings path and never get friend actions.
+- Anonymous visitors receive the existing profile shell with only public data
+  and no actions.
+- Eligible strangers receive that same shell plus Add friend.
+- Friends receive that same shell with friend-authorized data and actions
+  through the new server-side relationship check.
+- Owners receive that same shell with the account settings path and never get
+  friend actions.
 - A non-friend requesting friend-only data receives the existing no-existence
   behavior (`404`), not an existence-revealing response. Hidden public blocks
   remain hidden in every view.
