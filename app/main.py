@@ -1513,15 +1513,9 @@ def get_friend_activity(
     return sorted([*messages, *invites], key=lambda item: item.created_at, reverse=True)[:20]
 
 
-@app.get("/friends/{user_id}/profile", response_model=FriendProfileRead)
-async def get_friend_profile(
-    user_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    friend = db.query(User).filter(User.id == user_id).first()
-    if friend is None or not are_friends(db, current_user.id, friend.id):
-        raise HTTPException(status_code=404, detail="Friend not found")
+async def friend_profile_response(
+    db: Session, current_user: User, friend: User
+) -> FriendProfileRead:
     if can_view_section(friend, current_user, friend.library_visibility, db):
         games = db.query(Game).filter(Game.owner_id == friend.id, Game.source != "steam").order_by(func.lower(Game.title)).all()
         library_items = [public_library_game_response(game).model_dump(mode="json") for game in games]
@@ -1549,6 +1543,35 @@ async def get_friend_profile(
     else:
         library = hidden_public_block()
     return FriendProfileRead(user=public_user_response(friend), library=library)
+
+
+@app.get("/users/{public_id}/friend-profile", response_model=FriendProfileRead)
+async def get_friend_profile_by_public_id(
+    public_id: str,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    friend = db.query(User).filter(User.public_id == public_id).first()
+    if (
+        current_user is None
+        or friend is None
+        or current_user.id == friend.id
+        or not are_friends(db, current_user.id, friend.id)
+    ):
+        raise HTTPException(status_code=404, detail="Friend not found")
+    return await friend_profile_response(db, current_user, friend)
+
+
+@app.get("/friends/{user_id}/profile", response_model=FriendProfileRead)
+async def get_friend_profile(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friend = db.query(User).filter(User.id == user_id).first()
+    if friend is None or not are_friends(db, current_user.id, friend.id):
+        raise HTTPException(status_code=404, detail="Friend not found")
+    return await friend_profile_response(db, current_user, friend)
 
 
 @app.delete("/friends/{user_id}", status_code=204)

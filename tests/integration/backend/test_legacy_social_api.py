@@ -87,6 +87,38 @@ def test_legacy_friends_list_profile_and_delete_with_scoping(
     assert db_session.query(Friendship).count() == 0
 
 
+def test_friend_profile_by_public_id_requires_an_authenticated_friend(
+    api_client, app_main, db_session, user_factory, auth_as
+):
+    viewer = user_factory(
+        email="canonical-viewer@example.com",
+        public_id="canonical-viewer",
+        public_nickname="Viewer",
+    )
+    friend = user_factory(
+        email="canonical-friend@example.com",
+        public_id="canonical-friend",
+        public_nickname="Friend",
+    )
+    stranger = user_factory(
+        email="canonical-stranger@example.com",
+        public_id="canonical-stranger",
+        public_nickname="Stranger",
+    )
+    make_friends(db_session, viewer, friend)
+
+    auth_as(viewer)
+    response = api_client.get(f"/users/{friend.public_id}/friend-profile")
+    assert response.status_code == 200
+    assert response.json()["user"]["public_id"] == friend.public_id
+    assert api_client.get(f"/users/{stranger.public_id}/friend-profile").status_code == 404
+    assert api_client.get(f"/users/{viewer.public_id}/friend-profile").status_code == 404
+    assert api_client.get("/users/unknown-profile/friend-profile").status_code == 404
+
+    app_main.app.dependency_overrides.pop(app_main.get_optional_current_user)
+    assert api_client.get(f"/users/{friend.public_id}/friend-profile").status_code == 404
+
+
 def test_legacy_conversations_messages_persist_read_state_and_scope(
     api_client, db_session, user_factory, auth_as
 ):
