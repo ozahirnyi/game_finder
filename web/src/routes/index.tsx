@@ -412,8 +412,10 @@ function Home() {
 }
 
 function RecommendationCard({ recommendation }: { recommendation: DashboardRecommendation }) {
+  const hasVerifiedCatalogId =
+    Number.isInteger(recommendation.igdb_id) && Number(recommendation.igdb_id) > 0;
   const content = (
-    <Panel interactive className="h-full p-5">
+    <Panel interactive={hasVerifiedCatalogId} className="h-full p-5">
       {recommendation.cover_url && (
         <GameCover
           title={recommendation.title}
@@ -437,15 +439,27 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
     </Panel>
   );
 
+  if (hasVerifiedCatalogId) {
+    return (
+      <Link
+        to="/games/$gameId"
+        params={{ gameId: String(recommendation.igdb_id) }}
+        search={{ title: recommendation.title }}
+        className="block h-full"
+      >
+        {content}
+      </Link>
+    );
+  }
+
   return (
-    <Link
-      to="/games/$gameId"
-      params={{ gameId: String(recommendation.igdb_id ?? 0) }}
-      search={{ title: recommendation.title }}
-      className="block h-full"
-    >
+    <div className="h-full">
       {content}
-    </Link>
+      <p className="mt-3 text-sm text-muted-foreground">A catalog page is not available for this title.</p>
+      <Link to="/search" search={{ q: recommendation.title }} className="mt-2 inline-flex text-sm font-bold text-primary">
+        Search this title
+      </Link>
+    </div>
   );
 }
 

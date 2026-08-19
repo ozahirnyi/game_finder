@@ -107,7 +107,7 @@ describe("Home recommendations", () => {
     );
   });
 
-  it("opens an unenriched recommendation through its exact title", async () => {
+  it("keeps an unmatched recommendation off an invalid game route", async () => {
     api.getAuthSnapshot.mockReturnValue(true);
     api.getDashboard.mockResolvedValue({
       recommendations: {
@@ -122,8 +122,12 @@ describe("Home recommendations", () => {
 
     renderHome();
 
-    expect((await screen.findByRole("link", { name: /Unknown title/i })).getAttribute("href")).toBe(
-      "/games/0?title=Unknown+title",
+    const cardTitle = await screen.findByRole("heading", { name: "Unknown title" });
+    expect(cardTitle.closest("a")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Unknown title" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Search this title" })).toHaveAttribute(
+      "href",
+      "/search?q=Unknown+title",
     );
   });
 
