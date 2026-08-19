@@ -201,12 +201,16 @@ describe("Home recommendations", () => {
 
     renderHome();
 
-    expect(await screen.findByText("No popular games are available right now.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No popular games are available right now."),
+    ).toBeInTheDocument();
   });
 
   it("retries guest trending games after a failure", async () => {
     api.getAuthSnapshot.mockReturnValue(false);
-    api.getTrendingGames.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ results: [] });
+    api.getTrendingGames
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue({ results: [] });
 
     renderHome();
 

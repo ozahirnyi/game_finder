@@ -151,8 +151,8 @@ function Home() {
                 : libraryQuery.isError
                   ? "Your library is unavailable."
                   : libraryQuery.data?.games.length
-                ? `${libraryQuery.data.games.length} games ready to explore.`
-                : "Sync Steam or import PlayStation games to fill your library."}
+                    ? `${libraryQuery.data.games.length} games ready to explore.`
+                    : "Sync Steam or import PlayStation games to fill your library."}
             </p>
             <Link
               to="/library"
@@ -169,8 +169,8 @@ function Home() {
                 : friendsQuery.isError
                   ? "Your friends are unavailable."
                   : friendsQuery.data?.length
-                ? `${friendsQuery.data.length} friends connected.`
-                : "Add friends to see shared games and activity."}
+                    ? `${friendsQuery.data.length} friends connected.`
+                    : "Add friends to see shared games and activity."}
             </p>
             <Link
               to="/friends"
@@ -254,7 +254,9 @@ function Home() {
             ))}
           </div>
         ) : (
-          <Panel className="p-6 text-sm text-muted-foreground">No popular games are available right now.</Panel>
+          <Panel className="p-6 text-sm text-muted-foreground">
+            No popular games are available right now.
+          </Panel>
         )}
       </section>
 
@@ -340,8 +342,8 @@ function Home() {
                     : friendsQuery.isError
                       ? "Your friends are unavailable."
                       : friendsQuery.data?.length
-                    ? `${friendsQuery.data.length} friends are connected.`
-                    : "Add friends to see shared games and activity."}
+                        ? `${friendsQuery.data.length} friends are connected.`
+                        : "Add friends to see shared games and activity."}
                 </p>
               ) : (
                 <EmptyState
@@ -455,8 +457,14 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
   return (
     <div className="h-full">
       {content}
-      <p className="mt-3 text-sm text-muted-foreground">A catalog page is not available for this title.</p>
-      <Link to="/search" search={{ q: recommendation.title }} className="mt-2 inline-flex text-sm font-bold text-primary">
+      <p className="mt-3 text-sm text-muted-foreground">
+        A catalog page is not available for this title.
+      </p>
+      <Link
+        to="/search"
+        search={{ q: recommendation.title }}
+        className="mt-2 inline-flex text-sm font-bold text-primary"
+      >
         Search this title
       </Link>
     </div>

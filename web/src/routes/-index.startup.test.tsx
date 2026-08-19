@@ -83,7 +83,9 @@ describe("home startup", () => {
 
     renderHome();
 
-    expect(await screen.findByText("Your dashboard · library and friends are loading")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Your dashboard · library and friends are loading"),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/0 games in your library/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/0 friends connected/i)).not.toBeInTheDocument();
   });
