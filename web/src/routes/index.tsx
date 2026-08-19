@@ -57,6 +57,10 @@ function Home() {
   const recommendationBlock = dashboardQuery.data?.recommendations;
   const recommendations = recommendationBlock?.data?.recommendations ?? [];
   const trendingGames = trendingQuery.data?.results ?? [];
+  const accountSummaryPending =
+    profileQuery.isPending || libraryQuery.isPending || friendsQuery.isPending;
+  const accountSummaryUnavailable =
+    profileQuery.isError || libraryQuery.isError || friendsQuery.isError;
 
   return (
     <AppShell>
@@ -69,7 +73,11 @@ function Home() {
         </h1>
         <p className="relative mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
           {signedIn
-            ? `${profileQuery.data?.display_name ?? "Your dashboard"} · ${libraryQuery.data?.games.length ?? 0} games in your library · ${friendsQuery.data?.length ?? 0} friends connected`
+            ? accountSummaryPending
+              ? "Your dashboard · library and friends are loading"
+              : accountSummaryUnavailable
+                ? "Your dashboard · library and friends are unavailable"
+                : `${profileQuery.data?.display_name ?? "Your dashboard"} · ${libraryQuery.data?.games.length ?? 0} games in your library · ${friendsQuery.data?.length ?? 0} friends connected`
             : "Search games, discover new favourites, and catch live price drops — before you even sign in."}
         </p>
         <form
@@ -138,7 +146,11 @@ function Home() {
               hint={libraryQuery.data?.steam_error ?? "Steam and PlayStation games"}
             />
             <p className="mt-3 text-sm text-muted-foreground">
-              {libraryQuery.data?.games.length
+              {libraryQuery.isPending
+                ? "Your library is loading."
+                : libraryQuery.isError
+                  ? "Your library is unavailable."
+                  : libraryQuery.data?.games.length
                 ? `${libraryQuery.data.games.length} games ready to explore.`
                 : "Sync Steam or import PlayStation games to fill your library."}
             </p>
@@ -152,7 +164,11 @@ function Home() {
           <Panel className="p-6">
             <SectionHeader title="Friends online" hint="Your gaming circle" />
             <p className="mt-3 text-sm text-muted-foreground">
-              {friendsQuery.data?.length
+              {friendsQuery.isPending
+                ? "Your friends are loading."
+                : friendsQuery.isError
+                  ? "Your friends are unavailable."
+                  : friendsQuery.data?.length
                 ? `${friendsQuery.data.length} friends connected.`
                 : "Add friends to see shared games and activity."}
             </p>
@@ -176,6 +192,17 @@ function Home() {
         {signedIn ? (
           dashboardQuery.isPending ? (
             <Panel className="p-6 text-sm text-muted-foreground">Finding recommendations…</Panel>
+          ) : dashboardQuery.isError ? (
+            <Panel className="p-6 text-sm text-muted-foreground">
+              <p>Recommendations are unavailable.</p>
+              <button
+                type="button"
+                onClick={() => dashboardQuery.refetch()}
+                className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+              >
+                Retry recommendations
+              </button>
+            </Panel>
           ) : recommendationBlock?.status === "ready" && recommendations.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {recommendations.map((recommendation) => (
@@ -308,7 +335,11 @@ function Home() {
               </div>
               {signedIn ? (
                 <p className="text-sm text-muted-foreground">
-                  {friendsQuery.data?.length
+                  {friendsQuery.isPending
+                    ? "Your friends are loading."
+                    : friendsQuery.isError
+                      ? "Your friends are unavailable."
+                      : friendsQuery.data?.length
                     ? `${friendsQuery.data.length} friends are connected.`
                     : "Add friends to see shared games and activity."}
                 </p>

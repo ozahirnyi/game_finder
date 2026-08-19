@@ -158,6 +158,21 @@ describe("Home recommendations", () => {
     expect(screen.queryByText("Hades")).not.toBeInTheDocument();
   });
 
+  it("shows a retryable state when the dashboard request fails", async () => {
+    api.getAuthSnapshot.mockReturnValue(true);
+    api.getDashboard.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({
+      recommendations: { status: "empty", data: [] },
+    });
+
+    renderHome();
+
+    const retry = await screen.findByRole("button", { name: "Retry recommendations" });
+    expect(screen.getByText("Recommendations are unavailable.")).toBeInTheDocument();
+    const callsBeforeRetry = api.getDashboard.mock.calls.length;
+    fireEvent.click(retry);
+    await waitFor(() => expect(api.getDashboard.mock.calls.length).toBe(callsBeforeRetry + 1));
+  });
+
   it("renders real trending catalog games for a guest", async () => {
     api.getAuthSnapshot.mockReturnValue(false);
     api.getTrendingGames.mockResolvedValue({ results: [{ id: 44, name: "Hades" }] });
