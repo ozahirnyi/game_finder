@@ -243,7 +243,24 @@ function Home() {
           </select>
         </div>
       </section>
-      {best && (
+      {dealsQuery.isPending ? (
+        <Panel className="p-6 text-sm text-muted-foreground">Live deals · loading</Panel>
+      ) : dealsQuery.isError ? (
+        <Panel className="p-6 text-sm text-muted-foreground">
+          <p>Price drops are unavailable for {region}.</p>
+          <button
+            type="button"
+            onClick={() => dealsQuery.refetch()}
+            className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+          >
+            Retry price drops
+          </button>
+        </Panel>
+      ) : deals.length === 0 ? (
+        <Panel className="p-6 text-sm text-muted-foreground">
+          No price drops are available for {region}.
+        </Panel>
+      ) : best ? (
         <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
           <div className="animate-reveal group lg:col-span-7">
             {bestTarget ? (
@@ -347,7 +364,7 @@ function Home() {
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </AppShell>
   );
 }

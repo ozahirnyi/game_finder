@@ -181,4 +181,32 @@ describe("Home recommendations", () => {
     expect(await screen.findByText("Twelfth deal")).toBeInTheDocument();
     await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("US", 13));
   });
+
+  it("shows a loading state while selected-region deals are pending", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getDeals.mockImplementation(() => new Promise(() => {}));
+
+    renderHome();
+
+    expect(await screen.findByText("Live deals · loading")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when the selected region has no deals", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getDeals.mockResolvedValue({ results: [] });
+
+    renderHome();
+
+    expect(await screen.findByText("No price drops are available for US.")).toBeInTheDocument();
+  });
+
+  it("retries selected-region deals after a failure", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getDeals.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ results: [] });
+
+    renderHome();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Retry price drops" }));
+    await waitFor(() => expect(api.getDeals).toHaveBeenLastCalledWith("US", 13));
+  });
 });
