@@ -57,6 +57,10 @@ function Home() {
   const recommendationBlock = dashboardQuery.data?.recommendations;
   const recommendations = recommendationBlock?.data?.recommendations ?? [];
   const trendingGames = trendingQuery.data?.results ?? [];
+  const accountSummaryPending =
+    profileQuery.isPending || libraryQuery.isPending || friendsQuery.isPending;
+  const accountSummaryUnavailable =
+    profileQuery.isError || libraryQuery.isError || friendsQuery.isError;
 
   return (
     <AppShell>
@@ -69,7 +73,11 @@ function Home() {
         </h1>
         <p className="relative mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
           {signedIn
-            ? `${profileQuery.data?.display_name ?? "Your dashboard"} · ${libraryQuery.data?.games.length ?? 0} games in your library · ${friendsQuery.data?.length ?? 0} friends connected`
+            ? accountSummaryPending
+              ? "Your dashboard · library and friends are loading"
+              : accountSummaryUnavailable
+                ? "Your dashboard · library and friends are unavailable"
+                : `${profileQuery.data?.display_name ?? "Your dashboard"} · ${libraryQuery.data?.games.length ?? 0} games in your library · ${friendsQuery.data?.length ?? 0} friends connected`
             : "Search games, discover new favourites, and catch live price drops — before you even sign in."}
         </p>
         <form
@@ -138,9 +146,13 @@ function Home() {
               hint={libraryQuery.data?.steam_error ?? "Steam and PlayStation games"}
             />
             <p className="mt-3 text-sm text-muted-foreground">
-              {libraryQuery.data?.games.length
-                ? `${libraryQuery.data.games.length} games ready to explore.`
-                : "Sync Steam or import PlayStation games to fill your library."}
+              {libraryQuery.isPending
+                ? "Your library is loading."
+                : libraryQuery.isError
+                  ? "Your library is unavailable."
+                  : libraryQuery.data?.games.length
+                    ? `${libraryQuery.data.games.length} games ready to explore.`
+                    : "Sync Steam or import PlayStation games to fill your library."}
             </p>
             <Link
               to="/library"
@@ -152,9 +164,13 @@ function Home() {
           <Panel className="p-6">
             <SectionHeader title="Friends online" hint="Your gaming circle" />
             <p className="mt-3 text-sm text-muted-foreground">
-              {friendsQuery.data?.length
-                ? `${friendsQuery.data.length} friends connected.`
-                : "Add friends to see shared games and activity."}
+              {friendsQuery.isPending
+                ? "Your friends are loading."
+                : friendsQuery.isError
+                  ? "Your friends are unavailable."
+                  : friendsQuery.data?.length
+                    ? `${friendsQuery.data.length} friends connected.`
+                    : "Add friends to see shared games and activity."}
             </p>
             <Link
               to="/friends"
@@ -176,6 +192,17 @@ function Home() {
         {signedIn ? (
           dashboardQuery.isPending ? (
             <Panel className="p-6 text-sm text-muted-foreground">Finding recommendations…</Panel>
+          ) : dashboardQuery.isError ? (
+            <Panel className="p-6 text-sm text-muted-foreground">
+              <p>Recommendations are unavailable.</p>
+              <button
+                type="button"
+                onClick={() => dashboardQuery.refetch()}
+                className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+              >
+                Retry recommendations
+              </button>
+            </Panel>
           ) : recommendationBlock?.status === "ready" && recommendations.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {recommendations.map((recommendation) => (
@@ -198,6 +225,19 @@ function Home() {
               }
             />
           )
+        ) : trendingQuery.isPending ? (
+          <Panel className="p-6 text-sm text-muted-foreground">Popular games · loading</Panel>
+        ) : trendingQuery.isError ? (
+          <Panel className="p-6 text-sm text-muted-foreground">
+            <p>Popular games are unavailable.</p>
+            <button
+              type="button"
+              onClick={() => trendingQuery.refetch()}
+              className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+            >
+              Retry popular games
+            </button>
+          </Panel>
         ) : trendingGames.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {trendingGames.map((game) => (
@@ -215,7 +255,7 @@ function Home() {
           </div>
         ) : (
           <Panel className="p-6 text-sm text-muted-foreground">
-            Popular games are temporarily unavailable.
+            No popular games are available right now.
           </Panel>
         )}
       </section>
@@ -243,7 +283,24 @@ function Home() {
           </select>
         </div>
       </section>
-      {best && (
+      {dealsQuery.isPending ? (
+        <Panel className="p-6 text-sm text-muted-foreground">Live deals · loading</Panel>
+      ) : dealsQuery.isError ? (
+        <Panel className="p-6 text-sm text-muted-foreground">
+          <p>Price drops are unavailable for {region}.</p>
+          <button
+            type="button"
+            onClick={() => dealsQuery.refetch()}
+            className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+          >
+            Retry price drops
+          </button>
+        </Panel>
+      ) : deals.length === 0 ? (
+        <Panel className="p-6 text-sm text-muted-foreground">
+          No price drops are available for {region}.
+        </Panel>
+      ) : best ? (
         <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
           <div className="animate-reveal group lg:col-span-7">
             {bestTarget ? (
@@ -280,9 +337,13 @@ function Home() {
               </div>
               {signedIn ? (
                 <p className="text-sm text-muted-foreground">
-                  {friendsQuery.data?.length
-                    ? `${friendsQuery.data.length} friends are connected.`
-                    : "Add friends to see shared games and activity."}
+                  {friendsQuery.isPending
+                    ? "Your friends are loading."
+                    : friendsQuery.isError
+                      ? "Your friends are unavailable."
+                      : friendsQuery.data?.length
+                        ? `${friendsQuery.data.length} friends are connected.`
+                        : "Add friends to see shared games and activity."}
                 </p>
               ) : (
                 <EmptyState
@@ -347,14 +408,16 @@ function Home() {
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </AppShell>
   );
 }
 
 function RecommendationCard({ recommendation }: { recommendation: DashboardRecommendation }) {
+  const hasVerifiedCatalogId =
+    Number.isInteger(recommendation.igdb_id) && Number(recommendation.igdb_id) > 0;
   const content = (
-    <Panel interactive className="h-full p-5">
+    <Panel interactive={hasVerifiedCatalogId} className="h-full p-5">
       {recommendation.cover_url && (
         <GameCover
           title={recommendation.title}
@@ -378,15 +441,33 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
     </Panel>
   );
 
+  if (hasVerifiedCatalogId) {
+    return (
+      <Link
+        to="/games/$gameId"
+        params={{ gameId: String(recommendation.igdb_id) }}
+        search={{ title: recommendation.title }}
+        className="block h-full"
+      >
+        {content}
+      </Link>
+    );
+  }
+
   return (
-    <Link
-      to="/games/$gameId"
-      params={{ gameId: String(recommendation.igdb_id ?? 0) }}
-      search={{ title: recommendation.title }}
-      className="block h-full"
-    >
+    <div className="h-full">
       {content}
-    </Link>
+      <p className="mt-3 text-sm text-muted-foreground">
+        A catalog page is not available for this title.
+      </p>
+      <Link
+        to="/search"
+        search={{ q: recommendation.title }}
+        className="mt-2 inline-flex text-sm font-bold text-primary"
+      >
+        Search this title
+      </Link>
+    </div>
   );
 }
 

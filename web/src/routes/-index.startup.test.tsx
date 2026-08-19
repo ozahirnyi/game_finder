@@ -8,8 +8,8 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
   getAuthSnapshot: vi.fn(),
@@ -64,6 +64,8 @@ beforeEach(() => {
   api.getDashboard.mockResolvedValue({ recommendations: { status: "empty", data: [] } });
 });
 
+afterEach(cleanup);
+
 describe("home startup", () => {
   it("renders the authenticated home heading before deferred sidebar deals resolve", async () => {
     renderHome();
@@ -71,13 +73,27 @@ describe("home startup", () => {
     expect(
       await screen.findByRole("heading", { name: "Play with friends tonight" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Live deals · loading")).toBeInTheDocument();
+    expect(screen.getAllByText("Live deals · loading").length).toBeGreaterThan(0);
+  });
+
+  it("does not present pending account data as zero games or friends", async () => {
+    api.getProfile.mockImplementation(() => new Promise(() => {}));
+    api.getLibraryOverview.mockImplementation(() => new Promise(() => {}));
+    api.getFriends.mockImplementation(() => new Promise(() => {}));
+
+    renderHome();
+
+    expect(
+      await screen.findByText("Your dashboard · library and friends are loading"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/0 games in your library/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 friends connected/i)).not.toBeInTheDocument();
   });
 
   it("uses a GET form so keyboard submit preserves the search query", async () => {
     renderHome();
 
-    const input = screen.getByPlaceholderText("Search games by title");
+    const input = await screen.findByPlaceholderText("Search games by title");
     const form = input.closest("form")!;
     expect(form).toHaveAttribute("action", "/search");
     expect(form).toHaveAttribute("method", "get");

@@ -107,7 +107,7 @@ describe("Home recommendations", () => {
     );
   });
 
-  it("opens an unenriched recommendation through its exact title", async () => {
+  it("keeps an unmatched recommendation off an invalid game route", async () => {
     api.getAuthSnapshot.mockReturnValue(true);
     api.getDashboard.mockResolvedValue({
       recommendations: {
@@ -122,8 +122,12 @@ describe("Home recommendations", () => {
 
     renderHome();
 
-    expect((await screen.findByRole("link", { name: /Unknown title/i })).getAttribute("href")).toBe(
-      "/games/0?title=Unknown+title",
+    const cardTitle = await screen.findByRole("heading", { name: "Unknown title" });
+    expect(cardTitle.closest("a")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Unknown title" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Search this title" })).toHaveAttribute(
+      "href",
+      "/search?q=Unknown+title",
     );
   });
 
@@ -158,6 +162,21 @@ describe("Home recommendations", () => {
     expect(screen.queryByText("Hades")).not.toBeInTheDocument();
   });
 
+  it("shows a retryable state when the dashboard request fails", async () => {
+    api.getAuthSnapshot.mockReturnValue(true);
+    api.getDashboard.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({
+      recommendations: { status: "empty", data: [] },
+    });
+
+    renderHome();
+
+    const retry = await screen.findByRole("button", { name: "Retry recommendations" });
+    expect(screen.getByText("Recommendations are unavailable.")).toBeInTheDocument();
+    const callsBeforeRetry = api.getDashboard.mock.calls.length;
+    fireEvent.click(retry);
+    await waitFor(() => expect(api.getDashboard.mock.calls.length).toBe(callsBeforeRetry + 1));
+  });
+
   it("renders real trending catalog games for a guest", async () => {
     api.getAuthSnapshot.mockReturnValue(false);
     api.getTrendingGames.mockResolvedValue({ results: [{ id: 44, name: "Hades" }] });
@@ -165,6 +184,40 @@ describe("Home recommendations", () => {
     renderHome();
 
     expect(await screen.findByText("Hades")).toHaveAttribute("data-game-id", "44");
+  });
+
+  it("shows loading while guest trending games are pending", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getTrendingGames.mockImplementation(() => new Promise(() => {}));
+
+    renderHome();
+
+    expect(await screen.findByText("Popular games · loading")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when the guest trending catalog is empty", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getTrendingGames.mockResolvedValue({ results: [] });
+
+    renderHome();
+
+    expect(
+      await screen.findByText("No popular games are available right now."),
+    ).toBeInTheDocument();
+  });
+
+  it("retries guest trending games after a failure", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getTrendingGames
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue({ results: [] });
+
+    renderHome();
+
+    const retry = await screen.findByRole("button", { name: "Retry popular games" });
+    const callsBeforeRetry = api.getTrendingGames.mock.calls.length;
+    fireEvent.click(retry);
+    await waitFor(() => expect(api.getTrendingGames.mock.calls.length).toBe(callsBeforeRetry + 1));
   });
 
   it("requests a twelfth standard deal for the full Price drops grid", async () => {
@@ -180,5 +233,33 @@ describe("Home recommendations", () => {
 
     expect(await screen.findByText("Twelfth deal")).toBeInTheDocument();
     await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("US", 13));
+  });
+
+  it("shows a loading state while selected-region deals are pending", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getDeals.mockImplementation(() => new Promise(() => {}));
+
+    renderHome();
+
+    expect(await screen.findByText("Live deals · loading")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when the selected region has no deals", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getDeals.mockResolvedValue({ results: [] });
+
+    renderHome();
+
+    expect(await screen.findByText("No price drops are available for US.")).toBeInTheDocument();
+  });
+
+  it("retries selected-region deals after a failure", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getDeals.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ results: [] });
+
+    renderHome();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Retry price drops" }));
+    await waitFor(() => expect(api.getDeals).toHaveBeenLastCalledWith("US", 13));
   });
 });
