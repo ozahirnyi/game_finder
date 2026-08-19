@@ -167,6 +167,36 @@ describe("Home recommendations", () => {
     expect(await screen.findByText("Hades")).toHaveAttribute("data-game-id", "44");
   });
 
+  it("shows loading while guest trending games are pending", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getTrendingGames.mockImplementation(() => new Promise(() => {}));
+
+    renderHome();
+
+    expect(await screen.findByText("Popular games · loading")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when the guest trending catalog is empty", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getTrendingGames.mockResolvedValue({ results: [] });
+
+    renderHome();
+
+    expect(await screen.findByText("No popular games are available right now.")).toBeInTheDocument();
+  });
+
+  it("retries guest trending games after a failure", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getTrendingGames.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ results: [] });
+
+    renderHome();
+
+    const retry = await screen.findByRole("button", { name: "Retry popular games" });
+    const callsBeforeRetry = api.getTrendingGames.mock.calls.length;
+    fireEvent.click(retry);
+    await waitFor(() => expect(api.getTrendingGames.mock.calls.length).toBe(callsBeforeRetry + 1));
+  });
+
   it("requests a twelfth standard deal for the full Price drops grid", async () => {
     api.getAuthSnapshot.mockReturnValue(false);
     api.getDeals.mockResolvedValue({

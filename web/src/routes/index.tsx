@@ -198,6 +198,19 @@ function Home() {
               }
             />
           )
+        ) : trendingQuery.isPending ? (
+          <Panel className="p-6 text-sm text-muted-foreground">Popular games · loading</Panel>
+        ) : trendingQuery.isError ? (
+          <Panel className="p-6 text-sm text-muted-foreground">
+            <p>Popular games are unavailable.</p>
+            <button
+              type="button"
+              onClick={() => trendingQuery.refetch()}
+              className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+            >
+              Retry popular games
+            </button>
+          </Panel>
         ) : trendingGames.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {trendingGames.map((game) => (
@@ -214,9 +227,7 @@ function Home() {
             ))}
           </div>
         ) : (
-          <Panel className="p-6 text-sm text-muted-foreground">
-            Popular games are temporarily unavailable.
-          </Panel>
+          <Panel className="p-6 text-sm text-muted-foreground">No popular games are available right now.</Panel>
         )}
       </section>
 
