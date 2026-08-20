@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from openpyxl import Workbook
 
-from app.database import Favorite, Game, WishlistItem
+from app.database import Favorite, Friendship, Game, PriceAlert, WishlistItem
 
 
 pytestmark = pytest.mark.integration
@@ -19,6 +19,63 @@ def _xlsx_bytes(sheet_name="Game Library", rows=None):
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
+
+
+def test_onboarding_summary_is_owner_scoped_and_counts_only_owned_alerts(
+    api_client, db_session, user_factory, auth_as
+):
+    owner = auth_as(user_factory(email="onboarding-owner@example.com", steam_id="steam-owner"))
+    other = user_factory(email="onboarding-other@example.com")
+    owner_wishlist = WishlistItem(user_id=owner.id, catalog_game_id=1, title="Owned")
+    other_wishlist = WishlistItem(user_id=other.id, catalog_game_id=2, title="Other")
+    db_session.add_all(
+        [
+            Game(owner_id=owner.id, title="PSN", source="psn", external_id="psn:1"),
+            Game(owner_id=other.id, title="Other PSN", source="psn", external_id="psn:2"),
+            owner_wishlist,
+            other_wishlist,
+        ]
+    )
+    db_session.flush()
+    db_session.add_all(
+        [
+            PriceAlert(user_id=owner.id, wishlist_item_id=owner_wishlist.id, target_price=10),
+            PriceAlert(user_id=owner.id, wishlist_item_id=other_wishlist.id, target_price=10),
+            Friendship(user_low_id=owner.id, user_high_id=other.id),
+        ]
+    )
+    db_session.commit()
+
+    response = api_client.get("/onboarding/summary")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "steam_linked": True,
+        "psn_library_games": 1,
+        "wishlist_games": 1,
+        "price_alerts": 1,
+        "friends": 1,
+    }
+
+
+def test_onboarding_summary_uses_steam_or_persisted_psn_and_requires_authentication(
+    api_client, db_session, user_factory, auth_as
+):
+    assert api_client.get("/onboarding/summary").status_code == 401
+
+    user = auth_as(user_factory(email="onboarding-empty@example.com"))
+    empty = api_client.get("/onboarding/summary")
+    assert empty.json() == {
+        "steam_linked": False,
+        "psn_library_games": 0,
+        "wishlist_games": 0,
+        "price_alerts": 0,
+        "friends": 0,
+    }
+
+    db_session.add(Game(owner_id=user.id, title="Imported", source="psn", external_id="psn:3"))
+    db_session.commit()
+    assert api_client.get("/onboarding/summary").json()["psn_library_games"] == 1
 
 
 def test_profile_get_patch_persists_profile_and_visibility_fields(

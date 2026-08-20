@@ -148,6 +148,14 @@ class ProfileSummaryRead(BaseModel):
     recently_played: DataBlock
 
 
+class OnboardingSummaryRead(BaseModel):
+    steam_linked: bool
+    psn_library_games: int
+    wishlist_games: int
+    price_alerts: int
+    friends: int
+
+
 class UserLogin(BaseModel):
     email: str
     password: str
