@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
+import { OnboardingGuidance } from "@/components/OnboardingGuidance";
 import { ProfileView } from "@/components/ProfileView";
-import { getFavorites, getLibraryOverview, getProfile } from "@/lib/api";
+import { getFavorites, getLibraryOverview, getOnboardingSummary, getProfile } from "@/lib/api";
 import { libraryPlaytime } from "@/lib/collectionPresentation";
 
 export const Route = createFileRoute("/account")({
@@ -30,11 +31,24 @@ export function AccountPage() {
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
   const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview });
   const favoritesQuery = useQuery({ queryKey: ["favorites"], queryFn: getFavorites });
+  const onboardingQuery = useQuery({
+    queryKey: ["onboarding-summary"],
+    queryFn: getOnboardingSummary,
+  });
   const profile = profileQuery.data;
   const owned = libraryQuery.data?.games ?? [];
 
   return (
     <AppShell>
+      <OnboardingGuidance
+        compact
+        summary={onboardingQuery.data}
+        isPending={onboardingQuery.isPending}
+        isError={onboardingQuery.isError}
+        onRetry={() => {
+          void onboardingQuery.refetch();
+        }}
+      />
       <ProfileView
         isSelf
         profile={{

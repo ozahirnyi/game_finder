@@ -14,11 +14,31 @@ import { OnboardingGuidance } from "./OnboardingGuidance";
 function renderGuidance(component: React.ReactNode) {
   const root = createRootRoute({ component: Outlet });
   const home = createRoute({ getParentRoute: () => root, path: "/", component: () => component });
-  const account = createRoute({ getParentRoute: () => root, path: "/account", component: () => null });
-  const psnImport = createRoute({ getParentRoute: () => root, path: "/psn-import", component: () => null });
-  const search = createRoute({ getParentRoute: () => root, path: "/search", component: () => null });
-  const friends = createRoute({ getParentRoute: () => root, path: "/friends", component: () => null });
-  const wishlist = createRoute({ getParentRoute: () => root, path: "/wishlist", component: () => null });
+  const account = createRoute({
+    getParentRoute: () => root,
+    path: "/account",
+    component: () => null,
+  });
+  const psnImport = createRoute({
+    getParentRoute: () => root,
+    path: "/psn-import",
+    component: () => null,
+  });
+  const search = createRoute({
+    getParentRoute: () => root,
+    path: "/search",
+    component: () => null,
+  });
+  const friends = createRoute({
+    getParentRoute: () => root,
+    path: "/friends",
+    component: () => null,
+  });
+  const wishlist = createRoute({
+    getParentRoute: () => root,
+    path: "/wishlist",
+    component: () => null,
+  });
   const router = createRouter({
     routeTree: root.addChildren([home, account, psnImport, search, friends, wishlist]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
@@ -52,15 +72,27 @@ describe("OnboardingGuidance", () => {
       "Find friends",
     ]);
     expect(screen.getByRole("link", { name: "Connect Steam" })).toHaveAttribute("href", "/account");
-    expect(screen.getByRole("link", { name: "Import PlayStation" })).toHaveAttribute("href", "/psn-import");
-    expect(screen.getByRole("link", { name: "Add a wishlist game" })).toHaveAttribute("href", "/search");
+    expect(screen.getByRole("link", { name: "Import PlayStation" })).toHaveAttribute(
+      "href",
+      "/psn-import",
+    );
+    expect(screen.getByRole("link", { name: "Add a wishlist game" })).toHaveAttribute(
+      "href",
+      "/search",
+    );
     expect(screen.getByRole("link", { name: "Find friends" })).toHaveAttribute("href", "/friends");
   });
 
   it("treats linked Steam or imported PSN games as a completed library", async () => {
     renderGuidance(
       <OnboardingGuidance
-        summary={{ steam_linked: true, psn_library_games: 0, wishlist_games: 0, price_alerts: 0, friends: 0 }}
+        summary={{
+          steam_linked: true,
+          psn_library_games: 0,
+          wishlist_games: 0,
+          price_alerts: 0,
+          friends: 0,
+        }}
         isPending={false}
         isError={false}
         onRetry={vi.fn()}
@@ -71,7 +103,13 @@ describe("OnboardingGuidance", () => {
     cleanup();
     renderGuidance(
       <OnboardingGuidance
-        summary={{ steam_linked: false, psn_library_games: 1, wishlist_games: 0, price_alerts: 0, friends: 0 }}
+        summary={{
+          steam_linked: false,
+          psn_library_games: 1,
+          wishlist_games: 0,
+          price_alerts: 0,
+          friends: 0,
+        }}
         isPending={false}
         isError={false}
         onRetry={vi.fn()}
@@ -83,15 +121,26 @@ describe("OnboardingGuidance", () => {
   it("offers an alert only after a wishlist game exists and keeps no-friends guidance", async () => {
     renderGuidance(
       <OnboardingGuidance
-        summary={{ steam_linked: true, psn_library_games: 0, wishlist_games: 1, price_alerts: 0, friends: 0 }}
+        summary={{
+          steam_linked: true,
+          psn_library_games: 0,
+          wishlist_games: 1,
+          price_alerts: 0,
+          friends: 0,
+        }}
         isPending={false}
         isError={false}
         onRetry={vi.fn()}
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "Create your first price alert" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Create your first price alert" })).toHaveAttribute("href", "/wishlist");
+    expect(
+      await screen.findByRole("heading", { name: "Create your first price alert" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create your first price alert" })).toHaveAttribute(
+      "href",
+      "/wishlist",
+    );
     expect(screen.getByRole("heading", { name: "Find friends" })).toBeInTheDocument();
   });
 
@@ -110,7 +159,13 @@ describe("OnboardingGuidance", () => {
 
     rerender(
       <OnboardingGuidance
-        summary={{ steam_linked: true, psn_library_games: 0, wishlist_games: 1, price_alerts: 1, friends: 1 }}
+        summary={{
+          steam_linked: true,
+          psn_library_games: 0,
+          wishlist_games: 1,
+          price_alerts: 1,
+          friends: 1,
+        }}
         isPending={false}
         isError={false}
         onRetry={retry}

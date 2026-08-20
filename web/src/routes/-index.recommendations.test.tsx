@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   getDeals: vi.fn(),
   getFriends: vi.fn(),
   getLibraryOverview: vi.fn(),
+  getOnboardingSummary: vi.fn(),
   getProfile: vi.fn(),
   searchGames: vi.fn(),
 }));
@@ -60,6 +61,13 @@ beforeEach(() => {
   api.getDeals.mockResolvedValue({ results: [] });
   api.getFriends.mockResolvedValue([]);
   api.getLibraryOverview.mockResolvedValue({ games: [] });
+  api.getOnboardingSummary.mockResolvedValue({
+    steam_linked: true,
+    psn_library_games: 0,
+    wishlist_games: 1,
+    price_alerts: 1,
+    friends: 1,
+  });
   api.getProfile.mockResolvedValue({ display_name: "Player" });
   api.searchGames.mockResolvedValue({ results: [] });
 });
