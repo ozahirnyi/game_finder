@@ -5,6 +5,7 @@ import { useState, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { GameCover } from "@/components/GameCover";
+import { OnboardingGuidance } from "@/components/OnboardingGuidance";
 import { Chip, EmptyState, Panel, PriceBlock, SectionHeader, Stat } from "@/components/ui-bits";
 import {
   getAuthSnapshot,
@@ -12,6 +13,7 @@ import {
   getDeals,
   getFriends,
   getLibraryOverview,
+  getOnboardingSummary,
   getProfile,
   getTrendingGames,
   searchGames,
@@ -36,6 +38,11 @@ function Home() {
   const dashboardQuery = useQuery({
     queryKey: ["dashboard"],
     queryFn: getDashboard,
+    enabled: signedIn,
+  });
+  const onboardingQuery = useQuery({
+    queryKey: ["onboarding-summary"],
+    queryFn: getOnboardingSummary,
     enabled: signedIn,
   });
   const trendingQuery = useQuery({
@@ -137,6 +144,17 @@ function Home() {
           </div>
         )}
       </section>
+
+      {signedIn && (
+        <OnboardingGuidance
+          summary={onboardingQuery.data}
+          isPending={onboardingQuery.isPending}
+          isError={onboardingQuery.isError}
+          onRetry={() => {
+            void onboardingQuery.refetch();
+          }}
+        />
+      )}
 
       {signedIn && (
         <section className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2">

@@ -80,6 +80,14 @@ export type LibraryOverview = {
   steam_error?: string | null;
 };
 
+export type OnboardingSummary = {
+  steam_linked: boolean;
+  psn_library_games: number;
+  wishlist_games: number;
+  price_alerts: number;
+  friends: number;
+};
+
 export type CollectionGame = {
   id: string;
   catalog_game_id: number;
@@ -523,6 +531,10 @@ export function getTrendingGames() {
 
 export function getDashboard() {
   return apiRequest<Dashboard>("/dashboard", { auth: true });
+}
+
+export function getOnboardingSummary() {
+  return apiRequest<OnboardingSummary>("/onboarding/summary", { auth: true });
 }
 
 export function getCatalogGame(id: string | number) {

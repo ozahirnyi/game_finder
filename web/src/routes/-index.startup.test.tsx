@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   getFriends: vi.fn(),
   getIncomingFriendRequests: vi.fn(),
   getLibraryOverview: vi.fn(),
+  getOnboardingSummary: vi.fn(),
   getProfile: vi.fn(),
   getSteamSocial: vi.fn(),
   searchGames: vi.fn(),
@@ -54,11 +55,19 @@ function renderHome() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   api.getAuthSnapshot.mockReturnValue(true);
   api.getDeals.mockImplementation(() => new Promise(() => {}));
   api.getFriends.mockResolvedValue([]);
   api.getIncomingFriendRequests.mockResolvedValue([]);
   api.getLibraryOverview.mockResolvedValue({ games: [] });
+  api.getOnboardingSummary.mockResolvedValue({
+    steam_linked: false,
+    psn_library_games: 0,
+    wishlist_games: 0,
+    price_alerts: 0,
+    friends: 0,
+  });
   api.getProfile.mockResolvedValue({ display_name: "Player" });
   api.getSteamSocial.mockResolvedValue({ friends: [] });
   api.getDashboard.mockResolvedValue({ recommendations: { status: "empty", data: [] } });
@@ -99,5 +108,22 @@ describe("home startup", () => {
     expect(form).toHaveAttribute("method", "get");
     expect(input).toHaveAttribute("name", "q");
     expect(screen.getByRole("button", { name: "Search games" })).toHaveAttribute("type", "submit");
+  });
+
+  it("shows full setup guidance for a signed-in new user", async () => {
+    renderHome();
+
+    expect(await screen.findByText("Connect a library")).toBeInTheDocument();
+    expect(api.getOnboardingSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not request or render setup guidance for a signed-out visitor", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+
+    renderHome();
+
+    expect(await screen.findByRole("heading", { name: "Find your next game" })).toBeInTheDocument();
+    expect(api.getOnboardingSummary).not.toHaveBeenCalled();
+    expect(screen.queryByText("Connect a library")).not.toBeInTheDocument();
   });
 });

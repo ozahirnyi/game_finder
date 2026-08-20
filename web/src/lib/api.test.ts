@@ -10,6 +10,7 @@ import {
   getGoogleLoginUrl,
   getFavorites,
   getLibraryOverview,
+  getOnboardingSummary,
   getPublicProfile,
   getSteamLinkUrl,
   getAuthSnapshot,
@@ -127,6 +128,32 @@ describe("apiRequest", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/dashboard",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+  });
+
+  it("loads the authenticated onboarding summary", async () => {
+    setToken("token");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          steam_linked: false,
+          psn_library_games: 0,
+          wishlist_games: 0,
+          price_alerts: 0,
+          friends: 0,
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getOnboardingSummary();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/onboarding/summary",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
       }),

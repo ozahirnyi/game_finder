@@ -39,7 +39,7 @@ from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTr
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
-    HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
+    HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead
@@ -2137,6 +2137,46 @@ async def profile_summary(current_user: User = Depends(get_current_user), db: Se
         favorites=favorites_block(db, current_user.id),
         wishlist=wishlist_block(db, current_user.id),
         recently_played=empty_block("No recently played games are available yet."),
+    )
+
+
+@app.get("/onboarding/summary", response_model=OnboardingSummaryRead)
+def onboarding_summary(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    return OnboardingSummaryRead(
+        steam_linked=bool(current_user.steam_id),
+        psn_library_games=(
+            db.query(func.count(Game.id))
+            .filter(Game.owner_id == current_user.id, Game.source == "psn")
+            .scalar()
+            or 0
+        ),
+        wishlist_games=(
+            db.query(func.count(WishlistItem.id))
+            .filter(WishlistItem.user_id == current_user.id)
+            .scalar()
+            or 0
+        ),
+        price_alerts=(
+            db.query(func.count(PriceAlert.id))
+            .join(WishlistItem, PriceAlert.wishlist_item_id == WishlistItem.id)
+            .filter(
+                PriceAlert.user_id == current_user.id,
+                WishlistItem.user_id == current_user.id,
+            )
+            .scalar()
+            or 0
+        ),
+        friends=(
+            db.query(func.count(Friendship.id))
+            .filter(
+                (Friendship.user_low_id == current_user.id)
+                | (Friendship.user_high_id == current_user.id)
+            )
+            .scalar()
+            or 0
+        ),
     )
 
 
