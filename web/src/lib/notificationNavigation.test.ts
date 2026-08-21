@@ -9,7 +9,7 @@ describe("notificationDestination", () => {
   it("maps supported payloads to existing routes", () => {
     expect(notificationDestination(notification("friend_request", { request_id: "r-1" }))).toEqual({
       to: "/friends",
-      search: { request: "r-1" },
+      search: { request: "r-1", notification: "n" },
     });
     expect(notificationDestination(notification("friend_request_accepted", { public_id: "sam" }))).toEqual({
       to: "/users/$publicId",
@@ -17,7 +17,7 @@ describe("notificationDestination", () => {
     });
     expect(notificationDestination(notification("message", { conversation_id: "c-1" }))).toEqual({
       to: "/friends",
-      search: { conversation: "c-1" },
+      search: { conversation: "c-1", notification: "n" },
     });
     expect(notificationDestination(notification("price_alert", { catalog_game_id: 42 }))).toEqual({
       to: "/games/$gameId",
@@ -25,7 +25,7 @@ describe("notificationDestination", () => {
     });
     expect(notificationDestination(notification("game_invite_response", { invite_id: "i-1" }))).toEqual({
       to: "/friends",
-      search: { invite: "i-1" },
+      search: { invite: "i-1", notification: "n" },
     });
   });
 
