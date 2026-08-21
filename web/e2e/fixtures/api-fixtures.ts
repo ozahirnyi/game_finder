@@ -1,4 +1,4 @@
-import type { CatalogGame, Deal, OnboardingSummary, Profile } from "../../src/lib/api";
+import type { CatalogGame, CollectionGame, Deal, OnboardingSummary, PriceAlert, Profile } from "../../src/lib/api";
 
 export type GuestHomeFixtures = {
   trendingGames: { results: CatalogGame[] };
@@ -12,6 +12,8 @@ export type ApiState = GuestHomeFixtures & {
   onboarding: OnboardingSummary;
   profile: Profile;
   library: { games: []; steam_available: boolean };
+  wishlist: CollectionGame[];
+  alerts: PriceAlert[];
 };
 
 export function createGuestHomeFixtures(): ApiState {
@@ -48,5 +50,7 @@ export function createGuestHomeFixtures(): ApiState {
     onboarding: { steam_linked: false, psn_library_games: 0, wishlist_games: 0, price_alerts: 0, friends: 0 },
     profile: { id: "user-1", email: "player@example.com", display_name: "Player", bio: null, platforms: [], favorite_genres: [] },
     library: { games: [], steam_available: false },
+    wishlist: [{ id: "wishlist-101", catalog_game_id: 101, source: "catalog", external_id: "101", title: "Celeste" }],
+    alerts: [],
   };
 }

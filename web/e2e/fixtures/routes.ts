@@ -66,6 +66,14 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
       if (state.onboardingFailureCount-- > 0) { await route.fulfill({ status: 500, json: { detail: "Unavailable" } }); return; }
       await route.fulfill({ json: state.onboarding }); return;
     }
+    if (request.method() === "GET" && path === "/wishlist") { await route.fulfill({ json: state.wishlist }); return; }
+    if (request.method() === "GET" && path === "/telegram/me") { await route.fulfill({ json: { configured: false, linked: false } }); return; }
+    if (request.method() === "GET" && path === "/price-alerts") { await route.fulfill({ json: state.alerts }); return; }
+    if (request.method() === "POST" && path === "/price-alerts") {
+      const body = requestRecord.jsonBody as Omit<import("../../src/lib/api").PriceAlert, "id" | "created_at" | "updated_at">;
+      const alert = { ...body, id: "alert-1", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" };
+      state.alerts.push(alert); await route.fulfill({ json: alert }); return;
+    }
 
     await route.fulfill({ status: 501, json: { detail: "Unmocked API request" } });
   });

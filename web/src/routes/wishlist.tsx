@@ -42,7 +42,11 @@ function WishlistPage() {
   const navigate = useNavigate();
   const [showAlerts, setShowAlerts] = useState(false);
   const [catalogGameId, setCatalogGameId] = useState("");
-  const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist });
+  const wishlistQuery = useQuery({
+    queryKey: ["wishlist"],
+    queryFn: getWishlist,
+    refetchOnMount: "always",
+  });
   const removeMutation = useMutation({
     mutationFn: removeWishlist,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
@@ -52,7 +56,6 @@ function WishlistPage() {
     mutationFn: (data: PriceAlertCreate) => createPriceAlert(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["price-alerts"] });
-      setShowAlerts(false);
     },
   });
   const deleteAlertMutation = useMutation({
