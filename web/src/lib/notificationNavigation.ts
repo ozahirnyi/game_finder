@@ -2,7 +2,7 @@ import type { Notification } from "./api";
 
 export type NotificationDestination =
   | { to: "/friends"; search: { request?: string; conversation?: string; invite?: string } }
-  | { to: "/friends/$friendId"; params: { friendId: string } }
+  | { to: "/users/$publicId"; params: { publicId: string } }
   | { to: "/games/$gameId"; params: { gameId: string } };
 
 const stringField = (payload: Record<string, unknown>, key: string) =>
@@ -17,8 +17,8 @@ export function notificationDestination(
       return request ? { to: "/friends", search: { request } } : null;
     }
     case "friend_request_accepted": {
-      const friendId = stringField(notification.payload, "friend_id");
-      return friendId ? { to: "/friends/$friendId", params: { friendId } } : null;
+      const publicId = stringField(notification.payload, "public_id");
+      return publicId ? { to: "/users/$publicId", params: { publicId } } : null;
     }
     case "message": {
       const conversation = stringField(notification.payload, "conversation_id");

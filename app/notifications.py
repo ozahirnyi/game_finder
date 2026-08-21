@@ -18,8 +18,10 @@ def friend_request_payload(*, request_id: UUID, from_name: str) -> dict[str, str
     return {"request_id": str(request_id), "from": from_name}
 
 
-def friend_request_accepted_payload(*, friend_id: UUID, by: str) -> dict[str, str]:
-    return {"friend_id": str(friend_id), "by": by}
+def friend_request_accepted_payload(
+    *, friend_id: UUID, public_id: str, by: str
+) -> dict[str, str]:
+    return {"friend_id": str(friend_id), "public_id": public_id, "by": by}
 
 
 def message_payload(*, conversation_id: UUID, from_name: str, preview: str) -> dict[str, str]:

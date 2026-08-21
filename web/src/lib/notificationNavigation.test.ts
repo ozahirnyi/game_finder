@@ -11,9 +11,9 @@ describe("notificationDestination", () => {
       to: "/friends",
       search: { request: "r-1" },
     });
-    expect(notificationDestination(notification("friend_request_accepted", { friend_id: "f-1" }))).toEqual({
-      to: "/friends/$friendId",
-      params: { friendId: "f-1" },
+    expect(notificationDestination(notification("friend_request_accepted", { public_id: "sam" }))).toEqual({
+      to: "/users/$publicId",
+      params: { publicId: "sam" },
     });
     expect(notificationDestination(notification("message", { conversation_id: "c-1" }))).toEqual({
       to: "/friends",

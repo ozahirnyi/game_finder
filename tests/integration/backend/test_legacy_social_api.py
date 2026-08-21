@@ -42,7 +42,11 @@ def test_legacy_friend_requests_cover_lists_create_accept_and_owner_checks(
     assert db_session.query(FriendRequest).count() == 0
     assert db_session.query(Friendship).count() == 1
     accepted_notice = db_session.query(Notification).filter(Notification.user_id == sender.id).one()
-    assert accepted_notice.payload == {"friend_id": str(recipient.id), "by": "Recipient"}
+    assert accepted_notice.payload == {
+        "friend_id": str(recipient.id),
+        "public_id": recipient.public_id,
+        "by": "Recipient",
+    }
 
     auth_as(outsider)
     assert api_client.post(f"/friends/requests/{request_id}/accept").status_code == 404
