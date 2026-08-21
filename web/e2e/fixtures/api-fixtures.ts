@@ -6,7 +6,11 @@ export type GuestHomeFixtures = {
   deals: { results: Deal[] };
 };
 
-export function createGuestHomeFixtures(): GuestHomeFixtures {
+export type ApiState = GuestHomeFixtures & {
+  trendingFailureCount: number;
+};
+
+export function createGuestHomeFixtures(): ApiState {
   return {
     trendingGames: {
       results: [
@@ -35,5 +39,6 @@ export function createGuestHomeFixtures(): GuestHomeFixtures {
         },
       ],
     },
+    trendingFailureCount: 0,
   };
 }

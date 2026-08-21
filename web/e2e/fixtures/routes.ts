@@ -1,5 +1,5 @@
 import type { Page, Route } from "@playwright/test";
-import { createGuestHomeFixtures } from "./api-fixtures";
+import { createGuestHomeFixtures, type ApiState } from "./api-fixtures";
 
 export type ApiRequest = {
   method: string;
@@ -8,7 +8,7 @@ export type ApiRequest = {
   jsonBody?: unknown;
 };
 
-export type ApiRoutes = { requests: ApiRequest[] };
+export type ApiRoutes = { requests: ApiRequest[]; state: ApiState };
 
 async function jsonBody(route: Route) {
   if (route.request().postData() === null) return undefined;
@@ -21,6 +21,7 @@ async function jsonBody(route: Route) {
 
 export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
   const requests: ApiRequest[] = [];
+  const state = createGuestHomeFixtures();
 
   await page.route("**/api/**", async (route) => {
     const request = route.request();
@@ -35,22 +36,26 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
     if (body !== undefined) requestRecord.jsonBody = body;
     requests.push(requestRecord);
 
-    const fixtures = createGuestHomeFixtures();
     if (request.method() === "GET" && path === "/catalog/trending-games") {
-      await route.fulfill({ json: fixtures.trendingGames });
+      if (state.trendingFailureCount > 0) {
+        state.trendingFailureCount -= 1;
+        await route.fulfill({ status: 500, json: { detail: "Catalog unavailable" } });
+        return;
+      }
+      await route.fulfill({ json: state.trendingGames });
       return;
     }
     if (request.method() === "GET" && path === "/search/games") {
-      await route.fulfill({ json: fixtures.searchGames });
+      await route.fulfill({ json: state.searchGames });
       return;
     }
     if (request.method() === "GET" && path === "/prices/deals") {
-      await route.fulfill({ json: fixtures.deals });
+      await route.fulfill({ json: state.deals });
       return;
     }
 
     await route.fulfill({ status: 501, json: { detail: "Unmocked API request" } });
   });
 
-  return { requests };
+  return { requests, state };
 }
