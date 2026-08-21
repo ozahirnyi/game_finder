@@ -25,3 +25,27 @@ test("malformed notification targets stay unread and show a neutral unavailable 
   await expect(page.getByRole("status")).toContainText("This notification action is no longer available.");
   await expect.poll(() => api.requests.some((request) => request.path === "/notifications/n-bad/read")).toBe(false);
 });
+
+const notificationDestinations = [
+  ["friend_request_accepted", "Friend request accepted", { by: "Sam", public_id: "sam-player" }, "**/users/sam-player"],
+  ["message", "New message", { from: "Sam", conversation_id: "conversation-1" }, "**/friends?conversation=conversation-1"],
+  ["game_invite", "Game invite", { from: "Sam", game_name: "Celeste", invite_id: "invite-1" }, "**/friends?invite=invite-1"],
+  ["game_invite_response", "Game invite response", { by: "Sam", invite_id: "invite-1", status: "accepted" }, "**/friends?invite=invite-1"],
+  ["price_alert", "Notification", { catalog_game_id: 101, message: "Celeste is discounted" }, "**/games/101"],
+];
+
+for (const [type, title, payload, url] of notificationDestinations) {
+  test(`${type} deep link uses its canonical destination`, async ({ page, api }) => {
+  api.state.notifications = [{ id: "n-target", type, payload, created_at: "2026-08-21T00:00:00Z" }];
+  api.state.publicProfiles["sam-player"] = {
+    public_id: "sam-player", nickname: "Sam", relationship: "none",
+    library: { status: "hidden", data: [] }, favorites: { status: "hidden", data: [] }, wishlist: { status: "hidden", data: [] },
+  };
+  await signIn(page);
+  await page.goto("/account");
+  await waitForHydration(page);
+  await page.getByText(title, { exact: true }).click();
+  await page.waitForURL(url);
+  await expect.poll(() => api.requests.some((request) => request.path === "/notifications/n-target/read")).toBe(true);
+  });
+}
