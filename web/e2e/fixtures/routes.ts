@@ -6,6 +6,7 @@ export type ApiRequest = {
   path: string;
   query: string;
   jsonBody?: unknown;
+  formBody?: string;
 };
 
 export type ApiRoutes = { requests: ApiRequest[]; state: ApiState };
@@ -34,6 +35,7 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
     };
     const body = await jsonBody(route);
     if (body !== undefined) requestRecord.jsonBody = body;
+    if (request.postData()) requestRecord.formBody = request.postData();
     requests.push(requestRecord);
 
     if (request.method() === "GET" && path === "/catalog/trending-games") {
@@ -51,6 +53,10 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
     }
     if (request.method() === "GET" && path === "/prices/deals") {
       await route.fulfill({ json: state.deals });
+      return;
+    }
+    if (request.method() === "POST" && path === "/auth/login") {
+      await route.fulfill({ json: { access_token: "browser-token", token_type: "bearer" } });
       return;
     }
 
