@@ -1,4 +1,4 @@
-import type { CatalogGame, Deal } from "../../src/lib/api";
+import type { CatalogGame, Deal, OnboardingSummary, Profile } from "../../src/lib/api";
 
 export type GuestHomeFixtures = {
   trendingGames: { results: CatalogGame[] };
@@ -8,6 +8,10 @@ export type GuestHomeFixtures = {
 
 export type ApiState = GuestHomeFixtures & {
   trendingFailureCount: number;
+  onboardingFailureCount: number;
+  onboarding: OnboardingSummary;
+  profile: Profile;
+  library: { games: []; steam_available: boolean };
 };
 
 export function createGuestHomeFixtures(): ApiState {
@@ -40,5 +44,9 @@ export function createGuestHomeFixtures(): ApiState {
       ],
     },
     trendingFailureCount: 0,
+    onboardingFailureCount: 0,
+    onboarding: { steam_linked: false, psn_library_games: 0, wishlist_games: 0, price_alerts: 0, friends: 0 },
+    profile: { id: "user-1", email: "player@example.com", display_name: "Player", bio: null, platforms: [], favorite_genres: [] },
+    library: { games: [], steam_available: false },
   };
 }

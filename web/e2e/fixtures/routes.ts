@@ -59,6 +59,13 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
       await route.fulfill({ json: { access_token: "browser-token", token_type: "bearer" } });
       return;
     }
+    if (request.method() === "GET" && path === "/profile") { await route.fulfill({ json: state.profile }); return; }
+    if (request.method() === "GET" && path === "/library/overview") { await route.fulfill({ json: state.library }); return; }
+    if (request.method() === "GET" && path === "/favorites") { await route.fulfill({ json: [] }); return; }
+    if (request.method() === "GET" && path === "/onboarding/summary") {
+      if (state.onboardingFailureCount-- > 0) { await route.fulfill({ status: 500, json: { detail: "Unavailable" } }); return; }
+      await route.fulfill({ json: state.onboarding }); return;
+    }
 
     await route.fulfill({ status: 501, json: { detail: "Unmocked API request" } });
   });
