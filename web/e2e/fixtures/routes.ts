@@ -55,6 +55,15 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
       await route.fulfill({ json: state.deals });
       return;
     }
+    if (request.method() === "GET" && path === "/catalog/games/101") {
+      await route.fulfill({ json: { id: 101, name: "Celeste", genres: ["Platformer"], platforms: ["PC"], description_raw: "A mountain adventure." } }); return;
+    }
+    if (request.method() === "GET" && path === "/steam/games/440") {
+      await route.fulfill({ json: { appid: 440, name: "Team Fortress 2", genres: [], platforms: ["PC"], description_raw: "Steam game." } }); return;
+    }
+    if (request.method() === "GET" && (path === "/prices/games/101" || path === "/prices/steam-games/440")) {
+      await route.fulfill({ json: { history: [] } }); return;
+    }
     if (request.method() === "POST" && path === "/auth/login") {
       await route.fulfill({ json: { access_token: "browser-token", token_type: "bearer" } });
       return;
@@ -62,11 +71,13 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
     if (request.method() === "GET" && path === "/profile") { await route.fulfill({ json: state.profile }); return; }
     if (request.method() === "GET" && path === "/library/overview") { await route.fulfill({ json: state.library }); return; }
     if (request.method() === "GET" && path === "/favorites") { await route.fulfill({ json: [] }); return; }
+    if (request.method() === "POST" && path === "/favorites/catalog-games/101") { await route.fulfill({ json: { id: "favorite-101", catalog_game_id: 101, source: "catalog", external_id: "101", title: "Celeste" } }); return; }
     if (request.method() === "GET" && path === "/onboarding/summary") {
       if (state.onboardingFailureCount-- > 0) { await route.fulfill({ status: 500, json: { detail: "Unavailable" } }); return; }
       await route.fulfill({ json: state.onboarding }); return;
     }
     if (request.method() === "GET" && path === "/wishlist") { await route.fulfill({ json: state.wishlist }); return; }
+    if (request.method() === "POST" && path === "/wishlist/steam-games/440") { await route.fulfill({ json: { id: "wishlist-440", catalog_game_id: 440, source: "steam", external_id: "440", title: "Team Fortress 2" } }); return; }
     if (request.method() === "GET" && path === "/telegram/me") { await route.fulfill({ json: { configured: false, linked: false } }); return; }
     if (request.method() === "GET" && path === "/price-alerts") { await route.fulfill({ json: state.alerts }); return; }
     if (request.method() === "POST" && path === "/price-alerts") {

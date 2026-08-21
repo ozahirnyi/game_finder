@@ -39,3 +39,31 @@ test("wishlist alert sends exact target price and target discount payloads", asy
   await expect(page.getByText("Celeste: alert below 19.99")).toBeVisible();
   await expect(page.getByText("Celeste: alert at 35% off")).toBeVisible();
 });
+
+test("catalog details save an owner-scoped favorite while Steam details use the Steam wishlist identity", async ({ page, api }) => {
+  await signIn(page);
+  api.state.searchGames.results = [
+    { id: 101, name: "Celeste", genres: ["Platformer"], platforms: ["PC"] },
+    { id: null, steam_appid: 440, source: "steam", name: "Team Fortress 2", genres: [], platforms: ["PC"] },
+  ];
+  await page.goto("/");
+  await waitForHydration(page);
+  await page.getByPlaceholder("Search games by title").fill("team");
+  await expect(page.getByRole("link", { name: /Team Fortress 2/ })).toBeVisible();
+  await page.getByRole("link", { name: /Celeste/ }).last().click();
+  await page.waitForURL("**/games/101*");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Add to favorites" }).click();
+  await expect.poll(() => api.requests.some((request) => request.method === "POST" && request.path === "/favorites/catalog-games/101")).toBe(true);
+  await expect(page.getByRole("button", { name: "Remove from favorites" })).toBeVisible();
+
+  await page.goto("/");
+  await waitForHydration(page);
+  await page.getByPlaceholder("Search games by title").fill("team");
+  await page.getByRole("link", { name: /Team Fortress 2/ }).click();
+  await page.waitForURL("**/games/440*source=steam*");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Add to wishlist" }).click();
+  await expect.poll(() => api.requests.some((request) => request.method === "POST" && request.path === "/wishlist/steam-games/440")).toBe(true);
+  await expect(page.getByRole("button", { name: "In wishlist" })).toBeVisible();
+});
