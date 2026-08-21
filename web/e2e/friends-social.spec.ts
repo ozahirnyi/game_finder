@@ -42,4 +42,10 @@ test("friend profile message and invite mutations use the canonical friend id an
   await page.getByLabel("Message text").fill("Retry me");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("alert")).toContainText("Could not send message.");
+
+  api.state.statusByPath["/game-invites"] = 500;
+  await page.goto("/users/sam-player?compose=invite");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Send invite" }).click();
+  await expect(page.getByRole("alert")).toContainText("Could not send invite.");
 });
