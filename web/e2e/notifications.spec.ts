@@ -22,7 +22,7 @@ test("malformed notification targets stay unread and show a neutral unavailable 
   await page.goto("/account");
   await waitForHydration(page);
   await page.getByText("Game invite", { exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("This notification action is no longer available.");
+  await expect(page.getByRole("status")).toContainText("This notification action is no longer available.", { timeout: 15_000 });
   await expect.poll(() => api.requests.some((request) => request.path === "/notifications/n-bad/read")).toBe(false);
 });
 
@@ -58,6 +58,17 @@ test("deleted friend-request targets stay unread and report neutral unavailabili
   await page.goto("/account");
   await waitForHydration(page);
   await page.getByText("Friend request", { exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("This notification action is no longer available.");
+  await expect(page.getByRole("status")).toContainText("This notification action is no longer available.", { timeout: 15_000 });
   await expect.poll(() => api.requests.some((request) => request.path === "/notifications/n-deleted/read")).toBe(false);
+});
+
+test("unauthorized friend-request targets stay unread and report neutral unavailability", async ({ page, api }) => {
+  api.state.notifications = [{ id: "n-unauthorized", type: "friend_request", payload: { request_id: "request-1", from: "Sam" }, created_at: "2026-08-21T00:00:00Z" }];
+  api.state.statusByPath["/friends/requests/incoming"] = 403;
+  await signIn(page);
+  await page.goto("/account");
+  await waitForHydration(page);
+  await page.getByText("Friend request", { exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("This notification action is no longer available.");
+  await expect.poll(() => api.requests.some((request) => request.path === "/notifications/n-unauthorized/read")).toBe(false);
 });

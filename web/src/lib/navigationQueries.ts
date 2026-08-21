@@ -17,6 +17,7 @@ export const friendsQueryOptions = () => ({
 export const incomingFriendRequestsQueryOptions = () => ({
   queryKey: ["friend-requests", "incoming"] as const,
   queryFn: getIncomingFriendRequests,
+  retry: false,
   staleTime: NAVIGATION_STALE_TIME,
 });
 

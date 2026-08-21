@@ -161,10 +161,11 @@ function FriendsPage() {
     Boolean(
       notificationSearch.request || notificationSearch.invite || notificationSearch.conversation,
     ) &&
-    incomingQuery.isSuccess &&
-    gameInvitesQuery.isSuccess &&
-    conversationsQuery.isSuccess &&
-    !hasNotificationTarget;
+    !hasNotificationTarget &&
+    (incomingQuery.isError ||
+      gameInvitesQuery.isError ||
+      conversationsQuery.isError ||
+      (incomingQuery.isSuccess && gameInvitesQuery.isSuccess && conversationsQuery.isSuccess));
   const steamFriends = (steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? []).sort(
     (a, b) =>
       b.taste_match_percent - a.taste_match_percent || b.common_games_count - a.common_games_count,
