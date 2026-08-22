@@ -33,7 +33,9 @@ export const Route = createFileRoute("/friends/")({
       ? { conversation: search.conversation }
       : {}),
     ...(typeof search.invite === "string" && search.invite ? { invite: search.invite } : {}),
-    ...(typeof search.notification === "string" && search.notification ? { notification: search.notification } : {}),
+    ...(typeof search.notification === "string" && search.notification
+      ? { notification: search.notification }
+      : {}),
   }),
   head: () => ({
     meta: [
@@ -152,7 +154,11 @@ function FriendsPage() {
   );
   const hasNotificationTarget = Boolean(matchingRequest || matchingInvite || matchingConversation);
   useEffect(() => {
-    if (notificationSearch.notification && hasNotificationTarget && !markedNotificationIds.current.has(notificationSearch.notification)) {
+    if (
+      notificationSearch.notification &&
+      hasNotificationTarget &&
+      !markedNotificationIds.current.has(notificationSearch.notification)
+    ) {
       markedNotificationIds.current.add(notificationSearch.notification);
       void markNotificationRead(notificationSearch.notification);
     }

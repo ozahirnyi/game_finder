@@ -11,9 +11,9 @@ export function createFutureJwt(claims: Record<string, unknown> = {}) {
 
 export async function signIn(page: Page, claims: Record<string, unknown> = {}) {
   const token = createFutureJwt(claims);
-  await page.addInitScript(
-    ({ key, value }) => window.localStorage.setItem(key, value),
-    { key: AUTH_TOKEN_STORAGE_KEY, value: token },
-  );
+  await page.addInitScript(({ key, value }) => window.localStorage.setItem(key, value), {
+    key: AUTH_TOKEN_STORAGE_KEY,
+    value: token,
+  });
   return token;
 }
