@@ -124,7 +124,11 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
     }
     if (request.method() === "GET" && path === "/game-invites") { await route.fulfill({ json: state.gameInvites }); return; }
     if (request.method() === "POST" && path === "/game-invites") {
-      const invite = { id: "invite-created", ...(requestRecord.jsonBody as object), status: "pending", sender: state.profile, recipient: state.users[0], created_at: "2026-08-21T00:00:00Z" };
+      const recipientId = (requestRecord.jsonBody as { recipient_id: string }).recipient_id;
+      const recipient =
+        state.friends.find((friend) => friend.user.id === recipientId)?.user ?? state.users[0];
+      const sender = { id: state.profile.id, public_id: "player", display_name: state.profile.display_name };
+      const invite = { id: "invite-created", ...(requestRecord.jsonBody as object), status: "pending", sender, recipient, created_at: "2026-08-21T00:00:00Z" };
       state.gameInvites.push(invite as GameInvite); await route.fulfill({ json: invite }); return;
     }
     if (request.method() === "POST" && /^\/game-invites\/[^/]+\/response$/.test(path)) {

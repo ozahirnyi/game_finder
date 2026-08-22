@@ -134,6 +134,11 @@ export function ProfileView({
     setPlatforms(profile.settings.platforms);
     setFavoriteGenres(profile.settings.favoriteGenres);
   }, [profile.settings]);
+  useEffect(() => {
+    if (!inviteOpen || selectedGameKey || !profile.sharedLibrary?.data[0]) return;
+    const game = profile.sharedLibrary.data[0];
+    setSelectedGameKey(`${game.source}:${game.external_id}`);
+  }, [inviteOpen, profile.sharedLibrary, selectedGameKey]);
   const resetMessageComposer = () => {
     setMessageBody("");
     if (messageTextareaRef.current) messageTextareaRef.current.style.height = "";
