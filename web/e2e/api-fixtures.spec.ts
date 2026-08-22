@@ -1,6 +1,9 @@
 import { expect, test } from "./fixtures/test";
 
-test("records an unhandled API request and returns a diagnostic response", async ({ page, api }) => {
+test("records an unhandled API request and returns a diagnostic response", async ({
+  page,
+  api,
+}) => {
   await page.goto("/");
   const response = await page.evaluate(async () => {
     const result = await fetch("/api/not-mocked");

@@ -1,7 +1,10 @@
 import type { Notification } from "./api";
 
 export type NotificationDestination =
-  | { to: "/friends"; search: { request?: string; conversation?: string; invite?: string; notification?: string } }
+  | {
+      to: "/friends";
+      search: { request?: string; conversation?: string; invite?: string; notification?: string };
+    }
   | { to: "/users/$publicId"; params: { publicId: string } }
   | { to: "/games/$gameId"; params: { gameId: string } };
 
@@ -14,7 +17,9 @@ export function notificationDestination(
   switch (notification.type) {
     case "friend_request": {
       const request = stringField(notification.payload, "request_id");
-      return request ? { to: "/friends", search: { request, notification: notification.id } } : null;
+      return request
+        ? { to: "/friends", search: { request, notification: notification.id } }
+        : null;
     }
     case "friend_request_accepted": {
       const publicId = stringField(notification.payload, "public_id");
@@ -22,7 +27,9 @@ export function notificationDestination(
     }
     case "message": {
       const conversation = stringField(notification.payload, "conversation_id");
-      return conversation ? { to: "/friends", search: { conversation, notification: notification.id } } : null;
+      return conversation
+        ? { to: "/friends", search: { conversation, notification: notification.id } }
+        : null;
     }
     case "game_invite":
     case "game_invite_response": {
