@@ -5,8 +5,8 @@ import type { Page } from "@playwright/test";
 type Fixtures = { api: ApiRoutes };
 
 export const test = base.extend<Fixtures>({
-  api: async ({ page }, use) => {
-    await use(await installGuestHomeRoutes(page));
+  api: async ({ page }, provideApi) => {
+    await provideApi(await installGuestHomeRoutes(page));
   },
 });
 

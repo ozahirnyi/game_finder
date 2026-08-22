@@ -6,7 +6,14 @@ test("guest discovery links catalog and Steam search results to their truthful d
 }) => {
   api.state.searchGames.results = [
     { id: 101, name: "Celeste", genres: ["Platformer"], platforms: ["PC"] },
-    { id: null, steam_appid: 440, source: "steam", name: "Team Fortress 2", genres: [], platforms: ["PC"] },
+    {
+      id: null,
+      steam_appid: 440,
+      source: "steam",
+      name: "Team Fortress 2",
+      genres: [],
+      platforms: ["PC"],
+    },
   ];
 
   await page.goto("/");
@@ -14,16 +21,24 @@ test("guest discovery links catalog and Steam search results to their truthful d
   await page.getByRole("button", { name: "Search games" }).click();
   await page.waitForURL("/search?q=team");
 
-  await expect.poll(() => api.requests.some((request) => request.path === "/search/games")).toBe(true);
+  await expect
+    .poll(() => api.requests.some((request) => request.path === "/search/games"))
+    .toBe(true);
 
-  await expect(page.getByRole("link", { name: /Celeste/ })).toHaveAttribute("href", "/games/101?title=Celeste");
+  await expect(page.getByRole("link", { name: /Celeste/ })).toHaveAttribute(
+    "href",
+    "/games/101?title=Celeste",
+  );
   await expect(page.getByRole("link", { name: /Team Fortress 2/ })).toHaveAttribute(
     "href",
     "/games/440?title=Team+Fortress+2&source=steam",
   );
 });
 
-test("guest discovery makes empty and failed catalog states truthful and retryable", async ({ page, api }) => {
+test("guest discovery makes empty and failed catalog states truthful and retryable", async ({
+  page,
+  api,
+}) => {
   api.state.trendingGames = { results: [] };
   api.state.trendingFailureCount = 4;
   await page.goto("/");
