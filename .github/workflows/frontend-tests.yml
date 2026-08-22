@@ -1,6 +1,7 @@
 name: Frontend tests
 
 on:
+  # Keep frontend validation scoped to pull requests that affect its inputs.
   pull_request:
     branches:
       - main
