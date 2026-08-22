@@ -1,14 +1,15 @@
 import type { Page, Route } from "@playwright/test";
-import { createGuestHomeFixtures } from "./api-fixtures";
+import { createGuestHomeFixtures, type ApiState } from "./api-fixtures";
 
 export type ApiRequest = {
   method: string;
   path: string;
   query: string;
   jsonBody?: unknown;
+  formBody?: string;
 };
 
-export type ApiRoutes = { requests: ApiRequest[] };
+export type ApiRoutes = { requests: ApiRequest[]; state: ApiState };
 
 async function jsonBody(route: Route) {
   if (route.request().postData() === null) return undefined;
@@ -21,6 +22,7 @@ async function jsonBody(route: Route) {
 
 export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
   const requests: ApiRequest[] = [];
+  const state = createGuestHomeFixtures();
 
   await page.route("**/api/**", async (route) => {
     const request = route.request();
@@ -33,24 +35,59 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
     };
     const body = await jsonBody(route);
     if (body !== undefined) requestRecord.jsonBody = body;
+    if (request.postData()) requestRecord.formBody = request.postData();
     requests.push(requestRecord);
 
-    const fixtures = createGuestHomeFixtures();
     if (request.method() === "GET" && path === "/catalog/trending-games") {
-      await route.fulfill({ json: fixtures.trendingGames });
+      if (state.trendingFailureCount > 0) {
+        state.trendingFailureCount -= 1;
+        await route.fulfill({ status: 500, json: { detail: "Catalog unavailable" } });
+        return;
+      }
+      await route.fulfill({ json: state.trendingGames });
       return;
     }
     if (request.method() === "GET" && path === "/search/games") {
-      await route.fulfill({ json: fixtures.searchGames });
+      await route.fulfill({ json: state.searchGames });
       return;
     }
     if (request.method() === "GET" && path === "/prices/deals") {
-      await route.fulfill({ json: fixtures.deals });
+      await route.fulfill({ json: state.deals });
       return;
+    }
+    if (request.method() === "GET" && path === "/catalog/games/101") {
+      await route.fulfill({ json: { id: 101, name: "Celeste", genres: ["Platformer"], platforms: ["PC"], description_raw: "A mountain adventure." } }); return;
+    }
+    if (request.method() === "GET" && path === "/steam/games/440") {
+      await route.fulfill({ json: { appid: 440, name: "Team Fortress 2", genres: [], platforms: ["PC"], description_raw: "Steam game." } }); return;
+    }
+    if (request.method() === "GET" && (path === "/prices/games/101" || path === "/prices/steam-games/440")) {
+      await route.fulfill({ json: { history: [] } }); return;
+    }
+    if (request.method() === "POST" && path === "/auth/login") {
+      await route.fulfill({ json: { access_token: "browser-token", token_type: "bearer" } });
+      return;
+    }
+    if (request.method() === "GET" && path === "/profile") { await route.fulfill({ json: state.profile }); return; }
+    if (request.method() === "GET" && path === "/library/overview") { await route.fulfill({ json: state.library }); return; }
+    if (request.method() === "GET" && path === "/favorites") { await route.fulfill({ json: [] }); return; }
+    if (request.method() === "POST" && path === "/favorites/catalog-games/101") { await route.fulfill({ json: { id: "favorite-101", catalog_game_id: 101, source: "catalog", external_id: "101", title: "Celeste" } }); return; }
+    if (request.method() === "GET" && path === "/onboarding/summary") {
+      if (state.onboardingFailureCount-- > 0) { await route.fulfill({ status: 500, json: { detail: "Unavailable" } }); return; }
+      await route.fulfill({ json: state.onboarding }); return;
+    }
+    if (request.method() === "GET" && path === "/wishlist") { await route.fulfill({ json: state.wishlist }); return; }
+    if (request.method() === "POST" && path === "/wishlist/steam-games/440") { await route.fulfill({ json: { id: "wishlist-440", catalog_game_id: 440, source: "steam", external_id: "440", title: "Team Fortress 2" } }); return; }
+    if (request.method() === "GET" && path === "/telegram/me") { await route.fulfill({ json: { configured: false, linked: false } }); return; }
+    if (request.method() === "GET" && path === "/price-alerts") { await route.fulfill({ json: state.alerts }); return; }
+    if (request.method() === "POST" && path === "/price-alerts") {
+      const body = requestRecord.jsonBody as Omit<import("../../src/lib/api").PriceAlert, "id" | "created_at" | "updated_at">;
+      const alert = { ...body, id: "alert-1", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" };
+      state.alerts.push(alert); await route.fulfill({ json: alert }); return;
     }
 
     await route.fulfill({ status: 501, json: { detail: "Unmocked API request" } });
   });
 
-  return { requests };
+  return { requests, state };
 }

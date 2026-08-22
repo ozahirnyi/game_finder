@@ -1,4 +1,4 @@
-import type { CatalogGame, Deal } from "../../src/lib/api";
+import type { CatalogGame, CollectionGame, Deal, OnboardingSummary, PriceAlert, Profile } from "../../src/lib/api";
 
 export type GuestHomeFixtures = {
   trendingGames: { results: CatalogGame[] };
@@ -6,7 +6,17 @@ export type GuestHomeFixtures = {
   deals: { results: Deal[] };
 };
 
-export function createGuestHomeFixtures(): GuestHomeFixtures {
+export type ApiState = GuestHomeFixtures & {
+  trendingFailureCount: number;
+  onboardingFailureCount: number;
+  onboarding: OnboardingSummary;
+  profile: Profile;
+  library: { games: []; steam_available: boolean };
+  wishlist: CollectionGame[];
+  alerts: PriceAlert[];
+};
+
+export function createGuestHomeFixtures(): ApiState {
   return {
     trendingGames: {
       results: [
@@ -35,5 +45,12 @@ export function createGuestHomeFixtures(): GuestHomeFixtures {
         },
       ],
     },
+    trendingFailureCount: 0,
+    onboardingFailureCount: 0,
+    onboarding: { steam_linked: false, psn_library_games: 0, wishlist_games: 0, price_alerts: 0, friends: 0 },
+    profile: { id: "user-1", email: "player@example.com", display_name: "Player", bio: null, platforms: [], favorite_genres: [] },
+    library: { games: [], steam_available: false },
+    wishlist: [{ id: "wishlist-101", catalog_game_id: 101, source: "catalog", external_id: "101", title: "Celeste" }],
+    alerts: [],
   };
 }
