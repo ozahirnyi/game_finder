@@ -1322,7 +1322,16 @@ def accept_friend_request(
     friendship = Friendship(user_low_id=low_id, user_high_id=high_id)
     db.add(friendship)
     sender = db.query(User).filter(User.id == request.sender_id).first()
-    create_notification(db, sender.id, "friend_request_accepted", friend_request_accepted_payload(friend_id=current_user.id, by=notification_actor_name(current_user)))
+    create_notification(
+        db,
+        sender.id,
+        "friend_request_accepted",
+        friend_request_accepted_payload(
+            friend_id=current_user.id,
+            public_id=current_user.public_id,
+            by=notification_actor_name(current_user),
+        ),
+    )
     db.delete(request)
     db.commit()
     db.refresh(friendship)

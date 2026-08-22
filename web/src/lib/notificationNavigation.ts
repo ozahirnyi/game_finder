@@ -1,8 +1,8 @@
 import type { Notification } from "./api";
 
 export type NotificationDestination =
-  | { to: "/friends"; search: { request?: string; conversation?: string; invite?: string } }
-  | { to: "/friends/$friendId"; params: { friendId: string } }
+  | { to: "/friends"; search: { request?: string; conversation?: string; invite?: string; notification?: string } }
+  | { to: "/users/$publicId"; params: { publicId: string } }
   | { to: "/games/$gameId"; params: { gameId: string } };
 
 const stringField = (payload: Record<string, unknown>, key: string) =>
@@ -14,20 +14,20 @@ export function notificationDestination(
   switch (notification.type) {
     case "friend_request": {
       const request = stringField(notification.payload, "request_id");
-      return request ? { to: "/friends", search: { request } } : null;
+      return request ? { to: "/friends", search: { request, notification: notification.id } } : null;
     }
     case "friend_request_accepted": {
-      const friendId = stringField(notification.payload, "friend_id");
-      return friendId ? { to: "/friends/$friendId", params: { friendId } } : null;
+      const publicId = stringField(notification.payload, "public_id");
+      return publicId ? { to: "/users/$publicId", params: { publicId } } : null;
     }
     case "message": {
       const conversation = stringField(notification.payload, "conversation_id");
-      return conversation ? { to: "/friends", search: { conversation } } : null;
+      return conversation ? { to: "/friends", search: { conversation, notification: notification.id } } : null;
     }
     case "game_invite":
     case "game_invite_response": {
       const invite = stringField(notification.payload, "invite_id");
-      return invite ? { to: "/friends", search: { invite } } : null;
+      return invite ? { to: "/friends", search: { invite, notification: notification.id } } : null;
     }
     case "price_alert": {
       const gameId = notification.payload.catalog_game_id;

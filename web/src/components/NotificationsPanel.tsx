@@ -97,7 +97,7 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                     return;
                   }
                   void navigate(destination);
-                  if (isUnread) markRead.mutate(n.id);
+                  if (isUnread && destination.to !== "/friends") markRead.mutate(n.id);
                 }}
                 className={`flex items-start gap-3 rounded-xl border p-3 transition ${
                   isUnread ? "border-primary/30 bg-primary/5" : "border-border bg-surface-2"

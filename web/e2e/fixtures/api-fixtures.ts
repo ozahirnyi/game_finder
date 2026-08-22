@@ -1,4 +1,20 @@
-import type { CatalogGame, CollectionGame, Deal, OnboardingSummary, PriceAlert, Profile } from "../../src/lib/api";
+import type {
+  CatalogGame,
+  CollectionGame,
+  Conversation,
+  ConversationMessage,
+  Deal,
+  Friend,
+  FriendProfile,
+  FriendRequest,
+  GameInvite,
+  Notification,
+  OnboardingSummary,
+  PriceAlert,
+  Profile,
+  PublicProfile,
+  SharedLibrary,
+} from "../../src/lib/api";
 
 export type GuestHomeFixtures = {
   trendingGames: { results: CatalogGame[] };
@@ -14,6 +30,18 @@ export type ApiState = GuestHomeFixtures & {
   library: { games: []; steam_available: boolean };
   wishlist: CollectionGame[];
   alerts: PriceAlert[];
+  friends: Friend[];
+  incomingFriendRequests: FriendRequest[];
+  users: Friend["user"][];
+  publicProfiles: Record<string, PublicProfile>;
+  friendProfiles: Record<string, FriendProfile>;
+  sharedLibraries: Record<string, SharedLibrary>;
+  conversations: Conversation[];
+  messages: Record<string, ConversationMessage[]>;
+  gameInvites: GameInvite[];
+  notifications: Notification[];
+  delays: Record<string, number>;
+  statusByPath: Record<string, number>;
 };
 
 export function createGuestHomeFixtures(): ApiState {
@@ -52,5 +80,26 @@ export function createGuestHomeFixtures(): ApiState {
     library: { games: [], steam_available: false },
     wishlist: [{ id: "wishlist-101", catalog_game_id: 101, source: "catalog", external_id: "101", title: "Celeste" }],
     alerts: [],
+    friends: [],
+    incomingFriendRequests: [],
+    users: [],
+    publicProfiles: {
+      "public-player": {
+        public_id: "public-player",
+        nickname: "Public Player",
+        relationship: "none",
+        library: { status: "hidden", data: [] },
+        favorites: { status: "hidden", data: [] },
+        wishlist: { status: "hidden", data: [] },
+      },
+    },
+    friendProfiles: {},
+    sharedLibraries: {},
+    conversations: [],
+    messages: {},
+    gameInvites: [],
+    notifications: [],
+    delays: {},
+    statusByPath: {},
   };
 }

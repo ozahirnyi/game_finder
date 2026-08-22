@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FriendConversationHistory } from "@/components/FriendConversationHistory";
 import { Avatar } from "@/components/GameCover";
@@ -15,6 +15,7 @@ import {
   getGameInvites,
   getSteamSocial,
   respondToGameInvite,
+  markNotificationRead,
   searchUsers,
 } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
@@ -32,6 +33,7 @@ export const Route = createFileRoute("/friends/")({
       ? { conversation: search.conversation }
       : {}),
     ...(typeof search.invite === "string" && search.invite ? { invite: search.invite } : {}),
+    ...(typeof search.notification === "string" && search.notification ? { notification: search.notification } : {}),
   }),
   head: () => ({
     meta: [
@@ -62,6 +64,7 @@ function FriendsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("");
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
+  const markedNotificationIds = useRef(new Set<string>());
   const friendsQuery = useQuery(friendsQueryOptions());
   const steamSocialQuery = useInfiniteQuery({ ...steamSocialInfiniteQueryOptions(), retry: false });
   const incomingQuery = useQuery(incomingFriendRequestsQueryOptions());
@@ -148,14 +151,21 @@ function FriendsPage() {
     (invite) => invite.id === notificationSearch.invite,
   );
   const hasNotificationTarget = Boolean(matchingRequest || matchingInvite || matchingConversation);
+  useEffect(() => {
+    if (notificationSearch.notification && hasNotificationTarget && !markedNotificationIds.current.has(notificationSearch.notification)) {
+      markedNotificationIds.current.add(notificationSearch.notification);
+      void markNotificationRead(notificationSearch.notification);
+    }
+  }, [hasNotificationTarget, notificationSearch.notification]);
   const notificationUnavailable =
     Boolean(
       notificationSearch.request || notificationSearch.invite || notificationSearch.conversation,
     ) &&
-    incomingQuery.isSuccess &&
-    gameInvitesQuery.isSuccess &&
-    conversationsQuery.isSuccess &&
-    !hasNotificationTarget;
+    !hasNotificationTarget &&
+    (incomingQuery.isError ||
+      gameInvitesQuery.isError ||
+      conversationsQuery.isError ||
+      (incomingQuery.isSuccess && gameInvitesQuery.isSuccess && conversationsQuery.isSuccess));
   const steamFriends = (steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? []).sort(
     (a, b) =>
       b.taste_match_percent - a.taste_match_percent || b.common_games_count - a.common_games_count,
