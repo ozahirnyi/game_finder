@@ -96,7 +96,7 @@ function Home() {
             <Search className="size-4 text-muted-foreground" />
             <input
               name="q"
-              value={query}
+              defaultValue={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search games by title"
               className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"

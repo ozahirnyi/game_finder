@@ -8,7 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "test": "vitest run --passWithNoTests --exclude e2e/**",
+    "test": "vitest run --passWithNoTests --exclude \"e2e/**\"",
     "test:ui": "playwright test",
     "test:ui:headed": "playwright test --headed",
     "test:all": "npm run test && npm run test:ui",
