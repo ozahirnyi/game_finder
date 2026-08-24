@@ -29,10 +29,11 @@ The TanStack `/psn` route owns the import UI and calls the existing preview and 
 ## User Flow
 
 1. The signed-in user chooses an `.xlsx` file.
-2. The client uploads it to `/psn/import/preview`.
-3. On success, the UI displays the unique detected titles with selected state and a confirmation action.
-4. On confirmation, it sends selected titles to `/psn/import/confirm` and displays created, updated, and skipped counts.
-5. If the workbook is structurally valid but contains no supported game records, the UI displays: `This PSN export was read successfully, but it contains no game activity or game purchases to import.`
+2. Before upload, the screen displays: `This import reads only game purchases and activity included by PlayStation in this Excel file. It is not a complete PSN library sync and cannot include discs, PS Plus access, or trophies.`
+3. The client uploads it to `/psn/import/preview`.
+4. On success, the UI displays the unique detected titles with selected state and a confirmation action.
+5. On confirmation, it sends selected titles to `/psn/import/confirm` and displays created, updated, and skipped counts.
+6. If the workbook is structurally valid but contains no supported game records, the UI displays: `This PSN export was read successfully, but it contains no game activity or game purchases to import.`
 
 ## Error Handling
 
