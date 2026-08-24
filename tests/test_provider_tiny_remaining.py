@@ -111,7 +111,7 @@ def _xlsx(rows, sheet="Game Library"):
 def test_psn_parser_skips_invalid_values_and_missing_columns():
     content = _xlsx([("Game Title", "Other"), (None, "x"), (123, "x"), (" " * 256, "x"), ("Valid", "x")])
     assert psn_export.parse_psn_export(content) == ["Valid"]
-    with pytest.raises(HTTPException, match="No game list"):
+    with pytest.raises(HTTPException, match="contains no game activity or game purchases"):
         psn_export.parse_psn_export(_xlsx([("Email",), ("a@test",)], sheet="Account"))
 
 
