@@ -18,7 +18,7 @@ TITLE_HEADERS = {
     "content title",
     "game name",
 }
-GAME_SHEET_MARKERS = {"game", "troph", "purchase", "library", "content"}
+GAME_SHEET_MARKERS = {"game", "troph", "purchase", "library", "content", "online", "vr"}
 
 
 def normalize_title(value: object) -> str | None:
@@ -35,7 +35,7 @@ def _normalized_header(value: object) -> str:
 
 
 def _candidate_columns(rows: Iterable[tuple[object, ...]], sheet_name: str) -> tuple[int, list[int]] | None:
-    name = sheet_name.lower()
+    name = sheet_name.strip().strip('"').casefold()
     for row_index, row in enumerate(rows):
         headers = [_normalized_header(value) for value in row]
         columns = [index for index, header in enumerate(headers) if header in TITLE_HEADERS]
@@ -45,6 +45,28 @@ def _candidate_columns(rows: Iterable[tuple[object, ...]], sheet_name: str) -> t
         if columns and has_game_context:
             return row_index, columns
     return None
+
+
+def _transaction_detail_columns(
+    rows: Iterable[tuple[object, ...]], sheet_name: str
+) -> tuple[int, int, int] | None:
+    if sheet_name.strip().strip('"').casefold() != "transaction detail":
+        return None
+    for row_index, row in enumerate(rows):
+        headers = [_normalized_header(value) for value in row]
+        if "game name" in headers and "content type" in headers:
+            return row_index, headers.index("game name"), headers.index("content type")
+    return None
+
+
+def _no_game_data_error() -> HTTPException:
+    return HTTPException(
+        status_code=422,
+        detail=(
+            "This PSN export was read successfully, but it contains no game activity "
+            "or game purchases to import."
+        ),
+    )
 
 
 def parse_psn_export(content: bytes) -> list[str]:
@@ -68,6 +90,21 @@ def parse_psn_export(content: bytes) -> list[str]:
                     buffered_rows.append(next(rows))
                 except StopIteration:
                     break
+            transaction_columns = _transaction_detail_columns(buffered_rows, worksheet.title)
+            if transaction_columns:
+                header_index, game_name_column, content_type_column = transaction_columns
+                for row in chain(buffered_rows[header_index + 1 :], rows):
+                    content_type = _normalized_header(
+                        row[content_type_column] if content_type_column < len(row) else None
+                    )
+                    if content_type != "game":
+                        continue
+                    title = normalize_title(row[game_name_column] if game_name_column < len(row) else None)
+                    if title:
+                        titles.setdefault(title.casefold(), title)
+                        if len(titles) >= MAX_IMPORTED_GAMES:
+                            return list(titles.values())
+                continue
             header = _candidate_columns(buffered_rows, worksheet.title)
             if not header:
                 continue
@@ -83,10 +120,7 @@ def parse_psn_export(content: bytes) -> list[str]:
         workbook.close()
 
     if not titles:
-        raise HTTPException(
-            status_code=422,
-            detail="No game list was found in this export. PlayStation exports vary by region; check the file or request a new Data Access export.",
-        )
+        raise _no_game_data_error()
     return list(titles.values())
 
 

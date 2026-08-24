@@ -34,7 +34,39 @@ def test_parse_psn_export_reads_unique_game_titles():
 def test_parse_psn_export_rejects_a_sheet_without_games():
     content = make_export([("Email", "Country"), ("player@example.com", "UA")], sheet_name="Account")
 
-    with pytest.raises(HTTPException, match="No game list"):
+    with pytest.raises(HTTPException, match="contains no game activity or game purchases"):
+        parse_psn_export(content)
+
+
+def test_parse_psn_export_imports_only_game_transactions():
+    content = make_export(
+        [
+            ("Transaction Date", "Game Name", "Content Type"),
+            ("2026-01-01", "Returnal", "Game"),
+            ("2026-01-01", "Returnal: Ascension", "DLC"),
+            ("2026-01-02", "Wallet top up", "Wallet"),
+        ],
+        sheet_name='"Transaction Detail"',
+    )
+
+    assert parse_psn_export(content) == ["Returnal"]
+
+
+def test_parse_psn_export_reads_online_and_vr_activity_titles():
+    online_content = make_export([("Game Title",), ("Astro Bot",)], sheet_name='"Gameplay Online"')
+    vr_content = make_export([("Game Title",), ("Beat Saber",)], sheet_name='"PS VR"')
+
+    assert parse_psn_export(online_content) == ["Astro Bot"]
+    assert parse_psn_export(vr_content) == ["Beat Saber"]
+
+
+def test_parse_psn_export_explains_valid_export_without_game_records():
+    content = make_export(
+        [("If data is found the below table shows Gameplay Online Details.",)],
+        sheet_name='"Gameplay Online"',
+    )
+
+    with pytest.raises(HTTPException, match="contains no game activity or game purchases"):
         parse_psn_export(content)
 
 
