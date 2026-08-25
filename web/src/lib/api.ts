@@ -315,9 +315,17 @@ export type SteamSocial = {
   top_friend_games: { appid: number; name: string; friends: number }[];
 };
 export type PsnImportPreview = {
+  items: PsnImportPreviewItem[];
   games: string[];
   total: number;
+  confirmed_total: number;
   message?: string | null;
+};
+export type PsnImportPreviewItem = {
+  source_title: string;
+  status: "confirmed" | "review";
+  igdb_id?: number | null;
+  title?: string | null;
 };
 export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
 export type Notification = {
@@ -488,11 +496,11 @@ export function previewPsnImport(file: File) {
   });
 }
 
-export function confirmPsnImport(games: string[]) {
+export function confirmPsnImport(gameIds: number[]) {
   return apiRequest<PsnImportResult>("/psn/import/confirm", {
     auth: true,
     method: "POST",
-    body: { games },
+    body: { game_ids: gameIds },
   });
 }
 
