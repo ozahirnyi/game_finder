@@ -39,6 +39,9 @@ describe("PsnImportPage", () => {
     );
 
     expect(await screen.findByText(/choose an export file/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/not a complete PSN library sync/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/use sample export/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/preview empty state/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/preview error state/i)).not.toBeInTheDocument();

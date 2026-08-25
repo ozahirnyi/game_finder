@@ -141,6 +141,10 @@ function PsnImportPage() {
           PlayStation has no public library API, so Playfinder imports from an export file you
           download from your PlayStation account.
         </p>
+        <p className="mt-3 max-w-xl rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-muted-foreground">
+          This is not a complete PSN library sync. We can import only game purchases and activity
+          included in the export; discs, PS Plus access, and trophies are not included.
+        </p>
 
         <div className="mt-8">
           <Stepper current={step} />

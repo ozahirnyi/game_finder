@@ -21,7 +21,7 @@ TITLE_HEADERS = {
     "content title",
     "game name",
 }
-GAME_SHEET_MARKERS = {"game", "troph", "purchase", "library", "content"}
+GAME_SHEET_MARKERS = {"game", "troph", "purchase", "library", "content", "online", "vr"}
 JSON_COLLECTION_KEYS = {"games", "library", "owned games", "owned_games", "items", "data"}
 
 
@@ -52,7 +52,7 @@ def _candidate_columns(rows: Iterable[tuple[object, ...]], sheet_name: str) -> t
 
 
 def _transaction_detail_columns(rows: Iterable[tuple[object, ...]], sheet_name: str) -> tuple[int, int, int] | None:
-    if sheet_name.casefold() != "transaction detail":
+    if sheet_name.strip().strip('"').casefold() != "transaction detail":
         return None
     for row_index, row in enumerate(rows):
         headers = [_normalized_header(value) for value in row]
@@ -68,6 +68,16 @@ def _validate_content(content: bytes) -> None:
         raise HTTPException(status_code=413, detail="The PSN export must be 10 MB or smaller")
 
 
+def _no_game_data_error() -> HTTPException:
+    return HTTPException(
+        status_code=422,
+        detail=(
+            "This PSN export was read successfully, but it contains no game activity "
+            "or game purchases to import."
+        ),
+    )
+
+
 def _finalize_titles(candidates: Iterable[object]) -> list[str]:
     titles: dict[str, str] = {}
     for candidate in candidates:
@@ -77,10 +87,7 @@ def _finalize_titles(candidates: Iterable[object]) -> list[str]:
             if len(titles) >= MAX_IMPORTED_GAMES:
                 break
     if not titles:
-        raise HTTPException(
-            status_code=422,
-            detail="No game list was found in this export. PlayStation exports vary by region; check the file or request a new Data Access export.",
-        )
+        raise _no_game_data_error()
     return list(titles.values())
 
 
@@ -130,10 +137,7 @@ def _parse_xlsx_export(content: bytes) -> list[str]:
         workbook.close()
 
     if not titles:
-        raise HTTPException(
-            status_code=422,
-            detail="No game list was found in this export. PlayStation exports vary by region; check the file or request a new Data Access export.",
-        )
+        raise _no_game_data_error()
     return list(titles.values())
 
 
