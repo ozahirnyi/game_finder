@@ -8,9 +8,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "test": "vitest run --passWithNoTests --exclude \"e2e/**\"",
+    "test": "vitest run --passWithNoTests --exclude \"e2e/**\" --exclude \"e2e-business/**\"",
     "test:ui": "playwright test",
     "test:ui:headed": "playwright test --headed",
+    "test:e2e:business": "playwright test --config=playwright.business.config.ts",
     "test:all": "npm run test && npm run test:ui",
     "lint": "eslint .",
     "format": "prettier --write ."

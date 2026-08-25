@@ -504,6 +504,14 @@ export function confirmPsnImport(gameIds: number[]) {
   });
 }
 
+export function confirmPsnImportGames(games: string[]) {
+  return apiRequest<PsnImportResult>("/psn/import/confirm", {
+    auth: true,
+    method: "POST",
+    body: { games },
+  });
+}
+
 export type CatalogPlatform =
   "pc" | "console" | "ps5" | "ps4" | "xbox_series" | "xbox_one" | "switch";
 export type CatalogFeature = "single_player" | "co_op" | "multiplayer";

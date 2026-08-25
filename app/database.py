@@ -54,6 +54,7 @@ class Game(Base):
     price_alert_last_cut: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
     owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),ForeignKey("users.id"),nullable=False)
+    e2e_fixture_key: Mapped[Optional[str]] = mapped_column(String(96), nullable=True, index=True)
 
     __table_args__ = (
         Index(
@@ -104,6 +105,41 @@ class User(Base):
     wishlist_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
     steam_visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="public", server_default="public")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
+    e2e_fixture_key: Mapped[Optional[str]] = mapped_column(String(96), nullable=True, index=True)
+    e2e_fixture_hidden: Mapped[bool] = mapped_column(default=False, nullable=False, server_default="false")
+
+
+class E2EFixtureRun(Base):
+    __tablename__ = "e2e_fixture_runs"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    fixture_key: Mapped[str] = mapped_column(String(96), nullable=False, unique=True, index=True)
+    environment: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")
+    actor: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class E2EFixtureMember(Base):
+    __tablename__ = "e2e_fixture_members"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("e2e_fixture_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    role: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    __table_args__ = (UniqueConstraint("run_id", "entity_type", "entity_id", name="uq_e2e_fixture_member"),)
+
+
+class E2EFixtureAudit(Base):
+    __tablename__ = "e2e_fixture_audit"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    fixture_key: Mapped[str] = mapped_column(String(96), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    actor: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    dry_run: Mapped[bool] = mapped_column(default=False, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class FriendRequest(Base):
