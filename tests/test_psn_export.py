@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 from openpyxl import Workbook
 
-from app.psn_export import parse_psn_export, psn_external_id
+from app.psn_export import PsnExportCandidate, parse_psn_export, parse_psn_export_candidates, psn_external_id
 
 
 def make_export(rows: list[tuple[str, ...]], sheet_name: str = "Game Library") -> bytes:
@@ -53,6 +53,23 @@ def test_parse_psn_export_uses_only_game_transactions_from_playstation_export():
     )
 
     assert parse_psn_export(content) == ["Returnal", "Hades"]
+
+
+def test_parse_psn_export_reads_product_purchases_with_content_descriptors():
+    content = make_export(
+        [
+            ("If data is found the below table shows the Details of Store Transactions.",),
+            (),
+            ("Transaction Detail",),
+            ("Transaction Date", "Game Name", "Product Name", "Content Type", "Transaction Type"),
+            ("2021-06-09", "GOD OF WAR", "God of War", "Violence", "Product Purchase"),
+            ("2021-06-09", "Wallet", "Wallet top up", "Wallet", "Wallet Funding"),
+        ],
+        sheet_name='"Transaction Detail"',
+    )
+
+    assert parse_psn_export_candidates(content) == [PsnExportCandidate("GOD OF WAR", "God of War")]
+    assert parse_psn_export(content) == ["GOD OF WAR"]
 
 
 def test_parse_psn_export_reads_quoted_transaction_detail_sheet_name():
