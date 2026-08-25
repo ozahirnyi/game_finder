@@ -263,6 +263,44 @@ def test_psn_import_preview_parses_xlsx_without_persisting(api_client, db_sessio
     assert db_session.query(Game).count() == 0
 
 
+def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_review(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="psn-transaction-preview@example.com"))
+
+    async def search_catalog(query, page=1):
+        return {"results": [{"id": 101, "name": "God of War"}]} if query == "GOD OF WAR" else {"results": []}
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    response = api_client.post(
+        "/psn/import/preview",
+        files={
+            "file": (
+                "export.xlsx",
+                _xlsx_bytes(
+                    '"Transaction Detail"',
+                    [
+                        ["Store Transactions"],
+                        [],
+                        ["Transaction Detail"],
+                        ["Game Name", "Product Name", "Content Type", "Transaction Type"],
+                        ["GOD OF WAR", "God of War", "Violence", "Product Purchase"],
+                        ["FORTNITE", "FN: PlayStation Plus Pack", "Violence", "Product Purchase"],
+                    ],
+                ),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["items"] == [
+        {"source_title": "GOD OF WAR", "status": "confirmed", "igdb_id": 101, "title": "God of War"},
+        {"source_title": "FORTNITE", "status": "review", "igdb_id": None, "title": None},
+    ]
+    assert db_session.query(Game).count() == 0
+
+
 @pytest.mark.parametrize(
     ("filename", "content", "content_type", "expected_games"),
     [
@@ -287,19 +325,23 @@ def test_psn_import_preview_accepts_supported_non_xlsx_exports(
 
 
 def test_psn_import_confirm_persists_owner_scoped_idempotent_games(
-    api_client, db_session, user_factory, auth_as
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
 ):
+    async def catalog_detail(igdb_id):
+        return {101: {"id": 101, "name": "Hades"}, 102: {"id": 102, "name": "Celeste"}}[igdb_id]
+
+    monkeypatch.setattr(app_main, "fetch_igdb_game_detail", catalog_detail)
     owner = auth_as(user_factory(email="psn-owner@example.com"))
-    first = api_client.post("/psn/import/confirm", json={"games": ["Hades", " Hades ", "Celeste"]})
+    first = api_client.post("/psn/import/confirm", json={"game_ids": [101, 101, 102]})
     assert first.status_code == 200
     assert first.json() == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2
 
-    second = api_client.post("/psn/import/confirm", json={"games": ["Hades", "Celeste"]})
+    second = api_client.post("/psn/import/confirm", json={"game_ids": [101, 102]})
     assert second.json() == {"created": 0, "updated": 0, "skipped": 2, "total": 2}
 
     other = auth_as(user_factory(email="psn-other@example.com"))
-    other_import = api_client.post("/psn/import/confirm", json={"games": ["Hades"]})
+    other_import = api_client.post("/psn/import/confirm", json={"game_ids": [101]})
     assert other_import.json()["created"] == 1
     assert db_session.query(Game).filter_by(owner_id=other.id, source="psn").count() == 1
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2

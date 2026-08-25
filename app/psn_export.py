@@ -2,6 +2,7 @@ import csv
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from io import BytesIO, StringIO
 from itertools import chain
 from pathlib import Path
@@ -23,6 +24,12 @@ TITLE_HEADERS = {
 }
 GAME_SHEET_MARKERS = {"game", "troph", "purchase", "library", "content", "online", "vr"}
 JSON_COLLECTION_KEYS = {"games", "library", "owned games", "owned_games", "items", "data"}
+
+
+@dataclass(frozen=True)
+class PsnExportCandidate:
+    title: str
+    product_name: str | None = None
 
 
 def normalize_title(value: object) -> str | None:
@@ -51,13 +58,21 @@ def _candidate_columns(rows: Iterable[tuple[object, ...]], sheet_name: str) -> t
     return None
 
 
-def _transaction_detail_columns(rows: Iterable[tuple[object, ...]], sheet_name: str) -> tuple[int, int, int] | None:
+def _transaction_detail_columns(
+    rows: Iterable[tuple[object, ...]], sheet_name: str
+) -> tuple[int, int, int | None, int | None, int | None] | None:
     if sheet_name.strip().strip('"').casefold() != "transaction detail":
         return None
     for row_index, row in enumerate(rows):
         headers = [_normalized_header(value) for value in row]
-        if "game name" in headers and "content type" in headers:
-            return row_index, headers.index("game name"), headers.index("content type")
+        if "game name" in headers:
+            return (
+                row_index,
+                headers.index("game name"),
+                headers.index("product name") if "product name" in headers else None,
+                headers.index("transaction type") if "transaction type" in headers else None,
+                headers.index("content type") if "content type" in headers else None,
+            )
     return None
 
 
@@ -91,14 +106,14 @@ def _finalize_titles(candidates: Iterable[object]) -> list[str]:
     return list(titles.values())
 
 
-def _parse_xlsx_export(content: bytes) -> list[str]:
+def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
 
     try:
         workbook = load_workbook(BytesIO(content), read_only=True, data_only=True)
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Upload the Excel file received from PlayStation (.xlsx)") from exc
 
-    titles: dict[str, str] = {}
+    candidates: dict[str, PsnExportCandidate] = {}
     try:
         for worksheet in workbook.worksheets:
             rows = worksheet.iter_rows(values_only=True)
@@ -110,16 +125,24 @@ def _parse_xlsx_export(content: bytes) -> list[str]:
                     break
             transaction_columns = _transaction_detail_columns(buffered_rows, worksheet.title)
             if transaction_columns:
-                header_index, game_name_column, content_type_column = transaction_columns
+                header_index, game_name_column, product_name_column, transaction_type_column, content_type_column = transaction_columns
                 for row in chain(buffered_rows[header_index + 1 :], rows):
-                    content_type = _normalized_header(
+                    if transaction_type_column is not None:
+                        transaction_type = _normalized_header(
+                            row[transaction_type_column] if transaction_type_column < len(row) else None
+                        )
+                        if transaction_type != "product purchase":
+                            continue
+                    elif content_type_column is not None and _normalized_header(
                         row[content_type_column] if content_type_column < len(row) else None
-                    )
-                    if content_type != "game":
+                    ) != "game":
                         continue
                     title = normalize_title(row[game_name_column] if game_name_column < len(row) else None)
                     if title:
-                        titles.setdefault(title.casefold(), title)
+                        product_name = normalize_title(
+                            row[product_name_column] if product_name_column is not None and product_name_column < len(row) else None
+                        )
+                        candidates.setdefault(title.casefold(), PsnExportCandidate(title, product_name))
                 continue
 
             header = _candidate_columns(buffered_rows, worksheet.title)
@@ -130,15 +153,19 @@ def _parse_xlsx_export(content: bytes) -> list[str]:
                 for column in columns:
                     title = normalize_title(row[column] if column < len(row) else None)
                     if title:
-                        titles.setdefault(title.casefold(), title)
-                        if len(titles) >= MAX_IMPORTED_GAMES:
-                            return list(titles.values())
+                        candidates.setdefault(title.casefold(), PsnExportCandidate(title))
+                        if len(candidates) >= MAX_IMPORTED_GAMES:
+                            return list(candidates.values())
     finally:
         workbook.close()
 
-    if not titles:
+    if not candidates:
         raise _no_game_data_error()
-    return list(titles.values())
+    return list(candidates.values())
+
+
+def _parse_xlsx_export(content: bytes) -> list[str]:
+    return [candidate.title for candidate in _parse_xlsx_export_candidates(content)]
 
 
 def _parse_csv_export(content: bytes) -> list[str]:
@@ -183,16 +210,20 @@ def _parse_json_export(content: bytes) -> list[str]:
     return _finalize_titles(candidates)
 
 
-def parse_psn_export(content: bytes, filename: str | None = None) -> list[str]:
+def parse_psn_export_candidates(content: bytes, filename: str | None = None) -> list[PsnExportCandidate]:
     _validate_content(content)
     suffix = Path(filename or "export.xlsx").suffix.casefold()
     if suffix == ".xlsx":
-        return _parse_xlsx_export(content)
+        return _parse_xlsx_export_candidates(content)
     if suffix == ".csv":
-        return _parse_csv_export(content)
+        return [PsnExportCandidate(title) for title in _parse_csv_export(content)]
     if suffix == ".json":
-        return _parse_json_export(content)
+        return [PsnExportCandidate(title) for title in _parse_json_export(content)]
     raise HTTPException(status_code=400, detail="Upload a supported PSN export (.xlsx, .csv, or .json)")
+
+
+def parse_psn_export(content: bytes, filename: str | None = None) -> list[str]:
+    return [candidate.title for candidate in parse_psn_export_candidates(content, filename)]
 
 
 def psn_external_id(title: str) -> str:

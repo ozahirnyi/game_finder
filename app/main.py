@@ -31,12 +31,12 @@ from app.integrations.igdb import (
     IGDBError,
 )
 from app.prices import fetch_game_price_history
-from app.psn_export import normalize_title, parse_psn_export, psn_external_id
+from app.psn_export import normalize_title, parse_psn_export_candidates
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
-from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
+from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportPreviewItem, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
@@ -587,6 +587,32 @@ def delete_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: 
         raise HTTPException(status_code=404, detail="Game not found")
 
 
+PSN_PRODUCT_REVIEW_MARKERS = ("demo", "season pass", "subscription", "plus", "ea play", "currency", "points", "bundle")
+
+
+def _psn_catalog_match_key(value: str) -> str:
+    return re.sub(r"\s+", " ", value.replace("™", "").replace("®", "").replace("©", "")).strip().casefold()
+
+
+async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPreviewItem]:
+    items: list[PsnImportPreviewItem] = []
+    for candidate in parse_psn_export_candidates(content, filename):
+        product_name = (candidate.product_name or "").casefold()
+        if any(marker in product_name for marker in PSN_PRODUCT_REVIEW_MARKERS):
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="review"))
+            continue
+        try:
+            results = (await fetch_igdb_games(candidate.title, page=1)).get("results", [])
+        except IGDBError:
+            results = []
+        matches = [game for game in results if game.get("id") and _psn_catalog_match_key(game.get("name") or "") == _psn_catalog_match_key(candidate.title)]
+        if len(matches) == 1:
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="confirmed", igdb_id=int(matches[0]["id"]), title=matches[0]["name"]))
+        else:
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="review"))
+    return items
+
+
 @app.post("/psn/import/preview", response_model=PsnImportPreview)
 async def preview_psn_import(
     file: UploadFile = File(...),
@@ -597,27 +623,32 @@ async def preview_psn_import(
     if not filename.casefold().endswith((".xlsx", ".csv", ".json")):
         raise HTTPException(status_code=400, detail="Upload a supported PSN export (.xlsx, .csv, or .json)")
     content = await file.read()
-    games = parse_psn_export(content, filename)
+    items = await _psn_preview_items(content, filename)
     return PsnImportPreview(
-        games=games,
-        total=len(games),
-        message="Review the games below before importing them into your library.",
+        items=items,
+        games=[item.source_title for item in items],
+        total=len(items),
+        confirmed_total=sum(item.status == "confirmed" for item in items),
+        message="Only confirmed catalog matches are selected for import.",
     )
 
 
 @app.post("/psn/import/confirm", response_model=PsnImportResult)
-def confirm_psn_import(
+async def confirm_psn_import(
     data: PsnImportConfirmRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    unique_games: dict[str, str] = {}
-    for candidate in data.games:
-        title = normalize_title(candidate)
-        if title:
-            unique_games.setdefault(title.casefold(), title)
-    if not unique_games:
-        raise HTTPException(status_code=400, detail="Choose at least one valid game to import")
+    unique_games: dict[int, str] = {}
+    for igdb_id in set(data.game_ids):
+        try:
+            detail = await fetch_igdb_game_detail(igdb_id)
+        except IGDBError as exc:
+            raise HTTPException(status_code=422, detail="Choose games confirmed by the catalog preview") from exc
+        title = normalize_title(detail.get("name"))
+        if not title:
+            raise HTTPException(status_code=422, detail="Choose games confirmed by the catalog preview")
+        unique_games[igdb_id] = title
 
     existing = {
         game.external_id: game
@@ -628,8 +659,8 @@ def confirm_psn_import(
     now = datetime.now(timezone.utc)
     created = updated = skipped = 0
     try:
-        for title in unique_games.values():
-            external_id = psn_external_id(title)
+        for igdb_id, title in unique_games.items():
+            external_id = f"psn:{igdb_id}"
             imported = existing.get(external_id)
             if imported is None:
                 db.add(

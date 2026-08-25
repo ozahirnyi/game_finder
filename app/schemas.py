@@ -374,14 +374,23 @@ class SteamRecommendationRequest(BaseModel):
     prompt: str | None = Field(default=None, max_length=500)
 
 
+class PsnImportPreviewItem(BaseModel):
+    source_title: str
+    status: Literal["confirmed", "review"]
+    igdb_id: int | None = None
+    title: str | None = None
+
+
 class PsnImportPreview(BaseModel):
+    items: list[PsnImportPreviewItem] = Field(default_factory=list)
     games: list[str] = Field(default_factory=list)
     total: int = 0
+    confirmed_total: int = 0
     message: str | None = None
 
 
 class PsnImportConfirmRequest(BaseModel):
-    games: list[str] = Field(min_length=1, max_length=500)
+    game_ids: list[int] = Field(min_length=1, max_length=500)
 
 
 class PsnImportResult(BaseModel):
