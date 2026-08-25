@@ -82,19 +82,23 @@ function PsnImportPage() {
   const client = useQueryClient();
   const [rows, setRows] = useState<
     {
-      id: string;
+      id: number | null;
       title: string;
       matched: boolean;
       platform?: string;
     }[]
   >([]);
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<number[]>([]);
   const preview = useMutation({
     mutationFn: previewPsnImport,
     onSuccess: (data) => {
-      const next = data.games.map((title) => ({ id: title, title, matched: true }));
+      const next = data.items.map((item) => ({
+        id: item.igdb_id ?? null,
+        title: item.title ?? item.source_title,
+        matched: item.status === "confirmed" && item.igdb_id !== null,
+      }));
       setRows(next);
-      setSelected(next.map((game) => game.id));
+      setSelected(next.flatMap((game) => (game.matched && game.id !== null ? [game.id] : [])));
       setPhase("idle");
       setStep("preview");
     },
@@ -105,10 +109,18 @@ function PsnImportPage() {
   });
   const confirm = useMutation({
     mutationFn: confirmPsnImport,
+    onMutate: () => {
+      setFileError(null);
+      setPhase("loading");
+    },
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["library"] });
       client.invalidateQueries({ queryKey: ["library-overview"] });
       setStep("result");
+    },
+    onError: (error) => {
+      setFileError(error instanceof Error ? error.message : "We couldn't import those games.");
+      setPhase("error");
     },
   });
   const inputRef = useRef<HTMLInputElement>(null);
@@ -121,7 +133,7 @@ function PsnImportPage() {
     preview.mutate(file);
   }
 
-  function toggle(id: string) {
+  function toggle(id: number) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
 
@@ -239,13 +251,13 @@ function PsnImportPage() {
                 <div className="space-y-2">
                   {rows.map((g) => (
                     <label
-                      key={g.id}
+                      key={g.id ?? g.title}
                       className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 p-4"
                     >
                       <input
                         type="checkbox"
-                        checked={selected.includes(g.id)}
-                        onChange={() => toggle(g.id)}
+                        checked={g.id !== null && selected.includes(g.id)}
+                        onChange={() => g.id !== null && toggle(g.id)}
                         disabled={!g.matched}
                         className="size-4 accent-[var(--primary)]"
                       />
@@ -296,7 +308,7 @@ function PsnImportPage() {
             {phase === "error" ? (
               <ErrorState
                 title="Import failed"
-                description="Nothing was changed in your library. You can retry safely."
+                description={fileError ?? "Nothing was changed in your library. You can retry safely."}
                 onRetry={() => setPhase("idle")}
               />
             ) : phase === "loading" ? (
