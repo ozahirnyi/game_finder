@@ -608,6 +608,7 @@ PSN_MANUAL_PREVIEW_STATUSES = {"unmatched", "ambiguous", "catalog_unavailable"}
 # (10), and port (11) are standalone playable products. All other known types
 # are add-ons, bundles, episodes, seasons, mods, updates, or otherwise non-game.
 PSN_ALLOWED_IGDB_GAME_TYPES = {0, 8, 9, 10, 11}
+PSN_EXCLUDED_IGDB_GAME_TYPES = {1, 2, 3, 4, 5, 6, 7, 12, 13, 14}
 
 
 @dataclass(frozen=True)
@@ -659,6 +660,10 @@ def _psn_is_allowed_catalog_game(game: dict) -> bool:
     return _psn_game_type(game) in PSN_ALLOWED_IGDB_GAME_TYPES
 
 
+def _psn_is_explicit_non_game_catalog_entry(game: dict) -> bool:
+    return _psn_game_type(game) in PSN_EXCLUDED_IGDB_GAME_TYPES
+
+
 async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPreviewItem]:
     items: list[PsnImportPreviewItem] = []
     for candidate in parse_psn_export_candidates(content, filename):
@@ -694,6 +699,15 @@ async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPre
                 )
             )
             continue
+        if any(_psn_is_explicit_non_game_catalog_entry(game) for game in matches):
+            items.append(
+                PsnImportPreviewItem(
+                    source_title=candidate.title,
+                    status="excluded",
+                    reason="Excluded: the catalog classifies this purchase as non-game content.",
+                )
+            )
+            continue
         eligible_matches = [game for game in matches if _psn_is_allowed_catalog_game(game)]
         if platform_name:
             eligible_matches = [game for game in eligible_matches if _psn_has_platform(game, platform_name)]
@@ -701,28 +715,19 @@ async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPre
                 items.append(
                     PsnImportPreviewItem(
                         source_title=candidate.title,
-                        status="excluded",
-                        reason="Excluded: no eligible PlayStation game catalog entry matches this purchase.",
+                        status="unmatched",
+                        reason="Catalog details do not confirm this PlayStation edition — import using the PSN title.",
                     )
                 )
                 continue
         elif not eligible_matches:
-            if any(_psn_game_type(game) is not None for game in matches):
-                items.append(
-                    PsnImportPreviewItem(
-                        source_title=candidate.title,
-                        status="excluded",
-                        reason="Excluded: the catalog match is not a standalone playable game.",
-                    )
+            items.append(
+                PsnImportPreviewItem(
+                    source_title=candidate.title,
+                    status="unmatched",
+                    reason="Catalog details do not confirm this PlayStation edition — import using the PSN title.",
                 )
-            else:
-                items.append(
-                    PsnImportPreviewItem(
-                        source_title=candidate.title,
-                        status="unmatched",
-                        reason="No confirmed playable catalog match found. Import using the PSN title if this is the right game.",
-                    )
-                )
+            )
             continue
         if len(eligible_matches) == 1:
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="confirmed", igdb_id=int(eligible_matches[0]["id"]), title=eligible_matches[0]["name"]))
