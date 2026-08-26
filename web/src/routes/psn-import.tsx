@@ -11,7 +11,7 @@ import {
   RowSkeletonList,
   SectionHeader,
 } from "@/components/ui-bits";
-import { confirmPsnImportGames, previewPsnImport } from "@/lib/api";
+import { confirmPsnImport, previewPsnImport } from "@/lib/api";
 import { ArrowLeft, ArrowRight, Check, FileUp, Loader2, RotateCcw, Upload } from "lucide-react";
 
 export const Route = createFileRoute("/psn-import")({
@@ -108,7 +108,7 @@ function PsnImportPage() {
     },
   });
   const confirm = useMutation({
-    mutationFn: confirmPsnImportGames,
+    mutationFn: confirmPsnImport,
     onMutate: () => {
       setFileError(null);
       setPhase("loading");
