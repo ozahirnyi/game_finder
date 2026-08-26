@@ -68,7 +68,7 @@ def test_parse_psn_export_reads_product_purchases_with_content_descriptors():
         sheet_name='"Transaction Detail"',
     )
 
-    assert parse_psn_export_candidates(content) == [PsnExportCandidate("GOD OF WAR", "God of War", None)]
+    assert parse_psn_export_candidates(content) == [PsnExportCandidate("GOD OF WAR", "God of War", None, "Violence")]
     assert parse_psn_export(content) == ["GOD OF WAR"]
 
 
@@ -95,7 +95,7 @@ def test_parse_psn_export_candidates_retains_transaction_detail_platform():
     )
 
     assert parse_psn_export_candidates(content) == [
-        PsnExportCandidate("MORTAL KOMBAT X", "MORTAL KOMBAT X", "PS4")
+        PsnExportCandidate("MORTAL KOMBAT X", "MORTAL KOMBAT X", "PS4", "Game")
     ]
 
 

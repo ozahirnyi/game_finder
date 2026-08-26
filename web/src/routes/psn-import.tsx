@@ -167,7 +167,9 @@ function PsnImportPage() {
         </p>
         <p className="mt-3 max-w-xl rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-muted-foreground">
           This is not a complete PSN library sync. We can import only game purchases and activity
-          included in the export; discs, PS Plus access, and trophies are not included.
+          included in the export; discs, PS Plus access, and trophies are not included. Purchases
+          marked by PSN as applications or services are excluded, while uncertain catalog results
+          remain available for optional PSN-title import.
         </p>
 
         <div className="mt-8">
