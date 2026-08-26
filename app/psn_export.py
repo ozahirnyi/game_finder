@@ -30,6 +30,7 @@ JSON_COLLECTION_KEYS = {"games", "library", "owned games", "owned_games", "items
 class PsnExportCandidate:
     title: str
     product_name: str | None = None
+    platform: str | None = None
 
 
 def normalize_title(value: object) -> str | None:
@@ -60,7 +61,7 @@ def _candidate_columns(rows: Iterable[tuple[object, ...]], sheet_name: str) -> t
 
 def _transaction_detail_columns(
     rows: Iterable[tuple[object, ...]], sheet_name: str
-) -> tuple[int, int, int | None, int | None, int | None] | None:
+) -> tuple[int, int, int | None, int | None, int | None, int | None] | None:
     if sheet_name.strip().strip('"').casefold() != "transaction detail":
         return None
     for row_index, row in enumerate(rows):
@@ -72,6 +73,7 @@ def _transaction_detail_columns(
                 headers.index("product name") if "product name" in headers else None,
                 headers.index("transaction type") if "transaction type" in headers else None,
                 headers.index("content type") if "content type" in headers else None,
+                headers.index("platform") if "platform" in headers else None,
             )
     return None
 
@@ -125,7 +127,14 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
                     break
             transaction_columns = _transaction_detail_columns(buffered_rows, worksheet.title)
             if transaction_columns:
-                header_index, game_name_column, product_name_column, transaction_type_column, content_type_column = transaction_columns
+                (
+                    header_index,
+                    game_name_column,
+                    product_name_column,
+                    transaction_type_column,
+                    content_type_column,
+                    platform_column,
+                ) = transaction_columns
                 for row in chain(buffered_rows[header_index + 1 :], rows):
                     if transaction_type_column is not None:
                         transaction_type = _normalized_header(
@@ -142,7 +151,10 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
                         product_name = normalize_title(
                             row[product_name_column] if product_name_column is not None and product_name_column < len(row) else None
                         )
-                        candidates.setdefault(title.casefold(), PsnExportCandidate(title, product_name))
+                        platform = normalize_title(
+                            row[platform_column] if platform_column is not None and platform_column < len(row) else None
+                        )
+                        candidates.setdefault(title.casefold(), PsnExportCandidate(title, product_name, platform))
                 continue
 
             header = _candidate_columns(buffered_rows, worksheet.title)
@@ -230,3 +242,9 @@ def psn_external_id(title: str) -> str:
     normalized = re.sub(r"\s+", " ", title).strip().casefold()
     digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:32]
     return f"psn:{digest}"
+
+
+def psn_manual_external_id(title: str) -> str:
+    normalized = re.sub(r"\s+", " ", title).strip().casefold()
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:32]
+    return f"psn:manual:{digest}"

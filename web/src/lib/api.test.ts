@@ -230,7 +230,7 @@ describe("apiRequest", () => {
     );
   });
 
-  it("submits a PlayStation file preview and selected catalog ids", async () => {
+  it("submits a PlayStation file preview and typed catalog/manual selections", async () => {
     setToken("token");
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(
@@ -243,7 +243,7 @@ describe("apiRequest", () => {
     const file = new File(["title"], "library.csv", { type: "text/csv" });
 
     await previewPsnImport(file);
-    await confirmPsnImport([101]);
+    await confirmPsnImport([{ catalog_id: 101 }, { source_title: "Hades" }]);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -253,7 +253,7 @@ describe("apiRequest", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "/api/psn/import/confirm",
-      expect.objectContaining({ body: JSON.stringify({ game_ids: [101] }), method: "POST" }),
+      expect.objectContaining({ body: JSON.stringify({ selections: [{ catalog_id: 101 }, { source_title: "Hades" }] }), method: "POST" }),
     );
   });
 

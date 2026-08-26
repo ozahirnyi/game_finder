@@ -21,11 +21,11 @@ describe("PsnImportFlow", () => {
     expect(screen.getByText(/choose an export file/i)).toBeInTheDocument();
   });
 
-  it("selects confirmed games and leaves review items out of the import", async () => {
+  it("selects confirmed games and leaves excluded items out of the import", async () => {
     previewPsnImport.mockResolvedValueOnce({
       items: [
         { source_title: "God of War", status: "confirmed", igdb_id: 101, title: "God of War" },
-        { source_title: "EA Play", status: "review", igdb_id: null, title: null },
+        { source_title: "EA Play", status: "excluded", igdb_id: null, title: null },
       ],
     });
     confirmPsnImport.mockResolvedValueOnce({ created: 1, updated: 0, skipped: 0, total: 1 });
@@ -43,6 +43,6 @@ describe("PsnImportFlow", () => {
     expect(screen.getByRole("checkbox", { name: "God of War" })).toBeChecked();
     expect(screen.getByText(/EA Play.*not imported/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /import 1 game/i }));
-    await waitFor(() => expect(confirmPsnImport.mock.calls[0]?.[0]).toEqual([101]));
+    await waitFor(() => expect(confirmPsnImport.mock.calls[0]?.[0]).toEqual([{ catalog_id: 101 }]));
   });
 });

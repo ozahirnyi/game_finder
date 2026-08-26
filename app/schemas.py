@@ -376,9 +376,10 @@ class SteamRecommendationRequest(BaseModel):
 
 class PsnImportPreviewItem(BaseModel):
     source_title: str
-    status: Literal["confirmed", "review"]
+    status: Literal["confirmed", "unmatched", "ambiguous", "catalog_unavailable", "excluded"]
     igdb_id: int | None = None
     title: str | None = None
+    reason: str | None = None
 
 
 class PsnImportPreview(BaseModel):
@@ -389,8 +390,33 @@ class PsnImportPreview(BaseModel):
     message: str | None = None
 
 
+class PsnImportSelection(BaseModel):
+    catalog_id: int | None = Field(default=None, ge=1)
+    source_title: str | None = Field(default=None, max_length=255)
+
+    @field_validator("source_title", mode="before")
+    @classmethod
+    def normalize_source_title(cls, value: object) -> object:
+        return " ".join(value.split()) if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def require_exactly_one_selection_kind(self):
+        if (self.catalog_id is None) == (self.source_title is None):
+            raise ValueError("Provide exactly one of catalog_id or source_title")
+        if self.source_title is not None and not self.source_title:
+            raise ValueError("source_title must not be empty")
+        return self
+
+
 class PsnImportConfirmRequest(BaseModel):
-    game_ids: list[int] = Field(min_length=1, max_length=500)
+    selections: list[PsnImportSelection] | None = Field(default=None, min_length=1, max_length=500)
+    game_ids: list[int] | None = Field(default=None, min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def require_one_selection_payload(self):
+        if (self.selections is None) == (self.game_ids is None):
+            raise ValueError("Provide exactly one of selections or game_ids")
+        return self
 
 
 class PsnImportResult(BaseModel):
