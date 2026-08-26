@@ -301,6 +301,51 @@ def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_r
     assert db_session.query(Game).count() == 0
 
 
+def test_psn_import_preview_matches_edition_and_platform_suffixes(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="psn-edition-match@example.com"))
+
+    async def search_catalog(query, page=1):
+        return {"results": [{"id": 101, "name": "Horizon Zero Dawn"}]}
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    response = api_client.post(
+        "/psn/import/preview",
+        files={"file": ("export.xlsx", _xlsx_bytes(rows=[["Game Title"], ["Horizon Zero Dawn™ Complete Edition PS4 & PS5"]]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["items"] == [
+        {
+            "source_title": "Horizon Zero Dawn™ Complete Edition PS4 & PS5",
+            "status": "confirmed",
+            "igdb_id": 101,
+            "title": "Horizon Zero Dawn",
+        }
+    ]
+
+
+def test_psn_import_preview_keeps_ambiguous_normalized_titles_in_review(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="psn-ambiguous-match@example.com"))
+
+    async def search_catalog(query, page=1):
+        return {"results": [{"id": 101, "name": "Horizon Zero Dawn"}, {"id": 102, "name": "Horizon Zero Dawn™"}]}
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    response = api_client.post(
+        "/psn/import/preview",
+        files={"file": ("export.xlsx", _xlsx_bytes(rows=[["Game Title"], ["Horizon Zero Dawn Complete Edition"]]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["items"] == [
+        {"source_title": "Horizon Zero Dawn Complete Edition", "status": "review", "igdb_id": None, "title": None}
+    ]
+
+
 @pytest.mark.parametrize(
     ("filename", "content", "content_type", "expected_games"),
     [
