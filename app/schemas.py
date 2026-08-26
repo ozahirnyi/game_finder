@@ -79,7 +79,7 @@ class UserProfileRead(UserRead):
 
 
 class UserProfileUpdate(BaseModel):
-    display_name: str | None = Field(default=None, min_length=3, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+    display_name: str | None = Field(default=None, min_length=3, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9 _-]*$")
     bio: str | None = Field(default=None, max_length=1000)
     platforms: list[str] | None = Field(default=None, max_length=20)
     favorite_genres: list[str] | None = Field(default=None, max_length=20)

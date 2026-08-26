@@ -11,6 +11,7 @@ import {
   createConversation,
   createGameInvite,
   createMessage,
+  clearToken,
   type SharedLibrary,
   updateProfile,
 } from "@/lib/api";
@@ -246,6 +247,7 @@ export function ProfileView({
               </button>
               <Link
                 to="/sign-in"
+                onClick={() => clearToken()}
                 className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground transition hover:text-foreground"
               >
                 <LogOut className="size-4" /> Sign out
