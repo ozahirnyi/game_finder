@@ -301,7 +301,7 @@ def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_r
     assert db_session.query(Game).count() == 0
 
 
-def test_psn_import_preview_requires_an_allowed_game_type_and_the_stated_playstation_platform(
+def test_psn_import_preview_uses_platform_and_type_only_for_automatic_confirmation(
     api_client, user_factory, auth_as, app_main, monkeypatch
 ):
     auth_as(user_factory(email="psn-classification@example.com"))
@@ -311,6 +311,7 @@ def test_psn_import_preview_requires_an_allowed_game_type_and_the_stated_playsta
             "App-like item": [{"id": 1, "name": "App-like item", "platforms": ["PlayStation 5"], "game_type": 14}],
             "Playable item": [{"id": 2, "name": "Playable item", "platforms": ["PlayStation 5"], "game_type": 0}],
             "Other platform": [{"id": 3, "name": "Other platform", "platforms": ["PC"], "game_type": 0}],
+            "Unknown catalog type": [{"id": 4, "name": "Unknown catalog type", "platforms": ["PlayStation 5"]}],
         }[query]}
 
     monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
@@ -326,6 +327,7 @@ def test_psn_import_preview_requires_an_allowed_game_type_and_the_stated_playsta
                         ["App-like item", "App-like item", "Violence", "Product Purchase", "PS5"],
                         ["Playable item", "Playable item", "Violence", "Product Purchase", "PS5"],
                         ["Other platform", "Other platform", "Violence", "Product Purchase", "PS5"],
+                        ["Unknown catalog type", "Unknown catalog type", "Violence", "Product Purchase", "PS5"],
                     ],
                 ),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -336,8 +338,29 @@ def test_psn_import_preview_requires_an_allowed_game_type_and_the_stated_playsta
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
         ("App-like item", "excluded"),
         ("Playable item", "confirmed"),
-        ("Other platform", "excluded"),
+        ("Other platform", "unmatched"),
+        ("Unknown catalog type", "unmatched"),
     ]
+    assert response.json()["items"][2]["reason"] == "Catalog details do not confirm this PlayStation edition — import using the PSN title."
+
+
+@pytest.mark.parametrize("game_type", [1, 2, 3, 6, 7, 14])
+def test_psn_import_preview_excludes_authoritatively_non_game_catalog_types(
+    api_client, user_factory, auth_as, app_main, monkeypatch, game_type
+):
+    auth_as(user_factory(email=f"psn-catalog-type-{game_type}@example.com"))
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_games",
+        AsyncMock(return_value={"results": [{"id": 1, "name": "Catalog item", "platforms": ["PlayStation 5"], "game_type": game_type}]}),
+    )
+
+    response = api_client.post(
+        "/psn/import/preview",
+        files={"file": ("export.csv", b"Game Name\nCatalog item\n", "text/csv")},
+    )
+
+    assert response.json()["items"][0]["status"] == "excluded"
 
 
 def test_psn_import_preview_keeps_only_eligible_catalog_uncertainty_in_manual_review(
