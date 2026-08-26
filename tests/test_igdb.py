@@ -13,6 +13,7 @@ def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
             "cover": {"url": "//images.igdb.com/igdb/image/upload/t_thumb/cover.jpg"},
             "genres": [{"name": "RPG"}],
             "platforms": [{"name": "PC (Microsoft Windows)"}],
+            "game_type": {"type": 0},
             "external_games": [{"category": 1, "uid": "1145350"}],
         }
     )
@@ -22,6 +23,7 @@ def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
     assert result["background_image"].startswith("https://")
     assert result["steam_appid"] == 1145350
     assert result["genres"] == ["RPG"]
+    assert result["game_type"] == 0
 
 
 def test_normalize_igdb_game_uses_total_rating_when_critic_rating_is_missing():
@@ -48,6 +50,7 @@ async def test_igdb_roguelike_filter_uses_real_keyword_metadata(monkeypatch):
     )
 
     assert 'keywords.name = "Roguelike"' in captured["query"]
+    assert "game_type.type" in captured["query"]
 
 
 @pytest.mark.anyio

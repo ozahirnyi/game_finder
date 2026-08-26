@@ -144,13 +144,14 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
         "background_image": cover, "description_raw": game.get("summary"),
         "rating": game.get("rating") if game.get("rating") is not None else game.get("total_rating"), "genres": [x["name"] for x in game.get("genres", []) if x.get("name")],
         "platforms": [x.get("name") or (x.get("platform") or {}).get("name") for x in game.get("platforms", []) if x.get("name") or (x.get("platform") or {}).get("name")],
+        "game_type": (game.get("game_type") or {}).get("type") if isinstance(game.get("game_type"), dict) else game.get("game_type"),
         "game_modes": [x["name"] for x in game.get("game_modes", []) if x.get("name")],
         "keywords": [x["name"] for x in game.get("keywords", []) if x.get("name")],
         "steam_appid": steam_appid,
     }
 
 
-_FIELDS = "fields id,name,first_release_date,summary,rating,total_rating,cover.url,genres.name,platforms.name,game_modes.name,keywords.name,external_games.category,external_games.uid;"
+_FIELDS = "fields id,name,first_release_date,summary,rating,total_rating,cover.url,genres.name,platforms.name,game_type.type,game_modes.name,keywords.name,external_games.category,external_games.uid;"
 
 
 async def fetch_igdb_games(

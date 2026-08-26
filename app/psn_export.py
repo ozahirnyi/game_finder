@@ -31,6 +31,8 @@ class PsnExportCandidate:
     title: str
     product_name: str | None = None
     platform: str | None = None
+    transaction_type: str | None = None
+    content_type: str | None = None
 
 
 def normalize_title(value: object) -> str | None:
@@ -136,16 +138,12 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
                     platform_column,
                 ) = transaction_columns
                 for row in chain(buffered_rows[header_index + 1 :], rows):
-                    if transaction_type_column is not None:
-                        transaction_type = _normalized_header(
-                            row[transaction_type_column] if transaction_type_column < len(row) else None
-                        )
-                        if transaction_type != "product purchase":
-                            continue
-                    elif content_type_column is not None and _normalized_header(
-                        row[content_type_column] if content_type_column < len(row) else None
-                    ) != "game":
-                        continue
+                    transaction_type = normalize_title(
+                        row[transaction_type_column] if transaction_type_column is not None and transaction_type_column < len(row) else None
+                    )
+                    content_type = (
+                        normalize_title(row[content_type_column] if content_type_column < len(row) else None) or ""
+                    ) if content_type_column is not None else None
                     title = normalize_title(row[game_name_column] if game_name_column < len(row) else None)
                     if title:
                         product_name = normalize_title(
@@ -154,7 +152,10 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
                         platform = normalize_title(
                             row[platform_column] if platform_column is not None and platform_column < len(row) else None
                         )
-                        candidates.setdefault(title.casefold(), PsnExportCandidate(title, product_name, platform))
+                        candidates.setdefault(
+                            title.casefold(),
+                            PsnExportCandidate(title, product_name, platform, transaction_type, content_type),
+                        )
                 continue
 
             header = _candidate_columns(buffered_rows, worksheet.title)
@@ -235,7 +236,20 @@ def parse_psn_export_candidates(content: bytes, filename: str | None = None) -> 
 
 
 def parse_psn_export(content: bytes, filename: str | None = None) -> list[str]:
-    return [candidate.title for candidate in parse_psn_export_candidates(content, filename)]
+    candidates = parse_psn_export_candidates(content, filename)
+    return [
+        candidate.title
+        for candidate in candidates
+        if (
+            candidate.transaction_type is None
+            or candidate.transaction_type.casefold() == "product purchase"
+        )
+        and (
+            candidate.transaction_type is not None
+            or candidate.content_type is None
+            or candidate.content_type.casefold() == "game"
+        )
+    ]
 
 
 def psn_external_id(title: str) -> str:

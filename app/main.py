@@ -4,6 +4,7 @@ import uuid
 import contextlib
 import re
 import unicodedata
+from dataclasses import dataclass
 from typing import Literal
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
@@ -32,7 +33,7 @@ from app.integrations.igdb import (
     IGDBError,
 )
 from app.prices import fetch_game_price_history
-from app.psn_export import normalize_title, parse_psn_export_candidates, psn_manual_external_id
+from app.psn_export import PsnExportCandidate, normalize_title, parse_psn_export_candidates, psn_manual_external_id
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
@@ -597,10 +598,25 @@ def delete_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: 
         raise HTTPException(status_code=404, detail="Game not found")
 
 
-PSN_PRODUCT_REVIEW_MARKERS = ("demo", "season pass", "subscription", "plus", "ea play", "currency", "points", "bundle", "dlc")
+PSN_PRODUCT_EXCLUSION_MARKERS = (
+    "demo", "trial", "season pass", "subscription", "ps plus", "ea play", "currency", "virtual currency",
+    "points", "wallet", "bundle", "dlc", "add-on", "add on", "expansion", "pack", "season",
+)
 PSN_CATALOG_PLATFORM_NAMES = {"ps4": "playstation 4", "ps5": "playstation 5"}
 PSN_MANUAL_PREVIEW_STATUSES = {"unmatched", "ambiguous", "catalog_unavailable"}
-_psn_manual_preview_titles: dict[uuid.UUID, set[str]] = {}
+# IGDB game type enum: main game (0), remake (8), remaster (9), expanded game
+# (10), and port (11) are standalone playable products. All other known types
+# are add-ons, bundles, episodes, seasons, mods, updates, or otherwise non-game.
+PSN_ALLOWED_IGDB_GAME_TYPES = {0, 8, 9, 10, 11}
+
+
+@dataclass(frozen=True)
+class PsnPreviewAuthorization:
+    confirmed_catalog_ids: frozenset[int]
+    manual_titles: frozenset[str]
+
+
+_psn_preview_authorizations: dict[uuid.UUID, PsnPreviewAuthorization] = {}
 PSN_TITLE_SUFFIX_RE = re.compile(
     r"(?:\s*[-–—:]?\s*(?:complete|deluxe|ultimate|game of the year)\s+edition|\s*[-–—:]?\s*(?:ps4\s*(?:&|and)\s*ps5|ps[45]))\s*$",
     re.IGNORECASE,
@@ -617,21 +633,42 @@ def _psn_catalog_match_key(value: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip().casefold()
 
 
-def _psn_is_excluded(value: str) -> bool:
-    normalized = value.casefold()
-    return any(marker in normalized for marker in PSN_PRODUCT_REVIEW_MARKERS)
+def _psn_product_exclusion_reason(candidate: PsnExportCandidate) -> str | None:
+    if candidate.transaction_type and candidate.transaction_type.casefold() != "product purchase":
+        return "Excluded: this transaction is not a product purchase."
+    purchase_description = " ".join(
+        value for value in (candidate.product_name, candidate.content_type) if value
+    ).casefold()
+    if any(marker in purchase_description for marker in PSN_PRODUCT_EXCLUSION_MARKERS):
+        return "Excluded: this purchase is a service, demo, add-on, currency item, or bundle."
+    return None
+
+
+def _psn_game_type(game: dict) -> int | None:
+    value = game.get("game_type")
+    if isinstance(value, dict):
+        value = value.get("type")
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _psn_has_platform(game: dict, platform_name: str) -> bool:
+    return any(str(platform).strip().casefold() == platform_name for platform in game.get("platforms") or [])
+
+
+def _psn_is_allowed_catalog_game(game: dict) -> bool:
+    return _psn_game_type(game) in PSN_ALLOWED_IGDB_GAME_TYPES
 
 
 async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPreviewItem]:
     items: list[PsnImportPreviewItem] = []
     for candidate in parse_psn_export_candidates(content, filename):
-        product_name = (candidate.product_name or "").casefold()
-        if _psn_is_excluded(product_name):
+        exclusion_reason = _psn_product_exclusion_reason(candidate)
+        if exclusion_reason:
             items.append(
                 PsnImportPreviewItem(
                     source_title=candidate.title,
                     status="excluded",
-                    reason="Excluded: subscription/demo/DLC or currency purchase.",
+                    reason=exclusion_reason,
                 )
             )
             continue
@@ -648,15 +685,7 @@ async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPre
             continue
         matches = [game for game in results if game.get("id") and _psn_catalog_match_key(game.get("name") or "") == _psn_catalog_match_key(candidate.title)]
         platform_name = PSN_CATALOG_PLATFORM_NAMES.get((candidate.platform or "").casefold())
-        if len(matches) > 1 and platform_name:
-            matches = [
-                game
-                for game in matches
-                if any(platform_name in str(platform).casefold() for platform in game.get("platforms") or [])
-            ]
-        if len(matches) == 1:
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="confirmed", igdb_id=int(matches[0]["id"]), title=matches[0]["name"]))
-        elif not matches:
+        if not matches:
             items.append(
                 PsnImportPreviewItem(
                     source_title=candidate.title,
@@ -664,6 +693,39 @@ async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPre
                     reason="No exact catalog match found. Import using the PSN title if this is the right game.",
                 )
             )
+            continue
+        eligible_matches = [game for game in matches if _psn_is_allowed_catalog_game(game)]
+        if platform_name:
+            eligible_matches = [game for game in eligible_matches if _psn_has_platform(game, platform_name)]
+            if not eligible_matches:
+                items.append(
+                    PsnImportPreviewItem(
+                        source_title=candidate.title,
+                        status="excluded",
+                        reason="Excluded: no eligible PlayStation game catalog entry matches this purchase.",
+                    )
+                )
+                continue
+        elif not eligible_matches:
+            if any(_psn_game_type(game) is not None for game in matches):
+                items.append(
+                    PsnImportPreviewItem(
+                        source_title=candidate.title,
+                        status="excluded",
+                        reason="Excluded: the catalog match is not a standalone playable game.",
+                    )
+                )
+            else:
+                items.append(
+                    PsnImportPreviewItem(
+                        source_title=candidate.title,
+                        status="unmatched",
+                        reason="No confirmed playable catalog match found. Import using the PSN title if this is the right game.",
+                    )
+                )
+            continue
+        if len(eligible_matches) == 1:
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="confirmed", igdb_id=int(eligible_matches[0]["id"]), title=eligible_matches[0]["name"]))
         else:
             items.append(
                 PsnImportPreviewItem(
@@ -686,11 +748,18 @@ async def preview_psn_import(
         raise HTTPException(status_code=400, detail="Upload a supported PSN export (.xlsx, .csv, or .json)")
     content = await file.read()
     items = await _psn_preview_items(content, filename)
-    _psn_manual_preview_titles[current_user.id] = {
+    _psn_preview_authorizations[current_user.id] = PsnPreviewAuthorization(
+        confirmed_catalog_ids=frozenset(
+            int(item.igdb_id)
+            for item in items
+            if item.status == "confirmed" and item.igdb_id is not None
+        ),
+        manual_titles=frozenset(
         _psn_catalog_match_key(item.source_title)
         for item in items
         if item.status in PSN_MANUAL_PREVIEW_STATUSES
-    }
+        ),
+    )
     return PsnImportPreview(
         items=items,
         games=[item.source_title for item in items],
@@ -711,8 +780,11 @@ async def confirm_psn_import(
         selections = [PsnImportSelection(catalog_id=igdb_id) for igdb_id in data.game_ids]
 
     unique_games: dict[str, str] = {}
+    authorization = _psn_preview_authorizations.get(current_user.id)
     for selection in selections:
         if selection.catalog_id is not None:
+            if authorization is None or selection.catalog_id not in authorization.confirmed_catalog_ids:
+                raise HTTPException(status_code=422, detail="Choose games confirmed by the catalog preview")
             try:
                 detail = await fetch_igdb_game_detail(selection.catalog_id)
             except IGDBError as exc:
@@ -726,8 +798,8 @@ async def confirm_psn_import(
         source_title = selection.source_title
         if (
             source_title is None
-            or _psn_is_excluded(source_title)
-            or _psn_catalog_match_key(source_title) not in _psn_manual_preview_titles.get(current_user.id, set())
+            or authorization is None
+            or _psn_catalog_match_key(source_title) not in authorization.manual_titles
         ):
             raise HTTPException(status_code=422, detail="Choose an eligible title from the PSN preview")
         unique_games[psn_manual_external_id(source_title)] = source_title
