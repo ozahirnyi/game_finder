@@ -31,6 +31,7 @@ class PsnExportCandidate:
     title: str
     product_name: str | None = None
     platform: str | None = None
+    content_type: str | None = None
 
 
 def normalize_title(value: object) -> str | None:
@@ -154,7 +155,10 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
                         platform = normalize_title(
                             row[platform_column] if platform_column is not None and platform_column < len(row) else None
                         )
-                        candidates.setdefault(title.casefold(), PsnExportCandidate(title, product_name, platform))
+                        content_type = normalize_title(
+                            row[content_type_column] if content_type_column is not None and content_type_column < len(row) else None
+                        )
+                        candidates.setdefault(title.casefold(), PsnExportCandidate(title, product_name, platform, content_type))
                 continue
 
             header = _candidate_columns(buffered_rows, worksheet.title)

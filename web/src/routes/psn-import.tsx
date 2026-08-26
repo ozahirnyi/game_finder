@@ -149,6 +149,11 @@ function PsnImportPage() {
     setSelected((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
   }
 
+  const catalogRows = rows.filter((row) => row.status === "confirmed");
+  const reviewRows = rows.filter((row) => ["unmatched", "ambiguous", "catalog_unavailable"].includes(row.status));
+  const excludedRows = rows.filter((row) => row.status === "excluded");
+  const eligibleRows = [...catalogRows, ...reviewRows];
+
   return (
     <AppShell>
       <Link
@@ -167,7 +172,9 @@ function PsnImportPage() {
         </p>
         <p className="mt-3 max-w-xl rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-muted-foreground">
           This is not a complete PSN library sync. We can import only game purchases and activity
-          included in the export; discs, PS Plus access, and trophies are not included.
+          included in the export; discs, PS Plus access, and trophies are not included. Purchases
+          marked by PSN as applications or services are excluded, while uncertain catalog results
+          remain available for optional PSN-title import.
         </p>
 
         <div className="mt-8">
@@ -260,8 +267,15 @@ function PsnImportPage() {
               />
             ) : (
               <>
-                <div className="space-y-2">
-                  {rows.map((g) => (
+                <div className="space-y-6">
+                  {[
+                    { title: "Catalog matches", items: catalogRows },
+                    { title: "Need review", items: reviewRows },
+                    { title: "Excluded purchases", items: excludedRows },
+                  ].filter((section) => section.items.length > 0).map((section) => (
+                    <section key={section.title} className="space-y-2">
+                      <h2 className="label-mono text-muted-foreground">{section.title} ({section.items.length})</h2>
+                      {section.items.map((g) => (
                     <label
                       key={g.key}
                       className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 p-4"
@@ -281,11 +295,13 @@ function PsnImportPage() {
                         {previewStatusCopy(g.status, g.reason)}
                       </Chip>
                     </label>
+                      ))}
+                    </section>
                   ))}
                 </div>
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
                   <p className="label-mono text-muted-foreground">
-                    {selected.length} of {rows.length} selected
+                    {selected.length} of {eligibleRows.length} eligible purchases selected
                   </p>
                   <div className="flex gap-2">
                     <button

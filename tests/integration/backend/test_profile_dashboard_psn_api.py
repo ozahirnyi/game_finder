@@ -458,6 +458,56 @@ def test_psn_import_preview_excludes_marker_products(api_client, user_factory, a
     assert search_catalog.await_count == 0
 
 
+def test_psn_import_preview_excludes_known_apps_and_confirms_playstation_games(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="psn-app-classification@example.com"))
+
+    async def search_catalog(query, page=1):
+        return {
+            "results": {
+                "Twitch": [{"id": 1, "name": "Twitch", "platforms": ["PlayStation 4"]}],
+                "YouTube": [{"id": 2, "name": "YouTube", "platforms": ["PlayStation 5"]}],
+                "FORTNITE": [
+                    {"id": 1905, "name": "FORTNITE", "platforms": ["PlayStation 4"]},
+                    {"id": 231090, "name": "FORTNITE", "platforms": ["PC"]},
+                ],
+                "FIFA 16": [{"id": 3, "name": "FIFA 16", "platforms": ["PlayStation 4"]}],
+                "Apex Legends": [{"id": 4, "name": "Apex Legends", "platforms": ["PlayStation 5"]}],
+            }[query]
+        }
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    response = api_client.post(
+        "/psn/import/preview",
+        files={
+            "file": (
+                "export.xlsx",
+                _xlsx_bytes(
+                    "Transaction Detail",
+                    [
+                        ["Transaction Date", "Game Name", "Product Name", "Content Type", "Platform", "Transaction Type"],
+                        ["2026-01-01", "Twitch", "Twitch", "Application", "PS4", "Product Purchase"],
+                        ["2026-01-01", "YouTube", "YouTube", "Application", "PS5", "Product Purchase"],
+                        ["2026-01-01", "FORTNITE", "FORTNITE", "Game", "PS4", "Product Purchase"],
+                        ["2026-01-01", "FIFA 16", "FIFA 16", "Game", "PS4", "Product Purchase"],
+                        ["2026-01-01", "Apex Legends", "Apex Legends", "Game", "PS5", "Product Purchase"],
+                    ],
+                ),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+
+    assert [(item["source_title"], item["status"], item["igdb_id"]) for item in response.json()["items"]] == [
+        ("Twitch", "excluded", None),
+        ("YouTube", "excluded", None),
+        ("FORTNITE", "confirmed", 1905),
+        ("FIFA 16", "confirmed", 3),
+        ("Apex Legends", "confirmed", 4),
+    ]
+
+
 def test_psn_import_mixed_preview_and_confirmation_flow(
     api_client, db_session, user_factory, auth_as, app_main, monkeypatch
 ):

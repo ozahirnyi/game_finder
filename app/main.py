@@ -598,6 +598,7 @@ def delete_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: 
 
 
 PSN_PRODUCT_REVIEW_MARKERS = ("demo", "season pass", "subscription", "plus", "ea play", "currency", "points", "bundle", "dlc")
+PSN_NON_GAME_CONTENT_TYPES = {"app", "application", "service", "video", "music", "social"}
 PSN_CATALOG_PLATFORM_NAMES = {"ps4": "playstation 4", "ps5": "playstation 5"}
 PSN_MANUAL_PREVIEW_STATUSES = {"unmatched", "ambiguous", "catalog_unavailable"}
 _psn_manual_preview_titles: dict[uuid.UUID, set[str]] = {}
@@ -622,10 +623,23 @@ def _psn_is_excluded(value: str) -> bool:
     return any(marker in normalized for marker in PSN_PRODUCT_REVIEW_MARKERS)
 
 
+def _psn_is_non_game_content_type(value: str | None) -> bool:
+    return (value or "").casefold().strip() in PSN_NON_GAME_CONTENT_TYPES
+
+
 async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPreviewItem]:
     items: list[PsnImportPreviewItem] = []
     for candidate in parse_psn_export_candidates(content, filename):
         product_name = (candidate.product_name or "").casefold()
+        if _psn_is_non_game_content_type(candidate.content_type):
+            items.append(
+                PsnImportPreviewItem(
+                    source_title=candidate.title,
+                    status="excluded",
+                    reason="Excluded: PSN identifies this purchase as an application or service.",
+                )
+            )
+            continue
         if _psn_is_excluded(product_name):
             items.append(
                 PsnImportPreviewItem(
