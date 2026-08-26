@@ -90,6 +90,59 @@ function Stepper({ current }: { current: Step }) {
   );
 }
 
+function PreviewGroup({
+  title,
+  rows,
+  selected,
+  onToggle,
+  hint,
+}: {
+  title: string;
+  rows: PsnPreviewRow[];
+  selected: string[];
+  onToggle: (key: string) => void;
+  hint: string;
+}) {
+  return (
+    <section className="space-y-2" aria-label={title}>
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-bold">{title} ({rows.length})</h3>
+        <p className="label-mono text-muted-foreground">{hint}</p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">None</p>
+      ) : (
+        rows.map((game) => {
+          const excluded = game.status === "excluded";
+          return (
+            <label
+              key={game.key}
+              className={`flex items-center gap-3 rounded-xl border border-border bg-surface-2 p-4 ${
+                excluded ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(game.key)}
+                onChange={() => onToggle(game.key)}
+                disabled={excluded}
+                className="size-4 accent-[var(--primary)]"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold">{game.title}</p>
+                <p className="label-mono mt-1 text-muted-foreground">{game.sourceTitle}</p>
+              </div>
+              <Chip tone={game.status === "confirmed" ? "primary" : "outline"}>
+                {previewStatusCopy(game.status, game.reason)}
+              </Chip>
+            </label>
+          );
+        })
+      )}
+    </section>
+  );
+}
+
 function PsnImportPage() {
   const [step, setStep] = useState<Step>("upload");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -136,6 +189,10 @@ function PsnImportPage() {
     },
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const catalogRows = rows.filter((row) => row.status === "confirmed");
+  const reviewRows = rows.filter((row) => row.status !== "confirmed" && row.status !== "excluded");
+  const excludedRows = rows.filter((row) => row.status === "excluded");
+  const eligibleRows = [...catalogRows, ...reviewRows];
 
   function parseFile(file: File) {
     const name = file.name;
@@ -146,6 +203,7 @@ function PsnImportPage() {
   }
 
   function toggle(key: string) {
+    if (rows.find((row) => row.key === key)?.status === "excluded") return;
     setSelected((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
   }
 
@@ -260,32 +318,14 @@ function PsnImportPage() {
               />
             ) : (
               <>
-                <div className="space-y-2">
-                  {rows.map((g) => (
-                    <label
-                      key={g.key}
-                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 p-4"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(g.key)}
-                        onChange={() => toggle(g.key)}
-                        disabled={g.status === "excluded"}
-                        className="size-4 accent-[var(--primary)]"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold">{g.title}</p>
-                        <p className="label-mono mt-1 text-muted-foreground">{g.sourceTitle}</p>
-                      </div>
-                      <Chip tone={g.status === "confirmed" ? "primary" : "outline"}>
-                        {previewStatusCopy(g.status, g.reason)}
-                      </Chip>
-                    </label>
-                  ))}
+                <div className="space-y-6">
+                  <PreviewGroup title="Catalog matches" rows={catalogRows} selected={selected} onToggle={toggle} hint="Selected automatically" />
+                  <PreviewGroup title="Need review" rows={reviewRows} selected={selected} onToggle={toggle} hint="Select games to import" />
+                  <PreviewGroup title="Excluded purchases" rows={excludedRows} selected={selected} onToggle={toggle} hint="Cannot be imported" />
                 </div>
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
                   <p className="label-mono text-muted-foreground">
-                    {selected.length} of {rows.length} selected
+                    {selected.length} of {eligibleRows.length} eligible purchases selected
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -337,7 +377,7 @@ function PsnImportPage() {
                     <div>
                       <p className="label-mono text-muted-foreground">Skipped</p>
                       <p className="mt-1.5 font-display text-2xl font-bold">
-                        {rows.length - selected.length}
+                        {eligibleRows.length - selected.length}
                       </p>
                     </div>
                     <div>
@@ -357,7 +397,7 @@ function PsnImportPage() {
                     onClick={() =>
                       confirm.mutate(
                         rows
-                          .filter((row) => selected.includes(row.key))
+                          .filter((row) => row.status !== "excluded" && selected.includes(row.key))
                           .map((row) =>
                             row.status === "confirmed" && row.catalogId !== null
                               ? { catalog_id: row.catalogId }

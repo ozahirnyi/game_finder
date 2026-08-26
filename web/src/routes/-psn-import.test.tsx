@@ -77,6 +77,10 @@ describe("PsnImportPage", () => {
     await screen.findByText(/choose an export file/i);
     fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(["x"], "export.xlsx")] } });
     await screen.findByText("God of War");
+    expect(screen.getByRole("heading", { name: "Catalog matches (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Need review (3)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Excluded purchases (1)" })).toBeInTheDocument();
+    expect(screen.getByText("1 of 4 eligible purchases selected")).toBeInTheDocument();
     expect(screen.getByText("Catalog match")).toBeInTheDocument();
     expect(screen.getByText("Multiple catalog matches — import using PSN title")).toBeInTheDocument();
     expect(screen.getByText("No catalog match — import using PSN title")).toBeInTheDocument();

@@ -68,8 +68,31 @@ def test_parse_psn_export_reads_product_purchases_with_content_descriptors():
         sheet_name='"Transaction Detail"',
     )
 
-    assert parse_psn_export_candidates(content) == [PsnExportCandidate("GOD OF WAR", "God of War", None)]
+    assert parse_psn_export_candidates(content) == [
+        PsnExportCandidate("GOD OF WAR", "God of War", None, "Product Purchase", "Violence"),
+        PsnExportCandidate("Wallet", "Wallet top up", None, "Wallet Funding", "Wallet"),
+    ]
     assert parse_psn_export(content) == ["GOD OF WAR"]
+
+
+def test_parse_psn_export_candidates_retains_non_product_transactions_for_preview_classification():
+    content = make_export(
+        [
+            ("Transaction Date", "Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"),
+            ("2026-01-01", "Service item", "Service item", "Service", "Subscription Renewal", "PS5"),
+        ],
+        sheet_name="Transaction Detail",
+    )
+
+    assert parse_psn_export_candidates(content) == [
+        PsnExportCandidate(
+            "Service item",
+            "Service item",
+            "PS5",
+            "Subscription Renewal",
+            "Service",
+        )
+    ]
 
 
 def test_parse_psn_export_reads_quoted_transaction_detail_sheet_name():
@@ -95,7 +118,7 @@ def test_parse_psn_export_candidates_retains_transaction_detail_platform():
     )
 
     assert parse_psn_export_candidates(content) == [
-        PsnExportCandidate("MORTAL KOMBAT X", "MORTAL KOMBAT X", "PS4")
+        PsnExportCandidate("MORTAL KOMBAT X", "MORTAL KOMBAT X", "PS4", None, "Game")
     ]
 
 

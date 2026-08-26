@@ -57,7 +57,7 @@ async def test_igdb_search_normalizes_results(monkeypatch):
     ))
 
     assert await igdb.fetch_igdb_games("game") == {
-        "results": [{"id": 1, "name": "Game", "released": None, "background_image": None, "description_raw": None, "rating": None, "genres": ["RPG"], "platforms": [], "game_modes": [], "keywords": [], "steam_appid": None}]
+        "results": [{"id": 1, "name": "Game", "released": None, "background_image": None, "description_raw": None, "rating": None, "genres": ["RPG"], "platforms": [], "game_type": None, "game_modes": [], "keywords": [], "steam_appid": None}]
     }
 
 
