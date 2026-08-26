@@ -68,7 +68,7 @@ export function PsnImportFlow() {
                   <span className="text-sm font-medium">{item.title}</span>
                 </label>
               ))}
-              {items.filter((item) => item.status === "review").map((item) => (
+              {items.filter((item) => item.status !== "confirmed").map((item) => (
                 <p key={item.source_title} className="rounded-xl border border-border bg-surface-2 p-3 text-sm text-muted-foreground">
                   {item.source_title} — not imported (needs review)
                 </p>
@@ -78,7 +78,7 @@ export function PsnImportFlow() {
               <button
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60"
                 disabled={selectedIds.length === 0 || confirm.isPending}
-                onClick={() => confirm.mutate(selectedIds)}
+                onClick={() => confirm.mutate(selectedIds.map((catalog_id) => ({ catalog_id })))}
               >
                 {confirm.isPending
                   ? "Importing…"

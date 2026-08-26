@@ -11,7 +11,7 @@ import {
   RowSkeletonList,
   SectionHeader,
 } from "@/components/ui-bits";
-import { confirmPsnImport, previewPsnImport } from "@/lib/api";
+import { confirmPsnImport, previewPsnImport, type PsnImportPreviewItem } from "@/lib/api";
 import { ArrowLeft, ArrowRight, Check, FileUp, Loader2, RotateCcw, Upload } from "lucide-react";
 
 export const Route = createFileRoute("/psn-import")({
@@ -37,6 +37,14 @@ export const Route = createFileRoute("/psn-import")({
 
 type Step = "upload" | "preview" | "confirm" | "result";
 type Phase = "idle" | "loading" | "error";
+type PsnPreviewRow = {
+  key: string;
+  catalogId: number | null;
+  sourceTitle: string;
+  title: string;
+  status: PsnImportPreviewItem["status"];
+  reason: string | null;
+};
 
 const steps: { key: Step; label: string }[] = [
   { key: "upload", label: "Upload export" },
@@ -44,6 +52,14 @@ const steps: { key: Step; label: string }[] = [
   { key: "confirm", label: "Confirm import" },
   { key: "result", label: "Result" },
 ];
+
+function previewStatusCopy(status: PsnImportPreviewItem["status"], reason: string | null) {
+  if (status === "confirmed") return "Catalog match";
+  if (status === "unmatched") return "No catalog match — import using PSN title";
+  if (status === "ambiguous") return "Multiple catalog matches — import using PSN title";
+  if (status === "catalog_unavailable") return "Catalog temporarily unavailable — import using PSN title";
+  return reason ?? "Excluded: subscription/demo/DLC or currency purchase.";
+}
 
 function Stepper({ current }: { current: Step }) {
   const idx = steps.findIndex((s) => s.key === current);
@@ -80,25 +96,21 @@ function PsnImportPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const client = useQueryClient();
-  const [rows, setRows] = useState<
-    {
-      id: number | null;
-      title: string;
-      matched: boolean;
-      platform?: string;
-    }[]
-  >([]);
-  const [selected, setSelected] = useState<number[]>([]);
+  const [rows, setRows] = useState<PsnPreviewRow[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
   const preview = useMutation({
     mutationFn: previewPsnImport,
     onSuccess: (data) => {
-      const next = data.items.map((item) => ({
-        id: item.igdb_id ?? null,
+      const next = data.items.map((item, index) => ({
+        key: `${index}:${item.source_title}`,
+        catalogId: item.igdb_id ?? null,
+        sourceTitle: item.source_title,
         title: item.title ?? item.source_title,
-        matched: item.status === "confirmed" && item.igdb_id !== null,
+        status: item.status,
+        reason: item.reason ?? null,
       }));
       setRows(next);
-      setSelected(next.flatMap((game) => (game.matched && game.id !== null ? [game.id] : [])));
+      setSelected(next.flatMap((game) => (game.status === "confirmed" && game.catalogId !== null ? [game.key] : [])));
       setPhase("idle");
       setStep("preview");
     },
@@ -133,8 +145,8 @@ function PsnImportPage() {
     preview.mutate(file);
   }
 
-  function toggle(id: number) {
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  function toggle(key: string) {
+    setSelected((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
   }
 
   return (
@@ -251,25 +263,23 @@ function PsnImportPage() {
                 <div className="space-y-2">
                   {rows.map((g) => (
                     <label
-                      key={g.id ?? g.title}
+                      key={g.key}
                       className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 p-4"
                     >
                       <input
                         type="checkbox"
-                        checked={g.id !== null && selected.includes(g.id)}
-                        onChange={() => g.id !== null && toggle(g.id)}
-                        disabled={!g.matched}
+                        checked={selected.includes(g.key)}
+                        onChange={() => toggle(g.key)}
+                        disabled={g.status === "excluded"}
                         className="size-4 accent-[var(--primary)]"
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-bold">{g.title}</p>
-                        <p className="label-mono mt-1 text-muted-foreground">{g.platform}</p>
+                        <p className="label-mono mt-1 text-muted-foreground">{g.sourceTitle}</p>
                       </div>
-                      {g.matched ? (
-                        <Chip tone="primary">Matched</Chip>
-                      ) : (
-                        <Chip tone="outline">No catalog match</Chip>
-                      )}
+                      <Chip tone={g.status === "confirmed" ? "primary" : "outline"}>
+                        {previewStatusCopy(g.status, g.reason)}
+                      </Chip>
                     </label>
                   ))}
                 </div>
@@ -344,7 +354,17 @@ function PsnImportPage() {
                     Back
                   </button>
                   <button
-                    onClick={() => confirm.mutate(selected)}
+                    onClick={() =>
+                      confirm.mutate(
+                        rows
+                          .filter((row) => selected.includes(row.key))
+                          .map((row) =>
+                            row.status === "confirmed" && row.catalogId !== null
+                              ? { catalog_id: row.catalogId }
+                              : { source_title: row.sourceTitle },
+                          ),
+                      )
+                    }
                     className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:opacity-90"
                   >
                     Import {selected.length} games

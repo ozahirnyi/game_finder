@@ -53,11 +53,14 @@ describe("PsnImportPage", () => {
     expect(screen.queryByText(/preview error state/i)).not.toBeInTheDocument();
   });
 
-  it("confirms selected catalog ids instead of source titles", async () => {
+  it("submits catalog IDs for confirmed rows and PSN titles for opted-in review rows", async () => {
     previewPsnImport.mockResolvedValueOnce({
       items: [
         { source_title: "GOD OF WAR", status: "confirmed", igdb_id: 101, title: "God of War" },
-        { source_title: "EA Play", status: "review", igdb_id: null, title: null },
+        { source_title: "MORTAL KOMBAT X", status: "ambiguous", igdb_id: null, title: null },
+        { source_title: "Unknown Game", status: "unmatched", igdb_id: null, title: null },
+        { source_title: "Offline Game", status: "catalog_unavailable", igdb_id: null, title: null },
+        { source_title: "EA Play", status: "excluded", igdb_id: null, title: null, reason: "Excluded: subscription/demo/DLC or currency purchase." },
       ],
       games: ["GOD OF WAR", "EA Play"],
       total: 2,
@@ -74,9 +77,22 @@ describe("PsnImportPage", () => {
     await screen.findByText(/choose an export file/i);
     fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(["x"], "export.xlsx")] } });
     await screen.findByText("God of War");
+    expect(screen.getByText("Catalog match")).toBeInTheDocument();
+    expect(screen.getByText("Multiple catalog matches — import using PSN title")).toBeInTheDocument();
+    expect(screen.getByText("No catalog match — import using PSN title")).toBeInTheDocument();
+    expect(screen.getByText("Catalog temporarily unavailable — import using PSN title")).toBeInTheDocument();
+    expect(screen.getByText("Excluded: subscription/demo/DLC or currency purchase.")).toBeInTheDocument();
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes).toHaveLength(5);
+    expect(checkboxes[0]).toBeChecked();
+    expect(checkboxes[4]).toBeDisabled();
+    fireEvent.click(checkboxes[1]);
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-    fireEvent.click(screen.getByRole("button", { name: /import 1 game/i }));
+    fireEvent.click(screen.getByRole("button", { name: /import 2 games/i }));
 
-    await waitFor(() => expect(confirmPsnImport.mock.calls[0]?.[0]).toEqual([101]));
+    await waitFor(() => expect(confirmPsnImport.mock.calls[0]?.[0]).toEqual([
+      { catalog_id: 101 },
+      { source_title: "MORTAL KOMBAT X" },
+    ]));
   });
 });

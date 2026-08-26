@@ -68,7 +68,7 @@ def test_parse_psn_export_reads_product_purchases_with_content_descriptors():
         sheet_name='"Transaction Detail"',
     )
 
-    assert parse_psn_export_candidates(content) == [PsnExportCandidate("GOD OF WAR", "God of War")]
+    assert parse_psn_export_candidates(content) == [PsnExportCandidate("GOD OF WAR", "God of War", None)]
     assert parse_psn_export(content) == ["GOD OF WAR"]
 
 
@@ -83,6 +83,20 @@ def test_parse_psn_export_reads_quoted_transaction_detail_sheet_name():
     )
 
     assert parse_psn_export(content) == ["Returnal"]
+
+
+def test_parse_psn_export_candidates_retains_transaction_detail_platform():
+    content = make_export(
+        [
+            ("Transaction Date", "Game Name", "Product Name", "Content Type", "Platform"),
+            ("2026-01-01", "MORTAL KOMBAT X", "MORTAL KOMBAT X", "Game", "PS4"),
+        ],
+        sheet_name="Transaction Detail",
+    )
+
+    assert parse_psn_export_candidates(content) == [
+        PsnExportCandidate("MORTAL KOMBAT X", "MORTAL KOMBAT X", "PS4")
+    ]
 
 
 def test_parse_psn_export_explains_export_without_game_data():

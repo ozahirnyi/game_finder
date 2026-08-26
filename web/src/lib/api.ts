@@ -323,10 +323,12 @@ export type PsnImportPreview = {
 };
 export type PsnImportPreviewItem = {
   source_title: string;
-  status: "confirmed" | "review";
+  status: "confirmed" | "unmatched" | "ambiguous" | "catalog_unavailable" | "excluded";
   igdb_id?: number | null;
   title?: string | null;
+  reason?: string | null;
 };
+export type PsnImportSelection = { catalog_id: number } | { source_title: string };
 export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
 export type Notification = {
   id: string;
@@ -496,11 +498,11 @@ export function previewPsnImport(file: File) {
   });
 }
 
-export function confirmPsnImport(gameIds: number[]) {
+export function confirmPsnImport(selections: PsnImportSelection[]) {
   return apiRequest<PsnImportResult>("/psn/import/confirm", {
     auth: true,
     method: "POST",
-    body: { game_ids: gameIds },
+    body: { selections },
   });
 }
 
