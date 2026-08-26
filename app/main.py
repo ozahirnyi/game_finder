@@ -3,6 +3,7 @@ import os
 import uuid
 import contextlib
 import re
+import unicodedata
 from typing import Literal
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
@@ -597,10 +598,20 @@ def delete_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: 
 
 
 PSN_PRODUCT_REVIEW_MARKERS = ("demo", "season pass", "subscription", "plus", "ea play", "currency", "points", "bundle")
+PSN_TITLE_SUFFIX_RE = re.compile(
+    r"(?:\s*[-–—:]?\s*(?:complete|deluxe|ultimate|game of the year)\s+edition|\s*[-–—:]?\s*(?:ps4\s*(?:&|and)\s*ps5|ps[45]))\s*$",
+    re.IGNORECASE,
+)
 
 
 def _psn_catalog_match_key(value: str) -> str:
-    return re.sub(r"\s+", " ", value.replace("™", "").replace("®", "").replace("©", "")).strip().casefold()
+    cleaned = unicodedata.normalize("NFKC", value.replace("™", "").replace("®", "").replace("©", ""))
+    while True:
+        normalized = PSN_TITLE_SUFFIX_RE.sub("", cleaned)
+        if normalized == cleaned:
+            break
+        cleaned = normalized
+    return re.sub(r"\s+", " ", cleaned).strip().casefold()
 
 
 async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPreviewItem]:
