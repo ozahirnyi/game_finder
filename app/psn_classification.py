@@ -50,15 +50,6 @@ EXPLICIT_NON_GAME_CONTENT_IDENTITIES = frozenset(
         "currency",
         "virtual currency",
         "points",
-        "subscription",
-        "wallet",
-        "currency",
-        "virtual currency",
-        "points",
-        "subscription",
-        "currency",
-        "virtual currency",
-        "points",
     }
 )
 
