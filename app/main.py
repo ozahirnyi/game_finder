@@ -601,11 +601,10 @@ def delete_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: 
 
 PSN_CATALOG_PLATFORM_NAMES = {"ps4": "playstation 4", "ps5": "playstation 5"}
 PSN_MANUAL_PREVIEW_STATUSES = {"unmatched", "ambiguous", "catalog_unavailable"}
-# IGDB game type enum: main game (0), remake (8), remaster (9), expanded game
-# (10), and port (11) are standalone playable products. All other known types
-# are add-ons, bundles, episodes, seasons, mods, updates, or otherwise non-game.
+# IGDB game type can positively choose one result among duplicate exact names.
+# It must not exclude a PSN product: a unique exact catalog result remains
+# eligible even when its type is absent, unknown, or denotes a collection.
 PSN_ALLOWED_IGDB_GAME_TYPES = {0, 8, 9, 10, 11}
-PSN_EXCLUDED_IGDB_GAME_TYPES = {1, 2, 3, 4, 5, 6, 7, 12, 13, 14}
 IGDB_GAME_TYPE_VALUES = {
     "main_game": 0,
     "dlc_addon": 1,
@@ -665,10 +664,6 @@ def _psn_is_allowed_catalog_game(game: dict) -> bool:
     return _psn_game_type(game) in PSN_ALLOWED_IGDB_GAME_TYPES
 
 
-def _psn_is_explicit_non_game_catalog_entry(game: dict) -> bool:
-    return _psn_game_type(game) in PSN_EXCLUDED_IGDB_GAME_TYPES
-
-
 async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPreviewItem]:
     items: list[PsnImportPreviewItem] = []
     for candidate in parse_psn_export_candidates(content, filename):
@@ -704,20 +699,10 @@ async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPre
                 )
             )
             continue
-        if all(_psn_is_explicit_non_game_catalog_entry(game) for game in matches):
-            items.append(
-                PsnImportPreviewItem(
-                    source_title=candidate.title,
-                    status="excluded",
-                    reason="Excluded: the catalog classifies this purchase as non-game content.",
-                )
-            )
-            continue
         platform_matches = [game for game in matches if platform_name and _psn_has_platform(game, platform_name)]
         selection_pool = platform_matches or matches
-        plausible_matches = [game for game in selection_pool if not _psn_is_explicit_non_game_catalog_entry(game)]
-        playable_matches = [game for game in plausible_matches if _psn_is_allowed_catalog_game(game)]
-        selected_matches = playable_matches if len(playable_matches) == 1 else plausible_matches
+        playable_matches = [game for game in selection_pool if _psn_is_allowed_catalog_game(game)]
+        selected_matches = playable_matches if len(playable_matches) == 1 else selection_pool
         if len(selected_matches) == 1:
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="confirmed", igdb_id=int(selected_matches[0]["id"]), title=selected_matches[0]["name"]))
         else:
