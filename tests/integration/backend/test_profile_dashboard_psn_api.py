@@ -376,12 +376,59 @@ def test_psn_import_preview_uses_platform_and_type_only_to_choose_between_exact_
     )
 
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
-        ("App-like item", "excluded"),
+        ("App-like item", "confirmed"),
         ("Playable item", "confirmed"),
         ("Other platform", "confirmed"),
         ("Unknown catalog type", "confirmed"),
     ]
-    assert [item["igdb_id"] for item in response.json()["items"]] == [None, 2, 3, 4]
+    assert [item["igdb_id"] for item in response.json()["items"]] == [1, 2, 3, 4]
+
+
+def test_psn_import_preview_keeps_a_unique_exact_catalog_collection_eligible(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="psn-catalog-collection@example.com"))
+
+    async def search_catalog(query, page=1):
+        assert query == "Catalog collection"
+        return {
+            "results": [
+                {
+                    "id": 501,
+                    "name": "Catalog collection",
+                    "platforms": ["PlayStation 5"],
+                    "game_type": "bundle",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    response = api_client.post(
+        "/psn/import/preview",
+        files={
+            "file": (
+                "export.xlsx",
+                _xlsx_bytes(
+                    "Transaction Detail",
+                    [
+                        ["Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"],
+                        ["Catalog collection", "Catalog collection", "Violence", "Product Purchase", "PS5"],
+                    ],
+                ),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+
+    assert response.json()["items"] == [
+        {
+            "source_title": "Catalog collection",
+            "status": "confirmed",
+            "igdb_id": 501,
+            "title": "Catalog collection",
+            "reason": None,
+        }
+    ]
 
 
 def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_titles_eligible(
@@ -434,7 +481,7 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
 
 
 @pytest.mark.parametrize("game_type", [1, 2, 3, 6, 7, 14])
-def test_psn_import_preview_excludes_authoritatively_non_game_catalog_types(
+def test_psn_import_preview_keeps_unique_exact_catalog_candidates_eligible_regardless_of_type(
     api_client, user_factory, auth_as, app_main, monkeypatch, game_type
 ):
     auth_as(user_factory(email=f"psn-catalog-type-{game_type}@example.com"))
@@ -449,10 +496,11 @@ def test_psn_import_preview_excludes_authoritatively_non_game_catalog_types(
         files={"file": ("export.csv", b"Game Name\nCatalog item\n", "text/csv")},
     )
 
-    assert response.json()["items"][0]["status"] == "excluded"
+    assert response.json()["items"][0]["status"] == "confirmed"
+    assert response.json()["items"][0]["igdb_id"] == 1
 
 
-def test_psn_import_preview_keeps_only_eligible_catalog_uncertainty_in_manual_review(
+def test_psn_import_preview_uses_catalog_type_only_to_choose_between_duplicate_exact_candidates(
     api_client, user_factory, auth_as, app_main, monkeypatch
 ):
     auth_as(user_factory(email="psn-eligible-review@example.com"))
@@ -493,7 +541,7 @@ def test_psn_import_preview_keeps_only_eligible_catalog_uncertainty_in_manual_re
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
         ("Duplicate game", "ambiguous"),
         ("Web game", "confirmed"),
-        ("Mixed catalog records", "ambiguous"),
+        ("Mixed catalog records", "confirmed"),
     ]
 
 
