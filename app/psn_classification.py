@@ -82,6 +82,11 @@ EXPLICIT_NON_GAME_DESCRIPTOR_IDENTITIES = frozenset(
         "expansion pack",
         "bundle",
         "season pass",
+        "subscription",
+        "wallet",
+        "currency",
+        "virtual currency",
+        "points",
     }
 )
 
