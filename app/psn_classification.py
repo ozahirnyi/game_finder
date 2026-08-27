@@ -35,7 +35,24 @@ KNOWN_NON_GAME_PSN_PRODUCT_IDENTITIES = frozenset(
     )
 )
 
-EXPLICIT_NON_GAME_PRODUCT_MARKERS = (
+EXPLICIT_NON_GAME_CONTENT_IDENTITIES = frozenset(
+    {
+        "demo",
+        "trial",
+        "dlc",
+        "downloadable content",
+        "add on",
+        "expansion",
+        "bundle",
+        "season pass",
+        "subscription",
+        "currency",
+        "virtual currency",
+        "points",
+    }
+)
+
+EXPLICIT_NON_GAME_PRODUCT_IDENTITIES = (
     "playstation plus",
     "ps plus",
     "subscription",
@@ -51,8 +68,22 @@ EXPLICIT_NON_GAME_PRODUCT_MARKERS = (
     "add-on",
     "add on",
     "expansion",
+    "expansion pack",
     "bundle",
 )
+
+
+def _is_explicit_product_identity(product_name: str, title: str) -> bool:
+    if product_name in {"playstation plus", "ps plus"} or "playstation plus" in product_name:
+        return True
+    if product_name == title:
+        return False
+    return any(
+        product_name == identity
+        or product_name.startswith(f"{identity} ")
+        or product_name.endswith(f" {identity}")
+        for identity in EXPLICIT_NON_GAME_PRODUCT_IDENTITIES
+    )
 
 
 def psn_purchase_exclusion_reason(candidate: PsnExportCandidate) -> str | None:
@@ -68,9 +99,9 @@ def psn_purchase_exclusion_reason(candidate: PsnExportCandidate) -> str | None:
     if identities & KNOWN_NON_GAME_PSN_PRODUCT_IDENTITIES:
         return "Excluded: this PSN product is a known app, service, or system theme."
 
-    purchase_description = " ".join(
-        value for value in (candidate.product_name, candidate.content_type) if value
-    ).casefold()
-    if any(marker in purchase_description for marker in EXPLICIT_NON_GAME_PRODUCT_MARKERS):
+    product_name = normalize_psn_product_identity(candidate.product_name)
+    content_type = normalize_psn_product_identity(candidate.content_type)
+    title = normalize_psn_product_identity(candidate.title)
+    if content_type in EXPLICIT_NON_GAME_CONTENT_IDENTITIES or _is_explicit_product_identity(product_name, title):
         return "Excluded: this purchase is explicitly a subscription, currency item, demo, add-on, pass, or bundle."
     return None

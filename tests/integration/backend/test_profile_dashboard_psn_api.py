@@ -392,6 +392,8 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
     async def search_catalog(query, page=1):
         if query == "Adventure Theme Park":
             return {"results": [{"id": 101, "name": query}]}
+        if query == "Trial Grounds":
+            return {"results": [{"id": 102, "name": query}]}
         return {"results": []}
 
     monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
@@ -405,6 +407,7 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
                     [
                         ["Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"],
                         ["Adventure Theme Park", "Adventure Theme Park", "Violence", "Product Purchase", "PS5"],
+                        ["Trial Grounds", "Trial Grounds", "Violence", "Product Purchase", "PS5"],
                         ["Streaming service", "Spotify", "Entertainment", "Product Purchase", "PS4"],
                         ["Console appearance", "PS4 Base Theme", "Entertainment", "Product Purchase", "PS4"],
                         ["Wallet funding", "Wallet top up", "Currency", "Wallet Funding", "Web"],
@@ -418,6 +421,7 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
 
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
         ("Adventure Theme Park", "confirmed"),
+        ("Trial Grounds", "confirmed"),
         ("Streaming service", "excluded"),
         ("Console appearance", "excluded"),
         ("Wallet funding", "excluded"),
@@ -456,6 +460,10 @@ def test_psn_import_preview_keeps_only_eligible_catalog_uncertainty_in_manual_re
                 {"id": 11, "name": "Duplicate game", "platforms": ["PlayStation 4"], "game_type": 11},
             ],
             "Web game": [{"id": 12, "name": "Web game", "platforms": ["PC"], "game_type": 8}],
+            "Mixed catalog records": [
+                {"id": 13, "name": "Mixed catalog records", "platforms": ["PlayStation 5"], "game_type": 14},
+                {"id": 14, "name": "Mixed catalog records", "platforms": ["PC"], "game_type": 0},
+            ],
         }[query]}
 
     monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
@@ -470,6 +478,7 @@ def test_psn_import_preview_keeps_only_eligible_catalog_uncertainty_in_manual_re
                         ["Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"],
                         ["Duplicate game", "Duplicate game", "Violence", "Product Purchase", "PS4"],
                         ["Web game", "Web game", "Violence", "Product Purchase", "Web"],
+                        ["Mixed catalog records", "Mixed catalog records", "Violence", "Product Purchase", "PS5"],
                     ],
                 ),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -480,6 +489,7 @@ def test_psn_import_preview_keeps_only_eligible_catalog_uncertainty_in_manual_re
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
         ("Duplicate game", "ambiguous"),
         ("Web game", "confirmed"),
+        ("Mixed catalog records", "ambiguous"),
     ]
 
 

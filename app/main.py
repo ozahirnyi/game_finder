@@ -715,8 +715,9 @@ async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPre
             continue
         platform_matches = [game for game in matches if platform_name and _psn_has_platform(game, platform_name)]
         selection_pool = platform_matches or matches
-        playable_matches = [game for game in selection_pool if _psn_is_allowed_catalog_game(game)]
-        selected_matches = playable_matches if len(playable_matches) == 1 else selection_pool
+        plausible_matches = [game for game in selection_pool if not _psn_is_explicit_non_game_catalog_entry(game)]
+        playable_matches = [game for game in plausible_matches if _psn_is_allowed_catalog_game(game)]
+        selected_matches = playable_matches if len(playable_matches) == 1 else plausible_matches
         if len(selected_matches) == 1:
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="confirmed", igdb_id=int(selected_matches[0]["id"]), title=selected_matches[0]["name"]))
         else:
