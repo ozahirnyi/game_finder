@@ -296,7 +296,7 @@ def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_r
     assert response.status_code == 200
     assert response.json()["items"] == [
         {"source_title": "GOD OF WAR", "status": "confirmed", "igdb_id": 101, "title": "God of War", "reason": None},
-        {"source_title": "FORTNITE", "status": "excluded", "igdb_id": None, "title": None, "reason": "Excluded: this purchase is a non-game service, theme, demo, add-on, currency item, or bundle."},
+        {"source_title": "FORTNITE", "status": "excluded", "igdb_id": None, "title": None, "reason": "Excluded: this purchase is explicitly a subscription, currency item, demo, add-on, pass, or bundle."},
     ]
     assert db_session.query(Game).count() == 0
 
@@ -336,12 +336,12 @@ def test_psn_import_preview_classifies_a_sanitized_representative_export(
     )
 
     statuses = [item["status"] for item in response.json()["items"]]
-    assert statuses.count("confirmed") == 10
-    assert statuses.count("unmatched") == 2
+    assert statuses.count("confirmed") == 12
+    assert statuses.count("unmatched") == 0
     assert statuses.count("excluded") == 4
 
 
-def test_psn_import_preview_uses_platform_and_type_only_for_automatic_confirmation(
+def test_psn_import_preview_uses_platform_and_type_only_to_choose_between_exact_candidates(
     api_client, user_factory, auth_as, app_main, monkeypatch
 ):
     auth_as(user_factory(email="psn-classification@example.com"))
@@ -378,10 +378,51 @@ def test_psn_import_preview_uses_platform_and_type_only_for_automatic_confirmati
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
         ("App-like item", "excluded"),
         ("Playable item", "confirmed"),
-        ("Other platform", "unmatched"),
-        ("Unknown catalog type", "unmatched"),
+        ("Other platform", "confirmed"),
+        ("Unknown catalog type", "confirmed"),
     ]
-    assert response.json()["items"][2]["reason"] == "Catalog details do not confirm this PlayStation edition — import using the PSN title."
+    assert [item["igdb_id"] for item in response.json()["items"]] == [None, 2, 3, 4]
+
+
+def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_titles_eligible(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="psn-explicit-purchase-evidence@example.com"))
+
+    async def search_catalog(query, page=1):
+        if query == "Adventure Theme Park":
+            return {"results": [{"id": 101, "name": query}]}
+        return {"results": []}
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    response = api_client.post(
+        "/psn/import/preview",
+        files={
+            "file": (
+                "export.xlsx",
+                _xlsx_bytes(
+                    "Transaction Detail",
+                    [
+                        ["Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"],
+                        ["Adventure Theme Park", "Adventure Theme Park", "Violence", "Product Purchase", "PS5"],
+                        ["Streaming service", "Spotify", "Entertainment", "Product Purchase", "PS4"],
+                        ["Console appearance", "PS4 Base Theme", "Entertainment", "Product Purchase", "PS4"],
+                        ["Wallet funding", "Wallet top up", "Currency", "Wallet Funding", "Web"],
+                        ["Extra content", "Expansion Pack", "Add-On", "Product Purchase", "PS5"],
+                    ],
+                ),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+
+    assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
+        ("Adventure Theme Park", "confirmed"),
+        ("Streaming service", "excluded"),
+        ("Console appearance", "excluded"),
+        ("Wallet funding", "excluded"),
+        ("Extra content", "excluded"),
+    ]
 
 
 @pytest.mark.parametrize("game_type", [1, 2, 3, 6, 7, 14])
@@ -587,7 +628,7 @@ def test_psn_import_preview_excludes_marker_products(api_client, user_factory, a
                     "Transaction Detail",
                     [
                         ["Transaction Date", "Game Name", "Product Name", "Content Type", "Platform"],
-                        ["2026-01-01", "FORTNITE", "Fortnite Plus Pack", "Game", "PS5"],
+                        ["2026-01-01", "FORTNITE", "Fortnite PlayStation Plus Pack", "Game", "PS5"],
                     ],
                 ),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -836,7 +877,7 @@ def test_psn_import_confirm_rejects_an_excluded_preview_title_even_without_marke
                     "Transaction Detail",
                     [
                         ["Transaction Date", "Game Name", "Product Name", "Content Type", "Platform"],
-                        ["2026-01-01", "FORTNITE", "Fortnite Plus Pack", "Game", "PS5"],
+                        ["2026-01-01", "FORTNITE", "Fortnite PlayStation Plus Pack", "Game", "PS5"],
                     ],
                 ),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
