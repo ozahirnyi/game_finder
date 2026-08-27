@@ -599,8 +599,8 @@ def delete_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: 
 
 
 PSN_PRODUCT_EXCLUSION_MARKERS = (
-    "demo", "trial", "season pass", "subscription", "ps plus", "ea play", "currency", "virtual currency",
-    "points", "wallet", "bundle", "dlc", "add-on", "add on", "expansion", "pack", "season",
+    "demo", "trial", "season pass", "subscription", "ps plus", "playstation plus", "ea play", "currency", "virtual currency",
+    "points", "wallet", "bundle", "dlc", "add-on", "add on", "expansion", "pack", "season", "theme", "avatar",
 )
 PSN_CATALOG_PLATFORM_NAMES = {"ps4": "playstation 4", "ps5": "playstation 5"}
 PSN_MANUAL_PREVIEW_STATUSES = {"unmatched", "ambiguous", "catalog_unavailable"}
@@ -609,6 +609,23 @@ PSN_MANUAL_PREVIEW_STATUSES = {"unmatched", "ambiguous", "catalog_unavailable"}
 # are add-ons, bundles, episodes, seasons, mods, updates, or otherwise non-game.
 PSN_ALLOWED_IGDB_GAME_TYPES = {0, 8, 9, 10, 11}
 PSN_EXCLUDED_IGDB_GAME_TYPES = {1, 2, 3, 4, 5, 6, 7, 12, 13, 14}
+IGDB_GAME_TYPE_VALUES = {
+    "main_game": 0,
+    "dlc_addon": 1,
+    "expansion": 2,
+    "bundle": 3,
+    "standalone_expansion": 4,
+    "mod": 5,
+    "episode": 6,
+    "season": 7,
+    "remake": 8,
+    "remaster": 9,
+    "expanded_game": 10,
+    "port": 11,
+    "fork": 12,
+    "pack": 13,
+    "update": 14,
+}
 
 
 @dataclass(frozen=True)
@@ -641,7 +658,7 @@ def _psn_product_exclusion_reason(candidate: PsnExportCandidate) -> str | None:
         value for value in (candidate.product_name, candidate.content_type) if value
     ).casefold()
     if any(marker in purchase_description for marker in PSN_PRODUCT_EXCLUSION_MARKERS):
-        return "Excluded: this purchase is a service, demo, add-on, currency item, or bundle."
+        return "Excluded: this purchase is a non-game service, theme, demo, add-on, currency item, or bundle."
     return None
 
 
@@ -649,6 +666,8 @@ def _psn_game_type(game: dict) -> int | None:
     value = game.get("game_type")
     if isinstance(value, dict):
         value = value.get("type")
+    if isinstance(value, str):
+        return IGDB_GAME_TYPE_VALUES.get(value.casefold())
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 

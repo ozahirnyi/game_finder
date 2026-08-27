@@ -296,9 +296,49 @@ def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_r
     assert response.status_code == 200
     assert response.json()["items"] == [
         {"source_title": "GOD OF WAR", "status": "confirmed", "igdb_id": 101, "title": "God of War", "reason": None},
-        {"source_title": "FORTNITE", "status": "excluded", "igdb_id": None, "title": None, "reason": "Excluded: this purchase is a service, demo, add-on, currency item, or bundle."},
+        {"source_title": "FORTNITE", "status": "excluded", "igdb_id": None, "title": None, "reason": "Excluded: this purchase is a non-game service, theme, demo, add-on, currency item, or bundle."},
     ]
     assert db_session.query(Game).count() == 0
+
+
+def test_psn_import_preview_classifies_a_sanitized_representative_export(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="psn-representative-export@example.com"))
+    normal_titles = [f"Owned game {index}" for index in range(1, 11)]
+
+    async def search_catalog(query, page=1):
+        if query in normal_titles:
+            return {"results": [{"id": normal_titles.index(query) + 1, "name": query, "platforms": ["PlayStation 4"], "game_type": "main_game"}]}
+        if query == "Catalog platform gap":
+            return {"results": [{"id": 101, "name": query, "platforms": ["PC"], "game_type": "main_game"}]}
+        if query == "Catalog type gap":
+            return {"results": [{"id": 102, "name": query, "platforms": ["PlayStation 5"]}]}
+        return {"results": []}
+
+    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    rows = [["Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"]]
+    rows.extend([[title, title, "Violence", "Product Purchase", "PS4"] for title in normal_titles])
+    rows.extend(
+        [
+            ["Catalog platform gap", "Catalog platform gap", "Violence", "Product Purchase", "PS5"],
+            ["Catalog type gap", "Catalog type gap", "Violence", "Product Purchase", "PS5"],
+            ["Subscription product", "PlayStation Plus Membership", "Violence", "Product Purchase", "PS5"],
+            ["Theme purchase", "PS4 Base Theme", "Violence", "Product Purchase", "PS4"],
+            ["Wallet purchase", "Wallet top up", "Violence", "Product Purchase", "PS5"],
+            ["Add-on purchase", "Example DLC", "Violence", "Product Purchase", "PS5"],
+        ]
+    )
+
+    response = api_client.post(
+        "/psn/import/preview",
+        files={"file": ("representative.xlsx", _xlsx_bytes("Transaction Detail", rows), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+
+    statuses = [item["status"] for item in response.json()["items"]]
+    assert statuses.count("confirmed") == 10
+    assert statuses.count("unmatched") == 2
+    assert statuses.count("excluded") == 4
 
 
 def test_psn_import_preview_uses_platform_and_type_only_for_automatic_confirmation(
