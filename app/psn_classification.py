@@ -35,6 +35,15 @@ KNOWN_NON_GAME_PSN_PRODUCT_IDENTITIES = frozenset(
     )
 )
 
+# Exact names used by PlayStation Store for non-game storefront categories.
+# Keep these separate from apps/services and add only verified category labels;
+# never add a game title or a generic keyword such as "theme".
+KNOWN_NON_GAME_PSN_STORE_CATEGORY_IDENTITIES = frozenset(
+    {
+        "ad sales ps4 themes",
+    }
+)
+
 EXPLICIT_NON_GAME_CONTENT_IDENTITIES = frozenset(
     {
         "demo",
@@ -104,6 +113,8 @@ def psn_purchase_exclusion_reason(candidate: PsnExportCandidate) -> str | None:
     }
     if identities & KNOWN_NON_GAME_PSN_PRODUCT_IDENTITIES:
         return "Excluded: this PSN product is a known app, service, or system theme."
+    if identities & KNOWN_NON_GAME_PSN_STORE_CATEGORY_IDENTITIES:
+        return "Excluded: this PSN title is a known non-game storefront category."
 
     product_name = normalize_psn_product_identity(candidate.product_name)
     content_type = normalize_psn_product_identity(candidate.content_type)
