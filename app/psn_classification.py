@@ -46,6 +46,11 @@ EXPLICIT_NON_GAME_CONTENT_IDENTITIES = frozenset(
         "bundle",
         "season pass",
         "subscription",
+        "wallet",
+        "currency",
+        "virtual currency",
+        "points",
+        "subscription",
         "currency",
         "virtual currency",
         "points",
@@ -53,37 +58,36 @@ EXPLICIT_NON_GAME_CONTENT_IDENTITIES = frozenset(
 )
 
 EXPLICIT_NON_GAME_PRODUCT_IDENTITIES = (
-    "playstation plus",
-    "ps plus",
-    "subscription",
+    "demo entitlement",
     "season pass",
-    "wallet",
+    "expansion add on",
     "virtual currency",
-    "currency",
-    "points",
-    "demo",
-    "trial",
-    "dlc",
-    "downloadable content",
-    "add-on",
-    "add on",
-    "expansion",
-    "expansion pack",
-    "bundle",
+    "game bundle",
+    "wallet top up",
+)
+
+EXPLICIT_NON_GAME_DESCRIPTOR_IDENTITIES = frozenset(
+    {
+        "demo",
+        "trial",
+        "dlc",
+        "downloadable content",
+        "add on",
+        "expansion",
+        "expansion pack",
+        "bundle",
+        "season pass",
+    }
 )
 
 
 def _is_explicit_product_identity(product_name: str, title: str) -> bool:
-    if product_name in {"playstation plus", "ps plus"} or "playstation plus" in product_name:
+    if product_name in EXPLICIT_NON_GAME_PRODUCT_IDENTITIES or "playstation plus" in product_name:
         return True
-    if product_name == title:
+    if not title or not product_name.startswith(f"{title} "):
         return False
-    return any(
-        product_name == identity
-        or product_name.startswith(f"{identity} ")
-        or product_name.endswith(f" {identity}")
-        for identity in EXPLICIT_NON_GAME_PRODUCT_IDENTITIES
-    )
+    descriptor = product_name[len(title) + 1 :]
+    return descriptor in EXPLICIT_NON_GAME_DESCRIPTOR_IDENTITIES or descriptor.startswith("playstation plus ")
 
 
 def psn_purchase_exclusion_reason(candidate: PsnExportCandidate) -> str | None:

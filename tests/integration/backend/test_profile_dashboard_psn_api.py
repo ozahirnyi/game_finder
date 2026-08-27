@@ -326,7 +326,7 @@ def test_psn_import_preview_classifies_a_sanitized_representative_export(
             ["Subscription product", "PlayStation Plus Membership", "Violence", "Product Purchase", "PS5"],
             ["Theme purchase", "PS4 Base Theme", "Violence", "Product Purchase", "PS4"],
             ["Wallet purchase", "Wallet top up", "Violence", "Product Purchase", "PS5"],
-            ["Add-on purchase", "Example DLC", "Violence", "Product Purchase", "PS5"],
+            ["Add-on purchase", "Example DLC", "Add-On", "Product Purchase", "PS5"],
         ]
     )
 
@@ -407,7 +407,7 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
                     [
                         ["Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"],
                         ["Adventure Theme Park", "Adventure Theme Park", "Violence", "Product Purchase", "PS5"],
-                        ["Trial Grounds", "Trial Grounds", "Violence", "Product Purchase", "PS5"],
+                        ["Trial Grounds", "Trial Grounds Deluxe Edition", "Violence", "Product Purchase", "PS5"],
                         ["Streaming service", "Spotify", "Entertainment", "Product Purchase", "PS4"],
                         ["Console appearance", "PS4 Base Theme", "Entertainment", "Product Purchase", "PS4"],
                         ["Wallet funding", "Wallet top up", "Currency", "Wallet Funding", "Web"],
