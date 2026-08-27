@@ -54,6 +54,7 @@ EXPLICIT_NON_GAME_CONTENT_IDENTITIES = frozenset(
 )
 
 EXPLICIT_NON_GAME_PRODUCT_IDENTITIES = (
+    "ps plus",
     "demo entitlement",
     "season pass",
     "expansion add on",

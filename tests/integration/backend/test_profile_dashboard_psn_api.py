@@ -410,6 +410,7 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
                         ["Trial Grounds", "Trial Grounds Deluxe Edition", "Violence", "Product Purchase", "PS5"],
                         ["Streaming service", "Spotify", "Entertainment", "Product Purchase", "PS4"],
                         ["Console appearance", "PS4 Base Theme", "Entertainment", "Product Purchase", "PS4"],
+                        ["Subscription item", "PS Plus", "Game", "Product Purchase", "PS5"],
                         ["Wallet funding", "Wallet top up", "Currency", "Wallet Funding", "Web"],
                         ["Extra content", "Expansion Pack", "Add-On", "Product Purchase", "PS5"],
                     ],
@@ -424,6 +425,7 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
         ("Trial Grounds", "confirmed"),
         ("Streaming service", "excluded"),
         ("Console appearance", "excluded"),
+        ("Subscription item", "excluded"),
         ("Wallet funding", "excluded"),
         ("Extra content", "excluded"),
     ]
