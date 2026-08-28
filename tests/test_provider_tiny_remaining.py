@@ -117,7 +117,7 @@ def test_psn_parser_skips_invalid_values_and_missing_columns():
 
 def test_psn_parser_handles_short_transaction_rows():
     content = _xlsx([("Game Name", "Content Type"), ("Game",), ("Hades", "Game")], sheet="Transaction Detail")
-    assert psn_export.parse_psn_export(content) == ["Hades"]
+    assert psn_export.parse_psn_export(content) == ["Game", "Hades"]
     assert psn_export.normalize_title(None) is None
     assert psn_export.normalize_title("x" * 256) is None
 

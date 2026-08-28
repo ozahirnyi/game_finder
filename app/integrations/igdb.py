@@ -179,6 +179,28 @@ async def fetch_igdb_games(
     return {"results": [normalize_igdb_game(game) for game in games]}
 
 
+async def fetch_igdb_games_batch(titles: list[str]) -> dict[str, list[dict[str, Any]]]:
+    """Resolve up to ten distinct titles in one official IGDB multiquery call."""
+    unique_titles = list(dict.fromkeys(title for title in titles if title))[:10]
+    if not unique_titles:
+        return {}
+    queries = []
+    aliases: dict[str, str] = {}
+    for index, title in enumerate(unique_titles):
+        alias = f"psn_{index}"
+        aliases[alias] = title
+        safe_title = title.replace('"', "").replace("\\", "")
+        queries.append(f'query games "{alias}" {{ {_FIELDS} search "{safe_title}"; limit 20; }};')
+    responses = await _query("multiquery", "".join(queries))
+    results = {title: [] for title in unique_titles}
+    for response in responses:
+        title = aliases.get(str(response.get("name", "")))
+        if title:
+            values = response.get("result", [])
+            results[title] = [normalize_igdb_game(game) for game in values if isinstance(game, dict)]
+    return results
+
+
 async def fetch_igdb_game_detail(igdb_id: int) -> dict[str, Any]:
     games = await _query("games", f"{_FIELDS} where id = {igdb_id}; limit 1;")
     if not games:

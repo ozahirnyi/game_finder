@@ -122,6 +122,25 @@ def test_parse_psn_export_candidates_retains_transaction_detail_platform():
     ]
 
 
+def test_parse_psn_export_candidates_aggregates_all_transaction_evidence_for_one_title():
+    content = make_export(
+        [
+            ("Transaction Date", "Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"),
+            ("2026-01-01", "Hades", "Hades", "Violence", "Product Purchase", "PS5"),
+            ("2026-01-02", " hades ", "Hades Complete Edition", "Game", "Product Purchase", "PS4"),
+        ],
+        sheet_name="Transaction Detail",
+    )
+
+    [candidate] = parse_psn_export_candidates(content)
+
+    assert candidate.title == "Hades"
+    assert candidate.product_names == ("Hades", "Hades Complete Edition")
+    assert candidate.platforms == ("PS5", "PS4")
+    assert candidate.content_types == ("Violence", "Game")
+    assert candidate.transaction_types == ("Product Purchase",)
+
+
 def test_parse_psn_export_explains_export_without_game_data():
     content = make_export(
         [("If data is found the below table shows Gameplay Online Details.",)],

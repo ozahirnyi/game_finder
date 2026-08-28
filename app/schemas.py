@@ -376,10 +376,12 @@ class SteamRecommendationRequest(BaseModel):
 
 class PsnImportPreviewItem(BaseModel):
     source_title: str
-    status: Literal["confirmed", "unmatched", "ambiguous", "catalog_unavailable", "excluded"]
+    status: Literal["matched", "needs_mapping", "suggested_skip"]
     igdb_id: int | None = None
     title: str | None = None
     reason: str | None = None
+    suggestions: list[dict] = Field(default_factory=list)
+    candidate_token: str
 
 
 class PsnImportPreview(BaseModel):
@@ -391,32 +393,21 @@ class PsnImportPreview(BaseModel):
 
 
 class PsnImportSelection(BaseModel):
+    candidate_token: str = Field(min_length=1, max_length=4096)
+    action: Literal["catalog", "raw"]
     catalog_id: int | None = Field(default=None, ge=1)
-    source_title: str | None = Field(default=None, max_length=255)
-
-    @field_validator("source_title", mode="before")
-    @classmethod
-    def normalize_source_title(cls, value: object) -> object:
-        return " ".join(value.split()) if isinstance(value, str) else value
 
     @model_validator(mode="after")
-    def require_exactly_one_selection_kind(self):
-        if (self.catalog_id is None) == (self.source_title is None):
-            raise ValueError("Provide exactly one of catalog_id or source_title")
-        if self.source_title is not None and not self.source_title:
-            raise ValueError("source_title must not be empty")
+    def require_catalog_id_for_catalog_action(self):
+        if self.action == "catalog" and self.catalog_id is None:
+            raise ValueError("catalog_id is required for catalog imports")
+        if self.action == "raw" and self.catalog_id is not None:
+            raise ValueError("catalog_id is not valid for RAW imports")
         return self
 
 
 class PsnImportConfirmRequest(BaseModel):
-    selections: list[PsnImportSelection] | None = Field(default=None, min_length=1, max_length=500)
-    game_ids: list[int] | None = Field(default=None, min_length=1, max_length=500)
-
-    @model_validator(mode="after")
-    def require_one_selection_payload(self):
-        if (self.selections is None) == (self.game_ids is None):
-            raise ValueError("Provide exactly one of selections or game_ids")
-        return self
+    selections: list[PsnImportSelection] = Field(min_length=1, max_length=500)
 
 
 class PsnImportResult(BaseModel):

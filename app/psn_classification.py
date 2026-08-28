@@ -103,12 +103,12 @@ def _is_explicit_product_identity(product_name: str, title: str) -> bool:
 
 def psn_purchase_exclusion_reason(candidate: PsnExportCandidate) -> str | None:
     """Return a reason only when the PSN row itself explicitly proves it is not a game."""
-    if candidate.transaction_type and candidate.transaction_type.casefold() != "product purchase":
+    if any(value.casefold() != "product purchase" for value in candidate.transaction_types):
         return "Excluded: this transaction is not a product purchase."
 
     identities = {
         normalize_psn_product_identity(value)
-        for value in (candidate.title, candidate.product_name)
+        for value in (candidate.title, *candidate.product_names)
         if value
     }
     if identities & KNOWN_NON_GAME_PSN_PRODUCT_IDENTITIES:
@@ -116,9 +116,7 @@ def psn_purchase_exclusion_reason(candidate: PsnExportCandidate) -> str | None:
     if identities & KNOWN_NON_GAME_PSN_STORE_CATEGORY_IDENTITIES:
         return "Excluded: this PSN title is a known non-game storefront category."
 
-    product_name = normalize_psn_product_identity(candidate.product_name)
-    content_type = normalize_psn_product_identity(candidate.content_type)
     title = normalize_psn_product_identity(candidate.title)
-    if content_type in EXPLICIT_NON_GAME_CONTENT_IDENTITIES or _is_explicit_product_identity(product_name, title):
+    if any(normalize_psn_product_identity(value) in EXPLICIT_NON_GAME_CONTENT_IDENTITIES for value in candidate.content_types) or any(_is_explicit_product_identity(normalize_psn_product_identity(value), title) for value in candidate.product_names):
         return "Excluded: this purchase is explicitly a subscription, currency item, demo, add-on, pass, or bundle."
     return None
