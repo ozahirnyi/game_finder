@@ -33,6 +33,16 @@ class PsnExportCandidate:
     platform: str | None = None
     transaction_type: str | None = None
     content_type: str | None = None
+    product_names: tuple[str, ...] = ()
+    platforms: tuple[str, ...] = ()
+    transaction_types: tuple[str, ...] = ()
+    content_types: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "product_names", self.product_names or ((self.product_name,) if self.product_name else ()))
+        object.__setattr__(self, "platforms", self.platforms or ((self.platform,) if self.platform else ()))
+        object.__setattr__(self, "transaction_types", self.transaction_types or ((self.transaction_type,) if self.transaction_type else ()))
+        object.__setattr__(self, "content_types", self.content_types or ((self.content_type,) if self.content_type else ()))
 
 
 def normalize_title(value: object) -> str | None:
@@ -117,7 +127,40 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Upload the Excel file received from PlayStation (.xlsx)") from exc
 
-    candidates: dict[str, PsnExportCandidate] = {}
+    candidates: dict[str, dict[str, object]] = {}
+
+    def add_candidate(
+        title: str,
+        product_name: str | None = None,
+        platform: str | None = None,
+        transaction_type: str | None = None,
+        content_type: str | None = None,
+    ) -> None:
+        key = title.casefold()
+        item = candidates.setdefault(
+            key,
+            {"title": title, "product_names": [], "platforms": [], "transaction_types": [], "content_types": []},
+        )
+        for field, value in (
+            ("product_names", product_name), ("platforms", platform),
+            ("transaction_types", transaction_type), ("content_types", content_type),
+        ):
+            if value and value not in item[field]:
+                item[field].append(value)
+
+    def finalized_candidates() -> list[PsnExportCandidate]:
+        return [
+            PsnExportCandidate(
+                title=item["title"],
+                product_name=(item["product_names"] or [None])[0],
+                platform=(item["platforms"] or [None])[0],
+                transaction_type=(item["transaction_types"] or [None])[0],
+                content_type=(item["content_types"] or [None])[0],
+                product_names=tuple(item["product_names"]), platforms=tuple(item["platforms"]),
+                transaction_types=tuple(item["transaction_types"]), content_types=tuple(item["content_types"]),
+            )
+            for item in candidates.values()
+        ]
     try:
         for worksheet in workbook.worksheets:
             rows = worksheet.iter_rows(values_only=True)
@@ -152,10 +195,7 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
                         platform = normalize_title(
                             row[platform_column] if platform_column is not None and platform_column < len(row) else None
                         )
-                        candidates.setdefault(
-                            title.casefold(),
-                            PsnExportCandidate(title, product_name, platform, transaction_type, content_type),
-                        )
+                        add_candidate(title, product_name, platform, transaction_type, content_type)
                 continue
 
             header = _candidate_columns(buffered_rows, worksheet.title)
@@ -166,15 +206,15 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
                 for column in columns:
                     title = normalize_title(row[column] if column < len(row) else None)
                     if title:
-                        candidates.setdefault(title.casefold(), PsnExportCandidate(title))
+                        add_candidate(title)
                         if len(candidates) >= MAX_IMPORTED_GAMES:
-                            return list(candidates.values())
+                            return finalized_candidates()
     finally:
         workbook.close()
 
     if not candidates:
         raise _no_game_data_error()
-    return list(candidates.values())
+    return finalized_candidates()
 
 
 def _parse_xlsx_export(content: bytes) -> list[str]:

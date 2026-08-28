@@ -21,6 +21,12 @@ def _xlsx_bytes(sheet_name="Game Library", rows=None):
     return output.getvalue()
 
 
+def _batch_from_search(search):
+    async def batch(titles):
+        return {title: (await search(title)).get("results", []) for title in titles}
+    return batch
+
+
 def test_onboarding_summary_is_owner_scoped_and_counts_only_owned_alerts(
     api_client, db_session, user_factory, auth_as
 ):
@@ -263,15 +269,39 @@ def test_psn_import_preview_parses_xlsx_without_persisting(api_client, db_sessio
     assert db_session.query(Game).count() == 0
 
 
+def test_psn_import_preview_groups_reversible_candidates_and_batches_catalog_queries(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="psn-reversible@example.com"))
+    batch = AsyncMock(return_value={
+        "Hades": [{"id": 101, "name": "Hades"}],
+        "Unknown": [{"id": 102, "name": "Similar game"}],
+    })
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", batch)
+    response = api_client.post(
+        "/psn/import/preview",
+        files={"file": ("export.xlsx", _xlsx_bytes("Transaction Detail", [
+            ["Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"],
+            ["Hades", "Hades", "Violence", "Product Purchase", "PS5"],
+            ["Unknown", "Unknown", "Violence", "Product Purchase", "PS5"],
+            ["Spotify", "Spotify", "Violence", "Product Purchase", "PS4"],
+        ]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["status"] for item in items] == ["matched", "needs_mapping", "suggested_skip"]
+    assert items[0]["candidate_token"]
+    assert items[1]["suggestions"] == [{"id": 102, "title": "Similar game"}]
+    batch.assert_awaited_once_with(["Hades", "Unknown"])
+
+
 def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_review(
     api_client, db_session, user_factory, auth_as, app_main, monkeypatch
 ):
     auth_as(user_factory(email="psn-transaction-preview@example.com"))
 
-    async def search_catalog(query, page=1):
-        return {"results": [{"id": 101, "name": "God of War", "game_type": 0}]} if query == "GOD OF WAR" else {"results": []}
-
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={"GOD OF WAR": [{"id": 101, "name": "God of War"}]}))
     response = api_client.post(
         "/psn/import/preview",
         files={
@@ -294,10 +324,9 @@ def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_r
     )
 
     assert response.status_code == 200
-    assert response.json()["items"] == [
-        {"source_title": "GOD OF WAR", "status": "confirmed", "igdb_id": 101, "title": "God of War", "reason": None},
-        {"source_title": "FORTNITE", "status": "excluded", "igdb_id": None, "title": None, "reason": "Excluded: this purchase is explicitly a subscription, currency item, demo, add-on, pass, or bundle."},
-    ]
+    items = response.json()["items"]
+    assert [(item["source_title"], item["status"], item["igdb_id"]) for item in items] == [("GOD OF WAR", "matched", 101), ("FORTNITE", "suggested_skip", None)]
+    assert all(item["candidate_token"] for item in items)
     assert db_session.query(Game).count() == 0
 
 
@@ -307,16 +336,10 @@ def test_psn_import_preview_classifies_a_sanitized_representative_export(
     auth_as(user_factory(email="psn-representative-export@example.com"))
     normal_titles = [f"Owned game {index}" for index in range(1, 11)]
 
-    async def search_catalog(query, page=1):
-        if query in normal_titles:
-            return {"results": [{"id": normal_titles.index(query) + 1, "name": query, "platforms": ["PlayStation 4"], "game_type": "main_game"}]}
-        if query == "Catalog platform gap":
-            return {"results": [{"id": 101, "name": query, "platforms": ["PC"], "game_type": "main_game"}]}
-        if query == "Catalog type gap":
-            return {"results": [{"id": 102, "name": query, "platforms": ["PlayStation 5"]}]}
-        return {"results": []}
+    async def search_catalog_batch(titles):
+        return {title: ([{"id": normal_titles.index(title) + 1, "name": title, "platforms": ["PlayStation 4"]}] if title in normal_titles else [{"id": 101 if title == "Catalog platform gap" else 102, "name": title, "platforms": ["PC"]}] if title in {"Catalog platform gap", "Catalog type gap"} else []) for title in titles}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", search_catalog_batch)
     rows = [["Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"]]
     rows.extend([[title, title, "Violence", "Product Purchase", "PS4"] for title in normal_titles])
     rows.extend(
@@ -336,9 +359,9 @@ def test_psn_import_preview_classifies_a_sanitized_representative_export(
     )
 
     statuses = [item["status"] for item in response.json()["items"]]
-    assert statuses.count("confirmed") == 12
-    assert statuses.count("unmatched") == 0
-    assert statuses.count("excluded") == 4
+    assert statuses.count("matched") == 12
+    assert statuses.count("needs_mapping") == 0
+    assert statuses.count("suggested_skip") == 4
 
 
 def test_psn_import_preview_uses_platform_and_type_only_to_choose_between_exact_candidates(
@@ -354,7 +377,7 @@ def test_psn_import_preview_uses_platform_and_type_only_to_choose_between_exact_
             "Unknown catalog type": [{"id": 4, "name": "Unknown catalog type", "platforms": ["PlayStation 5"]}],
         }[query]}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post(
         "/psn/import/preview",
         files={
@@ -376,10 +399,10 @@ def test_psn_import_preview_uses_platform_and_type_only_to_choose_between_exact_
     )
 
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
-        ("App-like item", "confirmed"),
-        ("Playable item", "confirmed"),
-        ("Other platform", "confirmed"),
-        ("Unknown catalog type", "confirmed"),
+        ("App-like item", "matched"),
+        ("Playable item", "matched"),
+        ("Other platform", "matched"),
+        ("Unknown catalog type", "matched"),
     ]
     assert [item["igdb_id"] for item in response.json()["items"]] == [1, 2, 3, 4]
 
@@ -402,7 +425,7 @@ def test_psn_import_preview_keeps_a_unique_exact_catalog_collection_eligible(
             ]
         }
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post(
         "/psn/import/preview",
         files={
@@ -420,15 +443,9 @@ def test_psn_import_preview_keeps_a_unique_exact_catalog_collection_eligible(
         },
     )
 
-    assert response.json()["items"] == [
-        {
-            "source_title": "Catalog collection",
-            "status": "confirmed",
-            "igdb_id": 501,
-            "title": "Catalog collection",
-            "reason": None,
-        }
-    ]
+    item = response.json()["items"][0]
+    assert (item["source_title"], item["status"], item["igdb_id"], item["title"]) == ("Catalog collection", "matched", 501, "Catalog collection")
+    assert item["candidate_token"]
 
 
 def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_titles_eligible(
@@ -443,7 +460,7 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
             return {"results": [{"id": 102, "name": query}]}
         return {"results": []}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post(
         "/psn/import/preview",
         files={
@@ -469,14 +486,14 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
     )
 
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
-        ("Adventure Theme Park", "confirmed"),
-        ("Trial Grounds", "confirmed"),
-        ("Streaming service", "excluded"),
-        ("Console appearance", "excluded"),
-        ("Ad Sales PS4 Themes", "excluded"),
-        ("Subscription item", "excluded"),
-        ("Wallet funding", "excluded"),
-        ("Extra content", "excluded"),
+        ("Adventure Theme Park", "matched"),
+        ("Trial Grounds", "matched"),
+        ("Streaming service", "suggested_skip"),
+        ("Console appearance", "suggested_skip"),
+        ("Ad Sales PS4 Themes", "suggested_skip"),
+        ("Subscription item", "suggested_skip"),
+        ("Wallet funding", "suggested_skip"),
+        ("Extra content", "suggested_skip"),
     ]
 
 
@@ -487,8 +504,8 @@ def test_psn_import_preview_keeps_unique_exact_catalog_candidates_eligible_regar
     auth_as(user_factory(email=f"psn-catalog-type-{game_type}@example.com"))
     monkeypatch.setattr(
         app_main,
-        "fetch_igdb_games",
-        AsyncMock(return_value={"results": [{"id": 1, "name": "Catalog item", "platforms": ["PlayStation 5"], "game_type": game_type}]}),
+        "fetch_igdb_games_batch",
+        AsyncMock(return_value={"Catalog item": [{"id": 1, "name": "Catalog item", "platforms": ["PlayStation 5"], "game_type": game_type}]}),
     )
 
     response = api_client.post(
@@ -496,7 +513,7 @@ def test_psn_import_preview_keeps_unique_exact_catalog_candidates_eligible_regar
         files={"file": ("export.csv", b"Game Name\nCatalog item\n", "text/csv")},
     )
 
-    assert response.json()["items"][0]["status"] == "confirmed"
+    assert response.json()["items"][0]["status"] == "matched"
     assert response.json()["items"][0]["igdb_id"] == 1
 
 
@@ -518,7 +535,7 @@ def test_psn_import_preview_uses_catalog_type_only_to_choose_between_duplicate_e
             ],
         }[query]}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post(
         "/psn/import/preview",
         files={
@@ -539,9 +556,9 @@ def test_psn_import_preview_uses_catalog_type_only_to_choose_between_duplicate_e
     )
 
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
-        ("Duplicate game", "ambiguous"),
-        ("Web game", "confirmed"),
-        ("Mixed catalog records", "confirmed"),
+        ("Duplicate game", "needs_mapping"),
+        ("Web game", "matched"),
+        ("Mixed catalog records", "matched"),
     ]
 
 
@@ -553,22 +570,16 @@ def test_psn_import_preview_matches_edition_and_platform_suffixes(
     async def search_catalog(query, page=1):
         return {"results": [{"id": 101, "name": "Horizon Zero Dawn", "game_type": 0}]}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post(
         "/psn/import/preview",
         files={"file": ("export.xlsx", _xlsx_bytes(rows=[["Game Title"], ["Horizon Zero Dawn™ Complete Edition PS4 & PS5"]]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
 
     assert response.status_code == 200
-    assert response.json()["items"] == [
-        {
-            "source_title": "Horizon Zero Dawn™ Complete Edition PS4 & PS5",
-            "status": "confirmed",
-            "igdb_id": 101,
-            "title": "Horizon Zero Dawn",
-            "reason": None,
-        }
-    ]
+    item = response.json()["items"][0]
+    assert (item["status"], item["igdb_id"], item["title"]) == ("matched", 101, "Horizon Zero Dawn")
+    assert item["candidate_token"]
 
 
 def test_psn_import_preview_keeps_ambiguous_normalized_titles_in_review(
@@ -579,22 +590,16 @@ def test_psn_import_preview_keeps_ambiguous_normalized_titles_in_review(
     async def search_catalog(query, page=1):
         return {"results": [{"id": 101, "name": "Horizon Zero Dawn", "game_type": 0}, {"id": 102, "name": "Horizon Zero Dawn™", "game_type": 8}]}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post(
         "/psn/import/preview",
         files={"file": ("export.xlsx", _xlsx_bytes(rows=[["Game Title"], ["Horizon Zero Dawn Complete Edition"]]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
 
     assert response.status_code == 200
-    assert response.json()["items"] == [
-        {
-            "source_title": "Horizon Zero Dawn Complete Edition",
-            "status": "ambiguous",
-            "igdb_id": None,
-            "title": None,
-            "reason": "Multiple exact catalog matches found.",
-        }
-    ]
+    item = response.json()["items"][0]
+    assert (item["status"], item["reason"]) == ("needs_mapping", "Multiple exact catalog matches found.")
+    assert [suggestion["id"] for suggestion in item["suggestions"]] == [101, 102]
 
 
 def test_psn_import_preview_uses_ps4_platform_to_resolve_exact_duplicates(
@@ -610,7 +615,7 @@ def test_psn_import_preview_uses_ps4_platform_to_resolve_exact_duplicates(
             ]
         }
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post(
         "/psn/import/preview",
         files={
@@ -628,9 +633,8 @@ def test_psn_import_preview_uses_ps4_platform_to_resolve_exact_duplicates(
         },
     )
 
-    assert response.json()["items"] == [
-        {"source_title": "MORTAL KOMBAT X", "status": "confirmed", "igdb_id": 7292, "title": "MORTAL KOMBAT X", "reason": None}
-    ]
+    item = response.json()["items"][0]
+    assert (item["status"], item["igdb_id"], item["title"]) == ("matched", 7292, "MORTAL KOMBAT X")
 
 
 def test_psn_import_preview_keeps_duplicate_titles_without_playstation_platform_ambiguous(
@@ -641,10 +645,10 @@ def test_psn_import_preview_keeps_duplicate_titles_without_playstation_platform_
     async def search_catalog(query, page=1):
         return {"results": [{"id": 1905, "name": "FORTNITE", "platforms": ["PlayStation 4"], "game_type": 0}, {"id": 231090, "name": "FORTNITE", "platforms": ["PC"], "game_type": 11}]}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nFORTNITE\n", "text/csv")})
 
-    assert response.json()["items"][0]["status"] == "ambiguous"
+    assert response.json()["items"][0]["status"] == "needs_mapping"
 
 
 def test_psn_import_preview_reports_unmatched_catalog_titles(
@@ -655,10 +659,10 @@ def test_psn_import_preview_reports_unmatched_catalog_titles(
     async def search_catalog(query, page=1):
         return {"results": [{"id": 1, "name": "Not the PSN title"}]}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")})
 
-    assert response.json()["items"][0]["status"] == "unmatched"
+    assert response.json()["items"][0]["status"] == "needs_mapping"
 
 
 def test_psn_import_preview_reports_catalog_unavailability(
@@ -671,16 +675,16 @@ def test_psn_import_preview_reports_catalog_unavailability(
     async def search_catalog(query, page=1):
         raise IGDBError("unavailable")
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")})
 
-    assert response.json()["items"][0]["status"] == "catalog_unavailable"
+    assert response.json()["items"][0]["status"] == "needs_mapping"
 
 
 def test_psn_import_preview_excludes_marker_products(api_client, user_factory, auth_as, app_main, monkeypatch):
     auth_as(user_factory(email="psn-excluded@example.com"))
     search_catalog = AsyncMock(return_value={"results": [{"id": 101, "name": "FORTNITE"}]})
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post(
         "/psn/import/preview",
         files={
@@ -698,7 +702,7 @@ def test_psn_import_preview_excludes_marker_products(api_client, user_factory, a
         },
     )
 
-    assert response.json()["items"][0]["status"] == "excluded"
+    assert response.json()["items"][0]["status"] == "suggested_skip"
     assert search_catalog.await_count == 0
 
 
@@ -711,7 +715,7 @@ def test_psn_import_preview_excludes_clear_non_game_product_classes(
 ):
     auth_as(user_factory(email=f"psn-product-{product_name[:4]}@example.com"))
     search_catalog = AsyncMock(return_value={"results": [{"id": 101, "name": "Playable item", "game_type": 0}]})
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
 
     response = api_client.post(
         "/psn/import/preview",
@@ -730,7 +734,7 @@ def test_psn_import_preview_excludes_clear_non_game_product_classes(
         },
     )
 
-    assert response.json()["items"][0]["status"] == "excluded"
+    assert response.json()["items"][0]["status"] == "suggested_skip"
     assert search_catalog.await_count == 0
 
 
@@ -772,7 +776,7 @@ def test_psn_import_mixed_preview_and_confirmation_flow(
         assert igdb_id == 101
         return {"id": 101, "name": "God of War"}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     monkeypatch.setattr(app_main, "fetch_igdb_game_detail", catalog_detail)
     owner = auth_as(user_factory(email="psn-mixed-flow@example.com"))
     preview = api_client.post(
@@ -794,11 +798,12 @@ def test_psn_import_mixed_preview_and_confirmation_flow(
         },
     )
 
-    assert [item["status"] for item in preview.json()["items"]] == ["confirmed", "unmatched", "excluded"]
-    confirm = api_client.post(
-        "/psn/import/confirm",
-        json={"selections": [{"catalog_id": 101}, {"source_title": "Unknown Game"}]},
-    )
+    assert [item["status"] for item in preview.json()["items"]] == ["matched", "needs_mapping", "suggested_skip"]
+    items = preview.json()["items"]
+    confirm = api_client.post("/psn/import/confirm", json={"selections": [
+        {"candidate_token": items[0]["candidate_token"], "action": "catalog", "catalog_id": 101},
+        {"candidate_token": items[1]["candidate_token"], "action": "raw"},
+    ]})
 
     assert confirm.json() == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2
@@ -833,28 +838,22 @@ def test_psn_import_confirm_persists_owner_scoped_idempotent_games(
     async def catalog_detail(igdb_id):
         return {101: {"id": 101, "name": "Hades"}, 102: {"id": 102, "name": "Celeste"}}[igdb_id]
 
-    async def search_catalog(query, page=1):
-        return {
-            "results": [{"id": 101, "name": "Hades", "game_type": 0}]
-            if query == "Hades"
-            else [{"id": 102, "name": "Celeste", "game_type": 0}]
-        }
-
     monkeypatch.setattr(app_main, "fetch_igdb_game_detail", catalog_detail)
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={"Hades": [{"id": 101, "name": "Hades"}], "Celeste": [{"id": 102, "name": "Celeste"}]}))
     owner = auth_as(user_factory(email="psn-owner@example.com"))
-    api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\nCeleste\n", "text/csv")})
-    first = api_client.post("/psn/import/confirm", json={"selections": [{"catalog_id": 101}, {"catalog_id": 101}, {"catalog_id": 102}]})
+    preview = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\nCeleste\n", "text/csv")}).json()
+    tokens = {item["igdb_id"]: item["candidate_token"] for item in preview["items"]}
+    first = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": tokens[101], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens[101], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens[102], "action": "catalog", "catalog_id": 102}]})
     assert first.status_code == 200
     assert first.json() == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2
 
-    second = api_client.post("/psn/import/confirm", json={"selections": [{"catalog_id": 101}, {"catalog_id": 102}]})
+    second = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": tokens[101], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens[102], "action": "catalog", "catalog_id": 102}]})
     assert second.json() == {"created": 0, "updated": 0, "skipped": 2, "total": 2}
 
     other = auth_as(user_factory(email="psn-other@example.com"))
-    api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")})
-    other_import = api_client.post("/psn/import/confirm", json={"selections": [{"catalog_id": 101}]})
+    other_preview = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")}).json()
+    other_import = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": other_preview["items"][0]["candidate_token"], "action": "catalog", "catalog_id": 101}]})
     assert other_import.json()["created"] == 1
     assert db_session.query(Game).filter_by(owner_id=other.id, source="psn").count() == 1
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2
@@ -871,14 +870,15 @@ def test_psn_import_confirm_accepts_typed_catalog_and_manual_selections(
     async def search_catalog(query, page=1):
         return {"results": [{"id": 101, "name": "Hades", "game_type": 0}]} if query == "Hades" else {"results": []}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", search_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     owner = auth_as(user_factory(email="psn-typed-selections@example.com"))
     preview = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\nDisco Elysium\n", "text/csv")})
-    assert [item["status"] for item in preview.json()["items"]] == ["confirmed", "unmatched"]
+    items = preview.json()["items"]
+    assert [item["status"] for item in items] == ["matched", "needs_mapping"]
 
     first = api_client.post(
         "/psn/import/confirm",
-        json={"selections": [{"catalog_id": 101}, {"source_title": "  Disco   Elysium  "}]},
+        json={"selections": [{"candidate_token": items[0]["candidate_token"], "action": "catalog", "catalog_id": 101}, {"candidate_token": items[1]["candidate_token"], "action": "raw"}]},
     )
 
     assert first.status_code == 200
@@ -889,7 +889,7 @@ def test_psn_import_confirm_accepts_typed_catalog_and_manual_selections(
         ("psn:manual:25e9313cd2d548983d20a0d2ed07f60f", "Disco Elysium"),
     ]
 
-    second = api_client.post("/psn/import/confirm", json={"selections": [{"source_title": "disco elysium"}]})
+    second = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": items[1]["candidate_token"], "action": "raw"}]})
     assert second.json() == {"created": 0, "updated": 0, "skipped": 1, "total": 1}
 
 
@@ -925,7 +925,7 @@ def test_psn_import_confirm_rejects_a_catalog_id_that_was_not_confirmed_in_the_l
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 0
 
 
-def test_psn_import_confirm_rejects_an_excluded_preview_title_even_without_marker_in_title(
+def test_psn_import_confirm_allows_a_suggested_skip_to_be_restored_as_raw(
     api_client, db_session, user_factory, auth_as, app_main, monkeypatch
 ):
     owner = auth_as(user_factory(email="psn-excluded-bypass@example.com"))
@@ -946,9 +946,10 @@ def test_psn_import_confirm_rejects_an_excluded_preview_title_even_without_marke
             )
         },
     )
-    assert preview.json()["items"][0]["status"] == "excluded"
+    item = preview.json()["items"][0]
+    assert item["status"] == "suggested_skip"
 
-    response = api_client.post("/psn/import/confirm", json={"selections": [{"source_title": "FORTNITE"}]})
+    response = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": item["candidate_token"], "action": "raw"}]})
 
-    assert response.status_code == 422
-    assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 0
+    assert response.status_code == 200
+    assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 1

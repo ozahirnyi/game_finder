@@ -23,10 +23,12 @@ from app.openai_client import get_recommendation
 from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations, get_personalized_recommendations
 from app.cache import build_cache_key, get_json_cached
 from app.catalog_cache import get_cached_snapshot
+from jose import JWTError, jwt
 from app.integrations.igdb import (
     CatalogSearchFilters,
     fetch_igdb_game_detail,
     fetch_igdb_games,
+    fetch_igdb_games_batch,
     fetch_igdb_trending_games,
     fetch_igdb_upcoming_games,
     fetch_igdb_game_by_steam_appid,
@@ -37,7 +39,7 @@ from app.psn_export import PsnExportCandidate, normalize_title, parse_psn_export
 from app.psn_classification import psn_purchase_exclusion_reason
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
-from app.auth import hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
+from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportPreviewItem, PsnImportResult, PsnImportSelection, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
@@ -600,11 +602,6 @@ def delete_game_route(id: uuid.UUID,db: Session = Depends(get_db),current_user: 
 
 
 PSN_CATALOG_PLATFORM_NAMES = {"ps4": "playstation 4", "ps5": "playstation 5"}
-PSN_MANUAL_PREVIEW_STATUSES = {"unmatched", "ambiguous", "catalog_unavailable"}
-# IGDB game type can positively choose one result among duplicate exact names.
-# It must not exclude a PSN product: a unique exact catalog result remains
-# eligible even when its type is absent, unknown, or denotes a collection.
-PSN_ALLOWED_IGDB_GAME_TYPES = {0, 8, 9, 10, 11}
 IGDB_GAME_TYPE_VALUES = {
     "main_game": 0,
     "dlc_addon": 1,
@@ -624,13 +621,6 @@ IGDB_GAME_TYPE_VALUES = {
 }
 
 
-@dataclass(frozen=True)
-class PsnPreviewAuthorization:
-    confirmed_catalog_ids: frozenset[int]
-    manual_titles: frozenset[str]
-
-
-_psn_preview_authorizations: dict[uuid.UUID, PsnPreviewAuthorization] = {}
 PSN_TITLE_SUFFIX_RE = re.compile(
     r"(?:\s*[-–—:]?\s*(?:complete|deluxe|ultimate|game of the year)\s+edition|\s*[-–—:]?\s*(?:ps4\s*(?:&|and)\s*ps5|ps[45]))\s*$",
     re.IGNORECASE,
@@ -660,59 +650,54 @@ def _psn_has_platform(game: dict, platform_name: str) -> bool:
     return any(str(platform).strip().casefold() == platform_name for platform in game.get("platforms") or [])
 
 
-def _psn_is_allowed_catalog_game(game: dict) -> bool:
-    return _psn_game_type(game) in PSN_ALLOWED_IGDB_GAME_TYPES
+def _psn_candidate_token(user_id: uuid.UUID, title: str) -> str:
+    return jwt.encode({"sub": str(user_id), "title": title, "hash": _psn_catalog_match_key(title), "exp": datetime.now(timezone.utc) + timedelta(minutes=15)}, SECRET_KEY, algorithm="HS256")
 
 
-async def _psn_preview_items(content: bytes, filename: str) -> list[PsnImportPreviewItem]:
-    items: list[PsnImportPreviewItem] = []
-    for candidate in parse_psn_export_candidates(content, filename):
-        exclusion_reason = psn_purchase_exclusion_reason(candidate)
-        if exclusion_reason:
-            items.append(
-                PsnImportPreviewItem(
-                    source_title=candidate.title,
-                    status="excluded",
-                    reason=exclusion_reason,
-                )
-            )
-            continue
+def _psn_candidate_from_token(token: str, user_id: uuid.UUID) -> str:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+    except JWTError as exc:
+        raise HTTPException(status_code=422, detail="The PSN preview decision has expired or is invalid") from exc
+    title = normalize_title(payload.get("title"))
+    if payload.get("sub") != str(user_id) or not title or payload.get("hash") != _psn_catalog_match_key(title):
+        raise HTTPException(status_code=422, detail="The PSN preview decision is invalid")
+    return title
+
+
+def _psn_suggestions(results: list[dict]) -> list[dict]:
+    return [{"id": int(game["id"]), "title": game.get("name")} for game in results[:5] if game.get("id") and game.get("name")]
+
+
+async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) -> list[PsnImportPreviewItem]:
+    candidates = parse_psn_export_candidates(content, filename)
+    skipped = {candidate.title: psn_purchase_exclusion_reason(candidate) for candidate in candidates}
+    searchable = [candidate.title for candidate in candidates if not skipped[candidate.title]]
+    catalog: dict[str, list[dict]] = {}
+    unavailable: set[str] = set()
+    for index in range(0, len(searchable), 10):
+        batch = searchable[index:index + 10]
         try:
-            results = (await fetch_igdb_games(candidate.title, page=1)).get("results", [])
+            catalog.update(await fetch_igdb_games_batch(batch))
         except IGDBError:
-            items.append(
-                PsnImportPreviewItem(
-                    source_title=candidate.title,
-                    status="catalog_unavailable",
-                    reason="Catalog temporarily unavailable. Try again later or import using the PSN title.",
-                )
-            )
+            unavailable.update(batch)
+    items: list[PsnImportPreviewItem] = []
+    for candidate in candidates:
+        token = _psn_candidate_token(user_id, candidate.title)
+        if skipped[candidate.title]:
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="suggested_skip", reason=skipped[candidate.title], candidate_token=token))
             continue
+        results = catalog.get(candidate.title, [])
         matches = [game for game in results if game.get("id") and _psn_catalog_match_key(game.get("name") or "") == _psn_catalog_match_key(candidate.title)]
-        platform_name = PSN_CATALOG_PLATFORM_NAMES.get((candidate.platform or "").casefold())
-        if not matches:
-            items.append(
-                PsnImportPreviewItem(
-                    source_title=candidate.title,
-                    status="unmatched",
-                    reason="No exact catalog match found. Import using the PSN title if this is the right game.",
-                )
-            )
-            continue
-        platform_matches = [game for game in matches if platform_name and _psn_has_platform(game, platform_name)]
-        selection_pool = platform_matches or matches
-        playable_matches = [game for game in selection_pool if _psn_is_allowed_catalog_game(game)]
-        selected_matches = playable_matches if len(playable_matches) == 1 else selection_pool
-        if len(selected_matches) == 1:
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="confirmed", igdb_id=int(selected_matches[0]["id"]), title=selected_matches[0]["name"]))
+        platform_names = {PSN_CATALOG_PLATFORM_NAMES.get(platform.casefold()) for platform in candidate.platforms}
+        platform_matches = [game for game in matches if any(name and _psn_has_platform(game, name) for name in platform_names)]
+        selected = platform_matches if len(platform_matches) == 1 else matches
+        if len(selected) == 1:
+            game = selected[0]
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="matched", igdb_id=int(game["id"]), title=game["name"], candidate_token=token))
         else:
-            items.append(
-                PsnImportPreviewItem(
-                    source_title=candidate.title,
-                    status="ambiguous",
-                    reason="Multiple exact catalog matches found.",
-                )
-            )
+            reason = "Catalog temporarily unavailable." if candidate.title in unavailable else ("Multiple exact catalog matches found." if matches else "No exact catalog match found.")
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", reason=reason, suggestions=_psn_suggestions(results), candidate_token=token))
     return items
 
 
@@ -726,25 +711,13 @@ async def preview_psn_import(
     if not filename.casefold().endswith((".xlsx", ".csv", ".json")):
         raise HTTPException(status_code=400, detail="Upload a supported PSN export (.xlsx, .csv, or .json)")
     content = await file.read()
-    items = await _psn_preview_items(content, filename)
-    _psn_preview_authorizations[current_user.id] = PsnPreviewAuthorization(
-        confirmed_catalog_ids=frozenset(
-            int(item.igdb_id)
-            for item in items
-            if item.status == "confirmed" and item.igdb_id is not None
-        ),
-        manual_titles=frozenset(
-        _psn_catalog_match_key(item.source_title)
-        for item in items
-        if item.status in PSN_MANUAL_PREVIEW_STATUSES
-        ),
-    )
+    items = await _psn_preview_items(content, filename, current_user.id)
     return PsnImportPreview(
         items=items,
         games=[item.source_title for item in items],
         total=len(items),
-        confirmed_total=sum(item.status == "confirmed" for item in items),
-        message="Confirmed catalog matches are selected automatically. You can opt in to eligible PSN-title imports.",
+        confirmed_total=sum(item.status == "matched" for item in items),
+        message="Exact catalog matches are selected automatically; all other titles can be mapped or imported as RAW.",
     )
 
 
@@ -754,33 +727,19 @@ async def confirm_psn_import(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    selections = data.selections or []
-    if data.game_ids is not None:
-        selections = [PsnImportSelection(catalog_id=igdb_id) for igdb_id in data.game_ids]
-
     unique_games: dict[str, str] = {}
-    authorization = _psn_preview_authorizations.get(current_user.id)
-    for selection in selections:
-        if selection.catalog_id is not None:
-            if authorization is None or selection.catalog_id not in authorization.confirmed_catalog_ids:
-                raise HTTPException(status_code=422, detail="Choose games confirmed by the catalog preview")
+    for selection in data.selections:
+        source_title = _psn_candidate_from_token(selection.candidate_token, current_user.id)
+        if selection.action == "catalog":
             try:
-                detail = await fetch_igdb_game_detail(selection.catalog_id)
+                detail = await fetch_igdb_game_detail(selection.catalog_id or 0)
             except IGDBError as exc:
-                raise HTTPException(status_code=422, detail="Choose games confirmed by the catalog preview") from exc
+                raise HTTPException(status_code=422, detail="Choose a valid catalog game") from exc
             title = normalize_title(detail.get("name"))
             if not title:
-                raise HTTPException(status_code=422, detail="Choose games confirmed by the catalog preview")
+                raise HTTPException(status_code=422, detail="Choose a valid catalog game")
             unique_games[f"psn:{selection.catalog_id}"] = title
             continue
-
-        source_title = selection.source_title
-        if (
-            source_title is None
-            or authorization is None
-            or _psn_catalog_match_key(source_title) not in authorization.manual_titles
-        ):
-            raise HTTPException(status_code=422, detail="Choose an eligible title from the PSN preview")
         unique_games[psn_manual_external_id(source_title)] = source_title
 
     existing = {

@@ -323,12 +323,14 @@ export type PsnImportPreview = {
 };
 export type PsnImportPreviewItem = {
   source_title: string;
-  status: "confirmed" | "unmatched" | "ambiguous" | "catalog_unavailable" | "excluded";
+  status: "matched" | "needs_mapping" | "suggested_skip";
   igdb_id?: number | null;
   title?: string | null;
   reason?: string | null;
+  suggestions: { id: number; title: string }[];
+  candidate_token: string;
 };
-export type PsnImportSelection = { catalog_id: number } | { source_title: string };
+export type PsnImportSelection = { candidate_token: string; action: "catalog"; catalog_id: number } | { candidate_token: string; action: "raw" };
 export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
 export type Notification = {
   id: string;
