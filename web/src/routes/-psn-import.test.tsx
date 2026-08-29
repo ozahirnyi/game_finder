@@ -38,6 +38,18 @@ describe("PsnImportPage", () => {
     expect(screen.getByText("1 selected · 2 skipped")).toBeInTheDocument();
   });
 
+  it("separates unavailable titles and retries the same export without selecting RAW", async () => {
+    previewPsnImport.mockResolvedValueOnce({ items:[{source_title:"Hades",status:"matched",igdb_id:1,title:"Hades",candidate_token:"a",suggestions:[]},{source_title:"Celeste",status:"catalog_unavailable",candidate_token:"b",suggestions:[],reason:"Catalog temporarily unavailable."}],games:[],total:2,confirmed_total:1 });
+    previewPsnImport.mockResolvedValueOnce({ items:[{source_title:"Hades",status:"matched",igdb_id:1,title:"Hades",candidate_token:"a2",suggestions:[]},{source_title:"Celeste",status:"matched",igdb_id:2,title:"Celeste",candidate_token:"b2",suggestions:[]}],games:[],total:2,confirmed_total:2 });
+    const {container}=renderPage(); await screen.findByText("Choose an export file");
+    fireEvent.change(container.querySelector('input[type="file"]')!, {target:{files:[new File(["x"],"export.xlsx")]} });
+    await screen.findByText("Catalog unavailable (1)");
+    expect(screen.getByText("1 selected · 1 skipped")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name:"Retry unavailable titles"}));
+    await screen.findByText("Catalog matches (2)");
+    expect(previewPsnImport).toHaveBeenCalledTimes(2);
+  });
+
   it("returns from confirmation to preview when Escape is pressed", async () => {
     previewPsnImport.mockResolvedValueOnce({ items:[{source_title:"Hades",status:"matched",igdb_id:1,title:"Hades",candidate_token:"a",suggestions:[]}],games:[],total:1,confirmed_total:1 });
     const {container}=renderPage(); await screen.findByText("Choose an export file");
