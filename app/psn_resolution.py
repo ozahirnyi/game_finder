@@ -50,19 +50,24 @@ def _exact_matches(title: str, results: list[dict]) -> list[dict]:
     return [game for game in results if game.get("id") and normalize_psn_product_identity(str(game.get("name") or "")) == key]
 
 
-async def resolve_psn_catalog_titles(titles: list[str], *, max_fallback_titles: int = 20) -> dict[str, CatalogResolution]:
+async def resolve_psn_catalog_titles(titles: list[str], *, max_fallback_titles: int = 20, batch_fetcher=None, single_fetcher=None) -> dict[str, CatalogResolution]:
     """Resolve titles with bounded per-title recovery when a batch is incomplete."""
     unique = list(dict.fromkeys(title for title in titles if title))
-    try:
-        catalog = await fetch_igdb_games_batch(unique)
-    except (IGDBError, TypeError, ValueError):
-        catalog = {}
-    if not isinstance(catalog, dict):
-        catalog = {}
+    batch_fetcher = batch_fetcher or fetch_igdb_games_batch
+    single_fetcher = single_fetcher or fetch_igdb_games
+    catalog: dict[str, list[dict] | None] = {}
+    for index in range(0, len(unique), 10):
+        batch_titles = unique[index:index + 10]
+        try:
+            batch = await batch_fetcher(batch_titles)
+        except (IGDBError, TypeError, ValueError):
+            batch = {}
+        if isinstance(batch, dict):
+            catalog.update(batch)
     unresolved = [title for title in unique if not isinstance(catalog.get(title), list)]
     for title in unresolved[:max_fallback_titles]:
         try:
-            catalog[title] = (await fetch_igdb_games(title))["results"]
+            catalog[title] = (await single_fetcher(title))["results"]
         except (IGDBError, KeyError, TypeError):
             catalog[title] = None
     outcome: dict[str, CatalogResolution] = {}

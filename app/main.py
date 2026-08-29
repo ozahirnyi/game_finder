@@ -38,6 +38,7 @@ from app.prices import fetch_game_price_history
 from app.psn_export import PsnExportCandidate, normalize_title, parse_psn_export_candidates, psn_manual_external_id
 from app.psn_classification import psn_purchase_exclusion_reason, psn_repair_quarantine_reason
 from app.psn_resolution import classify_psn_candidate
+from app.psn_resolution import resolve_psn_catalog_titles
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
@@ -685,23 +686,22 @@ async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) 
         if classifications[candidate.title].kind == "suggested_skip"
     }
     searchable = [candidate.title for candidate in candidates if candidate.title not in skipped]
-    catalog: dict[str, list[dict]] = {}
-    unavailable: set[str] = set()
-    for index in range(0, len(searchable), 10):
-        batch = searchable[index:index + 10]
-        try:
-            catalog.update(await fetch_igdb_games_batch(batch))
-        except IGDBError:
-            unavailable.update(batch)
+    resolutions = await resolve_psn_catalog_titles(
+        searchable, batch_fetcher=fetch_igdb_games_batch, single_fetcher=fetch_igdb_games,
+    )
     items: list[PsnImportPreviewItem] = []
     for candidate in candidates:
         token = _psn_candidate_token(user_id, candidate.title)
         if candidate.title in skipped:
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="suggested_skip", reason=skipped[candidate.title], candidate_token=token))
             continue
-        results = catalog.get(candidate.title, [])
+        resolution = resolutions.get(candidate.title)
+        results = resolution.results if resolution else []
         if classifications[candidate.title].kind == "needs_review":
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", reason=classifications[candidate.title].reason, suggestions=_psn_suggestions(results), candidate_token=token))
+            continue
+        if resolution and resolution.kind == "unavailable":
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="catalog_unavailable", reason="Catalog temporarily unavailable.", candidate_token=token))
             continue
         matches = [game for game in results if game.get("id") and _psn_catalog_match_key(game.get("name") or "") == _psn_catalog_match_key(candidate.title)]
         platform_names = {PSN_CATALOG_PLATFORM_NAMES.get(platform.casefold()) for platform in candidate.platforms}
@@ -711,7 +711,7 @@ async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) 
             game = selected[0]
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="matched", igdb_id=int(game["id"]), title=game["name"], candidate_token=token))
         else:
-            reason = "Catalog temporarily unavailable." if candidate.title in unavailable else ("Multiple exact catalog matches found." if matches else "No exact catalog match found.")
+            reason = "Multiple exact catalog matches found." if matches else "No exact catalog match found."
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", reason=reason, suggestions=_psn_suggestions(results), candidate_token=token))
     return items
 

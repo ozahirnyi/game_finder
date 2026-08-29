@@ -314,6 +314,24 @@ def test_psn_preview_does_not_skip_game_with_related_demo_evidence(api_client, u
     assert response.json()["items"][0]["status"] == "matched"
 
 
+def test_psn_preview_keeps_partial_catalog_success_and_marks_unavailable(api_client, user_factory, auth_as, app_main, monkeypatch):
+    from app.psn_resolution import CatalogResolution
+
+    auth_as(user_factory(email="psn-catalog-status@example.com"))
+    monkeypatch.setattr(app_main, "resolve_psn_catalog_titles", AsyncMock(return_value={
+        "Hades": CatalogResolution("matched", [{"id": 101, "name": "Hades", "platforms": ["PlayStation 5"]}]),
+        "Celeste": CatalogResolution("unavailable", []),
+    }))
+
+    response = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\nCeleste\n", "text/csv")})
+
+    assert response.status_code == 200
+    assert [(item["source_title"], item["status"], item["reason"]) for item in response.json()["items"]] == [
+        ("Hades", "matched", None),
+        ("Celeste", "catalog_unavailable", "Catalog temporarily unavailable."),
+    ]
+
+
 def test_psn_import_preview_matches_provider_formatting_only(
     api_client, user_factory, auth_as, app_main, monkeypatch
 ):
@@ -713,7 +731,7 @@ def test_psn_import_preview_reports_catalog_unavailability(
     monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")})
 
-    assert response.json()["items"][0]["status"] == "needs_mapping"
+    assert response.json()["items"][0]["status"] == "catalog_unavailable"
 
 
 def test_psn_import_preview_excludes_marker_products(api_client, user_factory, auth_as, app_main, monkeypatch):
@@ -797,8 +815,8 @@ def test_psn_import_preview_excludes_non_product_transactions_before_catalog_loo
         },
     )
 
-    assert response.json()["items"][0]["reason"] == "Catalog temporarily unavailable."
-    assert search_catalog.await_count == 0
+    assert response.json()["items"][0]["reason"] == "No exact catalog match found."
+    assert search_catalog.await_count == 1
 
 
 def test_psn_import_mixed_preview_and_confirmation_flow(

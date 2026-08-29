@@ -380,7 +380,7 @@ class SteamRecommendationRequest(BaseModel):
 
 class PsnImportPreviewItem(BaseModel):
     source_title: str
-    status: Literal["matched", "needs_mapping", "suggested_skip"]
+    status: Literal["matched", "needs_mapping", "suggested_skip", "catalog_unavailable"]
     igdb_id: int | None = None
     title: str | None = None
     reason: str | None = None
