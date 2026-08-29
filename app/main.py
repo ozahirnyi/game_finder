@@ -36,7 +36,7 @@ from app.integrations.igdb import (
 )
 from app.prices import fetch_game_price_history
 from app.psn_export import PsnExportCandidate, normalize_title, parse_psn_export_candidates, psn_manual_external_id
-from app.psn_classification import psn_purchase_exclusion_reason
+from app.psn_classification import psn_purchase_exclusion_reason, psn_repair_quarantine_reason
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
@@ -47,7 +47,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
-    DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead
+    DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -365,7 +365,7 @@ def public_library_game_response(game: Game) -> PublicLibraryGameRead:
         source=game.source,
         cover_url=cover_url,
         playtime_forever=game.playtime_forever,
-        detail_game_id=game.external_id,
+        detail_game_id=str(game.catalog_game_id) if game.source == "psn" and game.link_state == "linked" and game.catalog_game_id else game.external_id,
     )
 
 
@@ -467,7 +467,7 @@ async def library_overview_route(
 ):
     games: list[LibraryGameRead] = []
     seen: set[tuple[str, str]] = set()
-    for game in list_games(db, current_user.id):
+    for game in (game for game in list_games(db, current_user.id) if game.link_state != "quarantined"):
         source = game.source if game.source in {"steam", "psn"} else "manual"
         external_id = game.external_id or str(game.id)
         key = (source, external_id)
@@ -475,7 +475,8 @@ async def library_overview_route(
             seen.add(key)
             games.append(LibraryGameRead(
                 id=str(game.id), source=source, external_id=game.external_id,
-                detail_game_id=(game.external_id if source == "steam" else str(game.id)), title=game.title,
+                detail_game_id=(game.external_id if source == "steam" else str(game.catalog_game_id) if game.link_state == "linked" and game.catalog_game_id else None),
+                catalog_game_id=game.catalog_game_id, link_state=game.link_state if game.source == "psn" else None, title=game.title,
                 cover_url=(
                     steam_library_cover_url(game.external_id, game.img_icon_url)
                     if game.source == "steam"
@@ -503,7 +504,12 @@ async def library_overview_route(
             steam_available = False
             steam_error = "Steam library is temporarily unavailable."
     games.sort(key=lambda game: (game.title.casefold(), game.source, game.id))
-    return LibraryOverviewRead(games=games, steam_available=steam_available, steam_error=steam_error)
+    repair_games = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn").all()
+    return LibraryOverviewRead(
+        games=games, steam_available=steam_available, steam_error=steam_error,
+        raw_count=sum(game.link_state not in {"linked", "quarantined"} for game in repair_games),
+        quarantined_count=sum(game.link_state == "quarantined" for game in repair_games),
+    )
 
 
 @app.post("/library/steam-games/{appid}/resolve", response_model=SteamLibraryResolveRead)
@@ -701,6 +707,98 @@ async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) 
     return items
 
 
+def _psn_linked_game_payload(detail: dict, catalog_id: int) -> tuple[str, str | None]:
+    title = normalize_title(detail.get("name"))
+    if not title or int(detail.get("id") or catalog_id) != catalog_id:
+        raise HTTPException(status_code=422, detail="Choose a valid catalog game")
+    cover = detail.get("background_image")
+    return title, cover if isinstance(cover, str) and cover.startswith(("http://", "https://")) else None
+
+
+async def _psn_repair_items(games: list[Game]) -> list[PsnLibraryRepairItem]:
+    raw = [game for game in games if game.link_state != "quarantined" and game.link_state != "linked"]
+    searchable = [game.title for game in raw if not psn_repair_quarantine_reason(game.title)]
+    catalog: dict[str, list[dict]] = {}
+    for index in range(0, len(searchable), 10):
+        try:
+            catalog.update(await fetch_igdb_games_batch(searchable[index:index + 10]))
+        except IGDBError:
+            pass
+    items: list[PsnLibraryRepairItem] = []
+    for game in games:
+        if game.link_state == "quarantined":
+            items.append(PsnLibraryRepairItem(game_id=game.id, title=game.title, link_state="quarantined", suggestion="quarantine"))
+            continue
+        if game.link_state == "linked" and game.catalog_game_id:
+            items.append(PsnLibraryRepairItem(game_id=game.id, title=game.title, link_state="linked", catalog_game_id=game.catalog_game_id, suggestion="linked"))
+            continue
+        reason = psn_repair_quarantine_reason(game.title)
+        if reason:
+            items.append(PsnLibraryRepairItem(game_id=game.id, title=game.title, link_state="raw", suggestion="quarantine", reason=reason))
+            continue
+        results = catalog.get(game.title, [])
+        matches = [item for item in results if item.get("id") and _psn_catalog_match_key(str(item.get("name") or "")) == _psn_catalog_match_key(game.title)]
+        items.append(PsnLibraryRepairItem(
+            game_id=game.id, title=game.title, link_state="raw",
+            suggestion="auto_link" if len(matches) == 1 else "review",
+            suggestions=_psn_suggestions(results),
+            reason=None if len(matches) == 1 else ("Multiple exact catalog matches found." if matches else "No exact catalog match found."),
+        ))
+    return items
+
+
+@app.get("/psn/library-repair/preview", response_model=PsnLibraryRepairPreview)
+async def preview_psn_library_repair(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    games = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn").order_by(Game.created_at, Game.id).all()
+    return PsnLibraryRepairPreview(
+        items=await _psn_repair_items(games),
+        raw_count=sum(game.link_state != "linked" and game.link_state != "quarantined" for game in games),
+        quarantined_count=sum(game.link_state == "quarantined" for game in games),
+    )
+
+
+@app.post("/psn/library-repair/apply")
+async def apply_psn_library_repair(data: PsnLibraryRepairApplyRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    decisions = {decision.game_id: decision for decision in data.decisions}
+    games = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn", Game.id.in_(decisions)).all()
+    if len(games) != len(decisions):
+        raise HTTPException(status_code=404, detail="PSN library entry not found")
+    try:
+        for game in games:
+            decision = decisions[game.id]
+            if decision.action == "delete":
+                db.delete(game)
+                continue
+            if decision.action == "quarantine":
+                game.link_state = "quarantined"
+                continue
+            if decision.action == "keep_raw":
+                game.link_state, game.catalog_game_id, game.img_icon_url = "raw", None, None
+                continue
+            if decision.action == "restore":
+                game.link_state = "linked" if game.catalog_game_id else "raw"
+                continue
+            try:
+                detail = await fetch_igdb_game_detail(decision.catalog_id or 0)
+            except IGDBError as exc:
+                raise HTTPException(status_code=422, detail="Choose a valid catalog game") from exc
+            title, cover = _psn_linked_game_payload(detail, decision.catalog_id or 0)
+            duplicate = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn", Game.catalog_game_id == decision.catalog_id, Game.id != game.id).first()
+            if duplicate:
+                duplicate.created_at = min(duplicate.created_at, game.created_at)
+                duplicate.notes = duplicate.notes or game.notes
+                duplicate.info = duplicate.info or game.info
+                duplicate.playtime_forever = max(duplicate.playtime_forever or 0, game.playtime_forever or 0) or None
+                db.delete(game)
+                continue
+            game.catalog_game_id, game.link_state, game.title, game.img_icon_url = decision.catalog_id, "linked", title, cover
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"updated": len(decisions)}
+
+
 @app.post("/psn/import/preview", response_model=PsnImportPreview)
 async def preview_psn_import(
     file: UploadFile = File(...),
@@ -727,7 +825,7 @@ async def confirm_psn_import(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    unique_games: dict[str, str] = {}
+    unique_games: dict[str, tuple[str, int | None, str | None, str]] = {}
     for selection in data.selections:
         source_title = _psn_candidate_from_token(selection.candidate_token, current_user.id)
         if selection.action == "catalog":
@@ -735,12 +833,10 @@ async def confirm_psn_import(
                 detail = await fetch_igdb_game_detail(selection.catalog_id or 0)
             except IGDBError as exc:
                 raise HTTPException(status_code=422, detail="Choose a valid catalog game") from exc
-            title = normalize_title(detail.get("name"))
-            if not title:
-                raise HTTPException(status_code=422, detail="Choose a valid catalog game")
-            unique_games[f"psn:{selection.catalog_id}"] = title
+            title, cover = _psn_linked_game_payload(detail, selection.catalog_id or 0)
+            unique_games[f"psn:{selection.catalog_id}"] = (title, selection.catalog_id, cover, "linked")
             continue
-        unique_games[psn_manual_external_id(source_title)] = source_title
+        unique_games[psn_manual_external_id(source_title)] = (source_title, None, None, "raw")
 
     existing = {
         game.external_id: game
@@ -751,7 +847,7 @@ async def confirm_psn_import(
     now = datetime.now(timezone.utc)
     created = updated = skipped = 0
     try:
-        for external_id, title in unique_games.items():
+        for external_id, (title, catalog_game_id, cover, link_state) in unique_games.items():
             imported = existing.get(external_id)
             if imported is None:
                 db.add(
@@ -759,7 +855,10 @@ async def confirm_psn_import(
                         owner_id=current_user.id,
                         source="psn",
                         external_id=external_id,
+                        catalog_game_id=catalog_game_id,
+                        link_state=link_state,
                         title=title,
+                        img_icon_url=cover,
                         info="Imported from your PlayStation data export",
                         synced_at=now,
                     )
@@ -767,6 +866,9 @@ async def confirm_psn_import(
                 created += 1
             elif imported.title != title and not external_id.startswith("psn:manual:"):
                 imported.title = title
+                imported.catalog_game_id = catalog_game_id
+                imported.link_state = link_state
+                imported.img_icon_url = cover
                 imported.synced_at = now
                 updated += 1
             else:
@@ -1075,7 +1177,7 @@ def get_public_profile(
 
     relationship = "none" if current_user is None else social_relationship(db, current_user.id, owner.id)
     if can_view_section(owner, current_user, owner.library_visibility, db):
-        games = db.query(Game).filter(Game.owner_id == owner.id).order_by(func.lower(Game.title)).all()
+        games = db.query(Game).filter(Game.owner_id == owner.id, Game.link_state != "quarantined").order_by(func.lower(Game.title)).all()
         library = PublicDataBlock(
             status="ready" if games else "empty",
             data=[public_library_game_response(game).model_dump(mode="json") for game in games],
@@ -1661,7 +1763,7 @@ async def friend_profile_response(
     db: Session, current_user: User, friend: User
 ) -> FriendProfileRead:
     if can_view_section(friend, current_user, friend.library_visibility, db):
-        games = db.query(Game).filter(Game.owner_id == friend.id, Game.source != "steam").order_by(func.lower(Game.title)).all()
+        games = db.query(Game).filter(Game.owner_id == friend.id, Game.source != "steam", Game.link_state != "quarantined").order_by(func.lower(Game.title)).all()
         library_items = [public_library_game_response(game).model_dump(mode="json") for game in games]
         if friend.steam_id and can_view_section(friend, current_user, friend.steam_visibility, db):
             try:

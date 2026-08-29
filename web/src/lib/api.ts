@@ -69,6 +69,8 @@ export type LibraryOverviewGame = {
   source: "manual" | "psn" | "steam";
   external_id?: string | null;
   detail_game_id?: string | null;
+  catalog_game_id?: number | null;
+  link_state?: "linked" | "raw" | null;
   title: string;
   cover_url?: string | null;
   playtime_forever?: number | null;
@@ -78,6 +80,8 @@ export type LibraryOverview = {
   games: LibraryOverviewGame[];
   steam_available: boolean;
   steam_error?: string | null;
+  raw_count: number;
+  quarantined_count: number;
 };
 
 export type OnboardingSummary = {
@@ -332,6 +336,8 @@ export type PsnImportPreviewItem = {
 };
 export type PsnImportSelection = { candidate_token: string; action: "catalog"; catalog_id: number } | { candidate_token: string; action: "raw" };
 export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
+export type PsnLibraryRepairItem = { game_id: string; title: string; link_state: "linked" | "raw" | "quarantined"; catalog_game_id?: number | null; suggestion: "linked" | "auto_link" | "review" | "quarantine"; suggestions: { id: number; title: string }[]; reason?: string | null };
+export type PsnLibraryRepairPreview = { items: PsnLibraryRepairItem[]; raw_count: number; quarantined_count: number };
 export type Notification = {
   id: string;
   type: string;
@@ -506,6 +512,14 @@ export function confirmPsnImport(selections: PsnImportSelection[]) {
     method: "POST",
     body: { selections },
   });
+}
+
+export function previewPsnLibraryRepair() {
+  return apiRequest<PsnLibraryRepairPreview>("/psn/library-repair/preview", { auth: true });
+}
+
+export function applyPsnLibraryRepair(decisions: { game_id: string; action: "link" | "keep_raw" | "quarantine" | "restore" | "delete"; catalog_id?: number }[]) {
+  return apiRequest<{ updated: number }>("/psn/library-repair/apply", { auth: true, method: "POST", body: { decisions } });
 }
 
 export type CatalogPlatform =

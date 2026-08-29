@@ -120,3 +120,19 @@ def psn_purchase_exclusion_reason(candidate: PsnExportCandidate) -> str | None:
     if any(normalize_psn_product_identity(value) in EXPLICIT_NON_GAME_CONTENT_IDENTITIES for value in candidate.content_types) or any(_is_explicit_product_identity(normalize_psn_product_identity(value), title) for value in candidate.product_names):
         return "Excluded: this purchase is explicitly a subscription, currency item, demo, add-on, pass, or bundle."
     return None
+
+
+REPAIR_NON_GAME_CATEGORY_PHRASES = frozenset({
+    "public test server", "test client", "beta client", "playtest", "subscription",
+    "theme", "dlc", "add on", "wallet", "currency",
+})
+
+
+def psn_repair_quarantine_reason(title: str) -> str | None:
+    """Return evidence-based generic non-game classification for stored PSN titles."""
+    identity = normalize_psn_product_identity(title)
+    if identity in KNOWN_NON_GAME_PSN_PRODUCT_IDENTITIES or identity in KNOWN_NON_GAME_PSN_STORE_CATEGORY_IDENTITIES:
+        return "Known PlayStation app, service, or theme."
+    if identity in REPAIR_NON_GAME_CATEGORY_PHRASES:
+        return "Stored title is an explicit non-game category."
+    return None

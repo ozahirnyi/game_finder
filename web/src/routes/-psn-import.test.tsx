@@ -28,14 +28,14 @@ describe("PsnImportPage", () => {
     await waitFor(() => expect(confirmPsnImport.mock.calls[0]?.[0]).toEqual([{candidate_token:"a",action:"catalog",catalog_id:1},{candidate_token:"b",action:"raw"}]));
   });
 
-  it("selects every actionable game while leaving suggested skips unselected", async () => {
+  it("selects only matched catalog games and leaves mapping rows unselected", async () => {
     previewPsnImport.mockResolvedValueOnce({ items:[{source_title:"Hades",status:"matched",igdb_id:1,title:"Hades",candidate_token:"a",suggestions:[]},{source_title:"Unknown",status:"needs_mapping",candidate_token:"b",suggestions:[]},{source_title:"Spotify",status:"suggested_skip",candidate_token:"c",suggestions:[],reason:"known app"}],games:[],total:3,confirmed_total:1 });
     const {container}=renderPage(); await screen.findByText("Choose an export file");
     fireEvent.change(container.querySelector('input[type="file"]')!, {target:{files:[new File(["x"],"export.xlsx")]}});
     await screen.findByText("Need mapping (1)");
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name:"Select all games"}));
-    expect(screen.getByText("2 selected · 1 skipped")).toBeInTheDocument();
+    expect(screen.getByText("1 selected · 2 skipped")).toBeInTheDocument();
   });
 
   it("returns from confirmation to preview when Escape is pressed", async () => {

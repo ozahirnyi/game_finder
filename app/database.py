@@ -42,6 +42,8 @@ class Game(Base):
     info: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="manual", server_default="manual")
     external_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    catalog_game_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    link_state: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     playtime_forever: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     playtime_2weeks: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     img_icon_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
