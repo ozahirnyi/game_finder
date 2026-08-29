@@ -953,3 +953,30 @@ def test_psn_import_confirm_allows_a_suggested_skip_to_be_restored_as_raw(
 
     assert response.status_code == 200
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 1
+
+
+def test_psn_library_repair_links_raw_rows_and_hides_quarantine(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory(email="psn-repair-owner@example.com"))
+    raw = Game(owner_id=owner.id, title="Hades", source="psn", external_id="psn:manual:test", link_state="raw")
+    junk = Game(owner_id=owner.id, title="Spotify", source="psn", external_id="psn:manual:junk", link_state="raw")
+    db_session.add_all([raw, junk])
+    db_session.commit()
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={"Hades": [{"id": 101, "name": "Hades", "background_image": "https://cover"}]}))
+    monkeypatch.setattr(app_main, "fetch_igdb_game_detail", AsyncMock(return_value={"id": 101, "name": "Hades", "background_image": "https://cover"}))
+
+    preview = api_client.get("/psn/library-repair/preview")
+    assert preview.status_code == 200
+    suggestions = {item["title"]: item for item in preview.json()["items"]}
+    assert suggestions["Hades"]["suggestion"] == "auto_link"
+    assert suggestions["Spotify"]["suggestion"] == "quarantine"
+
+    applied = api_client.post("/psn/library-repair/apply", json={"decisions": [
+        {"game_id": str(raw.id), "action": "link", "catalog_id": 101},
+        {"game_id": str(junk.id), "action": "quarantine"},
+    ]})
+    assert applied.status_code == 200
+    overview = api_client.get("/library/overview").json()["games"]
+    assert [(item["title"], item["catalog_game_id"], item["detail_game_id"]) for item in overview] == [("Hades", 101, "101")]
+    assert db_session.get(Game, junk.id).link_state == "quarantined"

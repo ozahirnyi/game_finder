@@ -45,7 +45,7 @@ function PsnImportPage() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [step]);
 
-  const selectAllGames = () => setRows(current => current.map(row => row.status === "suggested_skip" && !row.restored ? row : { ...row, decision: row.catalogId ? "catalog" : "raw" }));
+  const selectAllGames = () => setRows(current => current.map(row => row.status === "matched" && row.catalogId ? { ...row, decision: "catalog" } : row));
   const clearSelection = () => setRows(current => current.map(row => ({ ...row, decision: "skip" })));
 
   function previewRow(row: Row, editable = false) {

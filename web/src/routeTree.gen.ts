@@ -14,6 +14,7 @@ import { Route as AccountRouteImport } from './routes/account'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PsnImportRouteImport } from './routes/psn-import'
+import { Route as PsnLibraryRepairRouteImport } from './routes/psn-library-repair'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
@@ -46,6 +47,11 @@ const LibraryRoute = LibraryRouteImport.update({
 const PsnImportRoute = PsnImportRouteImport.update({
   id: '/psn-import',
   path: '/psn-import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PsnLibraryRepairRoute = PsnLibraryRepairRouteImport.update({
+  id: '/psn-library-repair',
+  path: '/psn-library-repair',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/deals': typeof DealsRoute
   '/library': typeof LibraryRoute
   '/psn-import': typeof PsnImportRoute
+  '/psn-library-repair': typeof PsnLibraryRepairRoute
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/deals': typeof DealsRoute
   '/library': typeof LibraryRoute
   '/psn-import': typeof PsnImportRoute
+  '/psn-library-repair': typeof PsnLibraryRepairRoute
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/deals': typeof DealsRoute
   '/library': typeof LibraryRoute
   '/psn-import': typeof PsnImportRoute
+  '/psn-library-repair': typeof PsnLibraryRepairRoute
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/library'
     | '/psn-import'
+    | '/psn-library-repair'
     | '/search'
     | '/sign-in'
     | '/sign-up'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/library'
     | '/psn-import'
+    | '/psn-library-repair'
     | '/search'
     | '/sign-in'
     | '/sign-up'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/library'
     | '/psn-import'
+    | '/psn-library-repair'
     | '/search'
     | '/sign-in'
     | '/sign-up'
@@ -189,6 +201,7 @@ export interface RootRouteChildren {
   DealsRoute: typeof DealsRoute
   LibraryRoute: typeof LibraryRoute
   PsnImportRoute: typeof PsnImportRoute
+  PsnLibraryRepairRoute: typeof PsnLibraryRepairRoute
   SearchRoute: typeof SearchRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
@@ -234,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/psn-import'
       fullPath: '/psn-import'
       preLoaderRoute: typeof PsnImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/psn-library-repair': {
+      id: '/psn-library-repair'
+      path: '/psn-library-repair'
+      fullPath: '/psn-library-repair'
+      preLoaderRoute: typeof PsnLibraryRepairRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -301,6 +321,7 @@ const rootRouteChildren: RootRouteChildren = {
   DealsRoute: DealsRoute,
   LibraryRoute: LibraryRoute,
   PsnImportRoute: PsnImportRoute,
+  PsnLibraryRepairRoute: PsnLibraryRepairRoute,
   SearchRoute: SearchRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,

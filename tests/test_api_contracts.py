@@ -1550,12 +1550,15 @@ def test_library_overview_preserves_stored_steam_app_identity(monkeypatch):
         main.app.dependency_overrides.clear()
 
     assert response.status_code == 200
-    assert response.json()["games"] == [{
-        "id": str(saved.id), "source": "steam", "external_id": "1097150",
-        "detail_game_id": "1097150", "title": "Fall Guys",
-        "cover_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/1097150/library_600x900.jpg",
-        "playtime_forever": 120,
-    }]
+    assert response.json() == {
+        "games": [{
+            "id": str(saved.id), "source": "steam", "external_id": "1097150",
+            "detail_game_id": "1097150", "catalog_game_id": None, "link_state": None,
+            "title": "Fall Guys", "cover_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/1097150/library_600x900.jpg",
+            "playtime_forever": 120,
+        }],
+        "steam_available": False, "steam_error": None, "raw_count": 0, "quarantined_count": 0,
+    }
 
 
 def test_dashboard_library_stats_and_linked_steam_library_contract(monkeypatch):

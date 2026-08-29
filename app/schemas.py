@@ -29,6 +29,8 @@ class LibraryGameRead(BaseModel):
     id: str
     source: Literal["manual", "psn", "steam"]
     external_id: str | None = None
+    catalog_game_id: int | None = None
+    link_state: Literal["linked", "raw"] | None = None
     detail_game_id: str | None = None
     title: str
     cover_url: str | None = None
@@ -39,6 +41,8 @@ class LibraryOverviewRead(BaseModel):
     games: list[LibraryGameRead] = Field(default_factory=list)
     steam_available: bool = False
     steam_error: str | None = None
+    raw_count: int = 0
+    quarantined_count: int = 0
 
 
 class SteamLibraryResolveRead(BaseModel):
@@ -415,6 +419,40 @@ class PsnImportResult(BaseModel):
     updated: int = 0
     skipped: int = 0
     total: int = 0
+
+
+class PsnLibraryRepairItem(BaseModel):
+    game_id: uuid.UUID
+    title: str
+    link_state: Literal["linked", "raw", "quarantined"]
+    catalog_game_id: int | None = None
+    suggestion: Literal["linked", "auto_link", "review", "quarantine"]
+    suggestions: list[dict] = Field(default_factory=list)
+    reason: str | None = None
+
+
+class PsnLibraryRepairPreview(BaseModel):
+    items: list[PsnLibraryRepairItem] = Field(default_factory=list)
+    raw_count: int = 0
+    quarantined_count: int = 0
+
+
+class PsnLibraryRepairDecision(BaseModel):
+    game_id: uuid.UUID
+    action: Literal["link", "keep_raw", "quarantine", "restore", "delete"]
+    catalog_id: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_catalog_action(self):
+        if self.action == "link" and self.catalog_id is None:
+            raise ValueError("catalog_id is required when linking")
+        if self.action != "link" and self.catalog_id is not None:
+            raise ValueError("catalog_id is only valid when linking")
+        return self
+
+
+class PsnLibraryRepairApplyRequest(BaseModel):
+    decisions: list[PsnLibraryRepairDecision] = Field(min_length=1, max_length=500)
 
 
 class TelegramAccountRead(BaseModel):
