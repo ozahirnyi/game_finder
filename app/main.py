@@ -365,7 +365,7 @@ def public_library_game_response(game: Game) -> PublicLibraryGameRead:
         source=game.source,
         cover_url=cover_url,
         playtime_forever=game.playtime_forever,
-        detail_game_id=str(game.catalog_game_id) if game.source == "psn" and game.link_state == "linked" and game.catalog_game_id else game.external_id,
+        detail_game_id=str(game.catalog_game_id) if game.source == "psn" and getattr(game, "link_state", None) == "linked" and game.catalog_game_id else game.external_id,
     )
 
 
@@ -467,7 +467,7 @@ async def library_overview_route(
 ):
     games: list[LibraryGameRead] = []
     seen: set[tuple[str, str]] = set()
-    for game in (game for game in list_games(db, current_user.id) if game.link_state != "quarantined"):
+    for game in (game for game in list_games(db, current_user.id) if getattr(game, "link_state", None) != "quarantined"):
         source = game.source if game.source in {"steam", "psn"} else "manual"
         external_id = game.external_id or str(game.id)
         key = (source, external_id)
@@ -475,8 +475,8 @@ async def library_overview_route(
             seen.add(key)
             games.append(LibraryGameRead(
                 id=str(game.id), source=source, external_id=game.external_id,
-                detail_game_id=(game.external_id if source == "steam" else str(game.catalog_game_id) if game.link_state == "linked" and game.catalog_game_id else None),
-                catalog_game_id=game.catalog_game_id, link_state=game.link_state if game.source == "psn" else None, title=game.title,
+                detail_game_id=(game.external_id if source == "steam" else str(getattr(game, "catalog_game_id", None)) if getattr(game, "link_state", None) == "linked" and getattr(game, "catalog_game_id", None) else None),
+                catalog_game_id=getattr(game, "catalog_game_id", None), link_state=getattr(game, "link_state", None) if game.source == "psn" else None, title=game.title,
                 cover_url=(
                     steam_library_cover_url(game.external_id, game.img_icon_url)
                     if game.source == "steam"
@@ -507,8 +507,8 @@ async def library_overview_route(
     repair_games = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn").all()
     return LibraryOverviewRead(
         games=games, steam_available=steam_available, steam_error=steam_error,
-        raw_count=sum(game.link_state not in {"linked", "quarantined"} for game in repair_games),
-        quarantined_count=sum(game.link_state == "quarantined" for game in repair_games),
+        raw_count=sum(getattr(game, "link_state", None) not in {"linked", "quarantined"} for game in repair_games),
+        quarantined_count=sum(getattr(game, "link_state", None) == "quarantined" for game in repair_games),
     )
 
 
@@ -1177,7 +1177,7 @@ def get_public_profile(
 
     relationship = "none" if current_user is None else social_relationship(db, current_user.id, owner.id)
     if can_view_section(owner, current_user, owner.library_visibility, db):
-        games = db.query(Game).filter(Game.owner_id == owner.id, Game.link_state != "quarantined").order_by(func.lower(Game.title)).all()
+        games = db.query(Game).filter(Game.owner_id == owner.id, or_(Game.link_state.is_(None), Game.link_state != "quarantined")).order_by(func.lower(Game.title)).all()
         library = PublicDataBlock(
             status="ready" if games else "empty",
             data=[public_library_game_response(game).model_dump(mode="json") for game in games],
@@ -1763,7 +1763,7 @@ async def friend_profile_response(
     db: Session, current_user: User, friend: User
 ) -> FriendProfileRead:
     if can_view_section(friend, current_user, friend.library_visibility, db):
-        games = db.query(Game).filter(Game.owner_id == friend.id, Game.source != "steam", Game.link_state != "quarantined").order_by(func.lower(Game.title)).all()
+        games = db.query(Game).filter(Game.owner_id == friend.id, Game.source != "steam", or_(Game.link_state.is_(None), Game.link_state != "quarantined")).order_by(func.lower(Game.title)).all()
         library_items = [public_library_game_response(game).model_dump(mode="json") for game in games]
         if friend.steam_id and can_view_section(friend, current_user, friend.steam_visibility, db):
             try:

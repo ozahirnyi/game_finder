@@ -1,14 +1,14 @@
 """add PSN catalog identity and repair state
 
-Revision ID: a1b2c3d4e5f6
-Revises: f8a9b0c1d2e3
+Revision ID: c9d8e7f6a5b4
+Revises: f3a4b5c6d7e8
 Create Date: 2026-08-29 00:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "a1b2c3d4e5f6"
-down_revision = "f8a9b0c1d2e3"
+revision = "c9d8e7f6a5b4"
+down_revision = "f3a4b5c6d7e8"
 branch_labels = None
 depends_on = None
 
