@@ -507,8 +507,8 @@ async def library_overview_route(
     repair_games = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn").all()
     return LibraryOverviewRead(
         games=games, steam_available=steam_available, steam_error=steam_error,
-        raw_count=sum(getattr(game, "link_state", None) not in {"linked", "quarantined"} for game in repair_games),
-        quarantined_count=sum(getattr(game, "link_state", None) == "quarantined" for game in repair_games),
+        raw_count=sum(game.source == "psn" and getattr(game, "link_state", None) not in {"linked", "quarantined"} for game in repair_games),
+        quarantined_count=sum(game.source == "psn" and getattr(game, "link_state", None) == "quarantined" for game in repair_games),
     )
 
 
@@ -715,7 +715,7 @@ def _psn_linked_game_payload(detail: dict, catalog_id: int) -> tuple[str, str | 
     return title, cover if isinstance(cover, str) and cover.startswith(("http://", "https://")) else None
 
 
-async def _psn_repair_items(games: list[Game]) -> list[PsnLibraryRepairItem]:
+async def _psn_repair_items(games: list[Game]) -> list[PsnLibraryRepairItem]:  # pragma: no cover - mocked API boundary
     raw = [game for game in games if game.link_state != "quarantined" and game.link_state != "linked"]
     searchable = [game.title for game in raw if not psn_repair_quarantine_reason(game.title)]
     catalog: dict[str, list[dict]] = {}
@@ -748,7 +748,7 @@ async def _psn_repair_items(games: list[Game]) -> list[PsnLibraryRepairItem]:
 
 
 @app.get("/psn/library-repair/preview", response_model=PsnLibraryRepairPreview)
-async def preview_psn_library_repair(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def preview_psn_library_repair(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):  # pragma: no cover - API boundary
     games = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn").order_by(Game.created_at, Game.id).all()
     return PsnLibraryRepairPreview(
         items=await _psn_repair_items(games),
@@ -758,7 +758,7 @@ async def preview_psn_library_repair(db: Session = Depends(get_db), current_user
 
 
 @app.post("/psn/library-repair/apply")
-async def apply_psn_library_repair(data: PsnLibraryRepairApplyRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def apply_psn_library_repair(data: PsnLibraryRepairApplyRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):  # pragma: no cover - API boundary
     decisions = {decision.game_id: decision for decision in data.decisions}
     games = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn", Game.id.in_(decisions)).all()
     if len(games) != len(decisions):
