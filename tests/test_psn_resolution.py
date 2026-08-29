@@ -1,4 +1,6 @@
 import pytest
+import asyncio
+from unittest.mock import AsyncMock
 
 from app.psn_export import PsnExportCandidate
 
@@ -31,3 +33,42 @@ def test_classification_skips_known_self_title_app():
     from app.psn_resolution import classify_psn_candidate
 
     assert classify_psn_candidate(PsnExportCandidate("Spotify")).kind == "suggested_skip"
+
+
+def test_resolver_falls_back_only_for_missing_batch_titles(monkeypatch):
+    from app import psn_resolution
+
+    monkeypatch.setattr(psn_resolution, "fetch_igdb_games_batch", AsyncMock(return_value={"Hades": [{"id": 1, "name": "Hades"}]}))
+    single = AsyncMock(return_value={"results": [{"id": 2, "name": "Celeste"}]})
+    monkeypatch.setattr(psn_resolution, "fetch_igdb_games", single)
+
+    result = asyncio.run(psn_resolution.resolve_psn_catalog_titles(["Hades", "Celeste"]))
+
+    assert result["Hades"].kind == "matched"
+    assert result["Celeste"].kind == "matched"
+    single.assert_awaited_once_with("Celeste")
+
+
+def test_resolver_marks_titles_beyond_fallback_budget_unavailable(monkeypatch):
+    from app import psn_resolution
+
+    monkeypatch.setattr(psn_resolution, "fetch_igdb_games_batch", AsyncMock(return_value={}))
+    single = AsyncMock(return_value={"results": []})
+    monkeypatch.setattr(psn_resolution, "fetch_igdb_games", single)
+
+    result = asyncio.run(psn_resolution.resolve_psn_catalog_titles(["One", "Two"], max_fallback_titles=1))
+
+    assert result["One"].kind == "no_match"
+    assert result["Two"].kind == "unavailable"
+    single.assert_awaited_once_with("One")
+
+
+def test_resolver_recovers_from_malformed_batch_shape(monkeypatch):
+    from app import psn_resolution
+
+    monkeypatch.setattr(psn_resolution, "fetch_igdb_games_batch", AsyncMock(return_value=None))
+    monkeypatch.setattr(psn_resolution, "fetch_igdb_games", AsyncMock(return_value={"results": [{"id": 1, "name": "Hades"}]}))
+
+    result = asyncio.run(psn_resolution.resolve_psn_catalog_titles(["Hades"]))
+
+    assert result["Hades"].kind == "matched"

@@ -55,7 +55,9 @@ async def resolve_psn_catalog_titles(titles: list[str], *, max_fallback_titles: 
     unique = list(dict.fromkeys(title for title in titles if title))
     try:
         catalog = await fetch_igdb_games_batch(unique)
-    except IGDBError:
+    except (IGDBError, TypeError, ValueError):
+        catalog = {}
+    if not isinstance(catalog, dict):
         catalog = {}
     unresolved = [title for title in unique if not isinstance(catalog.get(title), list)]
     for title in unresolved[:max_fallback_titles]:
