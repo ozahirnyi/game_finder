@@ -5,6 +5,8 @@ import pytest
 from openpyxl import Workbook
 
 from app.database import Favorite, Friendship, Game, PriceAlert, WishlistItem
+from app.psn_export import psn_manual_external_id
+from app.psn_resolution import CatalogResolution
 
 
 pytestmark = pytest.mark.integration
@@ -900,7 +902,6 @@ def test_psn_import_confirm_persists_owner_scoped_idempotent_games(
     assert first.status_code == 200
     assert first.json() == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2
-
     second = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": tokens[101], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens[102], "action": "catalog", "catalog_id": 102}]})
     assert second.json() == {"created": 0, "updated": 0, "skipped": 2, "total": 2}
 
@@ -910,6 +911,25 @@ def test_psn_import_confirm_persists_owner_scoped_idempotent_games(
     assert other_import.json()["created"] == 1
     assert db_session.query(Game).filter_by(owner_id=other.id, source="psn").count() == 1
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2
+
+
+def test_psn_catalog_confirmation_promotes_matching_owner_raw_row(api_client, db_session, user_factory, auth_as, app_main, monkeypatch):
+    owner = auth_as(user_factory(email="psn-promote-owner@example.com"))
+    raw = Game(owner_id=owner.id, title="Hades", source="psn", external_id=psn_manual_external_id("Hades"), link_state="raw", notes="keep", playtime_forever=12)
+    other = Game(owner_id=user_factory(email="psn-promote-other@example.com").id, title="Hades", source="psn", external_id=psn_manual_external_id("Hades"), link_state="raw")
+    db_session.add_all([raw, other]); db_session.commit()
+    created_at = raw.created_at
+    monkeypatch.setattr(app_main, "resolve_psn_catalog_titles", AsyncMock(return_value={"Hades": CatalogResolution("matched", [{"id": 101, "name": "Hades"}])}))
+    monkeypatch.setattr(app_main, "fetch_igdb_game_detail", AsyncMock(return_value={"id": 101, "name": "Hades", "background_image": "https://cover"}))
+    preview = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")}).json()
+    response = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": preview["items"][0]["candidate_token"], "action": "catalog", "catalog_id": 101}]})
+
+    assert response.status_code == 200
+    games = db_session.query(Game).filter_by(owner_id=owner.id, source="psn").all()
+    assert len(games) == 1
+    assert (games[0].external_id, games[0].catalog_game_id, games[0].link_state, games[0].notes, games[0].playtime_forever, games[0].created_at) == ("psn:101", 101, "linked", "keep", 12, created_at)
+    assert db_session.query(Game).filter_by(owner_id=other.owner_id, source="psn").one().link_state == "raw"
+
 
 
 def test_psn_import_confirm_accepts_typed_catalog_and_manual_selections(

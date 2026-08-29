@@ -847,6 +847,7 @@ async def confirm_psn_import(
     current_user: User = Depends(get_current_user),
 ):
     unique_games: dict[str, tuple[str, int | None, str | None, str]] = {}
+    raw_sources: dict[str, str] = {}
     for selection in data.selections:
         source_title = _psn_candidate_from_token(selection.candidate_token, current_user.id)
         if selection.action == "catalog":
@@ -855,7 +856,9 @@ async def confirm_psn_import(
             except IGDBError as exc:
                 raise HTTPException(status_code=422, detail="Choose a valid catalog game") from exc
             title, cover = _psn_linked_game_payload(detail, selection.catalog_id or 0)
-            unique_games[f"psn:{selection.catalog_id}"] = (title, selection.catalog_id, cover, "linked")
+            external_id = f"psn:{selection.catalog_id}"
+            unique_games[external_id] = (title, selection.catalog_id, cover, "linked")
+            raw_sources[external_id] = source_title
             continue
         unique_games[psn_manual_external_id(source_title)] = (source_title, None, None, "raw")
 
@@ -870,6 +873,24 @@ async def confirm_psn_import(
     try:
         for external_id, (title, catalog_game_id, cover, link_state) in unique_games.items():
             imported = existing.get(external_id)
+            raw = existing.get(psn_manual_external_id(raw_sources[external_id])) if external_id in raw_sources else None
+            if imported is None and raw is not None:
+                raw.external_id = external_id
+                raw.catalog_game_id = catalog_game_id
+                raw.link_state = link_state
+                raw.title = title
+                raw.img_icon_url = cover
+                raw.synced_at = now
+                updated += 1
+                continue
+            if imported is not None and raw is not None and raw.id != imported.id:
+                imported.created_at = min(imported.created_at, raw.created_at)
+                imported.notes = imported.notes or raw.notes
+                imported.info = imported.info or raw.info
+                imported.playtime_forever = max(imported.playtime_forever or 0, raw.playtime_forever or 0) or None
+                db.delete(raw)
+                skipped += 1
+                continue
             if imported is None:
                 db.add(
                     Game(
