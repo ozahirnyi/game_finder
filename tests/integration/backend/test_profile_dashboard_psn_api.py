@@ -980,3 +980,23 @@ def test_psn_library_repair_links_raw_rows_and_hides_quarantine(
     overview = api_client.get("/library/overview").json()["games"]
     assert [(item["title"], item["catalog_game_id"], item["detail_game_id"]) for item in overview] == [("Hades", 101, "101")]
     assert db_session.get(Game, junk.id).link_state == "quarantined"
+
+
+def test_remove_all_psn_library_games_is_owner_scoped(api_client, db_session, user_factory, auth_as):
+    owner = auth_as(user_factory(email="remove-all-psn@example.com"))
+    other = user_factory(email="keep-other-psn@example.com")
+    db_session.add_all([
+        Game(owner_id=owner.id, title="PSN one", source="psn", external_id="psn:1"),
+        Game(owner_id=owner.id, title="PSN raw", source="psn", external_id="psn:manual:one"),
+        Game(owner_id=owner.id, title="Manual", source="manual"),
+        Game(owner_id=other.id, title="Other PSN", source="psn", external_id="psn:2"),
+    ])
+    db_session.commit()
+
+    response = api_client.delete("/psn/library")
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted": 2}
+    assert [(game.owner_id, game.source) for game in db_session.query(Game).order_by(Game.title).all()] == [
+        (owner.id, "manual"), (other.id, "psn"),
+    ]
