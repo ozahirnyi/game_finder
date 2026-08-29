@@ -296,6 +296,23 @@ def test_psn_import_preview_groups_reversible_candidates_and_batches_catalog_que
     batch.assert_awaited_once_with(["Hades", "Unknown"])
 
 
+def test_psn_import_preview_matches_provider_formatting_only(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="psn-provider-formatting@example.com"))
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={
+        "Hades — Deluxe Edition (PS5)": [{"id": 101, "name": "Hades", "platforms": ["PlayStation 5"]}],
+    }))
+
+    response = api_client.post(
+        "/psn/import/preview",
+        files={"file": ("export.csv", "Game Name\nHades — Deluxe Edition (PS5)\n".encode(), "text/csv")},
+    )
+
+    item = response.json()["items"][0]
+    assert (item["status"], item["igdb_id"], item["title"]) == ("matched", 101, "Hades")
+
+
 def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_review(
     api_client, db_session, user_factory, auth_as, app_main, monkeypatch
 ):

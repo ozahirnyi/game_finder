@@ -628,7 +628,7 @@ IGDB_GAME_TYPE_VALUES = {
 
 
 PSN_TITLE_SUFFIX_RE = re.compile(
-    r"(?:\s*[-–—:]?\s*(?:complete|deluxe|ultimate|game of the year)\s+edition|\s*[-–—:]?\s*(?:ps4\s*(?:&|and)\s*ps5|ps[45]))\s*$",
+    r"(?:\s*[-–—:]?\s*(?:complete|deluxe|ultimate|game of the year)\s+edition|\s*(?:\((?:ps4\s*(?:&|and)\s*ps5|ps[45])\)|\[(?:ps4\s*(?:&|and)\s*ps5|ps[45])\]|ps4\s*(?:&|and)\s*ps5|ps[45]))\s*$",
     re.IGNORECASE,
 )
 
