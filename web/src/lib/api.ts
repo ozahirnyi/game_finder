@@ -522,6 +522,10 @@ export function applyPsnLibraryRepair(decisions: { game_id: string; action: "lin
   return apiRequest<{ updated: number }>("/psn/library-repair/apply", { auth: true, method: "POST", body: { decisions } });
 }
 
+export function deletePsnLibrary() {
+  return apiRequest<{ deleted: number }>("/psn/library", { auth: true, method: "DELETE" });
+}
+
 export type CatalogPlatform =
   "pc" | "console" | "ps5" | "ps4" | "xbox_series" | "xbox_one" | "switch";
 export type CatalogFeature = "single_player" | "co_op" | "multiplayer";

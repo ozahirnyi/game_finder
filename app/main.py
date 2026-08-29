@@ -799,6 +799,18 @@ async def apply_psn_library_repair(data: PsnLibraryRepairApplyRequest, db: Sessi
     return {"updated": len(decisions)}
 
 
+@app.delete("/psn/library")
+def delete_psn_library(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Explicitly remove every PSN entry owned by the authenticated user only."""
+    try:
+        deleted = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn").delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"deleted": deleted}
+
+
 @app.post("/psn/import/preview", response_model=PsnImportPreview)
 async def preview_psn_import(
     file: UploadFile = File(...),
