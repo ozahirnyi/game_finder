@@ -122,6 +122,20 @@ def test_parse_psn_export_candidates_retains_transaction_detail_platform():
     ]
 
 
+def test_parse_psn_export_candidates_preserves_paired_transaction_evidence():
+    content = make_export([
+        ("Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"),
+        ("Example Game", "Example Game", "Game", "Product Purchase", "PS5"),
+        ("Example Game", "Example Game Demo", "Game", "Voucher Purchase", "PS5"),
+    ], sheet_name="Transaction Detail")
+
+    [candidate] = parse_psn_export_candidates(content, "export.xlsx")
+
+    assert [(row.product_name, row.transaction_type) for row in candidate.transactions] == [
+        ("Example Game", "Product Purchase"), ("Example Game Demo", "Voucher Purchase"),
+    ]
+
+
 def test_parse_psn_export_candidates_aggregates_all_transaction_evidence_for_one_title():
     content = make_export(
         [

@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock
 
-from app.psn_export import PsnExportCandidate
+from app.psn_export import PsnExportCandidate, PsnTransactionEvidence
 
 
 def test_classification_keeps_base_purchase_eligible_when_related_demo_exists():
@@ -24,6 +24,7 @@ def test_classification_marks_entitlement_only_game_for_review():
         "Example Game",
         product_names=("Example Game Demo",),
         transaction_types=("Product Purchase",),
+        transactions=(PsnTransactionEvidence("Example Game Demo", "PS5", "Product Purchase", "Game"),),
     )
 
     assert classify_psn_candidate(candidate).kind == "needs_review"
@@ -33,6 +34,23 @@ def test_classification_skips_known_self_title_app():
     from app.psn_resolution import classify_psn_candidate
 
     assert classify_psn_candidate(PsnExportCandidate("Spotify")).kind == "suggested_skip"
+
+
+def test_classification_uses_paired_transaction_rows_not_aggregate_order():
+    from app.psn_resolution import classify_psn_candidate
+
+    candidate = PsnExportCandidate(
+        "Example Game",
+        product_names=("Example Game Demo", "Example Game"),
+        transaction_types=("Product Purchase", "Voucher Purchase"),
+        transactions=(
+            PsnTransactionEvidence("Example Game", "PS5", "Product Purchase", "Game"),
+            PsnTransactionEvidence("Example Game Demo", "PS5", "Voucher Purchase", "Game"),
+            PsnTransactionEvidence("Example Game PlayStation Plus Pack", "PS5", "Product Purchase", "Game"),
+        ),
+    )
+
+    assert classify_psn_candidate(candidate).kind == "eligible"
 
 
 def test_resolver_falls_back_only_for_missing_batch_titles(monkeypatch):

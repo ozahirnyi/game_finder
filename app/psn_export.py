@@ -2,7 +2,7 @@ import csv
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import BytesIO, StringIO
 from itertools import chain
 from pathlib import Path
@@ -27,6 +27,14 @@ JSON_COLLECTION_KEYS = {"games", "library", "owned games", "owned_games", "items
 
 
 @dataclass(frozen=True)
+class PsnTransactionEvidence:
+    product_name: str | None = None
+    platform: str | None = None
+    transaction_type: str | None = None
+    content_type: str | None = None
+
+
+@dataclass(frozen=True)
 class PsnExportCandidate:
     title: str
     product_name: str | None = None
@@ -37,6 +45,7 @@ class PsnExportCandidate:
     platforms: tuple[str, ...] = ()
     transaction_types: tuple[str, ...] = ()
     content_types: tuple[str, ...] = ()
+    transactions: tuple[PsnTransactionEvidence, ...] = field(default_factory=tuple, compare=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "product_names", self.product_names or ((self.product_name,) if self.product_name else ()))
@@ -139,7 +148,7 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
         key = title.casefold()
         item = candidates.setdefault(
             key,
-            {"title": title, "product_names": [], "platforms": [], "transaction_types": [], "content_types": []},
+            {"title": title, "product_names": [], "platforms": [], "transaction_types": [], "content_types": [], "transactions": []},
         )
         for field, value in (
             ("product_names", product_name), ("platforms", platform),
@@ -147,6 +156,7 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
         ):
             if value and value not in item[field]:
                 item[field].append(value)
+        item["transactions"].append(PsnTransactionEvidence(product_name, platform, transaction_type, content_type))
 
     def finalized_candidates() -> list[PsnExportCandidate]:
         return [
@@ -158,6 +168,7 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
                 content_type=(item["content_types"] or [None])[0],
                 product_names=tuple(item["product_names"]), platforms=tuple(item["platforms"]),
                 transaction_types=tuple(item["transaction_types"]), content_types=tuple(item["content_types"]),
+                transactions=tuple(item["transactions"]),
             )
             for item in candidates.values()
         ]

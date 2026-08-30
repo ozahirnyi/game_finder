@@ -32,13 +32,15 @@ def classify_psn_candidate(candidate: PsnExportCandidate) -> PsnClassification:
         return PsnClassification("suggested_skip", "Known PlayStation app, service, or system theme.")
     if title in KNOWN_NON_GAME_PSN_STORE_CATEGORY_IDENTITIES:
         return PsnClassification("suggested_skip", "Known PlayStation non-game storefront category.")
-    products = [normalize_psn_product_identity(value) for value in candidate.product_names]
+    transactions = candidate.transactions
     is_base_purchase = any(
-        transaction.casefold() == "product purchase" and product == title
-        for transaction, product in zip(candidate.transaction_types, products)
+        (row.transaction_type or "").casefold() == "product purchase"
+        and normalize_psn_product_identity(row.product_name) == title
+        for row in transactions
     )
-    entitlement_only = bool(products) and all(
-        _is_explicit_product_identity(product, title) for product in products
+    entitlement_only = bool(transactions) and all(
+        _is_explicit_product_identity(normalize_psn_product_identity(row.product_name), title)
+        for row in transactions
     )
     if entitlement_only and not is_base_purchase:
         return PsnClassification("needs_review", "Only related entitlement evidence was found.")
