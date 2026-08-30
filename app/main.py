@@ -37,6 +37,8 @@ from app.integrations.igdb import (
 from app.prices import fetch_game_price_history
 from app.psn_export import PsnExportCandidate, normalize_title, parse_psn_export_candidates, psn_manual_external_id
 from app.psn_classification import psn_purchase_exclusion_reason, psn_repair_quarantine_reason
+from app.psn_resolution import classify_psn_candidate
+from app.psn_resolution import resolve_psn_catalog_titles
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
@@ -677,23 +679,30 @@ def _psn_suggestions(results: list[dict]) -> list[dict]:
 
 async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) -> list[PsnImportPreviewItem]:
     candidates = parse_psn_export_candidates(content, filename)
-    skipped = {candidate.title: psn_purchase_exclusion_reason(candidate) for candidate in candidates}
-    searchable = [candidate.title for candidate in candidates if not skipped[candidate.title]]
-    catalog: dict[str, list[dict]] = {}
-    unavailable: set[str] = set()
-    for index in range(0, len(searchable), 10):
-        batch = searchable[index:index + 10]
-        try:
-            catalog.update(await fetch_igdb_games_batch(batch))
-        except IGDBError:
-            unavailable.update(batch)
+    classifications = {candidate.title: classify_psn_candidate(candidate) for candidate in candidates}
+    skipped = {
+        candidate.title: classifications[candidate.title].reason
+        for candidate in candidates
+        if classifications[candidate.title].kind == "suggested_skip"
+    }
+    searchable = [candidate.title for candidate in candidates if candidate.title not in skipped]
+    resolutions = await resolve_psn_catalog_titles(
+        searchable, batch_fetcher=fetch_igdb_games_batch, single_fetcher=fetch_igdb_games,
+    )
     items: list[PsnImportPreviewItem] = []
     for candidate in candidates:
         token = _psn_candidate_token(user_id, candidate.title)
-        if skipped[candidate.title]:
+        if candidate.title in skipped:
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="suggested_skip", reason=skipped[candidate.title], candidate_token=token))
             continue
-        results = catalog.get(candidate.title, [])
+        resolution = resolutions.get(candidate.title)
+        results = resolution.results if resolution else []
+        if resolution is None or resolution.kind == "unavailable":
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="catalog_unavailable", reason="Catalog temporarily unavailable.", candidate_token=token))
+            continue
+        if classifications[candidate.title].kind == "needs_review":
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", reason=classifications[candidate.title].reason, suggestions=_psn_suggestions(results), candidate_token=token))
+            continue
         matches = [game for game in results if game.get("id") and _psn_catalog_match_key(game.get("name") or "") == _psn_catalog_match_key(candidate.title)]
         platform_names = {PSN_CATALOG_PLATFORM_NAMES.get(platform.casefold()) for platform in candidate.platforms}
         platform_matches = [game for game in matches if any(name and _psn_has_platform(game, name) for name in platform_names)]
@@ -702,7 +711,7 @@ async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) 
             game = selected[0]
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="matched", igdb_id=int(game["id"]), title=game["name"], candidate_token=token))
         else:
-            reason = "Catalog temporarily unavailable." if candidate.title in unavailable else ("Multiple exact catalog matches found." if matches else "No exact catalog match found.")
+            reason = "Multiple exact catalog matches found." if matches else "No exact catalog match found."
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", reason=reason, suggestions=_psn_suggestions(results), candidate_token=token))
     return items
 
@@ -718,12 +727,9 @@ def _psn_linked_game_payload(detail: dict, catalog_id: int) -> tuple[str, str | 
 async def _psn_repair_items(games: list[Game]) -> list[PsnLibraryRepairItem]:  # pragma: no cover - mocked API boundary
     raw = [game for game in games if game.link_state != "quarantined" and game.link_state != "linked"]
     searchable = [game.title for game in raw if not psn_repair_quarantine_reason(game.title)]
-    catalog: dict[str, list[dict]] = {}
-    for index in range(0, len(searchable), 10):
-        try:
-            catalog.update(await fetch_igdb_games_batch(searchable[index:index + 10]))
-        except IGDBError:
-            pass
+    resolutions = await resolve_psn_catalog_titles(
+        searchable, batch_fetcher=fetch_igdb_games_batch, single_fetcher=fetch_igdb_games,
+    )
     items: list[PsnLibraryRepairItem] = []
     for game in games:
         if game.link_state == "quarantined":
@@ -736,12 +742,19 @@ async def _psn_repair_items(games: list[Game]) -> list[PsnLibraryRepairItem]:  #
         if reason:
             items.append(PsnLibraryRepairItem(game_id=game.id, title=game.title, link_state="raw", suggestion="quarantine", reason=reason))
             continue
-        results = catalog.get(game.title, [])
+        resolution = resolutions.get(game.title)
+        if resolution is None or resolution.kind == "unavailable":
+            items.append(PsnLibraryRepairItem(
+                game_id=game.id, title=game.title, link_state="raw", suggestion="unavailable",
+                reason="Catalog temporarily unavailable.",
+            ))
+            continue
+        results = resolution.results
         matches = [item for item in results if item.get("id") and _psn_catalog_match_key(str(item.get("name") or "")) == _psn_catalog_match_key(game.title)]
         items.append(PsnLibraryRepairItem(
             game_id=game.id, title=game.title, link_state="raw",
             suggestion="auto_link" if len(matches) == 1 else "review",
-            suggestions=_psn_suggestions(results),
+            suggestions=_psn_suggestions(matches if len(matches) == 1 else results),
             reason=None if len(matches) == 1 else ("Multiple exact catalog matches found." if matches else "No exact catalog match found."),
         ))
     return items
@@ -838,6 +851,7 @@ async def confirm_psn_import(
     current_user: User = Depends(get_current_user),
 ):
     unique_games: dict[str, tuple[str, int | None, str | None, str]] = {}
+    raw_sources: dict[str, str] = {}
     for selection in data.selections:
         source_title = _psn_candidate_from_token(selection.candidate_token, current_user.id)
         if selection.action == "catalog":
@@ -846,7 +860,9 @@ async def confirm_psn_import(
             except IGDBError as exc:
                 raise HTTPException(status_code=422, detail="Choose a valid catalog game") from exc
             title, cover = _psn_linked_game_payload(detail, selection.catalog_id or 0)
-            unique_games[f"psn:{selection.catalog_id}"] = (title, selection.catalog_id, cover, "linked")
+            external_id = f"psn:{selection.catalog_id}"
+            unique_games[external_id] = (title, selection.catalog_id, cover, "linked")
+            raw_sources[external_id] = source_title
             continue
         unique_games[psn_manual_external_id(source_title)] = (source_title, None, None, "raw")
 
@@ -861,6 +877,24 @@ async def confirm_psn_import(
     try:
         for external_id, (title, catalog_game_id, cover, link_state) in unique_games.items():
             imported = existing.get(external_id)
+            raw = existing.get(psn_manual_external_id(raw_sources[external_id])) if external_id in raw_sources else None
+            if imported is None and raw is not None:
+                raw.external_id = external_id
+                raw.catalog_game_id = catalog_game_id
+                raw.link_state = link_state
+                raw.title = title
+                raw.img_icon_url = cover
+                raw.synced_at = now
+                updated += 1
+                continue
+            merged_raw = False
+            if imported is not None and raw is not None and raw.id != imported.id:
+                imported.created_at = min(imported.created_at, raw.created_at)
+                imported.notes = imported.notes or raw.notes
+                imported.info = imported.info or raw.info
+                imported.playtime_forever = max(imported.playtime_forever or 0, raw.playtime_forever or 0) or None
+                db.delete(raw)
+                merged_raw = True
             if imported is None:
                 db.add(
                     Game(
@@ -876,15 +910,23 @@ async def confirm_psn_import(
                     )
                 )
                 created += 1
-            elif imported.title != title and not external_id.startswith("psn:manual:"):
-                imported.title = title
-                imported.catalog_game_id = catalog_game_id
-                imported.link_state = link_state
-                imported.img_icon_url = cover
-                imported.synced_at = now
-                updated += 1
             else:
-                skipped += 1
+                metadata_changed = (
+                    imported.title != title
+                    or imported.catalog_game_id != catalog_game_id
+                    or imported.link_state != link_state
+                    or imported.img_icon_url != cover
+                )
+                if metadata_changed:
+                    imported.title = title
+                    imported.catalog_game_id = catalog_game_id
+                    imported.link_state = link_state
+                    imported.img_icon_url = cover
+                    imported.synced_at = now
+                if merged_raw or metadata_changed:
+                    updated += 1
+                else:
+                    skipped += 1
         db.commit()
     except Exception:
         db.rollback()

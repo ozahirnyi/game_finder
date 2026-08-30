@@ -61,6 +61,34 @@ async def test_igdb_search_normalizes_results(monkeypatch):
     }
 
 
+@pytest.mark.anyio
+async def test_igdb_multiquery_keeps_only_valid_returned_aliases(monkeypatch):
+    captured = []
+    expected_titles = ["One", "Empty", "Missing", "Malformed", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
+
+    async def fake_query(endpoint, payload):
+        captured.append((endpoint, payload))
+        return [
+            {"name": "psn_0", "result": [{"id": 1, "name": "One"}]},
+            {"name": "psn_1", "result": []},
+            {"name": "psn_3", "result": {}},
+            {"name": "unexpected", "result": []},
+        ]
+
+    monkeypatch.setattr(igdb, "_query", fake_query)
+
+    result = await igdb.fetch_igdb_games_batch([*expected_titles, "Ten", "Eleven", "One"])
+
+    assert captured[0][0] == "multiquery"
+    assert all(f'query games "psn_{index}"' in captured[0][1] and f'search "{title}"' in captured[0][1] for index, title in enumerate(expected_titles))
+    assert "psn_10" not in captured[0][1]
+    assert result["One"][0]["name"] == "One"
+    assert result["Empty"] == []
+    assert "Missing" not in result
+    assert "Malformed" not in result
+    assert "unexpected" not in result
+
+
 @pytest.mark.parametrize("error,status", [("timeout", 504), ("request", 502), (None, 502)])
 @pytest.mark.anyio
 async def test_igdb_errors_map_to_igdb_error(monkeypatch, error, status):

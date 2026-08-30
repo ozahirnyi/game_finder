@@ -24,6 +24,9 @@ KNOWN_NON_GAME_PSN_PRODUCT_IDENTITIES = frozenset(
         "Disney+",
         "HBO Max",
         "Apple TV",
+        "EA Play",
+        "PlayStation Plus",
+        "Base Theme",
         "PlayStation Video",
         "PlayStation Music",
         "PlayStation Now",
@@ -127,12 +130,22 @@ REPAIR_NON_GAME_CATEGORY_PHRASES = frozenset({
     "theme", "dlc", "add on", "wallet", "currency",
 })
 
+SELF_TITLE_NON_GAME_CATEGORY_SUFFIXES = frozenset({
+    "public test server", "test client", "beta client", "playtest", "theme",
+})
+
+
+def is_explicit_non_game_self_title(title: str) -> bool:
+    """Recognize narrow standalone PSN service/category identities, never substrings."""
+    identity = normalize_psn_product_identity(title)
+    return any(identity == suffix or identity.endswith(f" {suffix}") for suffix in SELF_TITLE_NON_GAME_CATEGORY_SUFFIXES)
+
 
 def psn_repair_quarantine_reason(title: str) -> str | None:
     """Return evidence-based generic non-game classification for stored PSN titles."""
     identity = normalize_psn_product_identity(title)
     if identity in KNOWN_NON_GAME_PSN_PRODUCT_IDENTITIES or identity in KNOWN_NON_GAME_PSN_STORE_CATEGORY_IDENTITIES:
         return "Known PlayStation app, service, or theme."
-    if identity in REPAIR_NON_GAME_CATEGORY_PHRASES:
+    if identity in REPAIR_NON_GAME_CATEGORY_PHRASES or is_explicit_non_game_self_title(identity):
         return "Stored title is an explicit non-game category."
     return None
