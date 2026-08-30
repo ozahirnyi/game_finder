@@ -853,7 +853,7 @@ def test_psn_import_mixed_preview_and_confirmation_flow(
         },
     )
 
-    assert [item["status"] for item in preview.json()["items"]] == ["matched", "needs_mapping", "needs_mapping"]
+    assert [item["status"] for item in preview.json()["items"]] == ["matched", "needs_mapping", "suggested_skip"]
     items = preview.json()["items"]
     confirm = api_client.post("/psn/import/confirm", json={"selections": [
         {"candidate_token": items[0]["candidate_token"], "action": "catalog", "catalog_id": 101},

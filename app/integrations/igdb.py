@@ -192,11 +192,13 @@ async def fetch_igdb_games_batch(titles: list[str]) -> dict[str, list[dict[str, 
         safe_title = title.replace('"', "").replace("\\", "")
         queries.append(f'query games "{alias}" {{ {_FIELDS} search "{safe_title}"; limit 20; }};')
     responses = await _query("multiquery", "".join(queries))
-    results = {title: [] for title in unique_titles}
+    results: dict[str, list[dict[str, Any]]] = {}
     for response in responses:
+        if not isinstance(response, dict):
+            continue
         title = aliases.get(str(response.get("name", "")))
-        if title:
-            values = response.get("result", [])
+        values = response.get("result")
+        if title and isinstance(values, list):
             results[title] = [normalize_igdb_game(game) for game in values if isinstance(game, dict)]
     return results
 

@@ -8,6 +8,7 @@ from app.psn_classification import (
     KNOWN_NON_GAME_PSN_PRODUCT_IDENTITIES,
     KNOWN_NON_GAME_PSN_STORE_CATEGORY_IDENTITIES,
     _is_explicit_product_identity,
+    is_explicit_non_game_self_title,
     normalize_psn_product_identity,
 )
 from app.psn_export import PsnExportCandidate
@@ -32,6 +33,8 @@ def classify_psn_candidate(candidate: PsnExportCandidate) -> PsnClassification:
         return PsnClassification("suggested_skip", "Known PlayStation app, service, or system theme.")
     if title in KNOWN_NON_GAME_PSN_STORE_CATEGORY_IDENTITIES:
         return PsnClassification("suggested_skip", "Known PlayStation non-game storefront category.")
+    if is_explicit_non_game_self_title(title):
+        return PsnClassification("suggested_skip", "PSN title is an explicit non-game category.")
     transactions = candidate.transactions
     is_base_purchase = any(
         (row.transaction_type or "").casefold() == "product purchase"
