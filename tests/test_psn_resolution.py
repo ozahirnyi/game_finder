@@ -36,6 +36,35 @@ def test_classification_skips_known_self_title_app():
     assert classify_psn_candidate(PsnExportCandidate("Spotify")).kind == "suggested_skip"
 
 
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Example Game Demo",
+        "Example Game Trial",
+        "Example Game Season Pass",
+        "Example Game Public Test Server",
+        "Example Game Beta Client",
+        "Example Game Soundtrack",
+        "Example Game Virtual Currency",
+        "Example Game PS4 Theme",
+    ],
+)
+def test_classifier_skips_only_explicit_self_title_non_games(title):
+    from app.psn_resolution import classify_psn_candidate
+
+    assert classify_psn_candidate(PsnExportCandidate(title)).kind == "suggested_skip"
+
+
+@pytest.mark.parametrize(
+    "title",
+    ["Adventure Theme Park", "Pack Your Bags", "Test Drive Adventure", "Avatar Frontier"],
+)
+def test_classifier_does_not_use_broad_non_game_substrings(title):
+    from app.psn_resolution import classify_psn_candidate
+
+    assert classify_psn_candidate(PsnExportCandidate(title)).kind == "eligible"
+
+
 @pytest.mark.parametrize("title", ["EA Play", "PlayStation Plus", "Base Theme", "Example Public Test Server", "Example Test Client", "Example Beta Client", "Example Playtest", "Example Theme"])
 def test_classification_and_repair_quarantine_affirmative_generic_non_games(title):
     from app.psn_classification import psn_repair_quarantine_reason

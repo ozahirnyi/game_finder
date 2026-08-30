@@ -131,7 +131,21 @@ REPAIR_NON_GAME_CATEGORY_PHRASES = frozenset({
 })
 
 SELF_TITLE_NON_GAME_CATEGORY_SUFFIXES = frozenset({
-    "public test server", "test client", "beta client", "playtest", "theme",
+    "demo",
+    "trial",
+    "dlc",
+    "downloadable content",
+    "add on",
+    "season pass",
+    "public test server",
+    "test client",
+    "beta client",
+    "playtest",
+    "soundtrack",
+    "subscription",
+    "virtual currency",
+    "wallet top up",
+    "theme",
 })
 
 
