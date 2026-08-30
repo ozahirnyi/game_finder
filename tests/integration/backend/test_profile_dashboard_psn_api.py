@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from io import BytesIO
 from unittest.mock import AsyncMock
 
@@ -334,6 +335,23 @@ def test_psn_preview_keeps_partial_catalog_success_and_marks_unavailable(api_cli
     ]
 
 
+def test_psn_preview_reports_unavailable_before_entitlement_review(api_client, user_factory, auth_as, app_main, monkeypatch):
+    auth_as(user_factory(email="psn-entitlement-unavailable@example.com"))
+    monkeypatch.setattr(app_main, "resolve_psn_catalog_titles", AsyncMock(return_value={
+        "Example Game": CatalogResolution("unavailable", []),
+    }))
+
+    response = api_client.post(
+        "/psn/import/preview",
+        files={"file": ("export.xlsx", _xlsx_bytes("Transaction Detail", [
+            ["Game Name", "Product Name", "Content Type", "Transaction Type", "Platform"],
+            ["Example Game", "Example Game Demo", "Game", "Product Purchase", "PS5"],
+        ]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+
+    assert response.json()["items"][0]["status"] == "catalog_unavailable"
+
+
 def test_psn_import_preview_matches_provider_formatting_only(
     api_client, user_factory, auth_as, app_main, monkeypatch
 ):
@@ -356,7 +374,10 @@ def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_r
 ):
     auth_as(user_factory(email="psn-transaction-preview@example.com"))
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={"GOD OF WAR": [{"id": 101, "name": "God of War"}]}))
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={
+        "GOD OF WAR": [{"id": 101, "name": "God of War"}],
+        "FORTNITE": [],
+    }))
     response = api_client.post(
         "/psn/import/preview",
         files={
@@ -929,6 +950,42 @@ def test_psn_catalog_confirmation_promotes_matching_owner_raw_row(api_client, db
     assert len(games) == 1
     assert (games[0].external_id, games[0].catalog_game_id, games[0].link_state, games[0].notes, games[0].playtime_forever, games[0].created_at) == ("psn:101", 101, "linked", "keep", 12, created_at)
     assert db_session.query(Game).filter_by(owner_id=other.owner_id, source="psn").one().link_state == "raw"
+
+
+def test_psn_catalog_confirmation_enriches_linked_row_and_merges_raw_duplicate(api_client, db_session, user_factory, auth_as, app_main, monkeypatch):
+    owner = auth_as(user_factory(email="psn-merge-owner@example.com"))
+    raw = Game(
+        owner_id=owner.id, title="Hades", source="psn", external_id=psn_manual_external_id("Hades"),
+        link_state="raw", notes="keep", playtime_forever=12,
+        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+    )
+    linked = Game(
+        owner_id=owner.id, title="Hades", source="psn", external_id="psn:101",
+        catalog_game_id=101, link_state="linked", img_icon_url=None,
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+    db_session.add_all([raw, linked])
+    db_session.commit()
+    monkeypatch.setattr(app_main, "resolve_psn_catalog_titles", AsyncMock(return_value={
+        "Hades": CatalogResolution("matched", [{"id": 101, "name": "Hades"}]),
+    }))
+    monkeypatch.setattr(app_main, "fetch_igdb_game_detail", AsyncMock(return_value={
+        "id": 101, "name": "Hades", "background_image": "https://cover",
+    }))
+    preview = api_client.post(
+        "/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")},
+    ).json()
+
+    response = api_client.post("/psn/import/confirm", json={"selections": [{
+        "candidate_token": preview["items"][0]["candidate_token"], "action": "catalog", "catalog_id": 101,
+    }]})
+
+    assert response.json() == {"created": 0, "updated": 1, "skipped": 0, "total": 1}
+    games = db_session.query(Game).filter_by(owner_id=owner.id, source="psn").all()
+    assert len(games) == 1
+    assert (games[0].img_icon_url, games[0].notes, games[0].playtime_forever, games[0].created_at) == (
+        "https://cover", "keep", 12, datetime(2024, 1, 1),
+    )
 
 
 

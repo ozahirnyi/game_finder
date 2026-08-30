@@ -697,11 +697,11 @@ async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) 
             continue
         resolution = resolutions.get(candidate.title)
         results = resolution.results if resolution else []
+        if resolution is None or resolution.kind == "unavailable":
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="catalog_unavailable", reason="Catalog temporarily unavailable.", candidate_token=token))
+            continue
         if classifications[candidate.title].kind == "needs_review":
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", reason=classifications[candidate.title].reason, suggestions=_psn_suggestions(results), candidate_token=token))
-            continue
-        if resolution and resolution.kind == "unavailable":
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="catalog_unavailable", reason="Catalog temporarily unavailable.", candidate_token=token))
             continue
         matches = [game for game in results if game.get("id") and _psn_catalog_match_key(game.get("name") or "") == _psn_catalog_match_key(candidate.title)]
         platform_names = {PSN_CATALOG_PLATFORM_NAMES.get(platform.casefold()) for platform in candidate.platforms}
@@ -887,14 +887,14 @@ async def confirm_psn_import(
                 raw.synced_at = now
                 updated += 1
                 continue
+            merged_raw = False
             if imported is not None and raw is not None and raw.id != imported.id:
                 imported.created_at = min(imported.created_at, raw.created_at)
                 imported.notes = imported.notes or raw.notes
                 imported.info = imported.info or raw.info
                 imported.playtime_forever = max(imported.playtime_forever or 0, raw.playtime_forever or 0) or None
                 db.delete(raw)
-                skipped += 1
-                continue
+                merged_raw = True
             if imported is None:
                 db.add(
                     Game(
@@ -910,15 +910,23 @@ async def confirm_psn_import(
                     )
                 )
                 created += 1
-            elif imported.title != title and not external_id.startswith("psn:manual:"):
-                imported.title = title
-                imported.catalog_game_id = catalog_game_id
-                imported.link_state = link_state
-                imported.img_icon_url = cover
-                imported.synced_at = now
-                updated += 1
             else:
-                skipped += 1
+                metadata_changed = (
+                    imported.title != title
+                    or imported.catalog_game_id != catalog_game_id
+                    or imported.link_state != link_state
+                    or imported.img_icon_url != cover
+                )
+                if metadata_changed:
+                    imported.title = title
+                    imported.catalog_game_id = catalog_game_id
+                    imported.link_state = link_state
+                    imported.img_icon_url = cover
+                    imported.synced_at = now
+                if merged_raw or metadata_changed:
+                    updated += 1
+                else:
+                    skipped += 1
         db.commit()
     except Exception:
         db.rollback()
