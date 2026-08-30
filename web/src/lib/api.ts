@@ -336,7 +336,7 @@ export type PsnImportPreviewItem = {
 };
 export type PsnImportSelection = { candidate_token: string; action: "catalog"; catalog_id: number } | { candidate_token: string; action: "raw" };
 export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
-export type PsnLibraryRepairItem = { game_id: string; title: string; link_state: "linked" | "raw" | "quarantined"; catalog_game_id?: number | null; suggestion: "linked" | "auto_link" | "review" | "quarantine"; suggestions: { id: number; title: string }[]; reason?: string | null };
+export type PsnLibraryRepairItem = { game_id: string; title: string; link_state: "linked" | "raw" | "quarantined"; catalog_game_id?: number | null; suggestion: "linked" | "auto_link" | "review" | "quarantine" | "unavailable"; suggestions: { id: number; title: string }[]; reason?: string | null };
 export type PsnLibraryRepairPreview = { items: PsnLibraryRepairItem[]; raw_count: number; quarantined_count: number };
 export type Notification = {
   id: string;

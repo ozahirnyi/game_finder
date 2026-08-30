@@ -21,4 +21,15 @@ describe("PsnLibraryRepairPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Delete all PlayStation games" }));
     await waitFor(() => expect(screen.getByText("Deleted 2 PlayStation games.")).toBeInTheDocument());
   });
+
+  it("surfaces catalog unavailability and retries the lookup without repair actions", async () => {
+    previewPsnLibraryRepair
+      .mockResolvedValueOnce({ items: [{ game_id: "repair-unavailable", title: "Celeste", link_state: "raw", suggestion: "unavailable", suggestions: [], reason: "Catalog temporarily unavailable." }], raw_count: 1, quarantined_count: 0 })
+      .mockResolvedValueOnce({ items: [], raw_count: 0, quarantined_count: 0 });
+    renderPage();
+    expect(await screen.findByText("Catalog temporarily unavailable.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Quarantine" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry catalog lookup" }));
+    await waitFor(() => expect(previewPsnLibraryRepair).toHaveBeenCalledTimes(2));
+  });
 });

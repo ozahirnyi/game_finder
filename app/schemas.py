@@ -426,7 +426,7 @@ class PsnLibraryRepairItem(BaseModel):
     title: str
     link_state: Literal["linked", "raw", "quarantined"]
     catalog_game_id: int | None = None
-    suggestion: Literal["linked", "auto_link", "review", "quarantine"]
+    suggestion: Literal["linked", "auto_link", "review", "quarantine", "unavailable"]
     suggestions: list[dict] = Field(default_factory=list)
     reason: str | None = None
 

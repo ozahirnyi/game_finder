@@ -727,12 +727,9 @@ def _psn_linked_game_payload(detail: dict, catalog_id: int) -> tuple[str, str | 
 async def _psn_repair_items(games: list[Game]) -> list[PsnLibraryRepairItem]:  # pragma: no cover - mocked API boundary
     raw = [game for game in games if game.link_state != "quarantined" and game.link_state != "linked"]
     searchable = [game.title for game in raw if not psn_repair_quarantine_reason(game.title)]
-    catalog: dict[str, list[dict]] = {}
-    for index in range(0, len(searchable), 10):
-        try:
-            catalog.update(await fetch_igdb_games_batch(searchable[index:index + 10]))
-        except IGDBError:
-            pass
+    resolutions = await resolve_psn_catalog_titles(
+        searchable, batch_fetcher=fetch_igdb_games_batch, single_fetcher=fetch_igdb_games,
+    )
     items: list[PsnLibraryRepairItem] = []
     for game in games:
         if game.link_state == "quarantined":
@@ -745,12 +742,19 @@ async def _psn_repair_items(games: list[Game]) -> list[PsnLibraryRepairItem]:  #
         if reason:
             items.append(PsnLibraryRepairItem(game_id=game.id, title=game.title, link_state="raw", suggestion="quarantine", reason=reason))
             continue
-        results = catalog.get(game.title, [])
+        resolution = resolutions.get(game.title)
+        if resolution is None or resolution.kind == "unavailable":
+            items.append(PsnLibraryRepairItem(
+                game_id=game.id, title=game.title, link_state="raw", suggestion="unavailable",
+                reason="Catalog temporarily unavailable.",
+            ))
+            continue
+        results = resolution.results
         matches = [item for item in results if item.get("id") and _psn_catalog_match_key(str(item.get("name") or "")) == _psn_catalog_match_key(game.title)]
         items.append(PsnLibraryRepairItem(
             game_id=game.id, title=game.title, link_state="raw",
             suggestion="auto_link" if len(matches) == 1 else "review",
-            suggestions=_psn_suggestions(results),
+            suggestions=_psn_suggestions(matches if len(matches) == 1 else results),
             reason=None if len(matches) == 1 else ("Multiple exact catalog matches found." if matches else "No exact catalog match found."),
         ))
     return items

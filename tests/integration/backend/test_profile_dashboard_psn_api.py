@@ -1055,6 +1055,27 @@ def test_psn_library_repair_links_raw_rows_and_hides_quarantine(
     assert db_session.get(Game, junk.id).link_state == "quarantined"
 
 
+def test_psn_repair_preserves_partial_catalog_success_and_surfaces_unavailable(api_client, db_session, user_factory, auth_as, app_main, monkeypatch):
+    from app.integrations.igdb import IGDBError
+
+    owner = auth_as(user_factory(email="psn-repair-unavailable@example.com"))
+    db_session.add_all([
+        Game(owner_id=owner.id, title="Hades", source="psn", external_id="psn:manual:hades", link_state="raw"),
+        Game(owner_id=owner.id, title="Celeste", source="psn", external_id="psn:manual:celeste", link_state="raw"),
+    ]); db_session.commit()
+    batch = AsyncMock(return_value={"Hades": [{"id": 101, "name": "Hades"}]})
+    single = AsyncMock(side_effect=IGDBError("catalog unavailable"))
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", batch)
+    monkeypatch.setattr(app_main, "fetch_igdb_games", single)
+
+    items = {item["title"]: item for item in api_client.get("/psn/library-repair/preview").json()["items"]}
+
+    assert items["Hades"]["suggestion"] == "auto_link"
+    assert (items["Celeste"]["suggestion"], items["Celeste"]["reason"]) == ("unavailable", "Catalog temporarily unavailable.")
+    batch.assert_awaited_once_with(["Hades", "Celeste"])
+    single.assert_awaited_once_with("Celeste")
+
+
 def test_remove_all_psn_library_games_is_owner_scoped(api_client, db_session, user_factory, auth_as):
     owner = auth_as(user_factory(email="remove-all-psn@example.com"))
     other = user_factory(email="keep-other-psn@example.com")
