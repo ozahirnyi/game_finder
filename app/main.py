@@ -693,15 +693,15 @@ async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) 
     for candidate in candidates:
         token = _psn_candidate_token(user_id, candidate.title)
         if candidate.title in skipped:
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="suggested_skip", reason=skipped[candidate.title], candidate_token=token))
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="suggested_skip", recommended_action="skip", reason=skipped[candidate.title], candidate_token=token))
             continue
         resolution = resolutions.get(candidate.title)
         results = resolution.results if resolution else []
         if resolution is None or resolution.kind == "unavailable":
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="catalog_unavailable", reason="Catalog temporarily unavailable.", candidate_token=token))
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="catalog_unavailable", recommended_action="raw", reason="Catalog temporarily unavailable.", candidate_token=token))
             continue
         if classifications[candidate.title].kind == "needs_review":
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", reason=classifications[candidate.title].reason, suggestions=_psn_suggestions(results), candidate_token=token))
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", recommended_action="raw", reason=classifications[candidate.title].reason, suggestions=_psn_suggestions(results), candidate_token=token))
             continue
         matches = [game for game in results if game.get("id") and _psn_catalog_match_key(game.get("name") or "") == _psn_catalog_match_key(candidate.title)]
         platform_names = {PSN_CATALOG_PLATFORM_NAMES.get(platform.casefold()) for platform in candidate.platforms}
@@ -709,10 +709,10 @@ async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) 
         selected = platform_matches if len(platform_matches) == 1 else matches
         if len(selected) == 1:
             game = selected[0]
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="matched", igdb_id=int(game["id"]), title=game["name"], candidate_token=token))
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="matched", recommended_action="catalog", igdb_id=int(game["id"]), title=game["name"], candidate_token=token))
         else:
             reason = "Multiple exact catalog matches found." if matches else "No exact catalog match found."
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", reason=reason, suggestions=_psn_suggestions(results), candidate_token=token))
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", recommended_action="raw", reason=reason, suggestions=_psn_suggestions(results), candidate_token=token))
     return items
 
 
@@ -839,8 +839,8 @@ async def preview_psn_import(
         items=items,
         games=[item.source_title for item in items],
         total=len(items),
-        confirmed_total=sum(item.status == "matched" for item in items),
-        message="Exact catalog matches are selected automatically; all other titles can be mapped or imported as RAW.",
+        confirmed_total=sum(item.recommended_action != "skip" for item in items),
+        message="Plausible PlayStation games are selected automatically; catalog matches add artwork and details when available.",
     )
 
 

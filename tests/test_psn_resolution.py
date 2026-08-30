@@ -136,3 +136,26 @@ def test_resolver_recovers_from_malformed_batch_shape(monkeypatch):
     result = asyncio.run(psn_resolution.resolve_psn_catalog_titles(["Hades"]))
 
     assert result["Hades"].kind == "matched"
+
+
+def test_resolver_logs_aggregate_provider_failures_without_titles(caplog):
+    from app.integrations.igdb import IGDBError
+    from app import psn_resolution
+
+    batch = AsyncMock(side_effect=IGDBError("rate limited", 502))
+    single = AsyncMock(side_effect=IGDBError("still unavailable", 502))
+
+    with caplog.at_level("WARNING", logger="app.psn_resolution"):
+        result = asyncio.run(psn_resolution.resolve_psn_catalog_titles(
+            ["Private title one", "Private title two"],
+            batch_fetcher=batch,
+            single_fetcher=single,
+        ))
+
+    assert {item.kind for item in result.values()} == {"unavailable"}
+    text = caplog.text
+    assert "batch_size=2" in text
+    assert "error_type=IGDBError" in text
+    assert "status_code=502" in text
+    assert "fallback_failures=2" in text
+    assert "Private title" not in text

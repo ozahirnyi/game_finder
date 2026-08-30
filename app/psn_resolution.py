@@ -1,5 +1,6 @@
 """Shared PSN transaction classification and catalog resolution."""
 
+import logging
 from dataclasses import dataclass
 from typing import Awaitable, Callable
 
@@ -12,6 +13,9 @@ from app.psn_classification import (
     normalize_psn_product_identity,
 )
 from app.psn_export import PsnExportCandidate
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -61,20 +65,36 @@ async def resolve_psn_catalog_titles(titles: list[str], *, max_fallback_titles: 
     batch_fetcher = batch_fetcher or fetch_igdb_games_batch
     single_fetcher = single_fetcher or fetch_igdb_games
     catalog: dict[str, list[dict] | None] = {}
+    fallback_attempts = 0
+    fallback_failures = 0
     for index in range(0, len(unique), 10):
         batch_titles = unique[index:index + 10]
         try:
             batch = await batch_fetcher(batch_titles)
-        except (IGDBError, TypeError, ValueError):
+        except (IGDBError, TypeError, ValueError) as exc:
+            logger.warning(
+                "PSN catalog batch failed batch_size=%s error_type=%s status_code=%s",
+                len(batch_titles),
+                type(exc).__name__,
+                getattr(exc, "status_code", None),
+            )
             batch = {}
         if isinstance(batch, dict):
             catalog.update(batch)
     unresolved = [title for title in unique if not isinstance(catalog.get(title), list)]
     for title in unresolved[:max_fallback_titles]:
+        fallback_attempts += 1
         try:
             catalog[title] = (await single_fetcher(title))["results"]
-        except (IGDBError, KeyError, TypeError):
+        except (IGDBError, KeyError, TypeError, ValueError):
             catalog[title] = None
+            fallback_failures += 1
+    if fallback_failures:
+        logger.warning(
+            "PSN catalog single fallback failed fallback_attempts=%s fallback_failures=%s",
+            fallback_attempts,
+            fallback_failures,
+        )
     outcome: dict[str, CatalogResolution] = {}
     for title in unique:
         results = catalog.get(title)

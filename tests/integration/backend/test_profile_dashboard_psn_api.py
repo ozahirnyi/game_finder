@@ -294,6 +294,7 @@ def test_psn_import_preview_groups_reversible_candidates_and_batches_catalog_que
     assert response.status_code == 200
     items = response.json()["items"]
     assert [item["status"] for item in items] == ["matched", "needs_mapping", "suggested_skip"]
+    assert [item["recommended_action"] for item in items] == ["catalog", "raw", "skip"]
     assert items[0]["candidate_token"]
     assert items[1]["suggestions"] == [{"id": 102, "title": "Similar game"}]
     batch.assert_awaited_once_with(["Hades", "Unknown"])
@@ -333,6 +334,45 @@ def test_psn_preview_keeps_partial_catalog_success_and_marks_unavailable(api_cli
         ("Hades", "matched", None),
         ("Celeste", "catalog_unavailable", "Catalog temporarily unavailable."),
     ]
+
+
+def test_psn_import_catalog_outage_keeps_every_plausible_title_importable_as_raw(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    from app.psn_resolution import CatalogResolution
+
+    owner = auth_as(user_factory(email="psn-import-first-outage@example.com"))
+    titles = [f"Owned game {index}" for index in range(25)]
+    monkeypatch.setattr(
+        app_main,
+        "resolve_psn_catalog_titles",
+        AsyncMock(return_value={title: CatalogResolution("unavailable", []) for title in titles}),
+    )
+    content = ("Game Name\n" + "\n".join(titles) + "\n").encode()
+
+    response = api_client.post(
+        "/psn/import/preview",
+        files={"file": ("export.csv", content, "text/csv")},
+    )
+
+    items = response.json()["items"]
+    assert len(items) == 25
+    assert {item["status"] for item in items} == {"catalog_unavailable"}
+    assert {item["recommended_action"] for item in items} == {"raw"}
+    assert response.json()["confirmed_total"] == 25
+
+    confirmed = api_client.post(
+        "/psn/import/confirm",
+        json={"selections": [
+            {"candidate_token": item["candidate_token"], "action": "raw"}
+            for item in items
+        ]},
+    )
+
+    assert confirmed.status_code == 200
+    assert confirmed.json()["total"] == 25
+    stored = db_session.query(Game).filter_by(owner_id=owner.id, source="psn", link_state="raw").all()
+    assert len(stored) == 25
 
 
 def test_psn_preview_reports_unavailable_before_entitlement_review(api_client, user_factory, auth_as, app_main, monkeypatch):
