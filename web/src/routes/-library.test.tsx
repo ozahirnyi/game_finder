@@ -21,7 +21,9 @@ vi.mock("@/lib/api", () => api);
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock("@/components/GameCover", () => ({ GameCover: ({ title }: { title: string }) => <div data-testid="game-cover">{title}</div> }));
+vi.mock("@/components/GameCover", () => ({
+  GameCover: ({ title }: { title: string }) => <div data-testid="game-cover">{title}</div>,
+}));
 
 import { Route } from "./library";
 
@@ -70,8 +72,22 @@ describe("Library", () => {
   it("renders raw PSN entries without catalog links and keeps linked entries navigable", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [
-        { id: "raw", source: "psn", title: "Unknown Game", link_state: "raw", detail_game_id: null, cover_url: null },
-        { id: "linked", source: "psn", title: "Hades", link_state: "linked", detail_game_id: "101", cover_url: "https://cover" },
+        {
+          id: "raw",
+          source: "psn",
+          title: "Unknown Game",
+          link_state: "raw",
+          detail_game_id: null,
+          cover_url: null,
+        },
+        {
+          id: "linked",
+          source: "psn",
+          title: "Hades",
+          link_state: "linked",
+          detail_game_id: "101",
+          cover_url: "https://cover",
+        },
       ],
       raw_count: 1,
       quarantined_count: 0,
@@ -81,10 +97,15 @@ describe("Library", () => {
     renderLibrary();
 
     await screen.findByRole("heading", { name: "Unknown Game" });
-    expect(screen.getByText("PlayStation title — catalog details can be added later")).toBeInTheDocument();
+    expect(
+      screen.getByText("PlayStation title — catalog details can be added later"),
+    ).toBeInTheDocument();
     expect(screen.getAllByTestId("game-cover")[0]).toHaveTextContent("Unknown Game");
     expect(screen.getByRole("heading", { name: "Unknown Game" }).closest("a")).toBeNull();
-    expect(screen.getByRole("heading", { name: "Hades" }).closest("a")).toHaveAttribute("href", expect.stringContaining("/games/101"));
+    expect(screen.getByRole("heading", { name: "Hades" }).closest("a")).toHaveAttribute(
+      "href",
+      expect.stringContaining("/games/101"),
+    );
   });
 
   it("enriches pending PSN catalog rows sequentially", async () => {
@@ -103,7 +124,9 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(2));
-    expect(screen.queryByRole("button", { name: "Retry catalog matching" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Retry catalog matching" }),
+    ).not.toBeInTheDocument();
   });
 
   it("stops after a catalog error and lets the user retry", async () => {
@@ -129,18 +152,20 @@ describe("Library", () => {
 
   it("chooses a catalog game inline for a raw PSN entry", async () => {
     api.getLibraryOverview.mockResolvedValue({
-      games: [{
-        id: "raw",
-        source: "psn",
-        title: "STAR WARS Battlefront",
-        link_state: "raw",
-        catalog_lookup_state: "review",
-        detail_game_id: null,
-        catalog_game_id: null,
-        external_id: "psn:manual:battlefront",
-        cover_url: null,
-        playtime_forever: null,
-      }],
+      games: [
+        {
+          id: "raw",
+          source: "psn",
+          title: "STAR WARS Battlefront",
+          link_state: "raw",
+          catalog_lookup_state: "review",
+          detail_game_id: null,
+          catalog_game_id: null,
+          external_id: "psn:manual:battlefront",
+          cover_url: null,
+          playtime_forever: null,
+        },
+      ],
       steam_available: false,
       steam_error: null,
       raw_count: 1,
@@ -148,16 +173,18 @@ describe("Library", () => {
       pending_catalog_count: 0,
     });
     api.searchGames.mockResolvedValue({
-      results: [{
-        id: 777,
-        name: "Star Wars Battlefront",
-        released: "2015-11-17",
-        background_image: "https://covers/battlefront.jpg",
-        description_raw: null,
-        rating: 75,
-        genres: ["Shooter"],
-        platforms: ["PlayStation 4"],
-      }],
+      results: [
+        {
+          id: 777,
+          name: "Star Wars Battlefront",
+          released: "2015-11-17",
+          background_image: "https://covers/battlefront.jpg",
+          description_raw: null,
+          rating: 75,
+          genres: ["Shooter"],
+          platforms: ["PlayStation 4"],
+        },
+      ],
     });
     api.applyPsnLibraryRepair.mockResolvedValue({ updated: 1 });
 
@@ -170,9 +197,11 @@ describe("Library", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search catalog" }));
     fireEvent.click(await screen.findByRole("button", { name: "Use Star Wars Battlefront" }));
 
-    await waitFor(() => expect(api.applyPsnLibraryRepair).toHaveBeenCalledWith([
-      { game_id: "raw", action: "link", catalog_id: 777 },
-    ]));
+    await waitFor(() =>
+      expect(api.applyPsnLibraryRepair).toHaveBeenCalledWith([
+        { game_id: "raw", action: "link", catalog_id: 777 },
+      ]),
+    );
     expect(api.searchGames).toHaveBeenCalledWith({ query: "Star Wars Battlefront 2015" });
   });
 });

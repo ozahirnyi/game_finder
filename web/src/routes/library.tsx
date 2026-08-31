@@ -53,12 +53,13 @@ function LibraryPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["library-overview"] }),
   });
+  const enrichCatalog = enrichment.mutate;
   useEffect(() => {
     if ((libraryQuery.data?.pending_catalog_count ?? 0) > 0 && !enrichmentStarted.current) {
       enrichmentStarted.current = true;
-      enrichment.mutate();
+      enrichCatalog();
     }
-  }, [libraryQuery.data?.pending_catalog_count]);
+  }, [enrichCatalog, libraryQuery.data?.pending_catalog_count]);
   const owned = libraryQuery.data?.games ?? [];
   const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
   const visible = useMemo(() => {
@@ -88,7 +89,32 @@ function LibraryPage() {
           ))}
         </div>
       </div>
-      {(libraryQuery.data?.raw_count || libraryQuery.data?.quarantined_count) ? <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm"><p className="font-bold">Improve PlayStation details</p><p className="mt-1 text-muted-foreground">{enrichment.isPending ? "Matching imported PlayStation games to the catalog…" : enrichment.isError ? "Catalog matching stopped because the catalog is temporarily unavailable." : "Exact matches are linked automatically. You can choose uncertain matches below."}</p>{enrichment.isError ? <button type="button" onClick={() => enrichment.mutate()} className="mt-2 font-bold text-primary">Retry catalog matching</button> : null}{libraryQuery.data?.quarantined_count ? <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">Review hidden PSN entries</Link> : null}</div> : null}
+      {libraryQuery.data?.raw_count || libraryQuery.data?.quarantined_count ? (
+        <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
+          <p className="font-bold">Improve PlayStation details</p>
+          <p className="mt-1 text-muted-foreground">
+            {enrichment.isPending
+              ? "Matching imported PlayStation games to the catalog…"
+              : enrichment.isError
+                ? "Catalog matching stopped because the catalog is temporarily unavailable."
+                : "Exact matches are linked automatically. You can choose uncertain matches below."}
+          </p>
+          {enrichment.isError ? (
+            <button
+              type="button"
+              onClick={() => enrichCatalog()}
+              className="mt-2 font-bold text-primary"
+            >
+              Retry catalog matching
+            </button>
+          ) : null}
+          {libraryQuery.data?.quarantined_count ? (
+            <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">
+              Review hidden PSN entries
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4">
         {tabs.map((item) => (
@@ -195,7 +221,11 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
           </h4>
           <Chip tone="primary">Owned</Chip>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">{game.source === "psn" && game.link_state === "raw" ? "PlayStation title — catalog details can be added later" : "Synced from your connected library"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {game.source === "psn" && game.link_state === "raw"
+            ? "PlayStation title — catalog details can be added later"
+            : "Synced from your connected library"}
+        </p>
       </div>
       <div className="hidden text-right sm:block">
         <p className="label-mono text-muted-foreground">Source</p>
@@ -228,9 +258,7 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
   return (
     <div className="space-y-2">
       {card}
-      {game.source === "psn" && game.link_state === "raw" ? (
-        <PsnCatalogPicker game={game} />
-      ) : null}
+      {game.source === "psn" && game.link_state === "raw" ? <PsnCatalogPicker game={game} /> : null}
     </div>
   );
 }
@@ -243,11 +271,14 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
     mutationFn: (value: string) => searchGames({ query: value }),
   });
   const link = useMutation({
-    mutationFn: (catalogId: number) => applyPsnLibraryRepair([{
-      game_id: game.id,
-      action: "link",
-      catalog_id: catalogId,
-    }]),
+    mutationFn: (catalogId: number) =>
+      applyPsnLibraryRepair([
+        {
+          game_id: game.id,
+          action: "link",
+          catalog_id: catalogId,
+        },
+      ]),
     onSuccess: async () => {
       setOpen(false);
       await Promise.all([
@@ -256,9 +287,9 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
       ]);
     },
   });
-  const results = (search.data?.results ?? []).filter(
-    (result): result is typeof result & { id: number } => typeof result.id === "number",
-  ).slice(0, 5);
+  const results = (search.data?.results ?? [])
+    .filter((result): result is typeof result & { id: number } => typeof result.id === "number")
+    .slice(0, 5);
 
   return (
     <div className="rounded-xl border border-dashed border-border bg-surface/60 px-4 py-3">
@@ -294,10 +325,14 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
             {search.isPending ? "Searching…" : "Search catalog"}
           </button>
           {search.isError ? (
-            <p role="alert" className="text-sm text-red-600">Catalog search failed. Try again.</p>
+            <p role="alert" className="text-sm text-red-600">
+              Catalog search failed. Try again.
+            </p>
           ) : null}
           {search.isSuccess && results.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No results. Try a shorter or corrected title.</p>
+            <p className="text-sm text-muted-foreground">
+              No results. Try a shorter or corrected title.
+            </p>
           ) : null}
           {results.length > 0 ? (
             <div className="grid gap-2">
@@ -317,7 +352,9 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
             </div>
           ) : null}
           {link.isError ? (
-            <p role="alert" className="text-sm text-red-600">Could not link this game. Try again.</p>
+            <p role="alert" className="text-sm text-red-600">
+              Could not link this game. Try again.
+            </p>
           ) : null}
         </form>
       ) : null}
