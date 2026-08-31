@@ -126,4 +126,53 @@ describe("Library", () => {
     fireEvent.click(retry);
     await waitFor(() => expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(2));
   });
+
+  it("chooses a catalog game inline for a raw PSN entry", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{
+        id: "raw",
+        source: "psn",
+        title: "STAR WARS Battlefront",
+        link_state: "raw",
+        catalog_lookup_state: "review",
+        detail_game_id: null,
+        catalog_game_id: null,
+        external_id: "psn:manual:battlefront",
+        cover_url: null,
+        playtime_forever: null,
+      }],
+      steam_available: false,
+      steam_error: null,
+      raw_count: 1,
+      quarantined_count: 0,
+      pending_catalog_count: 0,
+    });
+    api.searchGames.mockResolvedValue({
+      results: [{
+        id: 777,
+        name: "Star Wars Battlefront",
+        released: "2015-11-17",
+        background_image: "https://covers/battlefront.jpg",
+        description_raw: null,
+        rating: 75,
+        genres: ["Shooter"],
+        platforms: ["PlayStation 4"],
+      }],
+    });
+    api.applyPsnLibraryRepair.mockResolvedValue({ updated: 1 });
+
+    renderLibrary();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
+    fireEvent.change(screen.getByLabelText("Catalog search for STAR WARS Battlefront"), {
+      target: { value: "Star Wars Battlefront 2015" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search catalog" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use Star Wars Battlefront" }));
+
+    await waitFor(() => expect(api.applyPsnLibraryRepair).toHaveBeenCalledWith([
+      { game_id: "raw", action: "link", catalog_id: 777 },
+    ]));
+    expect(api.searchGames).toHaveBeenCalledWith({ query: "Star Wars Battlefront 2015" });
+  });
 });
