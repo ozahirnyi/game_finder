@@ -67,7 +67,7 @@ function LibraryPage() {
           ))}
         </div>
       </div>
-      {(libraryQuery.data?.raw_count || libraryQuery.data?.quarantined_count) ? <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm"><p className="font-bold">Repair PSN library</p><p className="mt-1 text-muted-foreground">{libraryQuery.data?.raw_count ?? 0} unlinked and {libraryQuery.data?.quarantined_count ?? 0} quarantined PlayStation titles.</p><Link to="/psn-library-repair" className="mt-2 inline-block font-bold text-primary">Review PSN entries</Link></div> : null}
+      {(libraryQuery.data?.raw_count || libraryQuery.data?.quarantined_count) ? <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm"><p className="font-bold">Improve PlayStation details</p><p className="mt-1 text-muted-foreground">Repair can add catalog art and details or hide unwanted PlayStation entries.</p><Link to="/psn-library-repair" className="mt-2 inline-block font-bold text-primary">Review PSN entries</Link></div> : null}
 
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4">
         {tabs.map((item) => (
@@ -174,7 +174,7 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
           </h4>
           <Chip tone="primary">Owned</Chip>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">{game.source === "psn" && game.link_state === "raw" ? "PSN title — not linked to catalog" : "Synced from your connected library"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{game.source === "psn" && game.link_state === "raw" ? "PlayStation title — catalog details can be added later" : "Synced from your connected library"}</p>
       </div>
       <div className="hidden text-right sm:block">
         <p className="label-mono text-muted-foreground">Source</p>

@@ -36,6 +36,35 @@ def test_classification_skips_known_self_title_app():
     assert classify_psn_candidate(PsnExportCandidate("Spotify")).kind == "suggested_skip"
 
 
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Example Game Demo",
+        "Example Game Trial",
+        "Example Game Season Pass",
+        "Example Game Public Test Server",
+        "Example Game Beta Client",
+        "Example Game Soundtrack",
+        "Example Game Virtual Currency",
+        "Example Game PS4 Theme",
+    ],
+)
+def test_classifier_skips_only_explicit_self_title_non_games(title):
+    from app.psn_resolution import classify_psn_candidate
+
+    assert classify_psn_candidate(PsnExportCandidate(title)).kind == "suggested_skip"
+
+
+@pytest.mark.parametrize(
+    "title",
+    ["Adventure Theme Park", "Pack Your Bags", "Test Drive Adventure", "Avatar Frontier"],
+)
+def test_classifier_does_not_use_broad_non_game_substrings(title):
+    from app.psn_resolution import classify_psn_candidate
+
+    assert classify_psn_candidate(PsnExportCandidate(title)).kind == "eligible"
+
+
 @pytest.mark.parametrize("title", ["EA Play", "PlayStation Plus", "Base Theme", "Example Public Test Server", "Example Test Client", "Example Beta Client", "Example Playtest", "Example Theme"])
 def test_classification_and_repair_quarantine_affirmative_generic_non_games(title):
     from app.psn_classification import psn_repair_quarantine_reason
@@ -107,3 +136,26 @@ def test_resolver_recovers_from_malformed_batch_shape(monkeypatch):
     result = asyncio.run(psn_resolution.resolve_psn_catalog_titles(["Hades"]))
 
     assert result["Hades"].kind == "matched"
+
+
+def test_resolver_logs_aggregate_provider_failures_without_titles(caplog):
+    from app.integrations.igdb import IGDBError
+    from app import psn_resolution
+
+    batch = AsyncMock(side_effect=IGDBError("rate limited", 502))
+    single = AsyncMock(side_effect=IGDBError("still unavailable", 502))
+
+    with caplog.at_level("WARNING", logger="app.psn_resolution"):
+        result = asyncio.run(psn_resolution.resolve_psn_catalog_titles(
+            ["Private title one", "Private title two"],
+            batch_fetcher=batch,
+            single_fetcher=single,
+        ))
+
+    assert {item.kind for item in result.values()} == {"unavailable"}
+    text = caplog.text
+    assert "batch_size=2" in text
+    assert "error_type=IGDBError" in text
+    assert "status_code=502" in text
+    assert "fallback_failures=2" in text
+    assert "Private title" not in text

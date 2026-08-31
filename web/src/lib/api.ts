@@ -326,8 +326,9 @@ export type PsnImportPreview = {
   message?: string | null;
 };
 export type PsnImportPreviewItem = {
-  source_title: string;
-  status: "matched" | "needs_mapping" | "suggested_skip" | "catalog_unavailable";
+    source_title: string;
+    status: "matched" | "needs_mapping" | "suggested_skip" | "catalog_unavailable";
+    recommended_action: "catalog" | "raw" | "skip";
   igdb_id?: number | null;
   title?: string | null;
   reason?: string | null;
