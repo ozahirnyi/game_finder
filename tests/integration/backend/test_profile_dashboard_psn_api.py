@@ -1152,6 +1152,48 @@ def test_psn_library_repair_links_raw_rows_and_hides_quarantine(
     assert db_session.get(Game, junk.id).link_state == "quarantined"
 
 
+def test_library_overview_exposes_psn_catalog_lookup_progress(
+    api_client, db_session, user_factory, auth_as
+):
+    owner = auth_as(user_factory(email="psn-lookup-overview@example.com"))
+    db_session.add_all([
+        Game(
+            owner_id=owner.id,
+            source="psn",
+            external_id="psn:manual:pending",
+            title="Pending",
+            link_state="raw",
+            catalog_lookup_state=None,
+        ),
+        Game(
+            owner_id=owner.id,
+            source="psn",
+            external_id="psn:manual:review",
+            title="Review",
+            link_state="raw",
+            catalog_lookup_state="review",
+        ),
+        Game(
+            owner_id=owner.id,
+            source="psn",
+            external_id="psn:101",
+            title="Linked",
+            link_state="linked",
+            catalog_game_id=101,
+        ),
+    ])
+    db_session.commit()
+
+    payload = api_client.get("/library/overview").json()
+
+    assert payload["pending_catalog_count"] == 1
+    assert {item["title"]: item["catalog_lookup_state"] for item in payload["games"]} == {
+        "Linked": None,
+        "Pending": None,
+        "Review": "review",
+    }
+
+
 def test_psn_repair_preserves_partial_catalog_success_and_surfaces_unavailable(api_client, db_session, user_factory, auth_as, app_main, monkeypatch):
     from app.integrations.igdb import IGDBError
 

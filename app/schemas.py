@@ -31,6 +31,7 @@ class LibraryGameRead(BaseModel):
     external_id: str | None = None
     catalog_game_id: int | None = None
     link_state: Literal["linked", "raw"] | None = None
+    catalog_lookup_state: Literal["review", "no_match", "skipped"] | None = None
     detail_game_id: str | None = None
     title: str
     cover_url: str | None = None
@@ -43,6 +44,7 @@ class LibraryOverviewRead(BaseModel):
     steam_error: str | None = None
     raw_count: int = 0
     quarantined_count: int = 0
+    pending_catalog_count: int = 0
 
 
 class SteamLibraryResolveRead(BaseModel):

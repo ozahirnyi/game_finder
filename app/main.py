@@ -478,7 +478,9 @@ async def library_overview_route(
             games.append(LibraryGameRead(
                 id=str(game.id), source=source, external_id=game.external_id,
                 detail_game_id=(game.external_id if source == "steam" else str(getattr(game, "catalog_game_id", None)) if getattr(game, "link_state", None) == "linked" and getattr(game, "catalog_game_id", None) else None),
-                catalog_game_id=getattr(game, "catalog_game_id", None), link_state=getattr(game, "link_state", None) if game.source == "psn" else None, title=game.title,
+                catalog_game_id=getattr(game, "catalog_game_id", None), link_state=getattr(game, "link_state", None) if game.source == "psn" else None,
+                catalog_lookup_state=getattr(game, "catalog_lookup_state", None) if game.source == "psn" else None,
+                title=game.title,
                 cover_url=(
                     steam_library_cover_url(game.external_id, game.img_icon_url)
                     if game.source == "steam"
@@ -511,6 +513,12 @@ async def library_overview_route(
         games=games, steam_available=steam_available, steam_error=steam_error,
         raw_count=sum(game.source == "psn" and getattr(game, "link_state", None) not in {"linked", "quarantined"} for game in repair_games),
         quarantined_count=sum(game.source == "psn" and getattr(game, "link_state", None) == "quarantined" for game in repair_games),
+        pending_catalog_count=sum(
+            game.source == "psn"
+            and getattr(game, "link_state", None) not in {"linked", "quarantined"}
+            and getattr(game, "catalog_lookup_state", None) is None
+            for game in repair_games
+        ),
     )
 
 

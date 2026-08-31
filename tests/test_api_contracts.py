@@ -1554,10 +1554,12 @@ def test_library_overview_preserves_stored_steam_app_identity(monkeypatch):
         "games": [{
             "id": str(saved.id), "source": "steam", "external_id": "1097150",
             "detail_game_id": "1097150", "catalog_game_id": None, "link_state": None,
+            "catalog_lookup_state": None,
             "title": "Fall Guys", "cover_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/1097150/library_600x900.jpg",
             "playtime_forever": 120,
         }],
         "steam_available": False, "steam_error": None, "raw_count": 0, "quarantined_count": 0,
+        "pending_catalog_count": 0,
     }
 
 
