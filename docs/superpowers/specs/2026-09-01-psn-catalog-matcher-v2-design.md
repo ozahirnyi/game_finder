@@ -106,7 +106,7 @@ Do not use generic fuzzy matching for automatic links. Fuzzy or partial results 
 
 ## Matcher versioning and reprocessing
 
-Introduce a matcher version constant. A raw PSN row is pending enrichment when its `catalog_lookup_version` is lower than the current version, regardless of a previous `review` or `no_match` state.
+Introduce a matcher version constant. A raw PSN row is pending enrichment when its `catalog_lookup_version` is lower than the current version, regardless of a previous `review` or `no_match` state. Rows explicitly marked `skipped` by the user remain untouched until the user requests another lookup.
 
 After a successful decision, store the current version together with `catalog_lookup_state`. Linked and quarantined rows are not automatically reconsidered. A future matcher change increments the version and safely retries only unresolved raw rows.
 
