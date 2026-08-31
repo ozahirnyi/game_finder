@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
-import { type LibraryOverviewGame } from "@/lib/api";
+import { enrichPsnLibrary, type LibraryOverviewGame } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
 import { libraryOverviewQueryOptions } from "@/lib/navigationQueries";
 
@@ -37,7 +37,23 @@ type SortOrder = "playtime-desc" | "playtime-asc";
 function LibraryPage() {
   const [tab, setTab] = useState<Tab>("All games");
   const [sortOrder, setSortOrder] = useState<SortOrder>("playtime-desc");
+  const enrichmentStarted = useRef(false);
+  const queryClient = useQueryClient();
   const libraryQuery = useQuery(libraryOverviewQueryOptions());
+  const enrichment = useMutation({
+    mutationFn: async () => {
+      let result = await enrichPsnLibrary();
+      while (result.remaining > 0) result = await enrichPsnLibrary();
+      return result;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["library-overview"] }),
+  });
+  useEffect(() => {
+    if ((libraryQuery.data?.pending_catalog_count ?? 0) > 0 && !enrichmentStarted.current) {
+      enrichmentStarted.current = true;
+      enrichment.mutate();
+    }
+  }, [libraryQuery.data?.pending_catalog_count]);
   const owned = libraryQuery.data?.games ?? [];
   const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
   const visible = useMemo(() => {
@@ -67,7 +83,7 @@ function LibraryPage() {
           ))}
         </div>
       </div>
-      {(libraryQuery.data?.raw_count || libraryQuery.data?.quarantined_count) ? <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm"><p className="font-bold">Improve PlayStation details</p><p className="mt-1 text-muted-foreground">Repair can add catalog art and details or hide unwanted PlayStation entries.</p><Link to="/psn-library-repair" className="mt-2 inline-block font-bold text-primary">Review PSN entries</Link></div> : null}
+      {(libraryQuery.data?.raw_count || libraryQuery.data?.quarantined_count) ? <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm"><p className="font-bold">Improve PlayStation details</p><p className="mt-1 text-muted-foreground">{enrichment.isPending ? "Matching imported PlayStation games to the catalog…" : enrichment.isError ? "Catalog matching stopped because the catalog is temporarily unavailable." : "Exact matches are linked automatically. You can choose uncertain matches below."}</p>{enrichment.isError ? <button type="button" onClick={() => enrichment.mutate()} className="mt-2 font-bold text-primary">Retry catalog matching</button> : null}{libraryQuery.data?.quarantined_count ? <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">Review hidden PSN entries</Link> : null}</div> : null}
 
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4">
         {tabs.map((item) => (

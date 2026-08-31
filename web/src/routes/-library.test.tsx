@@ -7,10 +7,15 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const api = vi.hoisted(() => ({ getLibraryOverview: vi.fn() }));
+const api = vi.hoisted(() => ({
+  getLibraryOverview: vi.fn(),
+  enrichPsnLibrary: vi.fn(),
+  searchGames: vi.fn(),
+  applyPsnLibraryRepair: vi.fn(),
+}));
 
 vi.mock("@/lib/api", () => api);
 vi.mock("@/components/AppShell", () => ({
@@ -41,7 +46,15 @@ function renderLibrary() {
 }
 
 beforeEach(() => {
-  api.getLibraryOverview.mockResolvedValue({ games: [] });
+  vi.clearAllMocks();
+  api.getLibraryOverview.mockResolvedValue({
+    games: [],
+    steam_available: false,
+    steam_error: null,
+    raw_count: 0,
+    quarantined_count: 0,
+    pending_catalog_count: 0,
+  });
 });
 afterEach(cleanup);
 
@@ -62,6 +75,7 @@ describe("Library", () => {
       ],
       raw_count: 1,
       quarantined_count: 0,
+      pending_catalog_count: 0,
     });
 
     renderLibrary();
@@ -71,5 +85,45 @@ describe("Library", () => {
     expect(screen.getAllByTestId("game-cover")[0]).toHaveTextContent("Unknown Game");
     expect(screen.getByRole("heading", { name: "Unknown Game" }).closest("a")).toBeNull();
     expect(screen.getByRole("heading", { name: "Hades" }).closest("a")).toHaveAttribute("href", expect.stringContaining("/games/101"));
+  });
+
+  it("enriches pending PSN catalog rows sequentially", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [],
+      steam_available: false,
+      steam_error: null,
+      raw_count: 3,
+      quarantined_count: 0,
+      pending_catalog_count: 3,
+    });
+    api.enrichPsnLibrary
+      .mockResolvedValueOnce({ attempted: 1, linked: 1, review: 0, quarantined: 0, remaining: 2 })
+      .mockResolvedValueOnce({ attempted: 2, linked: 1, review: 1, quarantined: 0, remaining: 0 });
+
+    renderLibrary();
+
+    await waitFor(() => expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("button", { name: "Retry catalog matching" })).not.toBeInTheDocument();
+  });
+
+  it("stops after a catalog error and lets the user retry", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [],
+      steam_available: false,
+      steam_error: null,
+      raw_count: 1,
+      quarantined_count: 0,
+      pending_catalog_count: 1,
+    });
+    api.enrichPsnLibrary
+      .mockRejectedValueOnce(new Error("Catalog is temporarily unavailable"))
+      .mockResolvedValueOnce({ attempted: 1, linked: 1, review: 0, quarantined: 0, remaining: 0 });
+
+    renderLibrary();
+
+    const retry = await screen.findByRole("button", { name: "Retry catalog matching" });
+    expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(1);
+    fireEvent.click(retry);
+    await waitFor(() => expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(2));
   });
 });
