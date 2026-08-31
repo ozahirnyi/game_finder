@@ -458,6 +458,14 @@ class PsnLibraryRepairApplyRequest(BaseModel):
     decisions: list[PsnLibraryRepairDecision] = Field(min_length=1, max_length=500)
 
 
+class PsnCatalogEnrichmentResult(BaseModel):
+    attempted: int = 0
+    linked: int = 0
+    review: int = 0
+    quarantined: int = 0
+    remaining: int = 0
+
+
 class TelegramAccountRead(BaseModel):
     linked: bool
     configured: bool

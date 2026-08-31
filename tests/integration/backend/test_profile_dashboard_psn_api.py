@@ -1194,6 +1194,178 @@ def test_library_overview_exposes_psn_catalog_lookup_progress(
     }
 
 
+def test_psn_enrichment_processes_every_raw_row_in_bounded_batches(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory(email="psn-enrichment-all@example.com"))
+    db_session.add_all([
+        Game(
+            owner_id=owner.id,
+            source="psn",
+            external_id=f"psn:manual:{number}",
+            title=f"Game {number}",
+            link_state="raw",
+        )
+        for number in range(21)
+    ])
+    db_session.commit()
+    batch = AsyncMock(return_value={})
+
+    async def single_lookup(title: str):
+        number = int(title.removeprefix("Game "))
+        return {
+            "results": [{
+                "id": 1000 + number,
+                "name": title,
+                "background_image": f"https://covers/{number}.jpg",
+            }]
+        }
+
+    single = AsyncMock(side_effect=single_lookup)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", batch)
+    monkeypatch.setattr(app_main, "fetch_igdb_games", single)
+
+    attempts = []
+    remaining = 1
+    while remaining:
+        response = api_client.post("/psn/library-repair/enrich")
+        assert response.status_code == 200
+        payload = response.json()
+        attempts.append(payload["attempted"])
+        remaining = payload["remaining"]
+
+    games = db_session.query(Game).filter_by(owner_id=owner.id, source="psn").all()
+    assert len(games) == 21
+    assert all(game.link_state == "linked" and game.catalog_game_id for game in games)
+    assert all(game.img_icon_url and game.img_icon_url.startswith("https://covers/") for game in games)
+    assert attempts == [8, 8, 5]
+    assert single.await_count == 21
+
+
+def test_psn_enrichment_persists_review_and_no_match_without_repeating(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory(email="psn-enrichment-review@example.com"))
+    ambiguous = Game(
+        owner_id=owner.id,
+        source="psn",
+        external_id="psn:manual:ambiguous",
+        title="Example",
+        link_state="raw",
+    )
+    missing = Game(
+        owner_id=owner.id,
+        source="psn",
+        external_id="psn:manual:missing",
+        title="Missing",
+        link_state="raw",
+    )
+    db_session.add_all([ambiguous, missing])
+    db_session.commit()
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={
+        "Example": [
+            {"id": 1, "name": "Example (2010)"},
+            {"id": 2, "name": "Example Remake"},
+        ],
+        "Missing": [],
+    }))
+
+    first = api_client.post("/psn/library-repair/enrich")
+    second = api_client.post("/psn/library-repair/enrich")
+
+    assert first.status_code == 200
+    assert first.json() == {
+        "attempted": 2,
+        "linked": 0,
+        "review": 2,
+        "quarantined": 0,
+        "remaining": 0,
+    }
+    assert second.json()["attempted"] == 0
+    db_session.refresh(ambiguous)
+    db_session.refresh(missing)
+    assert ambiguous.catalog_lookup_state == "review"
+    assert missing.catalog_lookup_state == "no_match"
+
+
+def test_psn_enrichment_rolls_back_provider_unavailability(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    from app.integrations.igdb import IGDBError
+
+    owner = auth_as(user_factory(email="psn-enrichment-unavailable@example.com"))
+    game = Game(
+        owner_id=owner.id,
+        source="psn",
+        external_id="psn:manual:retry",
+        title="Retry Me",
+        link_state="raw",
+    )
+    db_session.add(game)
+    db_session.commit()
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_games_batch",
+        AsyncMock(side_effect=IGDBError("batch unavailable", 502)),
+    )
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_games",
+        AsyncMock(side_effect=IGDBError("single unavailable", 502)),
+    )
+
+    response = api_client.post("/psn/library-repair/enrich")
+
+    assert response.status_code == 502
+    db_session.refresh(game)
+    assert game.link_state == "raw"
+    assert game.catalog_lookup_state is None
+
+
+def test_psn_enrichment_quarantines_only_existing_high_confidence_non_games(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory(email="psn-enrichment-quarantine@example.com"))
+    junk = Game(
+        owner_id=owner.id,
+        source="psn",
+        external_id="psn:manual:spotify",
+        title="Spotify",
+        link_state="raw",
+    )
+    game = Game(
+        owner_id=owner.id,
+        source="psn",
+        external_id="psn:manual:bloodborne",
+        title="Bloodborne",
+        link_state="raw",
+    )
+    db_session.add_all([junk, game])
+    db_session.commit()
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={
+        "Bloodborne": [{
+            "id": 7334,
+            "name": "Bloodborne",
+            "background_image": "https://covers/bloodborne.jpg",
+        }],
+    }))
+
+    response = api_client.post("/psn/library-repair/enrich")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "attempted": 2,
+        "linked": 1,
+        "review": 0,
+        "quarantined": 1,
+        "remaining": 0,
+    }
+    db_session.refresh(junk)
+    db_session.refresh(game)
+    assert junk.link_state == "quarantined"
+    assert (game.link_state, game.catalog_game_id) == ("linked", 7334)
+
+
 def test_psn_repair_preserves_partial_catalog_success_and_surfaces_unavailable(api_client, db_session, user_factory, auth_as, app_main, monkeypatch):
     from app.integrations.igdb import IGDBError
 
