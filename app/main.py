@@ -49,7 +49,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
-    DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest
+    DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -478,7 +478,9 @@ async def library_overview_route(
             games.append(LibraryGameRead(
                 id=str(game.id), source=source, external_id=game.external_id,
                 detail_game_id=(game.external_id if source == "steam" else str(getattr(game, "catalog_game_id", None)) if getattr(game, "link_state", None) == "linked" and getattr(game, "catalog_game_id", None) else None),
-                catalog_game_id=getattr(game, "catalog_game_id", None), link_state=getattr(game, "link_state", None) if game.source == "psn" else None, title=game.title,
+                catalog_game_id=getattr(game, "catalog_game_id", None), link_state=getattr(game, "link_state", None) if game.source == "psn" else None,
+                catalog_lookup_state=getattr(game, "catalog_lookup_state", None) if game.source == "psn" else None,
+                title=game.title,
                 cover_url=(
                     steam_library_cover_url(game.external_id, game.img_icon_url)
                     if game.source == "steam"
@@ -511,6 +513,12 @@ async def library_overview_route(
         games=games, steam_available=steam_available, steam_error=steam_error,
         raw_count=sum(game.source == "psn" and getattr(game, "link_state", None) not in {"linked", "quarantined"} for game in repair_games),
         quarantined_count=sum(game.source == "psn" and getattr(game, "link_state", None) == "quarantined" for game in repair_games),
+        pending_catalog_count=sum(
+            game.source == "psn"
+            and getattr(game, "link_state", None) not in {"linked", "quarantined"}
+            and getattr(game, "catalog_lookup_state", None) is None
+            for game in repair_games
+        ),
     )
 
 
@@ -724,6 +732,31 @@ def _psn_linked_game_payload(detail: dict, catalog_id: int) -> tuple[str, str | 
     return title, cover if isinstance(cover, str) and cover.startswith(("http://", "https://")) else None
 
 
+def _link_psn_game_to_catalog(db: Session, game: Game, catalog_id: int, detail: dict) -> None:
+    title, cover = _psn_linked_game_payload(detail, catalog_id)
+    duplicate = db.query(Game).filter(
+        Game.owner_id == game.owner_id,
+        Game.source == "psn",
+        Game.catalog_game_id == catalog_id,
+        Game.id != game.id,
+    ).first()
+    target = duplicate or game
+    if duplicate:
+        duplicate.created_at = min(duplicate.created_at, game.created_at)
+        duplicate.notes = duplicate.notes or game.notes
+        duplicate.info = duplicate.info or game.info
+        duplicate.playtime_forever = max(
+            duplicate.playtime_forever or 0,
+            game.playtime_forever or 0,
+        ) or None
+        db.delete(game)
+    target.catalog_game_id = catalog_id
+    target.link_state = "linked"
+    target.catalog_lookup_state = None
+    target.title = title
+    target.img_icon_url = cover or target.img_icon_url
+
+
 async def _psn_repair_items(games: list[Game]) -> list[PsnLibraryRepairItem]:  # pragma: no cover - mocked API boundary
     raw = [game for game in games if game.link_state != "quarantined" and game.link_state != "linked"]
     searchable = [game.title for game in raw if not psn_repair_quarantine_reason(game.title)]
@@ -770,6 +803,86 @@ async def preview_psn_library_repair(db: Session = Depends(get_db), current_user
     )
 
 
+PSN_CATALOG_ENRICHMENT_BATCH_SIZE = 8
+
+
+def _pending_psn_catalog_query(db: Session, owner_id: uuid.UUID):
+    return db.query(Game).filter(
+        Game.owner_id == owner_id,
+        Game.source == "psn",
+        or_(Game.link_state.is_(None), Game.link_state.notin_({"linked", "quarantined"})),
+        Game.catalog_lookup_state.is_(None),
+    )
+
+
+@app.post("/psn/library-repair/enrich", response_model=PsnCatalogEnrichmentResult)
+async def enrich_psn_library_catalog(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    games = (
+        _pending_psn_catalog_query(db, current_user.id)
+        .order_by(Game.created_at, Game.id)
+        .limit(PSN_CATALOG_ENRICHMENT_BATCH_SIZE)
+        .all()
+    )
+    if not games:
+        return PsnCatalogEnrichmentResult()
+
+    quarantine = {
+        game.id
+        for game in games
+        if psn_repair_quarantine_reason(game.title)
+    }
+    searchable = [game.title for game in games if game.id not in quarantine]
+    resolutions = await resolve_psn_catalog_titles(
+        searchable,
+        max_fallback_titles=len(searchable),
+        batch_fetcher=fetch_igdb_games_batch,
+        single_fetcher=fetch_igdb_games,
+    )
+    if any(
+        resolutions.get(title) is None or resolutions[title].kind == "unavailable"
+        for title in searchable
+    ):
+        raise HTTPException(status_code=502, detail="Catalog is temporarily unavailable")
+
+    linked = review = quarantined = 0
+    try:
+        for game in games:
+            if game.id in quarantine:
+                game.link_state = "quarantined"
+                quarantined += 1
+                continue
+            results = resolutions[game.title].results
+            matches = [
+                item
+                for item in results
+                if item.get("id")
+                and _psn_catalog_match_key(str(item.get("name") or ""))
+                == _psn_catalog_match_key(game.title)
+            ]
+            if len(matches) == 1:
+                match = matches[0]
+                _link_psn_game_to_catalog(db, game, int(match["id"]), match)
+                linked += 1
+                continue
+            game.catalog_lookup_state = "review" if results else "no_match"
+            review += 1
+        db.commit()
+        remaining = _pending_psn_catalog_query(db, current_user.id).count()
+    except Exception:
+        db.rollback()
+        raise
+    return PsnCatalogEnrichmentResult(
+        attempted=len(games),
+        linked=linked,
+        review=review,
+        quarantined=quarantined,
+        remaining=remaining,
+    )
+
+
 @app.post("/psn/library-repair/apply")
 async def apply_psn_library_repair(data: PsnLibraryRepairApplyRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):  # pragma: no cover - API boundary
     decisions = {decision.game_id: decision for decision in data.decisions}
@@ -787,24 +900,18 @@ async def apply_psn_library_repair(data: PsnLibraryRepairApplyRequest, db: Sessi
                 continue
             if decision.action == "keep_raw":
                 game.link_state, game.catalog_game_id, game.img_icon_url = "raw", None, None
+                game.catalog_lookup_state = "skipped"
                 continue
             if decision.action == "restore":
                 game.link_state = "linked" if game.catalog_game_id else "raw"
+                if game.link_state == "raw":
+                    game.catalog_lookup_state = None
                 continue
             try:
                 detail = await fetch_igdb_game_detail(decision.catalog_id or 0)
             except IGDBError as exc:
                 raise HTTPException(status_code=422, detail="Choose a valid catalog game") from exc
-            title, cover = _psn_linked_game_payload(detail, decision.catalog_id or 0)
-            duplicate = db.query(Game).filter(Game.owner_id == current_user.id, Game.source == "psn", Game.catalog_game_id == decision.catalog_id, Game.id != game.id).first()
-            if duplicate:
-                duplicate.created_at = min(duplicate.created_at, game.created_at)
-                duplicate.notes = duplicate.notes or game.notes
-                duplicate.info = duplicate.info or game.info
-                duplicate.playtime_forever = max(duplicate.playtime_forever or 0, game.playtime_forever or 0) or None
-                db.delete(game)
-                continue
-            game.catalog_game_id, game.link_state, game.title, game.img_icon_url = decision.catalog_id, "linked", title, cover
+            _link_psn_game_to_catalog(db, game, decision.catalog_id or 0, detail)
         db.commit()
     except Exception:
         db.rollback()

@@ -1,11 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
-import { type LibraryOverviewGame } from "@/lib/api";
+import {
+  applyPsnLibraryRepair,
+  enrichPsnLibrary,
+  searchGames,
+  type LibraryOverviewGame,
+} from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
 import { libraryOverviewQueryOptions } from "@/lib/navigationQueries";
 
@@ -37,7 +42,24 @@ type SortOrder = "playtime-desc" | "playtime-asc";
 function LibraryPage() {
   const [tab, setTab] = useState<Tab>("All games");
   const [sortOrder, setSortOrder] = useState<SortOrder>("playtime-desc");
+  const enrichmentStarted = useRef(false);
+  const queryClient = useQueryClient();
   const libraryQuery = useQuery(libraryOverviewQueryOptions());
+  const enrichment = useMutation({
+    mutationFn: async () => {
+      let result = await enrichPsnLibrary();
+      while (result.remaining > 0) result = await enrichPsnLibrary();
+      return result;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["library-overview"] }),
+  });
+  const enrichCatalog = enrichment.mutate;
+  useEffect(() => {
+    if ((libraryQuery.data?.pending_catalog_count ?? 0) > 0 && !enrichmentStarted.current) {
+      enrichmentStarted.current = true;
+      enrichCatalog();
+    }
+  }, [enrichCatalog, libraryQuery.data?.pending_catalog_count]);
   const owned = libraryQuery.data?.games ?? [];
   const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
   const visible = useMemo(() => {
@@ -67,7 +89,32 @@ function LibraryPage() {
           ))}
         </div>
       </div>
-      {(libraryQuery.data?.raw_count || libraryQuery.data?.quarantined_count) ? <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm"><p className="font-bold">Improve PlayStation details</p><p className="mt-1 text-muted-foreground">Repair can add catalog art and details or hide unwanted PlayStation entries.</p><Link to="/psn-library-repair" className="mt-2 inline-block font-bold text-primary">Review PSN entries</Link></div> : null}
+      {libraryQuery.data?.raw_count || libraryQuery.data?.quarantined_count ? (
+        <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
+          <p className="font-bold">Improve PlayStation details</p>
+          <p className="mt-1 text-muted-foreground">
+            {enrichment.isPending
+              ? "Matching imported PlayStation games to the catalog…"
+              : enrichment.isError
+                ? "Catalog matching stopped because the catalog is temporarily unavailable."
+                : "Exact matches are linked automatically. You can choose uncertain matches below."}
+          </p>
+          {enrichment.isError ? (
+            <button
+              type="button"
+              onClick={() => enrichCatalog()}
+              className="mt-2 font-bold text-primary"
+            >
+              Retry catalog matching
+            </button>
+          ) : null}
+          {libraryQuery.data?.quarantined_count ? (
+            <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">
+              Review hidden PSN entries
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4">
         {tabs.map((item) => (
@@ -174,7 +221,11 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
           </h4>
           <Chip tone="primary">Owned</Chip>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">{game.source === "psn" && game.link_state === "raw" ? "PlayStation title — catalog details can be added later" : "Synced from your connected library"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {game.source === "psn" && game.link_state === "raw"
+            ? "PlayStation title — catalog details can be added later"
+            : "Synced from your connected library"}
+        </p>
       </div>
       <div className="hidden text-right sm:block">
         <p className="label-mono text-muted-foreground">Source</p>
@@ -192,7 +243,7 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
   const className =
     "hover-lift group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]";
   const gameId = game.source === "steam" ? game.external_id : game.detail_game_id;
-  return gameId ? (
+  const card = gameId ? (
     <Link
       to="/games/$gameId"
       params={{ gameId }}
@@ -203,5 +254,110 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
     </Link>
   ) : (
     <div className={className}>{contents}</div>
+  );
+  return (
+    <div className="space-y-2">
+      {card}
+      {game.source === "psn" && game.link_state === "raw" ? <PsnCatalogPicker game={game} /> : null}
+    </div>
+  );
+}
+
+function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(game.title);
+  const search = useMutation({
+    mutationFn: (value: string) => searchGames({ query: value }),
+  });
+  const link = useMutation({
+    mutationFn: (catalogId: number) =>
+      applyPsnLibraryRepair([
+        {
+          game_id: game.id,
+          action: "link",
+          catalog_id: catalogId,
+        },
+      ]),
+    onSuccess: async () => {
+      setOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["library-overview"] }),
+        queryClient.invalidateQueries({ queryKey: ["psn-library-repair"] }),
+      ]);
+    },
+  });
+  const results = (search.data?.results ?? [])
+    .filter((result): result is typeof result & { id: number } => typeof result.id === "number")
+    .slice(0, 5);
+
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-surface/60 px-4 py-3">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="text-sm font-bold text-primary"
+      >
+        {open ? "Close catalog search" : "Find in catalog"}
+      </button>
+      {open ? (
+        <form
+          className="mt-3 space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const value = query.trim();
+            if (value) search.mutate(value);
+          }}
+        >
+          <label className="block text-xs font-bold text-muted-foreground">
+            Catalog search for {game.title}
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={search.isPending || !query.trim()}
+            className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-50"
+          >
+            {search.isPending ? "Searching…" : "Search catalog"}
+          </button>
+          {search.isError ? (
+            <p role="alert" className="text-sm text-red-600">
+              Catalog search failed. Try again.
+            </p>
+          ) : null}
+          {search.isSuccess && results.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No results. Try a shorter or corrected title.
+            </p>
+          ) : null}
+          {results.length > 0 ? (
+            <div className="grid gap-2">
+              {results.map((result) => (
+                <button
+                  key={result.id}
+                  type="button"
+                  disabled={link.isPending}
+                  onClick={() => link.mutate(result.id)}
+                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-sm hover:border-primary/50 disabled:opacity-50"
+                  aria-label={`Use ${result.name}`}
+                >
+                  <span className="font-bold">{result.name}</span>
+                  <span className="text-xs text-muted-foreground">Use this game</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {link.isError ? (
+            <p role="alert" className="text-sm text-red-600">
+              Could not link this game. Try again.
+            </p>
+          ) : null}
+        </form>
+      ) : null}
+    </div>
   );
 }

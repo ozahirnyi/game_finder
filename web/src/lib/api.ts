@@ -71,6 +71,7 @@ export type LibraryOverviewGame = {
   detail_game_id?: string | null;
   catalog_game_id?: number | null;
   link_state?: "linked" | "raw" | null;
+  catalog_lookup_state?: "review" | "no_match" | "skipped" | null;
   title: string;
   cover_url?: string | null;
   playtime_forever?: number | null;
@@ -82,6 +83,7 @@ export type LibraryOverview = {
   steam_error?: string | null;
   raw_count: number;
   quarantined_count: number;
+  pending_catalog_count: number;
 };
 
 export type OnboardingSummary = {
@@ -339,6 +341,13 @@ export type PsnImportSelection = { candidate_token: string; action: "catalog"; c
 export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
 export type PsnLibraryRepairItem = { game_id: string; title: string; link_state: "linked" | "raw" | "quarantined"; catalog_game_id?: number | null; suggestion: "linked" | "auto_link" | "review" | "quarantine" | "unavailable"; suggestions: { id: number; title: string }[]; reason?: string | null };
 export type PsnLibraryRepairPreview = { items: PsnLibraryRepairItem[]; raw_count: number; quarantined_count: number };
+export type PsnCatalogEnrichmentResult = {
+  attempted: number;
+  linked: number;
+  review: number;
+  quarantined: number;
+  remaining: number;
+};
 export type Notification = {
   id: string;
   type: string;
@@ -517,6 +526,13 @@ export function confirmPsnImport(selections: PsnImportSelection[]) {
 
 export function previewPsnLibraryRepair() {
   return apiRequest<PsnLibraryRepairPreview>("/psn/library-repair/preview", { auth: true });
+}
+
+export function enrichPsnLibrary() {
+  return apiRequest<PsnCatalogEnrichmentResult>("/psn/library-repair/enrich", {
+    auth: true,
+    method: "POST",
+  });
 }
 
 export function applyPsnLibraryRepair(decisions: { game_id: string; action: "link" | "keep_raw" | "quarantine" | "restore" | "delete"; catalog_id?: number }[]) {
