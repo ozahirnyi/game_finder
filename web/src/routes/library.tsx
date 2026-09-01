@@ -258,7 +258,9 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
   return (
     <div className="space-y-2">
       {card}
-      {game.source === "psn" && game.link_state === "raw" ? <PsnCatalogPicker game={game} /> : null}
+      {game.source === "psn" && game.link_state === "raw" ? (
+        <PsnCatalogPicker key={`${game.id}:${game.catalog_search_query ?? ""}`} game={game} />
+      ) : null}
     </div>
   );
 }
@@ -266,7 +268,8 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
 function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState(game.title);
+  const initialQuery = game.catalog_search_query?.trim() || game.title;
+  const [query, setQuery] = useState(() => initialQuery);
   const search = useMutation({
     mutationFn: (value: string) => searchGames({ query: value }),
   });

@@ -104,6 +104,14 @@ def _is_explicit_product_identity(product_name: str, title: str) -> bool:
     return descriptor in EXPLICIT_NON_GAME_DESCRIPTOR_IDENTITIES or descriptor.startswith("playstation plus ")
 
 
+def is_explicit_psn_non_game_product(title: str, product_name: str) -> bool:
+    """Return whether a product name explicitly identifies non-game PSN content."""
+    return _is_explicit_product_identity(
+        normalize_psn_product_identity(product_name),
+        normalize_psn_product_identity(title),
+    )
+
+
 def psn_purchase_exclusion_reason(candidate: PsnExportCandidate) -> str | None:
     """Return a reason only when the PSN row itself explicitly proves it is not a game."""
     if any(value.casefold() != "product purchase" for value in candidate.transaction_types):

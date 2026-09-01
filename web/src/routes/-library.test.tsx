@@ -204,4 +204,68 @@ describe("Library", () => {
     );
     expect(api.searchGames).toHaveBeenCalledWith({ query: "Star Wars Battlefront 2015" });
   });
+
+  it("starts manual catalog search from the cleaned backend query", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [
+        {
+          id: "raw",
+          source: "psn",
+          title: "EA SPORTS™ FIFA 16",
+          link_state: "raw",
+          catalog_lookup_state: "review",
+          catalog_search_query: "FIFA 16",
+          detail_game_id: null,
+          catalog_game_id: null,
+          external_id: "psn:manual:fifa",
+          cover_url: null,
+        },
+      ],
+      steam_available: false,
+      steam_error: null,
+      raw_count: 1,
+      quarantined_count: 0,
+      pending_catalog_count: 0,
+    });
+
+    renderLibrary();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
+    expect(screen.getByLabelText("Catalog search for EA SPORTS™ FIFA 16")).toHaveValue("FIFA 16");
+  });
+
+  it("reprocesses a stale review row when backend marks it pending", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [
+        {
+          id: "stale",
+          source: "psn",
+          title: "Example",
+          link_state: "raw",
+          catalog_lookup_state: "review",
+          catalog_search_query: "Example",
+          detail_game_id: null,
+          catalog_game_id: null,
+          external_id: "psn:manual:example",
+          cover_url: null,
+        },
+      ],
+      steam_available: false,
+      steam_error: null,
+      raw_count: 1,
+      quarantined_count: 0,
+      pending_catalog_count: 1,
+    });
+    api.enrichPsnLibrary.mockResolvedValue({
+      attempted: 1,
+      linked: 0,
+      review: 1,
+      quarantined: 0,
+      remaining: 0,
+    });
+
+    renderLibrary();
+
+    await waitFor(() => expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(1));
+  });
 });
