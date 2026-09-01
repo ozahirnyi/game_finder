@@ -797,6 +797,7 @@ def _link_psn_game_to_catalog(db: Session, game: Game, catalog_id: int, detail: 
             duplicate.playtime_forever or 0,
             game.playtime_forever or 0,
         ) or None
+        _merge_game_psn_catalog_evidence(duplicate, _psn_game_catalog_evidence(game))
         db.delete(game)
     target.catalog_game_id = catalog_id
     target.link_state = "linked"
@@ -1018,8 +1019,8 @@ def _merge_psn_catalog_evidence(
 ) -> PsnCatalogEvidence:
     return PsnCatalogEvidence(
         incoming.title,
-        aliases=_stable_psn_evidence_values(existing.aliases, incoming.aliases),
-        platforms=_stable_psn_evidence_values(existing.platforms, incoming.platforms),
+        aliases=_stable_psn_evidence_values(existing.aliases, incoming.aliases)[:PSN_CANDIDATE_EVIDENCE_LIMIT],
+        platforms=_stable_psn_evidence_values(existing.platforms, incoming.platforms)[:PSN_CANDIDATE_EVIDENCE_LIMIT],
     )
 
 
@@ -1141,13 +1142,19 @@ async def confirm_psn_import(
                 created += 1
             else:
                 catalog_lookup_version = PSN_CATALOG_MATCHER_VERSION if link_state == "linked" else None
+                preserves_catalog_state = link_state == "raw" and (
+                    imported.link_state == "linked" or imported.catalog_lookup_state == "skipped"
+                )
                 metadata_changed = (
-                    imported.title != title
-                    or imported.catalog_game_id != catalog_game_id
-                    or imported.link_state != link_state
-                    or imported.img_icon_url != cover
-                    or imported.catalog_lookup_state is not None
-                    or imported.catalog_lookup_version != catalog_lookup_version
+                    not preserves_catalog_state
+                    and (
+                        imported.title != title
+                        or imported.catalog_game_id != catalog_game_id
+                        or imported.link_state != link_state
+                        or imported.img_icon_url != cover
+                        or imported.catalog_lookup_state is not None
+                        or imported.catalog_lookup_version != catalog_lookup_version
+                    )
                 )
                 evidence_changed = _merge_game_psn_catalog_evidence(imported, evidence)
                 if metadata_changed:

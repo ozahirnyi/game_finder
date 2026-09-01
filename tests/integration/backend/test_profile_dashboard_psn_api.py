@@ -1007,6 +1007,68 @@ def test_reimport_merges_psn_evidence_and_preserves_user_data(
     assert (stored.notes, stored.playtime_forever) == ("keep me", 90)
 
 
+@pytest.mark.parametrize(
+    ("link_state", "catalog_lookup_state"),
+    [("linked", None), ("raw", "skipped")],
+)
+def test_raw_reimport_preserves_protected_psn_catalog_state(
+    api_client, db_session, user_factory, auth_as, link_state, catalog_lookup_state
+):
+    owner = auth_as(user_factory(email=f"psn-protected-{link_state}-{catalog_lookup_state}@example.com"))
+    stored = Game(
+        owner_id=owner.id,
+        source="psn",
+        external_id=psn_manual_external_id("Protected Game"),
+        title="Protected Game",
+        link_state=link_state,
+        catalog_game_id=101,
+        catalog_lookup_state=catalog_lookup_state,
+        catalog_lookup_version=PSN_CATALOG_MATCHER_VERSION,
+        img_icon_url="https://cover",
+        psn_search_aliases=["Existing alias"],
+        psn_source_platforms=["PS4"],
+    )
+    db_session.add(stored)
+    db_session.commit()
+    export = _xlsx_bytes("Transaction Detail", rows=[
+        ["Game Name", "Product Name", "Platform", "Transaction Type"],
+        ["Protected Game", "Protected Game Complete Edition", "PS5", "Product Purchase"],
+    ])
+    item = api_client.post("/psn/import/preview", files={"file": ("reimport.xlsx", export)}).json()["items"][0]
+
+    response = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": item["candidate_token"], "action": "raw"}]})
+
+    assert response.json() == {"created": 0, "updated": 1, "skipped": 0, "total": 1}
+    db_session.refresh(stored)
+    assert (
+        stored.link_state,
+        stored.catalog_game_id,
+        stored.catalog_lookup_state,
+        stored.catalog_lookup_version,
+        stored.img_icon_url,
+    ) == (link_state, 101, catalog_lookup_state, PSN_CATALOG_MATCHER_VERSION, "https://cover")
+    assert stored.psn_search_aliases == ["Existing alias", "Protected Game", "Protected Game Complete Edition"]
+    assert stored.psn_source_platforms == ["PS4", "PS5"]
+
+
+def test_psn_catalog_evidence_merge_caps_stable_deduplicated_values(app_main):
+    existing = PsnCatalogEvidence(
+        "Hades",
+        aliases=("old-1", "old-2", "old-3", "old-4", "old-5", "old-6", "old-7"),
+        platforms=("PS1", "PS2", "PS3", "PS4", "PS5", "Vita", "PSP"),
+    )
+    incoming = PsnCatalogEvidence(
+        "Hades",
+        aliases=("old-2", "new-1", "new-2", "new-3"),
+        platforms=("PS3", "new-platform-1", "new-platform-2", "new-platform-3"),
+    )
+
+    merged = app_main._merge_psn_catalog_evidence(existing, incoming)
+
+    assert merged.aliases == ("old-1", "old-2", "old-3", "old-4", "old-5", "old-6", "old-7", "new-1")
+    assert merged.platforms == ("PS1", "PS2", "PS3", "PS4", "PS5", "Vita", "PSP", "new-platform-1")
+
+
 def test_psn_import_confirm_persists_owner_scoped_idempotent_games(
     api_client, db_session, user_factory, auth_as, app_main, monkeypatch
 ):
@@ -1146,6 +1208,44 @@ def test_psn_catalog_confirmation_enriches_linked_row_and_merges_raw_duplicate(a
     assert (games[0].img_icon_url, games[0].notes, games[0].playtime_forever, games[0].created_at) == (
         "https://cover", "keep", 12, datetime(2024, 1, 1),
     )
+
+
+def test_automatic_psn_duplicate_linking_merges_catalog_evidence(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory(email="psn-auto-duplicate-evidence@example.com"))
+    raw = Game(
+        owner_id=owner.id,
+        source="psn",
+        external_id=psn_manual_external_id("Hades"),
+        title="Hades",
+        link_state="raw",
+        psn_search_aliases=["Raw alias"],
+        psn_source_platforms=["PS5"],
+    )
+    linked = Game(
+        owner_id=owner.id,
+        source="psn",
+        external_id="psn:101",
+        title="Hades",
+        catalog_game_id=101,
+        link_state="linked",
+        psn_search_aliases=["Linked alias"],
+        psn_source_platforms=["PS4"],
+    )
+    db_session.add_all([raw, linked])
+    db_session.commit()
+    monkeypatch.setattr(app_main, "resolve_psn_catalog_evidence", AsyncMock(return_value={
+        str(raw.id): PsnCatalogDecision("linked", {"id": 101, "name": "Hades"}, "safe_winner", "safe_alias", 150),
+    }))
+
+    response = api_client.post("/psn/library-repair/enrich")
+
+    assert response.status_code == 200
+    games = db_session.query(Game).filter_by(owner_id=owner.id, source="psn").all()
+    assert len(games) == 1
+    assert games[0].psn_search_aliases == ["Linked alias", "Raw alias"]
+    assert games[0].psn_source_platforms == ["PS4", "PS5"]
 
 
 
