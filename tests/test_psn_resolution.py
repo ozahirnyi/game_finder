@@ -82,6 +82,13 @@ def test_generic_theme_category_does_not_substring_match_game_title():
     assert psn_repair_quarantine_reason("Adventure Theme Park") is None
 
 
+def test_public_non_game_product_check_is_limited_to_explicit_descriptor():
+    from app.psn_classification import is_explicit_psn_non_game_product
+
+    assert is_explicit_psn_non_game_product("Example Game", "Example Game PlayStation Plus Pack")
+    assert not is_explicit_psn_non_game_product("Example Game", "Example Game Complete Edition")
+
+
 def test_classification_uses_paired_transaction_rows_not_aggregate_order():
     from app.psn_resolution import classify_psn_candidate
 
