@@ -24,9 +24,7 @@ export function GameCover({
   return (
     <div
       className={`relative overflow-hidden ${className}`}
-      role={src ? "img" : undefined}
-      aria-label={src ? title : `${title} cover unavailable`}
-      {...(src ? { src } : {})}
+      aria-label={src ? undefined : `${title} cover unavailable`}
       style={{
         background: `radial-gradient(120% 90% at 15% 10%, ${from}55 0%, transparent 55%), linear-gradient(135deg, ${to} 0%, ${from}22 100%), ${to}`,
       }}

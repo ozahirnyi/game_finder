@@ -6,6 +6,7 @@ describe("GameCover", () => {
   it("renders a real catalog cover when src is present", () => {
     render(<GameCover title="Hades II" src="https://cdn.example/hades.jpg" />);
 
+    expect(screen.getAllByRole("img")).toHaveLength(1);
     expect(screen.getByRole("img", { name: "Hades II cover" })).toHaveAttribute(
       "src",
       "https://cdn.example/hades.jpg",
