@@ -18,6 +18,7 @@ export type SearchGame = {
   name: string | null;
   released: string | null;
   background_image: string | null;
+  platforms?: string[];
   source?: "steam";
   steam_appid?: number;
   url?: string;
@@ -104,14 +105,35 @@ export type PsnImportResult = {
   total: number;
 };
 
+export type RecommendationQuota = {
+  limit: number;
+  remaining: number;
+  cooldown_until: string | null;
+  reset_at: string;
+};
+
+export type RecommendationGame = {
+  id: number;
+  name: string;
+  released: string | null;
+  background_image: string | null;
+  platforms: string[];
+};
+
 export type RecommendationItem = {
   title: string;
   reason: string;
   tags: string[];
+  game?: RecommendationGame | null;
 };
 
 export type RecommendationResponse = {
   recommendations: RecommendationItem[];
+};
+
+export type AIRecommendationResponse = {
+  recommendations: RecommendationItem[];
+  quota: RecommendationQuota;
 };
 
 export type SteamLoginUrl = {
@@ -202,11 +224,13 @@ type RequestOptions = {
 
 export class ApiError extends Error {
   status: number;
+  detail: unknown;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, detail: unknown = null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -311,7 +335,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       removeStoredToken();
       message = "Your session expired. Please log in again.";
     }
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, detail);
   }
 
   return payload as T;
@@ -374,9 +398,14 @@ export function getTrendingGames(pageSize = 8) {
   return request<SearchResponse>(`/catalog/trending-games?page_size=${encodeURIComponent(pageSize)}`);
 }
 
+export function getRecommendationQuota() {
+  return request<RecommendationQuota>("/recommendations/quota", { auth: true });
+}
+
 export function getRecommendations(prompt: string) {
-  return request<RecommendationResponse>("/recommendations", {
+  return request<AIRecommendationResponse>("/recommendations", {
     method: "POST",
+    auth: true,
     body: { prompt, liked_game_ids: [] },
   });
 }

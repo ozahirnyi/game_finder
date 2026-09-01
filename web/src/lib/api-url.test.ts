@@ -12,7 +12,9 @@ describe("production API URL", () => {
       headers: { "Content-Type": "application/json" },
     })));
     vi.resetModules();
-    const { getRecommendations } = await import("./api");
+    const { getRecommendations, setToken } = await import("./api");
+    const validToken = `header.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.signature`;
+    setToken(validToken);
 
     await getRecommendations("cozy games");
 
