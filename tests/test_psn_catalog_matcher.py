@@ -55,3 +55,79 @@ def test_variant_cleanup_does_not_classify_generic_words_as_non_games(title):
     from app.psn_catalog_matcher import PsnCatalogEvidence, build_psn_query_variants
 
     assert build_psn_query_variants(PsnCatalogEvidence(title))[0] == title
+
+
+def test_cleaned_exact_match_links_playstation_release():
+    from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
+
+    evidence = PsnCatalogEvidence("EA SPORTS™ FIFA 16", platforms=("PS4",))
+    decision = choose_psn_catalog_match(evidence, {
+        "FIFA 16": [
+            {"id": 1, "name": "FIFA 16", "platforms": ["PC"], "game_type": 0},
+            {"id": 2, "name": "FIFA 16", "platforms": ["PlayStation 4"], "game_type": 0},
+        ],
+    })
+
+    assert decision.state == "linked"
+    assert decision.match["id"] == 2
+
+
+def test_fuzzy_result_is_never_auto_linked():
+    from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
+
+    evidence = PsnCatalogEvidence("Battlefront", platforms=("PS4",))
+    decision = choose_psn_catalog_match(evidence, {
+        "Battlefront": [{"id": 3, "name": "Star Wars Battlefront", "platforms": ["PlayStation 4"], "game_type": 0}],
+    })
+
+    assert decision.state == "review"
+
+
+def test_unknown_source_platform_keeps_equal_playstation_releases_ambiguous():
+    from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
+
+    evidence = PsnCatalogEvidence("Example")
+    decision = choose_psn_catalog_match(evidence, {
+        "Example": [
+            {"id": 10, "name": "Example", "platforms": ["PlayStation 4"], "game_type": 0},
+            {"id": 11, "name": "Example", "platforms": ["PlayStation 5"], "game_type": 0},
+        ],
+    })
+
+    assert decision.state == "review"
+    assert decision.reason == "ambiguous_top_candidates"
+
+
+def test_same_catalog_id_returned_by_two_queries_scores_once():
+    from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
+
+    game = {"id": 12, "name": "Example", "platforms": ["PlayStation 5"], "game_type": 0}
+    decision = choose_psn_catalog_match(PsnCatalogEvidence("Example", platforms=("PS5",)), {
+        "Example™": [game],
+        "Example": [game],
+    })
+
+    assert decision.state == "linked"
+    assert decision.match["id"] == 12
+
+
+def test_conflicting_edition_is_not_auto_linked():
+    from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
+
+    decision = choose_psn_catalog_match(PsnCatalogEvidence("Example Complete Edition"), {
+        "Example": [{"id": 13, "name": "Example Ultimate Edition", "platforms": ["PlayStation 5"], "game_type": 0}],
+    })
+
+    assert decision.state == "review"
+
+
+@pytest.mark.parametrize("game_type", [1, 2, 5, 13, 14])
+def test_non_independent_catalog_types_are_not_linked(game_type):
+    from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
+
+    decision = choose_psn_catalog_match(
+        PsnCatalogEvidence("Example", platforms=("PS5",)),
+        {"Example": [{"id": 4, "name": "Example", "platforms": ["PlayStation 5"], "game_type": game_type}]},
+    )
+
+    assert decision.state == "review"
