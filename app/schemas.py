@@ -32,6 +32,7 @@ class LibraryGameRead(BaseModel):
     catalog_game_id: int | None = None
     link_state: Literal["linked", "raw"] | None = None
     catalog_lookup_state: Literal["review", "no_match", "skipped"] | None = None
+    catalog_search_query: str | None = None
     detail_game_id: str | None = None
     title: str
     cover_url: str | None = None
@@ -382,7 +383,7 @@ class SteamRecommendationRequest(BaseModel):
 
 class PsnImportPreviewItem(BaseModel):
     source_title: str
-    status: Literal["matched", "needs_mapping", "suggested_skip", "catalog_unavailable"]
+    status: Literal["ready", "matched", "needs_mapping", "suggested_skip", "catalog_unavailable"]
     recommended_action: Literal["catalog", "raw", "skip"]
     igdb_id: int | None = None
     title: str | None = None

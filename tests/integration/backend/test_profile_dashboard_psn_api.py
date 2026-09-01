@@ -6,7 +6,8 @@ import pytest
 from openpyxl import Workbook
 
 from app.database import Favorite, Friendship, Game, PriceAlert, WishlistItem
-from app.psn_catalog_matcher import PsnCatalogEvidence
+from app.psn_catalog_matcher import PSN_CATALOG_MATCHER_VERSION, PsnCatalogDecision, PsnCatalogEvidence
+from app.psn_catalog_service import PsnCatalogUnavailable
 from app.psn_export import psn_manual_external_id
 from app.psn_resolution import CatalogResolution
 
@@ -294,11 +295,11 @@ def test_psn_import_preview_groups_reversible_candidates_and_batches_catalog_que
 
     assert response.status_code == 200
     items = response.json()["items"]
-    assert [item["status"] for item in items] == ["matched", "needs_mapping", "suggested_skip"]
-    assert [item["recommended_action"] for item in items] == ["catalog", "raw", "skip"]
+    assert [item["status"] for item in items] == ["ready", "ready", "suggested_skip"]
+    assert [item["recommended_action"] for item in items] == ["raw", "raw", "skip"]
     assert items[0]["candidate_token"]
-    assert items[1]["suggestions"] == [{"id": 102, "title": "Similar game"}]
-    batch.assert_awaited_once_with(["Hades", "Unknown"])
+    assert items[1]["suggestions"] == []
+    batch.assert_not_awaited()
 
 
 def test_psn_preview_does_not_skip_game_with_related_demo_evidence(api_client, user_factory, auth_as, app_main, monkeypatch):
@@ -316,7 +317,7 @@ def test_psn_preview_does_not_skip_game_with_related_demo_evidence(api_client, u
     )
 
     assert response.status_code == 200
-    assert response.json()["items"][0]["status"] == "matched"
+    assert response.json()["items"][0]["status"] == "ready"
 
 
 def test_psn_preview_keeps_partial_catalog_success_and_marks_unavailable(api_client, user_factory, auth_as, app_main, monkeypatch):
@@ -332,8 +333,8 @@ def test_psn_preview_keeps_partial_catalog_success_and_marks_unavailable(api_cli
 
     assert response.status_code == 200
     assert [(item["source_title"], item["status"], item["reason"]) for item in response.json()["items"]] == [
-        ("Hades", "matched", None),
-        ("Celeste", "catalog_unavailable", "Catalog temporarily unavailable."),
+        ("Hades", "ready", None),
+        ("Celeste", "ready", None),
     ]
 
 
@@ -358,7 +359,7 @@ def test_psn_import_catalog_outage_keeps_every_plausible_title_importable_as_raw
 
     items = response.json()["items"]
     assert len(items) == 25
-    assert {item["status"] for item in items} == {"catalog_unavailable"}
+    assert {item["status"] for item in items} == {"ready"}
     assert {item["recommended_action"] for item in items} == {"raw"}
     assert response.json()["confirmed_total"] == 25
 
@@ -390,7 +391,7 @@ def test_psn_preview_reports_unavailable_before_entitlement_review(api_client, u
         ]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
 
-    assert response.json()["items"][0]["status"] == "catalog_unavailable"
+    assert response.json()["items"][0]["status"] == "needs_mapping"
 
 
 def test_psn_import_preview_matches_provider_formatting_only(
@@ -407,7 +408,7 @@ def test_psn_import_preview_matches_provider_formatting_only(
     )
 
     item = response.json()["items"][0]
-    assert (item["status"], item["igdb_id"], item["title"]) == ("matched", 101, "Hades")
+    assert (item["status"], item["igdb_id"], item["title"]) == ("ready", None, None)
 
 
 def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_review(
@@ -442,7 +443,7 @@ def test_psn_import_preview_confirms_catalog_games_and_keeps_plus_purchases_in_r
 
     assert response.status_code == 200
     items = response.json()["items"]
-    assert [(item["source_title"], item["status"], item["igdb_id"]) for item in items] == [("GOD OF WAR", "matched", 101), ("FORTNITE", "needs_mapping", None)]
+    assert [(item["source_title"], item["status"], item["igdb_id"]) for item in items] == [("GOD OF WAR", "ready", None), ("FORTNITE", "needs_mapping", None)]
     assert all(item["candidate_token"] for item in items)
     assert db_session.query(Game).count() == 0
 
@@ -476,8 +477,8 @@ def test_psn_import_preview_classifies_a_sanitized_representative_export(
     )
 
     statuses = [item["status"] for item in response.json()["items"]]
-    assert statuses.count("matched") == 12
-    assert statuses.count("needs_mapping") == 4
+    assert statuses.count("ready") == 14
+    assert statuses.count("needs_mapping") == 2
     assert statuses.count("suggested_skip") == 0
 
 
@@ -516,12 +517,12 @@ def test_psn_import_preview_uses_platform_and_type_only_to_choose_between_exact_
     )
 
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
-        ("App-like item", "matched"),
-        ("Playable item", "matched"),
-        ("Other platform", "matched"),
-        ("Unknown catalog type", "matched"),
+        ("App-like item", "ready"),
+        ("Playable item", "ready"),
+        ("Other platform", "ready"),
+        ("Unknown catalog type", "ready"),
     ]
-    assert [item["igdb_id"] for item in response.json()["items"]] == [1, 2, 3, 4]
+    assert [item["igdb_id"] for item in response.json()["items"]] == [None, None, None, None]
 
 
 def test_psn_import_preview_keeps_a_unique_exact_catalog_collection_eligible(
@@ -561,7 +562,7 @@ def test_psn_import_preview_keeps_a_unique_exact_catalog_collection_eligible(
     )
 
     item = response.json()["items"][0]
-    assert (item["source_title"], item["status"], item["igdb_id"], item["title"]) == ("Catalog collection", "matched", 501, "Catalog collection")
+    assert (item["source_title"], item["status"], item["igdb_id"], item["title"]) == ("Catalog collection", "ready", None, None)
     assert item["candidate_token"]
 
 
@@ -602,16 +603,10 @@ def test_psn_import_preview_excludes_only_explicit_psn_clutter_and_keeps_marker_
         },
     )
 
-    assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
-        ("Adventure Theme Park", "matched"),
-        ("Trial Grounds", "matched"),
-        ("Streaming service", "needs_mapping"),
-        ("Console appearance", "needs_mapping"),
-        ("Ad Sales PS4 Themes", "suggested_skip"),
-        ("Subscription item", "needs_mapping"),
-        ("Wallet funding", "needs_mapping"),
-        ("Extra content", "needs_mapping"),
-    ]
+    items = {item["source_title"]: item["status"] for item in response.json()["items"]}
+    assert items["Adventure Theme Park"] == items["Trial Grounds"] == "ready"
+    assert items["Ad Sales PS4 Themes"] == "suggested_skip"
+    assert {items[title] for title in ("Streaming service", "Console appearance", "Subscription item", "Wallet funding", "Extra content")} <= {"ready", "needs_mapping"}
 
 
 @pytest.mark.parametrize("game_type", [1, 2, 3, 6, 7, 14])
@@ -630,8 +625,8 @@ def test_psn_import_preview_keeps_unique_exact_catalog_candidates_eligible_regar
         files={"file": ("export.csv", b"Game Name\nCatalog item\n", "text/csv")},
     )
 
-    assert response.json()["items"][0]["status"] == "matched"
-    assert response.json()["items"][0]["igdb_id"] == 1
+    assert response.json()["items"][0]["status"] == "ready"
+    assert response.json()["items"][0]["igdb_id"] is None
 
 
 def test_psn_import_preview_uses_catalog_type_only_to_choose_between_duplicate_exact_candidates(
@@ -673,9 +668,9 @@ def test_psn_import_preview_uses_catalog_type_only_to_choose_between_duplicate_e
     )
 
     assert [(item["source_title"], item["status"]) for item in response.json()["items"]] == [
-        ("Duplicate game", "needs_mapping"),
-        ("Web game", "matched"),
-        ("Mixed catalog records", "matched"),
+        ("Duplicate game", "ready"),
+        ("Web game", "ready"),
+        ("Mixed catalog records", "ready"),
     ]
 
 
@@ -695,7 +690,7 @@ def test_psn_import_preview_matches_edition_and_platform_suffixes(
 
     assert response.status_code == 200
     item = response.json()["items"][0]
-    assert (item["status"], item["igdb_id"], item["title"]) == ("matched", 101, "Horizon Zero Dawn")
+    assert (item["status"], item["igdb_id"], item["title"]) == ("ready", None, None)
     assert item["candidate_token"]
 
 
@@ -715,8 +710,8 @@ def test_psn_import_preview_keeps_ambiguous_normalized_titles_in_review(
 
     assert response.status_code == 200
     item = response.json()["items"][0]
-    assert (item["status"], item["reason"]) == ("needs_mapping", "Multiple exact catalog matches found.")
-    assert [suggestion["id"] for suggestion in item["suggestions"]] == [101, 102]
+    assert (item["status"], item["reason"]) == ("ready", None)
+    assert item["suggestions"] == []
 
 
 def test_psn_import_preview_uses_ps4_platform_to_resolve_exact_duplicates(
@@ -751,7 +746,7 @@ def test_psn_import_preview_uses_ps4_platform_to_resolve_exact_duplicates(
     )
 
     item = response.json()["items"][0]
-    assert (item["status"], item["igdb_id"], item["title"]) == ("matched", 7292, "MORTAL KOMBAT X")
+    assert (item["status"], item["igdb_id"], item["title"]) == ("ready", None, None)
 
 
 def test_psn_import_preview_keeps_duplicate_titles_without_playstation_platform_ambiguous(
@@ -765,7 +760,7 @@ def test_psn_import_preview_keeps_duplicate_titles_without_playstation_platform_
     monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nFORTNITE\n", "text/csv")})
 
-    assert response.json()["items"][0]["status"] == "needs_mapping"
+    assert response.json()["items"][0]["status"] == "ready"
 
 
 def test_psn_import_preview_reports_unmatched_catalog_titles(
@@ -779,7 +774,7 @@ def test_psn_import_preview_reports_unmatched_catalog_titles(
     monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")})
 
-    assert response.json()["items"][0]["status"] == "needs_mapping"
+    assert response.json()["items"][0]["status"] == "ready"
 
 
 def test_psn_import_preview_reports_catalog_unavailability(
@@ -795,7 +790,7 @@ def test_psn_import_preview_reports_catalog_unavailability(
     monkeypatch.setattr(app_main, "fetch_igdb_games_batch", _batch_from_search(search_catalog))
     response = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")})
 
-    assert response.json()["items"][0]["status"] == "catalog_unavailable"
+    assert response.json()["items"][0]["status"] == "ready"
 
 
 def test_psn_import_preview_excludes_marker_products(api_client, user_factory, auth_as, app_main, monkeypatch):
@@ -820,7 +815,7 @@ def test_psn_import_preview_excludes_marker_products(api_client, user_factory, a
     )
 
     assert response.json()["items"][0]["status"] == "needs_mapping"
-    assert search_catalog.await_count == 1
+    search_catalog.assert_not_awaited()
 
 
 @pytest.mark.parametrize(
@@ -852,7 +847,7 @@ def test_psn_import_preview_excludes_clear_non_game_product_classes(
     )
 
     assert response.json()["items"][0]["status"] == "needs_mapping"
-    assert search_catalog.await_count == 1
+    search_catalog.assert_not_awaited()
 
 
 def test_psn_import_preview_excludes_non_product_transactions_before_catalog_lookup(
@@ -879,8 +874,8 @@ def test_psn_import_preview_excludes_non_product_transactions_before_catalog_loo
         },
     )
 
-    assert response.json()["items"][0]["reason"] == "No exact catalog match found."
-    assert search_catalog.await_count == 1
+    assert response.json()["items"][0]["status"] == "ready"
+    search_catalog.assert_not_awaited()
 
 
 def test_psn_import_mixed_preview_and_confirmation_flow(
@@ -915,7 +910,7 @@ def test_psn_import_mixed_preview_and_confirmation_flow(
         },
     )
 
-    assert [item["status"] for item in preview.json()["items"]] == ["matched", "needs_mapping", "suggested_skip"]
+    assert [item["status"] for item in preview.json()["items"]] == ["ready", "ready", "suggested_skip"]
     items = preview.json()["items"]
     confirm = api_client.post("/psn/import/confirm", json={"selections": [
         {"candidate_token": items[0]["candidate_token"], "action": "catalog", "catalog_id": 101},
@@ -1022,12 +1017,12 @@ def test_psn_import_confirm_persists_owner_scoped_idempotent_games(
     monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={"Hades": [{"id": 101, "name": "Hades"}], "Celeste": [{"id": 102, "name": "Celeste"}]}))
     owner = auth_as(user_factory(email="psn-owner@example.com"))
     preview = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\nCeleste\n", "text/csv")}).json()
-    tokens = {item["igdb_id"]: item["candidate_token"] for item in preview["items"]}
-    first = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": tokens[101], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens[101], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens[102], "action": "catalog", "catalog_id": 102}]})
+    tokens = {title: item["candidate_token"] for title, item in zip(["Hades", "Celeste"], preview["items"])}
+    first = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": tokens["Hades"], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens["Hades"], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens["Celeste"], "action": "catalog", "catalog_id": 102}]})
     assert first.status_code == 200
     assert first.json() == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2
-    second = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": tokens[101], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens[102], "action": "catalog", "catalog_id": 102}]})
+    second = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": tokens["Hades"], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens["Celeste"], "action": "catalog", "catalog_id": 102}]})
     assert second.json() == {"created": 0, "updated": 0, "skipped": 2, "total": 2}
 
     other = auth_as(user_factory(email="psn-other@example.com"))
@@ -1169,7 +1164,7 @@ def test_psn_import_confirm_accepts_typed_catalog_and_manual_selections(
     owner = auth_as(user_factory(email="psn-typed-selections@example.com"))
     preview = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\nDisco Elysium\n", "text/csv")})
     items = preview.json()["items"]
-    assert [item["status"] for item in items] == ["matched", "needs_mapping"]
+    assert [item["status"] for item in items] == ["ready", "ready"]
 
     first = api_client.post(
         "/psn/import/confirm",
@@ -1277,7 +1272,7 @@ def test_psn_library_repair_links_raw_rows_and_hides_quarantine(
     assert db_session.get(Game, junk.id).link_state == "quarantined"
 
 
-def test_library_overview_exposes_psn_catalog_lookup_progress(
+def test_library_overview_uses_matcher_version_for_psn_catalog_lookup_progress(
     api_client, db_session, user_factory, auth_as
 ):
     owner = auth_as(user_factory(email="psn-lookup-overview@example.com"))
@@ -1288,7 +1283,7 @@ def test_library_overview_exposes_psn_catalog_lookup_progress(
             external_id="psn:manual:pending",
             title="Pending",
             link_state="raw",
-            catalog_lookup_state=None,
+            catalog_lookup_state="skipped",
         ),
         Game(
             owner_id=owner.id,
@@ -1297,6 +1292,15 @@ def test_library_overview_exposes_psn_catalog_lookup_progress(
             title="Review",
             link_state="raw",
             catalog_lookup_state="review",
+            catalog_lookup_version=1,
+        ),
+        Game(
+            owner_id=owner.id,
+            source="psn",
+            external_id="psn:manual:no-match",
+            title="No match",
+            link_state="raw",
+            catalog_lookup_state="no_match",
         ),
         Game(
             owner_id=owner.id,
@@ -1306,17 +1310,115 @@ def test_library_overview_exposes_psn_catalog_lookup_progress(
             link_state="linked",
             catalog_game_id=101,
         ),
+        Game(
+            owner_id=owner.id,
+            source="psn",
+            external_id="psn:manual:hidden",
+            title="Hidden",
+            link_state="quarantined",
+            catalog_lookup_version=1,
+        ),
     ])
     db_session.commit()
 
     payload = api_client.get("/library/overview").json()
 
-    assert payload["pending_catalog_count"] == 1
+    assert payload["pending_catalog_count"] == 2
     assert {item["title"]: item["catalog_lookup_state"] for item in payload["games"]} == {
         "Linked": None,
-        "Pending": None,
+        "No match": "no_match",
+        "Pending": "skipped",
         "Review": "review",
     }
+
+
+def test_library_overview_exposes_clean_catalog_search_query_only_for_raw_psn_rows(
+    api_client, db_session, user_factory, auth_as
+):
+    owner = auth_as(user_factory(email="psn-query-overview@example.com"))
+    db_session.add_all([
+        Game(owner_id=owner.id, source="psn", external_id="psn:manual:fifa", title="EA SPORTS™ FIFA 16", link_state="raw", psn_search_aliases=["FIFA 16"], psn_source_platforms=["PS4"]),
+        Game(owner_id=owner.id, source="psn", external_id="psn:2", title="FIFA 16", link_state="linked", catalog_game_id=2),
+        Game(owner_id=owner.id, source="steam", external_id="10", title="Steam game"),
+        Game(owner_id=owner.id, source="manual", title="Manual game"),
+    ])
+    db_session.commit()
+
+    items = {item["title"]: item for item in api_client.get("/library/overview").json()["games"]}
+
+    assert items["EA SPORTS™ FIFA 16"]["catalog_search_query"] == "FIFA 16"
+    assert items["FIFA 16"]["catalog_search_query"] is None
+    assert items["Steam game"]["catalog_search_query"] is None
+    assert items["Manual game"]["catalog_search_query"] is None
+
+
+def test_enrichment_uses_stored_alias_and_platform(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    user = auth_as(user_factory(email="matcher-v2-alias@example.com"))
+    game = Game(owner_id=user.id, source="psn", external_id="psn:manual:fifa", title="EA SPORTS™ FIFA 16", link_state="raw", psn_search_aliases=["FIFA 16"], psn_source_platforms=["PS4"])
+    db_session.add(game)
+    db_session.commit()
+    resolver = AsyncMock(return_value={str(game.id): PsnCatalogDecision("linked", {"id": 2, "name": "FIFA 16", "platforms": ["PlayStation 4"], "game_type": 0}, "safe_winner", "safe_alias", 150)})
+    monkeypatch.setattr(app_main, "resolve_psn_catalog_evidence", resolver)
+
+    response = api_client.post("/psn/library-repair/enrich")
+
+    assert response.status_code == 200
+    resolver.assert_awaited_once()
+    assert resolver.await_args.args == ({str(game.id): PsnCatalogEvidence("EA SPORTS™ FIFA 16", ("FIFA 16",), ("PS4",))},)
+    db_session.refresh(game)
+    assert game.catalog_game_id == 2
+    assert game.catalog_lookup_version == PSN_CATALOG_MATCHER_VERSION
+
+
+def test_provider_failure_does_not_advance_matcher_version(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    user = auth_as(user_factory(email="matcher-v2-failure@example.com"))
+    game = Game(owner_id=user.id, source="psn", external_id="psn:manual:retry", title="Retry", link_state="raw")
+    db_session.add(game)
+    db_session.commit()
+    monkeypatch.setattr(app_main, "resolve_psn_catalog_evidence", AsyncMock(side_effect=PsnCatalogUnavailable))
+
+    response = api_client.post("/psn/library-repair/enrich")
+
+    assert response.status_code == 502
+    db_session.refresh(game)
+    assert game.catalog_lookup_version is None
+
+
+def test_preview_is_independent_of_catalog_provider(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    auth_as(user_factory(email="matcher-v2-preview@example.com"))
+    batch = AsyncMock(side_effect=AssertionError("preview must not call IGDB"))
+    single = AsyncMock(side_effect=AssertionError("preview must not call IGDB"))
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", batch)
+    monkeypatch.setattr(app_main, "fetch_igdb_games", single)
+
+    response = api_client.post("/psn/import/preview", files={"file": ("export.xlsx", _xlsx_bytes(rows=[["Game Title"], ["Example Game"]]))})
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["status"] == "ready"
+    assert response.json()["items"][0]["recommended_action"] == "raw"
+    batch.assert_not_awaited()
+    single.assert_not_awaited()
+
+
+def test_unresolved_success_records_matcher_version(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    user = auth_as(user_factory(email="matcher-v2-review@example.com"))
+    game = Game(owner_id=user.id, source="psn", external_id="psn:manual:review", title="Review", link_state="raw")
+    db_session.add(game)
+    db_session.commit()
+    monkeypatch.setattr(app_main, "resolve_psn_catalog_evidence", AsyncMock(return_value={str(game.id): PsnCatalogDecision("review", reason="ambiguous_top_candidates")}))
+
+    assert api_client.post("/psn/library-repair/enrich").status_code == 200
+    db_session.refresh(game)
+    assert game.catalog_lookup_state == "review"
+    assert game.catalog_lookup_version == PSN_CATALOG_MATCHER_VERSION
 
 
 def test_psn_enrichment_processes_every_raw_row_in_bounded_batches(

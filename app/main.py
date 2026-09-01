@@ -40,8 +40,10 @@ from app.psn_catalog_matcher import (
     PSN_CATALOG_MATCHER_VERSION,
     PsnCatalogEvidence,
     normalize_psn_platform,
+    preferred_psn_catalog_query,
     safe_psn_search_aliases,
 )
+from app.psn_catalog_service import PsnCatalogUnavailable, resolve_psn_catalog_evidence
 from app.psn_classification import psn_purchase_exclusion_reason, psn_repair_quarantine_reason
 from app.psn_resolution import classify_psn_candidate
 from app.psn_resolution import resolve_psn_catalog_titles
@@ -469,6 +471,18 @@ def list_game_route(db: Session = Depends(get_db),current_user: User = Depends(g
     return list_games(db, current_user.id)
 
 
+def _is_pending_psn_catalog_game(game: Game) -> bool:
+    return (
+        game.source == "psn"
+        and getattr(game, "link_state", None) not in {"linked", "quarantined"}
+        and getattr(game, "catalog_lookup_state", None) != "skipped"
+        and (
+            getattr(game, "catalog_lookup_version", None) is None
+            or game.catalog_lookup_version < PSN_CATALOG_MATCHER_VERSION
+        )
+    )
+
+
 @app.get("/library/overview", response_model=LibraryOverviewRead)
 async def library_overview_route(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
@@ -486,6 +500,15 @@ async def library_overview_route(
                 detail_game_id=(game.external_id if source == "steam" else str(getattr(game, "catalog_game_id", None)) if getattr(game, "link_state", None) == "linked" and getattr(game, "catalog_game_id", None) else None),
                 catalog_game_id=getattr(game, "catalog_game_id", None), link_state=getattr(game, "link_state", None) if game.source == "psn" else None,
                 catalog_lookup_state=getattr(game, "catalog_lookup_state", None) if game.source == "psn" else None,
+                catalog_search_query=(
+                    preferred_psn_catalog_query(PsnCatalogEvidence(
+                        game.title,
+                        tuple(getattr(game, "psn_search_aliases", None) or ()),
+                        tuple(getattr(game, "psn_source_platforms", None) or ()),
+                    ))
+                    if source == "psn" and getattr(game, "link_state", None) == "raw"
+                    else None
+                ),
                 title=game.title,
                 cover_url=(
                     steam_library_cover_url(game.external_id, game.img_icon_url)
@@ -520,9 +543,7 @@ async def library_overview_route(
         raw_count=sum(game.source == "psn" and getattr(game, "link_state", None) not in {"linked", "quarantined"} for game in repair_games),
         quarantined_count=sum(game.source == "psn" and getattr(game, "link_state", None) == "quarantined" for game in repair_games),
         pending_catalog_count=sum(
-            game.source == "psn"
-            and getattr(game, "link_state", None) not in {"linked", "quarantined"}
-            and getattr(game, "catalog_lookup_state", None) is None
+            _is_pending_psn_catalog_game(game)
             for game in repair_games
         ),
     )
@@ -737,39 +758,17 @@ def _psn_suggestions(results: list[dict]) -> list[dict]:
 async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) -> list[PsnImportPreviewItem]:
     candidates = parse_psn_export_candidates(content, filename)
     classifications = {candidate.title: classify_psn_candidate(candidate) for candidate in candidates}
-    skipped = {
-        candidate.title: classifications[candidate.title].reason
-        for candidate in candidates
-        if classifications[candidate.title].kind == "suggested_skip"
-    }
-    searchable = [candidate.title for candidate in candidates if candidate.title not in skipped]
-    resolutions = await resolve_psn_catalog_titles(
-        searchable, batch_fetcher=fetch_igdb_games_batch, single_fetcher=fetch_igdb_games,
-    )
     items: list[PsnImportPreviewItem] = []
     for candidate in candidates:
         token = _psn_candidate_token(user_id, candidate)
-        if candidate.title in skipped:
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="suggested_skip", recommended_action="skip", reason=skipped[candidate.title], candidate_token=token))
+        classification = classifications[candidate.title]
+        if classification.kind == "suggested_skip":
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="suggested_skip", recommended_action="skip", reason=classification.reason, candidate_token=token))
             continue
-        resolution = resolutions.get(candidate.title)
-        results = resolution.results if resolution else []
-        if resolution is None or resolution.kind == "unavailable":
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="catalog_unavailable", recommended_action="raw", reason="Catalog temporarily unavailable.", candidate_token=token))
+        if classification.kind == "needs_review":
+            items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", recommended_action="raw", reason=classification.reason, candidate_token=token))
             continue
-        if classifications[candidate.title].kind == "needs_review":
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", recommended_action="raw", reason=classifications[candidate.title].reason, suggestions=_psn_suggestions(results), candidate_token=token))
-            continue
-        matches = [game for game in results if game.get("id") and _psn_catalog_match_key(game.get("name") or "") == _psn_catalog_match_key(candidate.title)]
-        platform_names = {PSN_CATALOG_PLATFORM_NAMES.get(platform.casefold()) for platform in candidate.platforms}
-        platform_matches = [game for game in matches if any(name and _psn_has_platform(game, name) for name in platform_names)]
-        selected = platform_matches if len(platform_matches) == 1 else matches
-        if len(selected) == 1:
-            game = selected[0]
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="matched", recommended_action="catalog", igdb_id=int(game["id"]), title=game["name"], candidate_token=token))
-        else:
-            reason = "Multiple exact catalog matches found." if matches else "No exact catalog match found."
-            items.append(PsnImportPreviewItem(source_title=candidate.title, status="needs_mapping", recommended_action="raw", reason=reason, suggestions=_psn_suggestions(results), candidate_token=token))
+        items.append(PsnImportPreviewItem(source_title=candidate.title, status="ready", recommended_action="raw", candidate_token=token))
     return items
 
 
@@ -802,6 +801,7 @@ def _link_psn_game_to_catalog(db: Session, game: Game, catalog_id: int, detail: 
     target.catalog_game_id = catalog_id
     target.link_state = "linked"
     target.catalog_lookup_state = None
+    target.catalog_lookup_version = PSN_CATALOG_MATCHER_VERSION
     target.title = title
     target.img_icon_url = cover or target.img_icon_url
 
@@ -860,7 +860,8 @@ def _pending_psn_catalog_query(db: Session, owner_id: uuid.UUID):
         Game.owner_id == owner_id,
         Game.source == "psn",
         or_(Game.link_state.is_(None), Game.link_state.notin_({"linked", "quarantined"})),
-        Game.catalog_lookup_state.is_(None),
+        or_(Game.catalog_lookup_state.is_(None), Game.catalog_lookup_state != "skipped"),
+        or_(Game.catalog_lookup_version.is_(None), Game.catalog_lookup_version < PSN_CATALOG_MATCHER_VERSION),
     )
 
 
@@ -883,17 +884,23 @@ async def enrich_psn_library_catalog(
         for game in games
         if psn_repair_quarantine_reason(game.title)
     }
-    searchable = [game.title for game in games if game.id not in quarantine]
-    resolutions = await resolve_psn_catalog_titles(
-        searchable,
-        max_fallback_titles=len(searchable),
-        batch_fetcher=fetch_igdb_games_batch,
-        single_fetcher=fetch_igdb_games,
-    )
-    if any(
-        resolutions.get(title) is None or resolutions[title].kind == "unavailable"
-        for title in searchable
-    ):
+    evidence = {
+        str(game.id): PsnCatalogEvidence(
+            game.title,
+            tuple(game.psn_search_aliases or ()),
+            tuple(game.psn_source_platforms or ()),
+        )
+        for game in games
+        if game.id not in quarantine
+    }
+    try:
+        decisions = await resolve_psn_catalog_evidence(
+            evidence,
+            batch_fetcher=fetch_igdb_games_batch,
+            single_fetcher=fetch_igdb_games,
+        )
+    except PsnCatalogUnavailable as exc:
+        db.rollback()
         raise HTTPException(status_code=502, detail="Catalog is temporarily unavailable")
 
     linked = review = quarantined = 0
@@ -903,20 +910,15 @@ async def enrich_psn_library_catalog(
                 game.link_state = "quarantined"
                 quarantined += 1
                 continue
-            results = resolutions[game.title].results
-            matches = [
-                item
-                for item in results
-                if item.get("id")
-                and _psn_catalog_match_key(str(item.get("name") or ""))
-                == _psn_catalog_match_key(game.title)
-            ]
-            if len(matches) == 1:
-                match = matches[0]
-                _link_psn_game_to_catalog(db, game, int(match["id"]), match)
+            decision = decisions.get(str(game.id))
+            if decision is None:
+                raise PsnCatalogUnavailable
+            if decision.state == "linked" and decision.match:
+                _link_psn_game_to_catalog(db, game, int(decision.match["id"]), decision.match)
                 linked += 1
                 continue
-            game.catalog_lookup_state = "review" if results else "no_match"
+            game.catalog_lookup_state = decision.state
+            game.catalog_lookup_version = PSN_CATALOG_MATCHER_VERSION
             review += 1
         db.commit()
         remaining = _pending_psn_catalog_query(db, current_user.id).count()
@@ -996,7 +998,7 @@ async def preview_psn_import(
         games=[item.source_title for item in items],
         total=len(items),
         confirmed_total=sum(item.recommended_action != "skip" for item in items),
-        message="Plausible PlayStation games are selected automatically; catalog matches add artwork and details when available.",
+        message="Selected games are added first; catalog artwork and details are matched later in your library.",
     )
 
 
