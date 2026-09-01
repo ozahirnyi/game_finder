@@ -223,7 +223,10 @@ def score_candidate(
     candidate_key = normalize_psn_catalog_identity(candidate_name)
     title_key = normalize_psn_catalog_identity(evidence.title)
     alias_keys = {normalize_psn_catalog_identity(value) for value in evidence.aliases}
-    query_keys = {normalize_psn_catalog_identity(value) for value in queries}
+    query_keys = {
+        normalize_psn_catalog_identity(value)
+        for value in build_psn_query_variants(evidence)
+    }
     candidate_query_keys = {
         normalize_psn_catalog_identity(value)
         for value in build_psn_query_variants(PsnCatalogEvidence(candidate_name))

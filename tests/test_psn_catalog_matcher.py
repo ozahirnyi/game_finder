@@ -83,6 +83,16 @@ def test_fuzzy_result_is_never_auto_linked():
     assert decision.state == "review"
 
 
+def test_query_key_cannot_create_identity_match_for_different_source_title():
+    from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
+
+    decision = choose_psn_catalog_match(PsnCatalogEvidence("Alpha", platforms=("PS5",)), {
+        "Beta": [{"id": 30, "name": "Beta", "platforms": ["PlayStation 5"], "game_type": 0}],
+    })
+
+    assert decision.state == "review"
+
+
 def test_unknown_source_platform_keeps_equal_playstation_releases_ambiguous():
     from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
 
