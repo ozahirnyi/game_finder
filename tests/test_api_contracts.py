@@ -1,13 +1,112 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from unittest.mock import Mock
 import uuid
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 import app.main as main
+from app.recommendation_quota import QuotaDenied, QuotaSnapshot
 
 
 client = TestClient(main.app)
+
+
+@pytest.fixture
+def authenticated_ai_request():
+    user = SimpleNamespace(id=uuid.uuid4())
+    db = object()
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: db
+    try:
+        yield user, db
+    finally:
+        main.app.dependency_overrides.clear()
+
+
+def quota_snapshot(remaining: int) -> QuotaSnapshot:
+    return QuotaSnapshot(
+        limit=3,
+        remaining=remaining,
+        cooldown_until=None,
+        reset_at=datetime(2026, 9, 2, tzinfo=timezone.utc),
+    )
+
+
+def test_ai_recommendations_require_authentication():
+    response = client.post("/recommendations", json={"prompt": "cozy co-op", "liked_game_ids": []})
+    assert response.status_code == 401
+
+
+def test_ai_recommendation_quota_denial_is_structured(monkeypatch, authenticated_ai_request):
+    snapshot = QuotaSnapshot(
+        limit=3, remaining=0, cooldown_until=None,
+        reset_at=datetime(2026, 9, 2, tzinfo=timezone.utc),
+    )
+
+    def deny(*_args, **_kwargs):
+        raise QuotaDenied("ai_daily_quota_exhausted", "Daily AI search limit reached.", snapshot)
+
+    monkeypatch.setattr(main, "reserve_quota", deny)
+    response = client.post("/recommendations", json={"prompt": "cozy co-op"})
+    assert response.status_code == 429
+    assert response.json()["detail"]["code"] == "ai_daily_quota_exhausted"
+    assert response.json()["detail"]["quota"]["remaining"] == 0
+
+
+def test_ai_response_contains_quota_catalog_cover_reason_and_tags(monkeypatch, authenticated_ai_request):
+    monkeypatch.setattr(main, "reserve_quota", lambda *_a, **_k: quota_snapshot(remaining=2))
+    monkeypatch.setattr(main, "get_recommendation", lambda *_a, **_k: {
+        "recommendations": [{"title": "Hades II", "reason": "Fast runs", "tags": ["Action"]}]
+    })
+
+    async def enrich(items, _search):
+        return [{**items[0], "game": {
+            "id": 8, "name": "Hades II", "released": "2025-09-25",
+            "background_image": "cover.jpg", "platforms": ["PC"],
+        }}]
+
+    monkeypatch.setattr(main, "enrich_recommendations", enrich)
+    response = client.post("/recommendations", json={"prompt": "fast roguelike"})
+    assert response.status_code == 200
+    assert response.json()["recommendations"][0]["game"]["id"] == 8
+    assert response.json()["recommendations"][0]["reason"] == "Fast runs"
+    assert response.json()["quota"]["remaining"] == 2
+
+
+def test_quota_status_returns_authoritative_fields(monkeypatch, authenticated_ai_request):
+    monkeypatch.setattr(main, "get_quota_status", lambda *_a, **_k: quota_snapshot(remaining=3))
+    response = client.get("/recommendations/quota")
+    assert response.status_code == 200
+    assert response.json() == {
+        "limit": 3, "remaining": 3, "cooldown_until": None,
+        "reset_at": "2026-09-02T00:00:00Z",
+    }
+
+
+def test_blank_prompt_does_not_reserve_quota(monkeypatch, authenticated_ai_request):
+    reserve = Mock()
+    monkeypatch.setattr(main, "reserve_quota", reserve)
+    response = client.post("/recommendations", json={"prompt": "   "})
+    assert response.status_code == 400
+    reserve.assert_not_called()
+
+
+def test_provider_failure_keeps_reserved_attempt(monkeypatch, authenticated_ai_request):
+    reserve = Mock(return_value=quota_snapshot(remaining=2))
+    monkeypatch.setattr(main, "reserve_quota", reserve)
+    monkeypatch.setattr(
+        main,
+        "get_recommendation",
+        Mock(side_effect=HTTPException(status_code=503, detail={
+            "code": "ai_recommendations_unavailable", "message": "OpenAI is temporarily unavailable.",
+        })),
+    )
+    response = client.post("/recommendations", json={"prompt": "cozy"})
+    assert response.status_code == 503
+    reserve.assert_called_once()
 
 
 def test_search_uses_steam_results_when_rawg_times_out(monkeypatch):
@@ -42,6 +141,7 @@ def test_search_uses_steam_results_when_rawg_times_out(monkeypatch):
         "source": "steam",
         "steam_appid": 1145360,
         "url": "https://store.steampowered.com/app/1145360/",
+        "platforms": [],
     }]}
 
 

@@ -65,14 +65,31 @@ class RecommendationRequest(BaseModel):
     liked_game_ids: list[int] = Field(default_factory=list)
 
 
+class RecommendationQuotaRead(BaseModel):
+    limit: int
+    remaining: int
+    cooldown_until: datetime | None = None
+    reset_at: datetime
+
+
+class RecommendationCatalogGame(BaseModel):
+    id: int
+    name: str
+    released: str | None = None
+    background_image: str | None = None
+    platforms: list[str] = Field(default_factory=list)
+
+
 class RecommendationItem(BaseModel):
     title: str
     reason: str
     tags: list[str] = Field(default_factory=list)
+    game: RecommendationCatalogGame | None = None
 
 
 class RecommendationResponse(BaseModel):
     recommendations: list[RecommendationItem] = Field(default_factory=list)
+    quota: RecommendationQuotaRead | None = None
 
 
 class GameSearchItem(BaseModel):
@@ -83,6 +100,7 @@ class GameSearchItem(BaseModel):
     source: str | None = None
     steam_appid: int | None = None
     url: str | None = None
+    platforms: list[str] = Field(default_factory=list)
 
 
 class GameSearchResponse(BaseModel):

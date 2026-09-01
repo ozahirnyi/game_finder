@@ -3,10 +3,12 @@ import os
 import uuid
 import contextlib
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -15,6 +17,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.openai_client import get_recommendation
 from app.cache import build_cache_key, get_json_cached
+from app.recommendation_quota import QuotaDenied, get_quota_status, reserve_quota
+from app.recommendations import enrich_recommendations
 from app.integrations.rawg import (
     fetch_rawg_game_detail,
     fetch_rawg_games,
@@ -28,7 +32,7 @@ from app.steam_store import fetch_steam_store_deals, fetch_steam_store_search
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
-    RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
+    RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
     HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest
 from app.steam import (
@@ -817,6 +821,7 @@ async def search(request: Request, q: str, page: int = 1):
                         "source": "steam",
                         "steam_appid": game["steam_appid"],
                         "url": game["url"],
+                        "platforms": [],
                     }
                     for game in games
                 ]}
@@ -942,16 +947,36 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
     return await get_json_cached(key, CACHE_TTL, fetch)
 
 
-@app.post("/recommendations",response_model=RecommendationResponse)
-@limiter.limit("5/minute")
-async def recommendations(request: Request, data: RecommendationRequest):
-    if not data.prompt.strip():
-        raise HTTPException(status_code=400,detail="prompt cannot be empty")
-    result = await asyncio.to_thread(
-        get_recommendation,
-        data.prompt,
-        data.liked_game_ids,)
-    return result
+@app.get("/recommendations/quota", response_model=RecommendationQuotaRead)
+def recommendation_quota(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    return get_quota_status(db, current_user.id)
+
+
+@app.post("/recommendations", response_model=RecommendationResponse)
+async def recommendations(
+    data: RecommendationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    prompt = data.prompt.strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="prompt cannot be empty")
+    try:
+        quota = reserve_quota(db, current_user.id)
+    except QuotaDenied as exc:
+        raise HTTPException(status_code=429, detail=jsonable_encoder({
+            "code": exc.code, "message": exc.message, "quota": asdict(exc.snapshot),
+        })) from exc
+    generated = await asyncio.to_thread(get_recommendation, prompt, data.liked_game_ids)
+
+    async def cached_search(title: str):
+        key = build_cache_key("recommendation_catalog_search", q=title)
+        return await get_json_cached(key, CACHE_TTL, lambda: fetch_rawg_games(title, page=1))
+
+    enriched = await enrich_recommendations(generated.get("recommendations", []), cached_search)
+    return {"recommendations": enriched, "quota": asdict(quota)}
 
 
 @app.exception_handler(RateLimitExceeded)
