@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type FormEvent,
@@ -117,23 +118,46 @@ export function AiRecommendationSearch() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const authGenerationRef = useRef(0);
 
-  const loadQuota = useCallback(async () => {
-    if (!authenticated) return;
+  const loadQuotaForGeneration = useCallback(async (generation: number) => {
     setQuotaState("loading");
     try {
-      setQuota(await getRecommendationQuota());
+      const nextQuota = await getRecommendationQuota();
+      if (generation !== authGenerationRef.current) return;
+      setQuota(nextQuota);
       setNow(Date.now());
       setQuotaState("success");
     } catch {
+      if (generation !== authGenerationRef.current) return;
       setQuota(null);
       setQuotaState("error");
     }
-  }, [authenticated]);
+  }, []);
+
+  const loadQuota = useCallback(() => {
+    void loadQuotaForGeneration(authGenerationRef.current);
+  }, [loadQuotaForGeneration]);
 
   useEffect(() => {
-    void loadQuota();
-  }, [loadQuota]);
+    const generation = authGenerationRef.current + 1;
+    authGenerationRef.current = generation;
+    setQuota(null);
+    setQuotaState(authenticated ? "loading" : "idle");
+    setRecommendations([]);
+    setPrompt("");
+    setPending(false);
+    setError("");
+    setNow(Date.now());
+    if (authenticated) {
+      void loadQuotaForGeneration(generation);
+    }
+    return () => {
+      if (authGenerationRef.current === generation) {
+        authGenerationRef.current += 1;
+      }
+    };
+  }, [authenticated, loadQuotaForGeneration]);
 
   const cooldownSeconds = quota?.cooldown_until
     ? Math.max(0, Math.ceil((Date.parse(quota.cooldown_until) - now) / 1000))
@@ -156,14 +180,17 @@ export function AiRecommendationSearch() {
     event.preventDefault();
     const normalized = prompt.trim();
     if (!normalized || disabled) return;
+    const generation = authGenerationRef.current;
     setPending(true);
     setError("");
     try {
       const response = await getRecommendations(normalized);
+      if (generation !== authGenerationRef.current) return;
       setRecommendations(response.recommendations);
       setQuota(response.quota);
       setNow(Date.now());
     } catch (reason) {
+      if (generation !== authGenerationRef.current) return;
       if (
         reason instanceof ApiError &&
         reason.status === 429 &&
@@ -176,7 +203,9 @@ export function AiRecommendationSearch() {
         reason instanceof Error ? reason.message : "AI search is unavailable.",
       );
     } finally {
-      setPending(false);
+      if (generation === authGenerationRef.current) {
+        setPending(false);
+      }
     }
   }
 

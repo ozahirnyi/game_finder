@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -11,16 +11,25 @@ import {
   getAuthSnapshot,
   getRecommendationQuota,
   getRecommendations,
+  type AIRecommendationResponse,
   type RecommendationQuota,
 } from "@/lib/api";
 import { AiRecommendationSearch } from "./AiRecommendationSearch";
+
+const authStore = vi.hoisted(() => ({
+  authenticated: false,
+  listeners: new Set<() => void>(),
+}));
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...actual,
-    getAuthSnapshot: vi.fn(),
-    subscribeToAuthChanges: vi.fn(() => () => undefined),
+    getAuthSnapshot: vi.fn(() => authStore.authenticated),
+    subscribeToAuthChanges: vi.fn((listener: () => void) => {
+      authStore.listeners.add(listener);
+      return () => authStore.listeners.delete(listener);
+    }),
     getRecommendationQuota: vi.fn(),
     getRecommendations: vi.fn(),
   };
@@ -43,6 +52,23 @@ function fillAndSubmit(prompt: string) {
   fireEvent.click(screen.getByRole("button", { name: /find games/i }));
 }
 
+function setAuthenticated(authenticated: boolean) {
+  act(() => {
+    authStore.authenticated = authenticated;
+    authStore.listeners.forEach((listener) => listener());
+  });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function renderAiSearch() {
   const rootRoute = createRootRoute({ component: AiRecommendationSearch });
   const router = createRouter({
@@ -54,13 +80,15 @@ function renderAiSearch() {
 
 describe("AiRecommendationSearch", () => {
   beforeEach(() => {
-    vi.mocked(getAuthSnapshot).mockReset();
+    authStore.authenticated = false;
+    authStore.listeners.clear();
+    vi.mocked(getAuthSnapshot).mockClear();
     vi.mocked(getRecommendationQuota).mockReset();
     vi.mocked(getRecommendations).mockReset();
   });
 
   it("does not call AI APIs for a guest and links to sign in", async () => {
-    vi.mocked(getAuthSnapshot).mockReturnValue(false);
+    authStore.authenticated = false;
 
     renderAiSearch();
 
@@ -72,7 +100,7 @@ describe("AiRecommendationSearch", () => {
   });
 
   it("shows remaining quota and blocks submission during cooldown", async () => {
-    vi.mocked(getAuthSnapshot).mockReturnValue(true);
+    authStore.authenticated = true;
     vi.mocked(getRecommendationQuota).mockResolvedValue(
       availableQuota(2, new Date(Date.now() + 60_000).toISOString()),
     );
@@ -88,7 +116,7 @@ describe("AiRecommendationSearch", () => {
   });
 
   it("shows an unavailable quota state and retries loading", async () => {
-    vi.mocked(getAuthSnapshot).mockReturnValue(true);
+    authStore.authenticated = true;
     vi.mocked(getRecommendationQuota)
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce(availableQuota());
@@ -107,7 +135,7 @@ describe("AiRecommendationSearch", () => {
   });
 
   it("renders a matched cover, internal link, reason, and tags", async () => {
-    vi.mocked(getAuthSnapshot).mockReturnValue(true);
+    authStore.authenticated = true;
     vi.mocked(getRecommendationQuota).mockResolvedValue(availableQuota());
     vi.mocked(getRecommendations).mockResolvedValue({
       recommendations: [
@@ -143,7 +171,7 @@ describe("AiRecommendationSearch", () => {
   });
 
   it("keeps existing cards after a later request fails", async () => {
-    vi.mocked(getAuthSnapshot).mockReturnValue(true);
+    authStore.authenticated = true;
     vi.mocked(getRecommendationQuota).mockResolvedValue(availableQuota());
     vi.mocked(getRecommendations)
       .mockResolvedValueOnce({
@@ -174,7 +202,7 @@ describe("AiRecommendationSearch", () => {
   });
 
   it("uses ordinary catalog search for an unmatched recommendation", async () => {
-    vi.mocked(getAuthSnapshot).mockReturnValue(true);
+    authStore.authenticated = true;
     vi.mocked(getRecommendationQuota).mockResolvedValue(availableQuota());
     vi.mocked(getRecommendations).mockResolvedValue({
       recommendations: [
@@ -204,7 +232,7 @@ describe("AiRecommendationSearch", () => {
   });
 
   it("uses authoritative quota details from a 429 response", async () => {
-    vi.mocked(getAuthSnapshot).mockReturnValue(true);
+    authStore.authenticated = true;
     vi.mocked(getRecommendationQuota).mockResolvedValue(availableQuota());
     vi.mocked(getRecommendations).mockRejectedValue(
       new ApiError("Daily AI search limit reached.", 429, {
@@ -223,5 +251,146 @@ describe("AiRecommendationSearch", () => {
     );
     expect(screen.getByText(/0 of 3 AI searches remaining/i)).toBeVisible();
     expect(screen.getByRole("button", { name: /resets/i })).toBeDisabled();
+  });
+
+  it("clears account-scoped cards and quota across logout and login", async () => {
+    authStore.authenticated = true;
+    const nextQuota = deferred<RecommendationQuota>();
+    vi.mocked(getRecommendationQuota)
+      .mockResolvedValueOnce(availableQuota())
+      .mockImplementationOnce(() => nextQuota.promise);
+    vi.mocked(getRecommendations).mockResolvedValue({
+      recommendations: [
+        {
+          title: "Hades II",
+          reason: "Fast runs",
+          tags: ["Action"],
+          game: null,
+        },
+      ],
+      quota: availableQuota(2),
+    });
+
+    renderAiSearch();
+    await screen.findByText(/3 of 3 AI searches remaining/i);
+    fillAndSubmit("fast runs");
+    expect(
+      await screen.findByRole("heading", { name: "Hades II" }),
+    ).toBeVisible();
+
+    setAuthenticated(false);
+    expect(await screen.findByRole("link", { name: /sign in/i })).toBeVisible();
+    setAuthenticated(true);
+
+    expect(
+      await screen.findByText("Loading AI search allowance"),
+    ).toBeVisible();
+    expect(
+      screen.queryByText(/AI searches remaining/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Hades II" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ignores a quota response from an earlier auth session", async () => {
+    authStore.authenticated = true;
+    const oldQuota = deferred<RecommendationQuota>();
+    const currentQuota = deferred<RecommendationQuota>();
+    vi.mocked(getRecommendationQuota)
+      .mockImplementationOnce(() => oldQuota.promise)
+      .mockImplementationOnce(() => currentQuota.promise);
+
+    renderAiSearch();
+    expect(
+      await screen.findByText("Loading AI search allowance"),
+    ).toBeVisible();
+    setAuthenticated(false);
+    setAuthenticated(true);
+    currentQuota.resolve(availableQuota(2));
+    expect(
+      await screen.findByText(/2 of 3 AI searches remaining/i),
+    ).toBeVisible();
+
+    oldQuota.resolve(availableQuota(0));
+    await act(async () => {
+      await oldQuota.promise;
+    });
+
+    expect(screen.getByText(/2 of 3 AI searches remaining/i)).toBeVisible();
+    expect(
+      screen.queryByText(/0 of 3 AI searches remaining/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ignores a recommendation response from an earlier auth session", async () => {
+    authStore.authenticated = true;
+    const oldRecommendations = deferred<AIRecommendationResponse>();
+    vi.mocked(getRecommendationQuota)
+      .mockResolvedValueOnce(availableQuota())
+      .mockResolvedValueOnce(availableQuota(2));
+    vi.mocked(getRecommendations).mockImplementationOnce(
+      () => oldRecommendations.promise,
+    );
+
+    renderAiSearch();
+    await screen.findByText(/3 of 3 AI searches remaining/i);
+    fillAndSubmit("old request");
+    expect(
+      screen.getByRole("button", { name: /finding games/i }),
+    ).toBeDisabled();
+    setAuthenticated(false);
+    setAuthenticated(true);
+    expect(
+      await screen.findByText(/2 of 3 AI searches remaining/i),
+    ).toBeVisible();
+
+    oldRecommendations.resolve({
+      recommendations: [
+        {
+          title: "Stale Game",
+          reason: "From the old session",
+          tags: ["Stale"],
+          game: null,
+        },
+      ],
+      quota: availableQuota(0),
+    });
+    await act(async () => {
+      await oldRecommendations.promise;
+    });
+
+    expect(screen.queryByText("Stale Game")).not.toBeInTheDocument();
+    expect(screen.getByText(/2 of 3 AI searches remaining/i)).toBeVisible();
+  });
+
+  it("blocks another request during a cooldown returned with recommendations", async () => {
+    authStore.authenticated = true;
+    vi.mocked(getRecommendationQuota).mockResolvedValue(availableQuota());
+    vi.mocked(getRecommendations).mockResolvedValue({
+      recommendations: [
+        {
+          title: "Hades II",
+          reason: "Fast runs",
+          tags: ["Action"],
+          game: null,
+        },
+      ],
+      quota: availableQuota(2, new Date(Date.now() + 60_000).toISOString()),
+    });
+
+    renderAiSearch();
+    await screen.findByText(/3 of 3 AI searches remaining/i);
+    fillAndSubmit("fast runs");
+
+    const cooldownButton = await screen.findByRole("button", {
+      name: /try again in/i,
+    });
+    expect(cooldownButton).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/describe what you want to play/i), {
+      target: { value: "second request" },
+    });
+    fireEvent.submit(cooldownButton.closest("form")!);
+    expect(getRecommendations).toHaveBeenCalledTimes(1);
   });
 });
