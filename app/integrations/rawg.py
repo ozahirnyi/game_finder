@@ -56,6 +56,11 @@ async def fetch_rawg_games(query: str, page: int = 1) -> dict[str, Any]:
                 "name": game.get("name"),
                 "released": game.get("released"),
                 "background_image": game.get("background_image"),
+                "platforms": [
+                    entry["platform"]["name"]
+                    for entry in game.get("platforms", [])
+                    if entry.get("platform", {}).get("name")
+                ],
             }
             for game in data.get("results", [])
         ]
