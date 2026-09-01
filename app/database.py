@@ -3,10 +3,10 @@ import uuid
 import os
 import secrets
 from dotenv import load_dotenv
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import CheckConstraint, create_engine, String, DateTime, ForeignKey, Float, Integer, Index, JSON, Text, text, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, create_engine, Date, String, DateTime, ForeignKey, Float, Integer, Index, JSON, Text, text, UniqueConstraint, func
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.exc import OperationalError
 
@@ -286,6 +286,17 @@ class PriceAlert(Base):
     last_notification_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class AIRecommendationQuota(Base):
+    __tablename__ = "ai_recommendation_quotas"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    quota_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OAuthIdentity(Base):
