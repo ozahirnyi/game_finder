@@ -1056,6 +1056,67 @@ def test_psn_catalog_confirmation_promotes_matching_owner_raw_row(api_client, db
     assert db_session.query(Game).filter_by(owner_id=other.owner_id, source="psn").one().link_state == "raw"
 
 
+def test_psn_catalog_confirmation_merges_each_matching_raw_row_for_one_catalog_selection(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory(email="psn-promote-two-raw-owner@example.com"))
+    first_raw = Game(
+        owner_id=owner.id,
+        title="Hades",
+        source="psn",
+        external_id=psn_manual_external_id("Hades"),
+        link_state="raw",
+        notes="first note",
+        playtime_forever=12,
+        psn_search_aliases=["Hades legacy"],
+        psn_source_platforms=["PS4"],
+        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+    )
+    second_raw = Game(
+        owner_id=owner.id,
+        title="Hades Complete Edition",
+        source="psn",
+        external_id=psn_manual_external_id("Hades Complete Edition"),
+        link_state="raw",
+        notes="second note",
+        playtime_forever=24,
+        psn_search_aliases=["Hades Complete legacy"],
+        psn_source_platforms=["PS5"],
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+    db_session.add_all([first_raw, second_raw])
+    db_session.commit()
+    monkeypatch.setattr(app_main, "resolve_psn_catalog_titles", AsyncMock(return_value={
+        "Hades": CatalogResolution("matched", [{"id": 101, "name": "Hades"}]),
+        "Hades Complete Edition": CatalogResolution("matched", [{"id": 101, "name": "Hades"}]),
+    }))
+    monkeypatch.setattr(app_main, "fetch_igdb_game_detail", AsyncMock(return_value={
+        "id": 101, "name": "Hades", "background_image": "https://cover",
+    }))
+    preview = api_client.post(
+        "/psn/import/preview",
+        files={"file": ("export.csv", b"Game Name\nHades\nHades Complete Edition\n", "text/csv")},
+    ).json()
+
+    response = api_client.post("/psn/import/confirm", json={"selections": [
+        {"candidate_token": preview["items"][0]["candidate_token"], "action": "catalog", "catalog_id": 101},
+        {"candidate_token": preview["items"][1]["candidate_token"], "action": "catalog", "catalog_id": 101},
+    ]})
+
+    assert response.status_code == 200
+    games = db_session.query(Game).filter_by(owner_id=owner.id, source="psn").all()
+    assert len(games) == 1
+    game = games[0]
+    assert (game.external_id, game.catalog_game_id, game.link_state) == ("psn:101", 101, "linked")
+    assert (game.notes, game.playtime_forever, game.created_at) == (
+        "first note", 24, datetime(2024, 1, 1),
+    )
+    assert game.psn_search_aliases == [
+        "Hades legacy", "Hades Complete legacy", "Hades", "Hades Complete Edition",
+    ]
+    assert game.psn_source_platforms == ["PS4", "PS5"]
+
+
 def test_psn_catalog_confirmation_enriches_linked_row_and_merges_raw_duplicate(api_client, db_session, user_factory, auth_as, app_main, monkeypatch):
     owner = auth_as(user_factory(email="psn-merge-owner@example.com"))
     raw = Game(

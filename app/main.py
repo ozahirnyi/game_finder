@@ -1046,7 +1046,7 @@ async def confirm_psn_import(
     current_user: User = Depends(get_current_user),
 ):
     unique_games: dict[str, tuple[str, int | None, str | None, str, PsnCatalogEvidence]] = {}
-    raw_sources: dict[str, PsnCatalogEvidence] = {}
+    raw_sources: dict[str, list[PsnCatalogEvidence]] = {}
     for selection in data.selections:
         evidence = _psn_candidate_from_token(selection.candidate_token, current_user.id)
         if selection.action == "catalog":
@@ -1056,7 +1056,7 @@ async def confirm_psn_import(
                 raise HTTPException(status_code=422, detail="Choose a valid catalog game") from exc
             title, cover = _psn_linked_game_payload(detail, selection.catalog_id or 0)
             external_id = f"psn:{selection.catalog_id}"
-            raw_sources[external_id] = evidence
+            raw_sources.setdefault(external_id, []).append(evidence)
             existing_selection = unique_games.get(external_id)
             if existing_selection:
                 evidence = _merge_psn_catalog_evidence(existing_selection[4], evidence)
@@ -1079,9 +1079,22 @@ async def confirm_psn_import(
     try:
         for external_id, (title, catalog_game_id, cover, link_state, evidence) in unique_games.items():
             imported = existing.get(external_id)
-            raw_evidence = raw_sources.get(external_id)
-            raw = existing.get(psn_manual_external_id(raw_evidence.title)) if raw_evidence else None
-            if imported is None and raw is not None:
+            raw_rows = []
+            raw_ids = set()
+            for raw_evidence in raw_sources.get(external_id, []):
+                raw = existing.get(psn_manual_external_id(raw_evidence.title))
+                if raw is not None and raw.id not in raw_ids:
+                    raw_rows.append(raw)
+                    raw_ids.add(raw.id)
+            if imported is None and raw_rows:
+                raw = raw_rows[0]
+                for duplicate in raw_rows[1:]:
+                    raw.created_at = min(raw.created_at, duplicate.created_at)
+                    raw.notes = raw.notes or duplicate.notes
+                    raw.info = raw.info or duplicate.info
+                    raw.playtime_forever = max(raw.playtime_forever or 0, duplicate.playtime_forever or 0) or None
+                    _merge_game_psn_catalog_evidence(raw, _psn_game_catalog_evidence(duplicate))
+                    db.delete(duplicate)
                 raw.external_id = external_id
                 raw.catalog_game_id = catalog_game_id
                 raw.link_state = link_state
@@ -1094,14 +1107,17 @@ async def confirm_psn_import(
                 updated += 1
                 continue
             merged_raw = False
-            if imported is not None and raw is not None and raw.id != imported.id:
-                imported.created_at = min(imported.created_at, raw.created_at)
-                imported.notes = imported.notes or raw.notes
-                imported.info = imported.info or raw.info
-                imported.playtime_forever = max(imported.playtime_forever or 0, raw.playtime_forever or 0) or None
-                _merge_game_psn_catalog_evidence(imported, _psn_game_catalog_evidence(raw))
-                db.delete(raw)
-                merged_raw = True
+            if imported is not None:
+                for raw in raw_rows:
+                    if raw.id == imported.id:
+                        continue
+                    imported.created_at = min(imported.created_at, raw.created_at)
+                    imported.notes = imported.notes or raw.notes
+                    imported.info = imported.info or raw.info
+                    imported.playtime_forever = max(imported.playtime_forever or 0, raw.playtime_forever or 0) or None
+                    _merge_game_psn_catalog_evidence(imported, _psn_game_catalog_evidence(raw))
+                    db.delete(raw)
+                    merged_raw = True
             if imported is None:
                 db.add(
                     Game(
