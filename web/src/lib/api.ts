@@ -72,6 +72,7 @@ export type LibraryOverviewGame = {
   catalog_game_id?: number | null;
   link_state?: "linked" | "raw" | null;
   catalog_lookup_state?: "review" | "no_match" | "skipped" | null;
+  catalog_search_query?: string | null;
   title: string;
   cover_url?: string | null;
   playtime_forever?: number | null;
@@ -329,7 +330,7 @@ export type PsnImportPreview = {
 };
 export type PsnImportPreviewItem = {
     source_title: string;
-    status: "matched" | "needs_mapping" | "suggested_skip" | "catalog_unavailable";
+    status: "matched" | "needs_mapping" | "suggested_skip" | "catalog_unavailable" | "ready";
     recommended_action: "catalog" | "raw" | "skip";
   igdb_id?: number | null;
   title?: string | null;
