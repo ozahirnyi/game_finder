@@ -6,6 +6,7 @@ import pytest
 from openpyxl import Workbook
 
 from app.database import Favorite, Friendship, Game, PriceAlert, WishlistItem
+from app.psn_catalog_matcher import PsnCatalogEvidence
 from app.psn_export import psn_manual_external_id
 from app.psn_resolution import CatalogResolution
 
@@ -946,6 +947,69 @@ def test_psn_import_preview_accepts_supported_non_xlsx_exports(
 
     assert response.status_code == 200
     assert response.json()["games"] == expected_games
+
+
+def test_confirm_persists_signed_psn_catalog_evidence(
+    api_client, db_session, user_factory, auth_as
+):
+    auth_as(user_factory(email="matcher-v2-import@example.com"))
+    content = _xlsx_bytes("Transaction Detail", rows=[
+        ["Transaction Date", "Game Name", "Product Name", "Content Type", "Platform", "Transaction Type"],
+        ["2026-01-01", "Example Game", "Example Game", "Game", "PS5", "Product Purchase"],
+        ["2026-01-02", "Example Game", "Example Game Complete Edition", "Game", "PS4", "Product Purchase"],
+    ])
+    preview = api_client.post("/psn/import/preview", files={"file": ("export.xlsx", content)}).json()
+    token = preview["items"][0]["candidate_token"]
+    response = api_client.post("/psn/import/confirm", json={
+        "selections": [{"candidate_token": token, "action": "raw"}],
+    })
+
+    assert response.status_code == 200
+    stored = db_session.query(Game).filter(Game.source == "psn").one()
+    assert stored.psn_source_platforms == ["PS5", "PS4"]
+    assert stored.psn_search_aliases == ["Example Game", "Example Game Complete Edition"]
+    assert stored.catalog_lookup_version is None
+
+
+def test_legacy_title_only_candidate_token_remains_valid(user_factory, auth_as, app_main):
+    from jose import jwt
+
+    user = auth_as(user_factory(email="matcher-v2-legacy@example.com"))
+    token = jwt.encode({
+        "sub": str(user.id),
+        "title": "Legacy Game",
+        "hash": app_main._psn_catalog_match_key("Legacy Game"),
+    }, app_main.SECRET_KEY, algorithm="HS256")
+
+    assert app_main._psn_candidate_from_token(token, user.id) == PsnCatalogEvidence("Legacy Game")
+
+
+def test_reimport_merges_psn_evidence_and_preserves_user_data(
+    api_client, db_session, user_factory, auth_as
+):
+    auth_as(user_factory(email="matcher-v2-merge@example.com"))
+    first = _xlsx_bytes("Transaction Detail", rows=[
+        ["Game Name", "Product Name", "Platform", "Transaction Type"],
+        ["Example Game", "Example Game", "PS4", "Product Purchase"],
+    ])
+    first_item = api_client.post("/psn/import/preview", files={"file": ("first.xlsx", first)}).json()["items"][0]
+    api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": first_item["candidate_token"], "action": "raw"}]})
+    stored = db_session.query(Game).filter(Game.source == "psn").one()
+    stored.notes = "keep me"
+    stored.playtime_forever = 90
+    db_session.commit()
+
+    second = _xlsx_bytes("Transaction Detail", rows=[
+        ["Game Name", "Product Name", "Platform", "Transaction Type"],
+        ["Example Game", "Example Game Complete Edition", "PS5", "Product Purchase"],
+    ])
+    second_item = api_client.post("/psn/import/preview", files={"file": ("second.xlsx", second)}).json()["items"][0]
+    api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": second_item["candidate_token"], "action": "raw"}]})
+    db_session.refresh(stored)
+
+    assert stored.psn_source_platforms == ["PS4", "PS5"]
+    assert stored.psn_search_aliases == ["Example Game", "Example Game Complete Edition"]
+    assert (stored.notes, stored.playtime_forever) == ("keep me", 90)
 
 
 def test_psn_import_confirm_persists_owner_scoped_idempotent_games(

@@ -36,6 +36,12 @@ from app.integrations.igdb import (
 )
 from app.prices import fetch_game_price_history
 from app.psn_export import PsnExportCandidate, normalize_title, parse_psn_export_candidates, psn_manual_external_id
+from app.psn_catalog_matcher import (
+    PSN_CATALOG_MATCHER_VERSION,
+    PsnCatalogEvidence,
+    normalize_psn_platform,
+    safe_psn_search_aliases,
+)
 from app.psn_classification import psn_purchase_exclusion_reason, psn_repair_quarantine_reason
 from app.psn_resolution import classify_psn_candidate
 from app.psn_resolution import resolve_psn_catalog_titles
@@ -666,11 +672,49 @@ def _psn_has_platform(game: dict, platform_name: str) -> bool:
     return any(str(platform).strip().casefold() == platform_name for platform in game.get("platforms") or [])
 
 
-def _psn_candidate_token(user_id: uuid.UUID, title: str) -> str:
-    return jwt.encode({"sub": str(user_id), "title": title, "hash": _psn_catalog_match_key(title), "exp": datetime.now(timezone.utc) + timedelta(minutes=15)}, SECRET_KEY, algorithm="HS256")
+PSN_CANDIDATE_EVIDENCE_LIMIT = 8
 
 
-def _psn_candidate_from_token(token: str, user_id: uuid.UUID) -> str:
+def _psn_candidate_evidence(candidate: PsnExportCandidate) -> PsnCatalogEvidence:
+    aliases = safe_psn_search_aliases(candidate)[:PSN_CANDIDATE_EVIDENCE_LIMIT]
+    platforms = tuple(
+        dict.fromkeys(
+            platform
+            for value in candidate.platforms
+            if value
+            if (platform := normalize_psn_platform(value)) is not None
+        )
+    )[:PSN_CANDIDATE_EVIDENCE_LIMIT]
+    return PsnCatalogEvidence(candidate.title, aliases=aliases, platforms=platforms)
+
+
+def _psn_candidate_token(user_id: uuid.UUID, candidate: PsnExportCandidate) -> str:
+    evidence = _psn_candidate_evidence(candidate)
+    return jwt.encode(
+        {
+            "sub": str(user_id),
+            "title": evidence.title,
+            "aliases": list(evidence.aliases),
+            "platforms": list(evidence.platforms),
+            "hash": _psn_catalog_match_key(evidence.title),
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+        },
+        SECRET_KEY,
+        algorithm="HS256",
+    )
+
+
+def _psn_token_evidence_values(payload: dict, field: str) -> tuple[str, ...]:
+    values = payload.get(field, [])
+    if not isinstance(values, list) or len(values) > PSN_CANDIDATE_EVIDENCE_LIMIT:
+        raise HTTPException(status_code=422, detail="The PSN preview decision is invalid")
+    normalized = tuple(normalize_title(value) for value in values)
+    if any(value is None for value in normalized):
+        raise HTTPException(status_code=422, detail="The PSN preview decision is invalid")
+    return tuple(dict.fromkeys(normalized))
+
+
+def _psn_candidate_from_token(token: str, user_id: uuid.UUID) -> PsnCatalogEvidence:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
     except JWTError as exc:
@@ -678,7 +722,12 @@ def _psn_candidate_from_token(token: str, user_id: uuid.UUID) -> str:
     title = normalize_title(payload.get("title"))
     if payload.get("sub") != str(user_id) or not title or payload.get("hash") != _psn_catalog_match_key(title):
         raise HTTPException(status_code=422, detail="The PSN preview decision is invalid")
-    return title
+    aliases = _psn_token_evidence_values(payload, "aliases")
+    platform_values = _psn_token_evidence_values(payload, "platforms")
+    platforms = tuple(normalize_psn_platform(value) for value in platform_values)
+    if any(platform is None for platform in platforms):
+        raise HTTPException(status_code=422, detail="The PSN preview decision is invalid")
+    return PsnCatalogEvidence(title, aliases=aliases, platforms=tuple(platforms))
 
 
 def _psn_suggestions(results: list[dict]) -> list[dict]:
@@ -699,7 +748,7 @@ async def _psn_preview_items(content: bytes, filename: str, user_id: uuid.UUID) 
     )
     items: list[PsnImportPreviewItem] = []
     for candidate in candidates:
-        token = _psn_candidate_token(user_id, candidate.title)
+        token = _psn_candidate_token(user_id, candidate)
         if candidate.title in skipped:
             items.append(PsnImportPreviewItem(source_title=candidate.title, status="suggested_skip", recommended_action="skip", reason=skipped[candidate.title], candidate_token=token))
             continue
@@ -951,16 +1000,55 @@ async def preview_psn_import(
     )
 
 
+def _stable_psn_evidence_values(*sources: tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
+    values: list[str] = []
+    seen: set[str] = set()
+    for source in sources:
+        for value in source or ():
+            if isinstance(value, str) and value not in seen:
+                seen.add(value)
+                values.append(value)
+    return tuple(values)
+
+
+def _merge_psn_catalog_evidence(
+    existing: PsnCatalogEvidence, incoming: PsnCatalogEvidence
+) -> PsnCatalogEvidence:
+    return PsnCatalogEvidence(
+        incoming.title,
+        aliases=_stable_psn_evidence_values(existing.aliases, incoming.aliases),
+        platforms=_stable_psn_evidence_values(existing.platforms, incoming.platforms),
+    )
+
+
+def _psn_game_catalog_evidence(game: Game) -> PsnCatalogEvidence:
+    return PsnCatalogEvidence(
+        game.title,
+        aliases=tuple(game.psn_search_aliases or ()),
+        platforms=tuple(game.psn_source_platforms or ()),
+    )
+
+
+def _merge_game_psn_catalog_evidence(game: Game, incoming: PsnCatalogEvidence) -> bool:
+    merged = _merge_psn_catalog_evidence(_psn_game_catalog_evidence(game), incoming)
+    aliases = list(merged.aliases)
+    platforms = list(merged.platforms)
+    changed = game.psn_search_aliases != aliases or game.psn_source_platforms != platforms
+    game.psn_search_aliases = aliases
+    game.psn_source_platforms = platforms
+    return changed
+
+
 @app.post("/psn/import/confirm", response_model=PsnImportResult)
 async def confirm_psn_import(
     data: PsnImportConfirmRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    unique_games: dict[str, tuple[str, int | None, str | None, str]] = {}
-    raw_sources: dict[str, str] = {}
+    unique_games: dict[str, tuple[str, int | None, str | None, str, PsnCatalogEvidence]] = {}
+    raw_sources: dict[str, PsnCatalogEvidence] = {}
     for selection in data.selections:
-        source_title = _psn_candidate_from_token(selection.candidate_token, current_user.id)
+        evidence = _psn_candidate_from_token(selection.candidate_token, current_user.id)
         if selection.action == "catalog":
             try:
                 detail = await fetch_igdb_game_detail(selection.catalog_id or 0)
@@ -968,10 +1056,17 @@ async def confirm_psn_import(
                 raise HTTPException(status_code=422, detail="Choose a valid catalog game") from exc
             title, cover = _psn_linked_game_payload(detail, selection.catalog_id or 0)
             external_id = f"psn:{selection.catalog_id}"
-            unique_games[external_id] = (title, selection.catalog_id, cover, "linked")
-            raw_sources[external_id] = source_title
+            raw_sources[external_id] = evidence
+            existing_selection = unique_games.get(external_id)
+            if existing_selection:
+                evidence = _merge_psn_catalog_evidence(existing_selection[4], evidence)
+            unique_games[external_id] = (title, selection.catalog_id, cover, "linked", evidence)
             continue
-        unique_games[psn_manual_external_id(source_title)] = (source_title, None, None, "raw")
+        external_id = psn_manual_external_id(evidence.title)
+        existing_selection = unique_games.get(external_id)
+        if existing_selection:
+            evidence = _merge_psn_catalog_evidence(existing_selection[4], evidence)
+        unique_games[external_id] = (evidence.title, None, None, "raw", evidence)
 
     existing = {
         game.external_id: game
@@ -982,16 +1077,20 @@ async def confirm_psn_import(
     now = datetime.now(timezone.utc)
     created = updated = skipped = 0
     try:
-        for external_id, (title, catalog_game_id, cover, link_state) in unique_games.items():
+        for external_id, (title, catalog_game_id, cover, link_state, evidence) in unique_games.items():
             imported = existing.get(external_id)
-            raw = existing.get(psn_manual_external_id(raw_sources[external_id])) if external_id in raw_sources else None
+            raw_evidence = raw_sources.get(external_id)
+            raw = existing.get(psn_manual_external_id(raw_evidence.title)) if raw_evidence else None
             if imported is None and raw is not None:
                 raw.external_id = external_id
                 raw.catalog_game_id = catalog_game_id
                 raw.link_state = link_state
+                raw.catalog_lookup_state = None
+                raw.catalog_lookup_version = PSN_CATALOG_MATCHER_VERSION if link_state == "linked" else None
                 raw.title = title
                 raw.img_icon_url = cover
                 raw.synced_at = now
+                _merge_game_psn_catalog_evidence(raw, evidence)
                 updated += 1
                 continue
             merged_raw = False
@@ -1000,6 +1099,7 @@ async def confirm_psn_import(
                 imported.notes = imported.notes or raw.notes
                 imported.info = imported.info or raw.info
                 imported.playtime_forever = max(imported.playtime_forever or 0, raw.playtime_forever or 0) or None
+                _merge_game_psn_catalog_evidence(imported, _psn_game_catalog_evidence(raw))
                 db.delete(raw)
                 merged_raw = True
             if imported is None:
@@ -1010,6 +1110,10 @@ async def confirm_psn_import(
                         external_id=external_id,
                         catalog_game_id=catalog_game_id,
                         link_state=link_state,
+                        catalog_lookup_state=None,
+                        catalog_lookup_version=PSN_CATALOG_MATCHER_VERSION if link_state == "linked" else None,
+                        psn_search_aliases=list(evidence.aliases),
+                        psn_source_platforms=list(evidence.platforms),
                         title=title,
                         img_icon_url=cover,
                         info="Imported from your PlayStation data export",
@@ -1018,19 +1122,25 @@ async def confirm_psn_import(
                 )
                 created += 1
             else:
+                catalog_lookup_version = PSN_CATALOG_MATCHER_VERSION if link_state == "linked" else None
                 metadata_changed = (
                     imported.title != title
                     or imported.catalog_game_id != catalog_game_id
                     or imported.link_state != link_state
                     or imported.img_icon_url != cover
+                    or imported.catalog_lookup_state is not None
+                    or imported.catalog_lookup_version != catalog_lookup_version
                 )
+                evidence_changed = _merge_game_psn_catalog_evidence(imported, evidence)
                 if metadata_changed:
                     imported.title = title
                     imported.catalog_game_id = catalog_game_id
                     imported.link_state = link_state
+                    imported.catalog_lookup_state = None
+                    imported.catalog_lookup_version = catalog_lookup_version
                     imported.img_icon_url = cover
                     imported.synced_at = now
-                if merged_raw or metadata_changed:
+                if merged_raw or metadata_changed or evidence_changed:
                     updated += 1
                 else:
                     skipped += 1
