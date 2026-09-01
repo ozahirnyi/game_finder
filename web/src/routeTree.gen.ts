@@ -14,6 +14,7 @@ import { Route as SteamRouteImport } from './routes/steam'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as PsnRouteImport } from './routes/psn'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as FriendsRouteImport } from './routes/friends'
 import { Route as DealsRouteImport } from './routes/deals'
@@ -43,6 +44,11 @@ const PsnRoute = PsnRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LibraryRoute = LibraryRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/deals': typeof DealsRoute
   '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/psn': typeof PsnRoute
   '/search': typeof SearchRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/deals': typeof DealsRoute
   '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/psn': typeof PsnRoute
   '/search': typeof SearchRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/deals': typeof DealsRoute
   '/friends': typeof FriendsRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/psn': typeof PsnRoute
   '/search': typeof SearchRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/friends'
     | '/library'
+    | '/login'
     | '/profile'
     | '/psn'
     | '/search'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/friends'
     | '/library'
+    | '/login'
     | '/profile'
     | '/psn'
     | '/search'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/friends'
     | '/library'
+    | '/login'
     | '/profile'
     | '/psn'
     | '/search'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   DealsRoute: typeof DealsRoute
   FriendsRoute: typeof FriendsRoute
   LibraryRoute: typeof LibraryRoute
+  LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   PsnRoute: typeof PsnRoute
   SearchRoute: typeof SearchRoute
@@ -197,6 +210,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/library': {
       id: '/library'
       path: '/library'
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   DealsRoute: DealsRoute,
   FriendsRoute: FriendsRoute,
   LibraryRoute: LibraryRoute,
+  LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   PsnRoute: PsnRoute,
   SearchRoute: SearchRoute,
