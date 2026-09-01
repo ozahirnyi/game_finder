@@ -21,7 +21,8 @@ async function apiLogin(request: APIRequestContext, credentials: typeof mara) {
   const response = await request.post(`${apiBase}/auth/login`, {
     form: { username: credentials.email, password: credentials.password },
   });
-  if (!response.ok()) throw new Error(`Login failed: ${response.status()} ${await response.text()}`);
+  if (!response.ok())
+    throw new Error(`Login failed: ${response.status()} ${await response.text()}`);
   return (await response.json()).access_token as string;
 }
 
@@ -105,7 +106,10 @@ test("profile preferences and PSN import persist through the real app", async ({
   await expect(page.getByText("Moonlit Harbor").first()).toBeVisible();
 });
 
-test("library, wishlist, favorite, alert and deletion stay owner-scoped", async ({ page, request }) => {
+test("library, wishlist, favorite, alert and deletion stay owner-scoped", async ({
+  page,
+  request,
+}) => {
   const token = await apiLogin(request, mara);
   const user = await api<{ id: string }>(request, token, "/auth/me");
   const games = await api<Array<{ id: string; title: string }>>(request, token, "/games");
@@ -143,7 +147,11 @@ test("library, wishlist, favorite, alert and deletion stay owner-scoped", async 
   if (!alerts.some((item) => item.wishlist_catalog_game_id === catalogId)) {
     await api(request, token, "/price-alerts", {
       method: "POST",
-      data: { wishlist_catalog_game_id: catalogId, target_discount: 20, delivery_channels: ["in_app"] },
+      data: {
+        wishlist_catalog_game_id: catalogId,
+        target_discount: 20,
+        delivery_channels: ["in_app"],
+      },
     });
   }
 
@@ -165,12 +173,19 @@ test("library, wishlist, favorite, alert and deletion stay owner-scoped", async 
   expect(user.id).toBeTruthy();
 });
 
-test("friend request, message, invite and notification flows work across two accounts", async ({ browser, request }) => {
+test("friend request, message, invite and notification flows work across two accounts", async ({
+  browser,
+  request,
+}) => {
   const maraToken = await apiLogin(request, mara);
   const jonasToken = await apiLogin(request, jonas);
   const maraUser = await api<{ id: string; public_id: string }>(request, maraToken, "/auth/me");
   const jonasUser = await api<{ id: string; public_id: string }>(request, jonasToken, "/auth/me");
-  const existingFriends = await api<Array<{ user: { id: string } }>>(request, jonasToken, "/friends");
+  const existingFriends = await api<Array<{ user: { id: string } }>>(
+    request,
+    jonasToken,
+    "/friends",
+  );
   const alreadyFriends = existingFriends.some((item) => item.user.id === maraUser.id);
 
   const incoming = await api<Array<{ id: string; sender: { id: string } }>>(
@@ -195,7 +210,9 @@ test("friend request, message, invite and notification flows work across two acc
     await jonasPage.getByRole("button", { name: /Accept Mara Ellison/ }).click();
     await expect(jonasPage.getByText("Friend added")).toBeVisible();
   }
-  await expect(jonasPage.getByRole("link", { name: "Mara Ellison", exact: true }).first()).toBeVisible();
+  await expect(
+    jonasPage.getByRole("link", { name: "Mara Ellison", exact: true }).first(),
+  ).toBeVisible();
 
   const conversations = await api<Array<{ id: string; participant: { id: string } }>>(
     request,
@@ -222,7 +239,10 @@ test("friend request, message, invite and notification flows work across two acc
   await jonasPage.reload();
   await expect(jonasPage.getByText("Ready for a co-op session?").first()).toBeVisible();
   await expect(jonasPage.getByRole("heading", { name: "Game invites" })).toBeVisible();
-  await jonasPage.getByRole("button", { name: /Accept Moonlit Harbor/ }).first().click();
+  await jonasPage
+    .getByRole("button", { name: /Accept Moonlit Harbor/ })
+    .first()
+    .click();
   await expect(jonasPage.getByText(/accepted the invitation/)).toBeVisible();
   await jonasPage.close();
 });

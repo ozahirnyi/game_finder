@@ -12,7 +12,11 @@ export function PsnImportFlow() {
     mutationFn: previewPsnImport,
     onSuccess: (data) => {
       setItems(data.items);
-      setSelectedIds(data.items.flatMap((item) => item.status === "confirmed" && item.igdb_id ? [item.igdb_id] : []));
+      setSelectedIds(
+        data.items.flatMap((item) =>
+          item.status === "confirmed" && item.igdb_id ? [item.igdb_id] : [],
+        ),
+      );
     },
   });
   const confirm = useMutation({
@@ -21,9 +25,7 @@ export function PsnImportFlow() {
   });
   const toggleGame = (igdbId: number) =>
     setSelectedIds((current) =>
-      current.includes(igdbId)
-        ? current.filter((id) => id !== igdbId)
-        : [...current, igdbId],
+      current.includes(igdbId) ? current.filter((id) => id !== igdbId) : [...current, igdbId],
     );
 
   return (
@@ -59,20 +61,31 @@ export function PsnImportFlow() {
               Confirmed catalog matches are selected. Review items are not imported automatically.
             </p>
             <div className="max-h-96 space-y-2 overflow-auto pr-1">
-              {items.filter((item) => item.status === "confirmed" && item.igdb_id).map((item) => (
-                <label
-                  key={item.igdb_id}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 p-3"
-                >
-                  <input checked={selectedIds.includes(item.igdb_id!)} type="checkbox" onChange={() => toggleGame(item.igdb_id!)} />
-                  <span className="text-sm font-medium">{item.title}</span>
-                </label>
-              ))}
-              {items.filter((item) => item.status !== "confirmed").map((item) => (
-                <p key={item.source_title} className="rounded-xl border border-border bg-surface-2 p-3 text-sm text-muted-foreground">
-                  {item.source_title} — not imported (needs review)
-                </p>
-              ))}
+              {items
+                .filter((item) => item.status === "confirmed" && item.igdb_id)
+                .map((item) => (
+                  <label
+                    key={item.igdb_id}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 p-3"
+                  >
+                    <input
+                      checked={selectedIds.includes(item.igdb_id!)}
+                      type="checkbox"
+                      onChange={() => toggleGame(item.igdb_id!)}
+                    />
+                    <span className="text-sm font-medium">{item.title}</span>
+                  </label>
+                ))}
+              {items
+                .filter((item) => item.status !== "confirmed")
+                .map((item) => (
+                  <p
+                    key={item.source_title}
+                    className="rounded-xl border border-border bg-surface-2 p-3 text-sm text-muted-foreground"
+                  >
+                    {item.source_title} — not imported (needs review)
+                  </p>
+                ))}
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <button

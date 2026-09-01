@@ -329,19 +329,33 @@ export type PsnImportPreview = {
   message?: string | null;
 };
 export type PsnImportPreviewItem = {
-    source_title: string;
-    status: "matched" | "needs_mapping" | "suggested_skip" | "catalog_unavailable" | "ready";
-    recommended_action: "catalog" | "raw" | "skip";
+  source_title: string;
+  status: "matched" | "needs_mapping" | "suggested_skip" | "catalog_unavailable" | "ready";
+  recommended_action: "catalog" | "raw" | "skip";
   igdb_id?: number | null;
   title?: string | null;
   reason?: string | null;
   suggestions: { id: number; title: string }[];
   candidate_token: string;
 };
-export type PsnImportSelection = { candidate_token: string; action: "catalog"; catalog_id: number } | { candidate_token: string; action: "raw" };
+export type PsnImportSelection =
+  | { candidate_token: string; action: "catalog"; catalog_id: number }
+  | { candidate_token: string; action: "raw" };
 export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
-export type PsnLibraryRepairItem = { game_id: string; title: string; link_state: "linked" | "raw" | "quarantined"; catalog_game_id?: number | null; suggestion: "linked" | "auto_link" | "review" | "quarantine" | "unavailable"; suggestions: { id: number; title: string }[]; reason?: string | null };
-export type PsnLibraryRepairPreview = { items: PsnLibraryRepairItem[]; raw_count: number; quarantined_count: number };
+export type PsnLibraryRepairItem = {
+  game_id: string;
+  title: string;
+  link_state: "linked" | "raw" | "quarantined";
+  catalog_game_id?: number | null;
+  suggestion: "linked" | "auto_link" | "review" | "quarantine" | "unavailable";
+  suggestions: { id: number; title: string }[];
+  reason?: string | null;
+};
+export type PsnLibraryRepairPreview = {
+  items: PsnLibraryRepairItem[];
+  raw_count: number;
+  quarantined_count: number;
+};
 export type PsnCatalogEnrichmentResult = {
   attempted: number;
   linked: number;
@@ -536,8 +550,18 @@ export function enrichPsnLibrary() {
   });
 }
 
-export function applyPsnLibraryRepair(decisions: { game_id: string; action: "link" | "keep_raw" | "quarantine" | "restore" | "delete"; catalog_id?: number }[]) {
-  return apiRequest<{ updated: number }>("/psn/library-repair/apply", { auth: true, method: "POST", body: { decisions } });
+export function applyPsnLibraryRepair(
+  decisions: {
+    game_id: string;
+    action: "link" | "keep_raw" | "quarantine" | "restore" | "delete";
+    catalog_id?: number;
+  }[],
+) {
+  return apiRequest<{ updated: number }>("/psn/library-repair/apply", {
+    auth: true,
+    method: "POST",
+    body: { decisions },
+  });
 }
 
 export function deletePsnLibrary() {

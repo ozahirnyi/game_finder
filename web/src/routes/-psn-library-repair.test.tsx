@@ -1,15 +1,47 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { previewPsnLibraryRepair, deletePsnLibrary } = vi.hoisted(() => ({ previewPsnLibraryRepair: vi.fn(), deletePsnLibrary: vi.fn() }));
-vi.mock("@/components/AppShell", () => ({ AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
-vi.mock("@/lib/api", () => ({ previewPsnLibraryRepair, deletePsnLibrary, applyPsnLibraryRepair: vi.fn() }));
+const { previewPsnLibraryRepair, deletePsnLibrary } = vi.hoisted(() => ({
+  previewPsnLibraryRepair: vi.fn(),
+  deletePsnLibrary: vi.fn(),
+}));
+vi.mock("@/components/AppShell", () => ({
+  AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+vi.mock("@/lib/api", () => ({
+  previewPsnLibraryRepair,
+  deletePsnLibrary,
+  applyPsnLibraryRepair: vi.fn(),
+}));
 import { Route } from "./psn-library-repair";
 
-function renderPage() { const root=createRootRoute({component:Outlet}); const route=createRoute({getParentRoute:()=>root,path:"/",component:Route.options.component}); const router=createRouter({routeTree:root.addChildren([route]),history:createMemoryHistory({initialEntries:["/"]})}); return render(<QueryClientProvider client={new QueryClient()}><RouterProvider router={router}/></QueryClientProvider>); }
+function renderPage() {
+  const root = createRootRoute({ component: Outlet });
+  const route = createRoute({
+    getParentRoute: () => root,
+    path: "/",
+    component: Route.options.component,
+  });
+  const router = createRouter({
+    routeTree: root.addChildren([route]),
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
 afterEach(() => vi.clearAllMocks());
 
 describe("PsnLibraryRepairPage", () => {
@@ -19,12 +51,27 @@ describe("PsnLibraryRepairPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Delete all PlayStation games" }));
-    await waitFor(() => expect(screen.getByText("Deleted 2 PlayStation games.")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Deleted 2 PlayStation games.")).toBeInTheDocument(),
+    );
   });
 
   it("surfaces catalog unavailability and retries the lookup without repair actions", async () => {
     previewPsnLibraryRepair
-      .mockResolvedValueOnce({ items: [{ game_id: "repair-unavailable", title: "Celeste", link_state: "raw", suggestion: "unavailable", suggestions: [], reason: "Catalog temporarily unavailable." }], raw_count: 1, quarantined_count: 0 })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            game_id: "repair-unavailable",
+            title: "Celeste",
+            link_state: "raw",
+            suggestion: "unavailable",
+            suggestions: [],
+            reason: "Catalog temporarily unavailable.",
+          },
+        ],
+        raw_count: 1,
+        quarantined_count: 0,
+      })
       .mockResolvedValueOnce({ items: [], raw_count: 0, quarantined_count: 0 });
     renderPage();
     expect(await screen.findByText("Catalog temporarily unavailable.")).toBeInTheDocument();

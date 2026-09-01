@@ -253,7 +253,10 @@ describe("apiRequest", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "/api/psn/import/confirm",
-      expect.objectContaining({ body: JSON.stringify({ selections: [{ catalog_id: 101 }, { source_title: "Hades" }] }), method: "POST" }),
+      expect.objectContaining({
+        body: JSON.stringify({ selections: [{ catalog_id: 101 }, { source_title: "Hades" }] }),
+        method: "POST",
+      }),
     );
   });
 
