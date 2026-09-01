@@ -36,14 +36,7 @@ def get_quota_status(
         (user_id, current.date()),
         populate_existing=True,
     )
-    if row is None:
-        return QuotaSnapshot(
-            limit=DAILY_LIMIT,
-            remaining=DAILY_LIMIT,
-            cooldown_until=None,
-            reset_at=_reset_at(current),
-        )
-    return _snapshot(row, current)
+    return _snapshot(row, current, _latest_attempt_at(db, user_id))
 
 
 def reserve_quota(
@@ -60,7 +53,7 @@ def reserve_quota(
         row = AIRecommendationQuota(user_id=user_id, quota_date=current.date())
         db.add(row)
         db.flush()
-    snapshot = _snapshot(row, current)
+    snapshot = _snapshot(row, current, _latest_attempt_at(db, user_id))
     if row.attempt_count >= DAILY_LIMIT:
         db.rollback()
         raise QuotaDenied(
@@ -76,7 +69,7 @@ def reserve_quota(
     row.attempt_count += 1
     row.last_attempt_at = current
     db.commit()
-    return _snapshot(row, current)
+    return _snapshot(row, current, current)
 
 
 def _utc(value: datetime | None) -> datetime:
@@ -99,15 +92,33 @@ def _reset_at(current: datetime) -> datetime:
     )
 
 
-def _snapshot(row: AIRecommendationQuota, current: datetime) -> QuotaSnapshot:
+def _latest_attempt_at(db: Session, user_id: uuid.UUID) -> datetime | None:
+    return (
+        db.query(AIRecommendationQuota.last_attempt_at)
+        .filter(
+            AIRecommendationQuota.user_id == user_id,
+            AIRecommendationQuota.last_attempt_at.is_not(None),
+        )
+        .order_by(AIRecommendationQuota.last_attempt_at.desc())
+        .limit(1)
+        .scalar()
+    )
+
+
+def _snapshot(
+    row: AIRecommendationQuota | None,
+    current: datetime,
+    latest_attempt_at: datetime | None,
+) -> QuotaSnapshot:
     cooldown_until = None
-    if row.last_attempt_at is not None:
-        candidate = _stored_utc(row.last_attempt_at) + COOLDOWN
+    if latest_attempt_at is not None:
+        candidate = _stored_utc(latest_attempt_at) + COOLDOWN
         if current < candidate:
             cooldown_until = candidate
+    attempt_count = row.attempt_count if row is not None else 0
     return QuotaSnapshot(
         limit=DAILY_LIMIT,
-        remaining=max(DAILY_LIMIT - row.attempt_count, 0),
+        remaining=max(DAILY_LIMIT - attempt_count, 0),
         cooldown_until=cooldown_until,
         reset_at=_reset_at(current),
     )

@@ -61,6 +61,39 @@ def test_utc_day_creates_a_fresh_quota(session, user):
     assert snapshot.reset_at == datetime(2026, 9, 3, tzinfo=timezone.utc)
 
 
+def test_status_preserves_cooldown_across_utc_midnight(session, user):
+    previous = datetime(2026, 9, 1, 23, 59, 50, tzinfo=timezone.utc)
+    midnight = datetime(2026, 9, 2, 0, 0, tzinfo=timezone.utc)
+    reserve_quota(session, user.id, previous)
+
+    snapshot = get_quota_status(session, user.id, midnight)
+
+    assert snapshot.remaining == 3
+    assert snapshot.cooldown_until == datetime(2026, 9, 2, 0, 0, 50, tzinfo=timezone.utc)
+    assert snapshot.reset_at == datetime(2026, 9, 3, tzinfo=timezone.utc)
+
+
+def test_cross_midnight_cooldown_denies_until_sixty_seconds(session, user):
+    previous = datetime(2026, 9, 1, 23, 59, 50, tzinfo=timezone.utc)
+    midnight = datetime(2026, 9, 2, 0, 0, tzinfo=timezone.utc)
+    reserve_quota(session, user.id, previous)
+
+    with pytest.raises(QuotaDenied) as exc:
+        reserve_quota(session, user.id, midnight)
+
+    assert exc.value.code == "ai_recommendation_cooldown"
+    assert exc.value.snapshot.remaining == 3
+    assert exc.value.snapshot.cooldown_until == datetime(
+        2026, 9, 2, 0, 0, 50, tzinfo=timezone.utc
+    )
+
+    snapshot = reserve_quota(session, user.id, previous + timedelta(seconds=60))
+    assert snapshot.remaining == 2
+    assert snapshot.cooldown_until == datetime(
+        2026, 9, 2, 0, 1, 50, tzinfo=timezone.utc
+    )
+
+
 def test_initial_status_does_not_persist_a_quota_row(session, user):
     now = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
 
