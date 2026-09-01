@@ -270,17 +270,34 @@ class RecommendationRequest(BaseModel):
     liked_game_ids: list[int] = Field(default_factory=list)
 
 
+class RecommendationQuotaRead(BaseModel):
+    limit: int
+    remaining: int
+    cooldown_until: datetime | None = None
+    reset_at: datetime
+
+
+class RecommendationCatalogGame(BaseModel):
+    id: int
+    name: str
+    released: str | None = None
+    background_image: str | None = None
+    platforms: list[str] = Field(default_factory=list)
+
+
 class RecommendationItem(BaseModel):
     title: str
     reason: str
     tags: list[str] = Field(default_factory=list)
     igdb_id: int | None = None
     cover_url: str | None = None
+    game: RecommendationCatalogGame | None = None
 
 
 class RecommendationResponse(BaseModel):
     recommendations: list[RecommendationItem] = Field(default_factory=list)
     cache_expires_at: datetime | None = None
+    quota: RecommendationQuotaRead | None = None
 
 
 class GameSearchItem(BaseModel):
