@@ -271,8 +271,25 @@ export type RecommendationItem = {
   tags: string[];
   igdb_id?: number | null;
   cover_url?: string | null;
+  game?: RecommendationGame | null;
 };
-export type RecommendationResponse = { recommendations: RecommendationItem[] };
+export type RecommendationQuota = {
+  limit: number;
+  remaining: number;
+  cooldown_until: string | null;
+  reset_at: string;
+};
+export type RecommendationGame = {
+  id: number;
+  name: string;
+  released: string | null;
+  background_image: string | null;
+  platforms: string[];
+};
+export type RecommendationResponse = {
+  recommendations: RecommendationItem[];
+  quota?: RecommendationQuota | null;
+};
 export type DashboardBlock<T> = {
   status: "ready" | "empty" | "error" | "not_connected";
   data: T;
@@ -375,6 +392,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly detail: unknown = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -423,7 +441,7 @@ async function toApiError(response: Response, authenticated: boolean) {
       ? payload.detail.message
       : (payload?.detail ?? `Request failed with status ${response.status}`);
   if (authenticated && response.status === 401) clearToken();
-  return new ApiError(message, response.status);
+  return new ApiError(message, response.status, payload?.detail ?? null);
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {
@@ -593,8 +611,13 @@ export function searchGames(options: CatalogSearchOptions) {
 export function getRecommendations(prompt: string) {
   return apiRequest<RecommendationResponse>("/recommendations", {
     method: "POST",
+    auth: true,
     body: { prompt, liked_game_ids: [] },
   });
+}
+
+export function getRecommendationQuota() {
+  return apiRequest<RecommendationQuota>("/recommendations/quota", { auth: true });
 }
 
 export function getTrendingGames() {

@@ -7,12 +7,14 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Literal
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Query
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -52,12 +54,14 @@ from app.genre_deals import build_genre_deal_groups, normalize_genre, select_dea
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportPreviewItem, PsnImportResult, PsnImportSelection, \
-    RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
+    RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult
+from app.recommendation_quota import QuotaDenied, get_quota_status, reserve_quota
+from app.recommendations import enrich_recommendations
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -3616,14 +3620,35 @@ async def resolve_recommendation_catalog_matches(result: dict) -> dict:
 
 @app.post("/recommendations",response_model=RecommendationResponse)
 @limiter.limit("5/minute")
-async def recommendations(request: Request, data: RecommendationRequest):
+async def recommendations(
+    request: Request,
+    data: RecommendationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not data.prompt.strip():
         raise HTTPException(status_code=400,detail="prompt cannot be empty")
-    result = await asyncio.to_thread(
-        get_recommendation,
-        data.prompt,
-        data.liked_game_ids,)
-    return await resolve_recommendation_catalog_matches(result)
+    try:
+        quota = reserve_quota(db, current_user.id)
+    except QuotaDenied as exc:
+        raise HTTPException(status_code=429, detail=jsonable_encoder({
+            "code": exc.code, "message": exc.message, "quota": asdict(exc.snapshot),
+        })) from exc
+    generated = await asyncio.to_thread(get_recommendation, data.prompt, data.liked_game_ids)
+
+    async def cached_search(title: str):
+        key = build_cache_key("recommendation_catalog_search", q=title)
+        return await get_json_cached(key, CACHE_TTL, lambda: fetch_igdb_games(title, page=1))
+
+    enriched = await enrich_recommendations(generated.get("recommendations", []), cached_search)
+    return {"recommendations": enriched, "quota": asdict(quota)}
+
+
+@app.get("/recommendations/quota", response_model=RecommendationQuotaRead)
+def recommendation_quota(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    return get_quota_status(db, current_user.id)
 
 
 @app.exception_handler(RateLimitExceeded)
