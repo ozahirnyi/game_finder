@@ -1,4 +1,7 @@
 import os
+from calendar import monthrange
+from datetime import datetime, timezone
+from math import isfinite
 from typing import Any
 
 import httpx
@@ -12,32 +15,86 @@ def get_itad_api_key() -> str:
     return os.getenv("ITAD_API_KEY") or os.getenv("ISTHEREANYDEAL_API_KEY") or ""
 
 
-def _money(value: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not value:
+def _money(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
         return None
     amount = value.get("amount")
     currency = value.get("currency")
-    if amount is None or not currency:
+    if isinstance(amount, bool) or not isinstance(amount, (int, float)) or not isfinite(amount) or amount < 0 or not isinstance(currency, str) or not currency.strip():
         return None
     return {"amount": amount, "currency": currency}
 
 
-def _deal(value: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not value:
+def _deal(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
         return None
+    timestamp = value.get("timestamp")
+    shop = value.get("shop") if isinstance(value.get("shop"), dict) else {}
     return {
-        "shop": (value.get("shop") or {}).get("name"),
+        "shop": shop.get("name"),
         "price": _money(value.get("price")),
         "regular": _money(value.get("regular")),
         "cut": value.get("cut"),
         "url": value.get("url"),
-        "timestamp": value.get("timestamp"),
+        "timestamp": timestamp if timestamp is None or _timestamp(timestamp) is not None else None,
     }
 
 
-def _history_point(value: dict[str, Any]) -> dict[str, Any]:
-    deal = value.get("deal") or {}
-    return {"timestamp": value.get("timestamp"), "shop": (value.get("shop") or {}).get("name"), "price": _money(deal.get("price")), "regular": _money(deal.get("regular"))}
+def _history_point(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {"timestamp": None, "shop": None, "price": None, "regular": None}
+    deal = value.get("deal") if isinstance(value.get("deal"), dict) else {}
+    shop = value.get("shop") if isinstance(value.get("shop"), dict) else {}
+    return {"timestamp": value.get("timestamp"), "shop": shop.get("name"), "price": _money(deal.get("price")), "regular": _money(deal.get("regular"))}
+
+
+def _timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def normalize_price_history(deals: list[dict[str, Any]], history_points: list[dict[str, Any]], *, now: datetime | None = None) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    """Keep valid provider data compact, chronological, and safe for charting."""
+    valid_deals = [deal for deal in (_deal(value) for value in deals) if deal and deal.get("price")]
+    current = min(
+        valid_deals,
+        key=lambda deal: (float(deal["price"]["amount"]), str(deal["price"]["currency"]), str(deal.get("shop") or ""), str(deal.get("url") or "")),
+        default=None,
+    )
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=timezone.utc)
+    current_time = current_time.astimezone(timezone.utc)
+    cutoff_month = current_time.month - 6
+    cutoff_year = current_time.year
+    if cutoff_month < 1:
+        cutoff_month += 12
+        cutoff_year -= 1
+    cutoff = current_time.replace(
+        year=cutoff_year,
+        month=cutoff_month,
+        day=min(current_time.day, monthrange(cutoff_year, cutoff_month)[1]),
+    )
+    weekly: dict[tuple[int, int], tuple[datetime, dict[str, Any]]] = {}
+    for raw_point in history_points:
+        point = _history_point(raw_point)
+        point_time = _timestamp(point.get("timestamp"))
+        price = point.get("price")
+        if point_time is None or point_time < cutoff or point_time > current_time or not price:
+            continue
+        week = point_time.isocalendar()
+        key = (week.year, week.week)
+        existing = weekly.get(key)
+        if existing is None or (float(price["amount"]), str(price["currency"]), point_time) < (float(existing[1]["price"]["amount"]), str(existing[1]["price"]["currency"]), existing[0]):
+            weekly[key] = (point_time, point)
+    return current, [point for _time, point in sorted(weekly.values(), key=lambda item: item[0])]
 
 
 def _itad_error_message(response: httpx.Response) -> str:
@@ -93,23 +150,26 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
         raise HTTPException(status_code=502, detail="Price history request failed")
 
     price_items = prices.json()
-    if not price_items:
+    if not isinstance(price_items, list) or not price_items or not isinstance(price_items[0], dict):
         raise HTTPException(status_code=404, detail="Price data not found for this game")
 
     item = price_items[0]
     history_low = item.get("historyLow") or {}
-    deals = [_deal(deal) for deal in item.get("deals") or []]
     history_data = history.json()
     history_points = history_data if isinstance(history_data, list) else history_data.get("history", [])
+    history_points = history_points if isinstance(history_points, list) else []
+    deal_values = item.get("deals") if isinstance(item.get("deals"), list) else []
+    current, normalized_history = normalize_price_history(deal_values, history_points)
+    deals = [deal for deal in (_deal(value) for value in deal_values) if deal and deal.get("price")]
 
     return {
         "itad_id": game_id,
         "title": game.get("title") or title,
         "url": (game.get("urls") or {}).get("game") or f"https://isthereanydeal.com/game/id:{game_id}/",
-        "current": _deal((item.get("deals") or [None])[0]) if item.get("deals") else None,
+        "current": current,
         "history_low_all": _money(history_low.get("all")),
         "history_low_1y": _money(history_low.get("y1")),
         "history_low_3m": _money(history_low.get("m3")),
         "deals": [deal for deal in deals if deal is not None],
-        "history": [_history_point(point) for point in history_points],
+        "history": normalized_history,
     }
