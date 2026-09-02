@@ -286,7 +286,10 @@ export type RecommendationGame = {
   background_image: string | null;
   platforms: string[];
 };
-export type RecommendationResponse = { recommendations: RecommendationItem[]; quota?: RecommendationQuota | null };
+export type RecommendationResponse = {
+  recommendations: RecommendationItem[];
+  quota?: RecommendationQuota | null;
+};
 export type DashboardBlock<T> = {
   status: "ready" | "empty" | "error" | "not_connected";
   data: T;
