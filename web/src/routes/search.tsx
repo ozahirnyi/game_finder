@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
+  ApiError,
   getRecommendations,
   searchGames,
   type CatalogFeature,
@@ -35,6 +36,41 @@ const filters: Array<{
   { label: "Multiplayer", type: "feature", value: "multiplayer" },
 ];
 
+function getAiSearchError(error: unknown) {
+  const detail =
+    error instanceof ApiError && typeof error.detail === "object" && error.detail !== null
+      ? (error.detail as { code?: unknown })
+      : null;
+  const code = typeof detail?.code === "string" ? detail.code : "";
+
+  if (error instanceof ApiError && error.status === 401) {
+    return { title: "Sign in required", description: "Sign in again to use AI search." };
+  }
+  if (code === "ai_daily_quota_exhausted") {
+    return {
+      title: "Daily AI search limit reached",
+      description: "Try again after the daily limit resets.",
+    };
+  }
+  if (code === "ai_recommendation_cooldown") {
+    return {
+      title: "Please wait before searching again",
+      description: "AI searches are limited to one request per minute.",
+    };
+  }
+  if (
+    code === "ai_recommendations_unavailable" ||
+    (error instanceof ApiError && error.status >= 500)
+  ) {
+    return {
+      title: "AI provider is temporarily unavailable",
+      description: "Please try again in a moment.",
+    };
+  }
+
+  return { title: "AI search is unavailable", description: "Please try again in a moment." };
+}
+
 function SearchPage() {
   const [query, setQuery] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -52,6 +88,9 @@ function SearchPage() {
   });
   const recommendationMutation = useMutation({ mutationFn: getRecommendations });
   const results = searchQuery.data?.results ?? [];
+  const aiSearchError = recommendationMutation.isError
+    ? getAiSearchError(recommendationMutation.error)
+    : null;
 
   function syncUrl(
     nextQuery: string,
@@ -229,11 +268,11 @@ function SearchPage() {
           {recommendationMutation.isPending && (
             <p className="text-sm text-muted-foreground">Finding games for you…</p>
           )}
-          {recommendationMutation.isError && (
+          {aiSearchError && (
             <EmptyState
               icon={<Sparkles className="size-5" />}
-              title="AI search is unavailable"
-              description="Please try again in a moment."
+              title={aiSearchError.title}
+              description={aiSearchError.description}
             />
           )}
           {recommendationMutation.data?.recommendations.length === 0 && (
