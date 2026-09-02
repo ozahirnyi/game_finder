@@ -39,4 +39,27 @@ describe("GameCover", () => {
       "https://images.example.test/fallback.jpg",
     );
   });
+
+  it("uses a cropped hero treatment and returns to the gradient after its provider image fails", () => {
+    const { container } = render(
+      <GameCover
+        from="#111111"
+        to="#222222"
+        title="Live game"
+        image="https://images.example.test/hero.jpg"
+        variant="hero"
+        bare
+      />,
+    );
+
+    const cover = container.firstElementChild;
+    expect(cover).toHaveAttribute("data-visual-role", "hero");
+    const image = within(container).getByRole("img", { name: "Live game" });
+    expect(image).toHaveClass("object-[center_35%]");
+
+    fireEvent.error(image);
+
+    expect(within(container).queryByRole("img", { name: "Live game" })).not.toBeInTheDocument();
+    expect(cover?.getAttribute("style")).toContain("linear-gradient");
+  });
 });
