@@ -5,8 +5,14 @@ import {
   formatCatalogReleaseDate,
   presentPriceHistory,
 } from "./gamePresentation";
+import { hasCatalogId } from "./catalogMatch";
 
 describe("catalog metadata presentation", () => {
+  it("accepts only catalog games with a verified numeric ID", () => {
+    expect(hasCatalogId({ id: 274755, name: "Hades" })).toBe(true);
+    expect(hasCatalogId({ id: null, name: "Coverless result" })).toBe(false);
+  });
+
   it("rounds ratings to one decimal place with the score scale", () => {
     expect(formatCatalogRating(89.246)).toBe("89.2 / 100");
   });

@@ -37,9 +37,10 @@ import {
   removeFavorite,
   saveCatalogGameToFavorites,
   searchGames,
+  type CatalogGame,
   type PriceAlertCreate,
 } from "@/lib/api";
-import { exactCatalogMatch } from "@/lib/catalogMatch";
+import { exactCatalogMatch, hasCatalogId } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
 export const Route = createFileRoute("/games/$gameId")({
@@ -79,18 +80,25 @@ export const Route = createFileRoute("/games/$gameId")({
           },
         };
       }
-      let catalog;
+      const loadCatalogGame = async (
+        id: string | number,
+      ): Promise<CatalogGame & { id: number }> => {
+        const catalog = await getCatalogGame(id);
+        if (!hasCatalogId(catalog)) throw new Error("Catalog game has no route-safe ID");
+        return catalog;
+      };
+      let catalog: CatalogGame & { id: number };
       try {
-        catalog = await getCatalogGame(params.gameId);
+        catalog = await loadCatalogGame(params.gameId);
         if (deps.title && !exactCatalogMatch([catalog], deps.title)) {
           throw new Error("Catalog ID does not match library title");
         }
       } catch {
         if (!deps.title) throw new Error("Catalog title unavailable");
-        const results = await searchGames({ query: deps.title });
-        const match = exactCatalogMatch(results.results, deps.title);
+        const results = (await searchGames({ query: deps.title })).results.filter(hasCatalogId);
+        const match = exactCatalogMatch(results, deps.title);
         if (!match) throw new Error("Catalog game unavailable");
-        catalog = await getCatalogGame(match.id);
+        catalog = await loadCatalogGame(match.id);
       }
       return {
         game: {
@@ -343,6 +351,7 @@ function GameDetail() {
           image={game.coverUrl}
           fallbackImage={game.fallbackCoverUrl}
           bare
+          variant="hero"
           className="h-72 w-full sm:h-96"
         />
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 sm:p-8">

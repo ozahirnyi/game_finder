@@ -1,5 +1,12 @@
 type CatalogSearchResult = { id: number; name: string };
 
+/** Narrows the catalog response only after its route-safe identity is present. */
+export function hasCatalogId<T extends { id: number | null; name: string }>(
+  game: T,
+): game is T & CatalogSearchResult {
+  return typeof game.id === "number";
+}
+
 export function exactCatalogMatch<T extends CatalogSearchResult>(
   results: T[],
   title: string,
