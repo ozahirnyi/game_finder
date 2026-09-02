@@ -212,4 +212,48 @@ describe("SearchPage", () => {
 
     expect(await screen.findByText("No AI matches found")).toBeInTheDocument();
   });
+
+  it("explains when the daily AI quota is exhausted", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ detail: { code: "ai_daily_quota_exhausted" } }), {
+            status: 429,
+          }),
+        ),
+      ),
+    );
+    window.localStorage.setItem("game_finder_token", "test-token");
+    renderSearch();
+    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
+      target: { value: "co-op" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
+
+    expect(await screen.findByText("Daily AI search limit reached")).toBeInTheDocument();
+  });
+
+  it("explains when the AI provider is unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ detail: { code: "ai_recommendations_unavailable" } }), {
+            status: 503,
+          }),
+        ),
+      ),
+    );
+    window.localStorage.setItem("game_finder_token", "test-token");
+    renderSearch();
+    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
+      target: { value: "co-op" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
+
+    expect(await screen.findByText("AI provider is temporarily unavailable")).toBeInTheDocument();
+  });
 });
