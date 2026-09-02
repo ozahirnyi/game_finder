@@ -31,6 +31,7 @@ from app.integrations.igdb import (
     fetch_igdb_game_detail,
     fetch_igdb_games,
     fetch_igdb_games_batch,
+    fetch_igdb_similar_games,
     fetch_igdb_trending_games,
     fetch_igdb_upcoming_games,
     fetch_igdb_game_by_steam_appid,
@@ -2762,6 +2763,8 @@ async def dashboard(current_user: User = Depends(get_current_user), db: Session 
         library_data["total_playtime_hours"] = round(library_data["total_playtime_minutes"] / 60, 1)
         library = DataBlock(status="ready", data=library_data)
     saved_games = list_games(db, current_user.id)
+    favorites = db.query(Favorite).filter(Favorite.user_id == current_user.id).all()
+    wishlist = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id).all()
     try:
         recommendation_block = DataBlock(
             status="ready",
@@ -2769,6 +2772,8 @@ async def dashboard(current_user: User = Depends(get_current_user), db: Session 
                 current_user,
                 saved_games,
                 steam_games if steam_block.status == "ready" else [],
+                favorites,
+                wishlist,
             ),
         )
     except Exception:
@@ -3391,6 +3396,44 @@ async def catalog_game_detail(igdb_id: int, db: Session = Depends(get_db)):
         return await get_json_cached(key, CACHE_TTL, fetch)
     except IGDBError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
+
+
+@app.get("/catalog/games/{igdb_id}/similar", response_model=GameSearchResponse, response_model_exclude_unset=True)
+async def catalog_similar_games(igdb_id: int):
+    if igdb_id < 1:
+        raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
+    try:
+        source = await fetch_igdb_game_detail(igdb_id)
+        candidates = await fetch_igdb_similar_games(igdb_id, limit=12)
+    except IGDBError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    source_genres = {str(value).casefold() for value in source.get("genres") or []}
+    source_platforms = {str(value).casefold() for value in source.get("platforms") or []}
+    results: list[dict] = []
+    seen: set[int] = set()
+    for candidate in candidates:
+        candidate_id = candidate.get("id") if isinstance(candidate, dict) else None
+        title = str(candidate.get("name") or "").strip() if isinstance(candidate, dict) else ""
+        if not isinstance(candidate_id, int) or candidate_id < 1 or not title or candidate_id == igdb_id or candidate_id in seen:
+            continue
+        seen.add(candidate_id)
+        genres = [str(value).strip() for value in candidate.get("genres") or [] if str(value).strip()]
+        platforms = [str(value).strip() for value in candidate.get("platforms") or [] if str(value).strip()]
+        score = 2 * len(source_genres.intersection(value.casefold() for value in genres)) + len(source_platforms.intersection(value.casefold() for value in platforms))
+        result = {
+            "id": candidate_id,
+            "name": title,
+            "genres": genres,
+            "platforms": platforms,
+            "_score": score,
+        }
+        for field in ("released", "background_image", "rating"):
+            if candidate.get(field) is not None:
+                result[field] = candidate[field]
+        results.append(result)
+    results.sort(key=lambda game: (-game.pop("_score"), game["name"].casefold(), game["id"]))
+    return {"results": results[:4]}
 
 
 @app.get("/catalog/upcoming-games", response_model=GameSearchResponse, response_model_exclude_unset=True)

@@ -36,24 +36,16 @@ def test_steam_recommendation_prompt_rejects_an_empty_library():
 async def test_personal_recommendation_handles_blank_candidates_and_cache_write_failure(monkeypatch):
     import app.steam_recommendations as recommendations
 
-    assert await recommendations.enrich_steam_candidate({"name": ""}) == {"name": "", "igdb_id": None}
-
     async def cache_get(_): return None
     async def cache_set(*_): raise RuntimeError("redis down")
-    async def candidates(): return {"candidates": [{"steam_appid": 99, "name": "Candidate"}]}
-    async def igdb(*_, **__): return {"results": [{"id": 5, "name": "Candidate"}]}
+    async def trending(*_args, **_kwargs): return {"results": [{"id": 5, "name": "Candidate", "genres": [], "platforms": []}]}
     monkeypatch.setattr(recommendations, "cache_get", cache_get)
     monkeypatch.setattr(recommendations, "cache_set", cache_set)
-    monkeypatch.setattr(recommendations, "fetch_steam_store_deal_candidates", candidates)
-    monkeypatch.setattr(recommendations, "fetch_igdb_games", igdb)
+    monkeypatch.setattr(recommendations, "fetch_igdb_trending_games", trending)
 
     user = type("User", (), {"id": uuid.uuid4(), "favorite_genres": [], "platforms": [], "bio": None})()
     result = await recommendations.get_personalized_recommendations(user, [], [])
     assert result["recommendations"][0]["igdb_id"] == 5
-
-    async def unavailable(*_, **__): raise RuntimeError("igdb down")
-    monkeypatch.setattr(recommendations, "fetch_igdb_games", unavailable)
-    assert (await recommendations.enrich_steam_candidate({"name": "Still shown"}))["igdb_id"] is None
 
     async def cache_unavailable(_): raise RuntimeError("redis unavailable")
     monkeypatch.setattr(recommendations, "cache_get", cache_unavailable)

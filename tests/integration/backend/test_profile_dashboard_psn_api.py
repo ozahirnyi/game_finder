@@ -243,6 +243,8 @@ def test_dashboard_uses_saved_library_when_linked_steam_fetch_fails(
     assert arguments[0] is user
     assert [game.title for game in arguments[1]] == ["Hades"]
     assert arguments[2] == []
+    assert arguments[3] == []
+    assert arguments[4] == []
 
 
 def test_dashboard_returns_popular_recommendations_without_personal_signals(
@@ -257,7 +259,7 @@ def test_dashboard_returns_popular_recommendations_without_personal_signals(
 
     assert response.status_code == 200
     assert response.json()["recommendations"]["status"] == "ready"
-    recommendations.assert_awaited_once_with(user, [], [])
+    recommendations.assert_awaited_once_with(user, [], [], [], [])
 
 
 def test_psn_import_preview_parses_xlsx_without_persisting(api_client, db_session, user_factory, auth_as):
