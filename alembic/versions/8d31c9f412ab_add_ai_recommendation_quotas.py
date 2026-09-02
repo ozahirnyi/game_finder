@@ -1,14 +1,14 @@
 """add AI recommendation quotas
 
 Revision ID: 8d31c9f412ab
-Revises: c3d4e5f6a7b8
+Revises: e4f6a8c0b2d1
 """
 from alembic import op
 import sqlalchemy as sa
 
 
 revision = "8d31c9f412ab"
-down_revision = "c3d4e5f6a7b8"
+down_revision = "e4f6a8c0b2d1"
 branch_labels = None
 depends_on = None
 

@@ -22,6 +22,7 @@ describe("SearchPage", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    window.localStorage.removeItem("game_finder_token");
     window.history.replaceState({}, "", "/search");
   });
 
@@ -58,6 +59,7 @@ describe("SearchPage", () => {
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
+    window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
     fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
     const prompt = await screen.findByPlaceholderText(/describe what you want/i);
@@ -169,6 +171,7 @@ describe("SearchPage", () => {
         ),
       ),
     );
+    window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
     fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
     fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
@@ -199,6 +202,7 @@ describe("SearchPage", () => {
         ),
       ),
     );
+    window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
     fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
     fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
