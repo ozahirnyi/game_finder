@@ -468,24 +468,28 @@ function GameDetail() {
                     Retry price history
                   </button>
                 </div>
-              ) : priceUnavailable ? (
-                <EmptyState
-                  title="Price unavailable"
-                  description="We have no current price for this title in your region."
-                />
               ) : (
                 <>
-                  <div className="mb-4">
-                    <PriceBlock
-                      price={game.price}
-                      originalPrice={game.originalPrice}
-                      discount={game.discount}
-                      currency={game.currency}
-                      store={game.store}
-                      size="lg"
-                      align="left"
-                    />
-                  </div>
+                  {priceUnavailable ? (
+                    <div className="mb-4">
+                      <EmptyState
+                        title="Price unavailable"
+                        description="We have no current price for this title in your region."
+                      />
+                    </div>
+                  ) : (
+                    <div className="mb-4">
+                      <PriceBlock
+                        price={game.price}
+                        originalPrice={game.originalPrice}
+                        discount={game.discount}
+                        currency={game.currency}
+                        store={game.store}
+                        size="lg"
+                        align="left"
+                      />
+                    </div>
+                  )}
                   <PriceHistoryChart points={priceHistory.points} currency={game.currency} />
                 </>
               )}
