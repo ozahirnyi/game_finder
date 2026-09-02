@@ -133,6 +133,21 @@ describe("game detail presentation", () => {
     await waitFor(() => expect(api.getPriceHistory).toHaveBeenCalledTimes(callsBeforeRetry + 1));
   });
 
+  it("keeps the historical chart visible when the current price is unavailable", async () => {
+    api.getPriceHistory.mockResolvedValue({
+      current: undefined,
+      history: [
+        { timestamp: "2025-08-01T00:00:00+00:00", price: { amount: 19.99, currency: "USD" } },
+        { timestamp: "2025-09-25T00:00:00+00:00", price: { amount: 24.99, currency: "USD" } },
+      ],
+    });
+    renderDetail();
+
+    expect(await screen.findByText("Price unavailable")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Price history chart")).toBeInTheDocument();
+    expect(screen.getByText("Historical low")).toBeInTheDocument();
+  });
+
   it("shows up to four similar catalog cards with internal detail links", async () => {
     api.getSimilarCatalogGames.mockResolvedValue({
       results: [
