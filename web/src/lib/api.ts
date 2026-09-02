@@ -636,6 +636,11 @@ export function getCatalogGame(id: string | number) {
   return apiRequest<CatalogGame>(`/catalog/games/${id}`);
 }
 
+/** Verified related catalog results from the Phase 1 discovery endpoint. */
+export function getSimilarCatalogGames(id: string | number) {
+  return apiRequest<{ results: CatalogGame[] }>(`/catalog/games/${id}/similar`);
+}
+
 export function getSteamGame(appid: string | number) {
   return apiRequest<{
     appid: number;

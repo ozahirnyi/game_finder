@@ -7,6 +7,7 @@ import {
   confirmPsnImport,
   createSocialFriendRequest,
   getDashboard,
+  getSimilarCatalogGames,
   getGoogleLoginUrl,
   getFavorites,
   getLibraryOverview,
@@ -132,6 +133,19 @@ describe("apiRequest", () => {
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
       }),
     );
+  });
+
+  it("loads related catalog games through the Phase 1 similar-games contract", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ results: [] }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getSimilarCatalogGames(274755);
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/catalog/games/274755/similar", expect.any(Object));
   });
 
   it("loads the authenticated onboarding summary", async () => {
