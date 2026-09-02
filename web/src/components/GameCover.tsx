@@ -10,6 +10,8 @@ type Props = {
   fallbackImage?: string;
   className?: string;
   compact?: boolean;
+  /** A wide, detail-page composition for existing provider cover art. */
+  variant?: "card" | "hero";
   /** Hide the large title — use when the surrounding card already shows it. */
   bare?: boolean;
 };
@@ -22,6 +24,7 @@ export function GameCover({
   fallbackImage,
   className = "",
   compact = false,
+  variant = "card",
   bare = false,
 }: Props) {
   const [broken, setBroken] = useState(false);
@@ -46,6 +49,7 @@ export function GameCover({
   return (
     <div
       className={`grain relative overflow-hidden ${className}`}
+      data-visual-role={variant}
       style={{
         background: `radial-gradient(130% 100% at 12% 4%, ${from}66 0%, transparent 58%), linear-gradient(150deg, ${to} 0%, #0f0f0f 100%)`,
       }}
@@ -65,9 +69,9 @@ export function GameCover({
               setBroken(true);
             }
           }}
-          className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 size-full object-cover ${
+            variant === "hero" ? "object-[center_35%]" : ""
+          } transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
         />
       )}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_92%,rgba(255,255,255,0.10),transparent_52%)]" />
