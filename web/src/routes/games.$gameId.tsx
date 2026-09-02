@@ -4,7 +4,13 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
+import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { PriceAlertForm } from "@/components/PriceAlertForm";
+import {
+  formatCatalogRating,
+  formatCatalogReleaseDate,
+  presentPriceHistory,
+} from "@/lib/gamePresentation";
 import { summarizePlatforms } from "@/lib/platformPresentation";
 import {
   Chip,
@@ -24,6 +30,7 @@ import {
   getFavorites,
   getFriends,
   getPriceHistory,
+  getSimilarCatalogGames,
   getSteamGame,
   getSteamPriceHistory,
   getWishlist,
@@ -158,30 +165,6 @@ export const Route = createFileRoute("/games/$gameId")({
   ),
 });
 
-function Sparkline({ priceHistory }: { priceHistory: { price: number; date: string }[] }) {
-  const w = 320;
-  const h = 60;
-  const max = Math.max(...priceHistory.map((p) => p.price));
-  const min = Math.min(...priceHistory.map((p) => p.price));
-  const pts = priceHistory
-    .map((p, i) => {
-      const x = (i / (priceHistory.length - 1)) * w;
-      const y = h - ((p.price - min) / (max - min || 1)) * (h - 8) - 4;
-      return `${x},${y}`;
-    })
-    .join(" ");
-  return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} className="text-primary">
-      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth={1.5} />
-      {priceHistory.map((p, i) => {
-        const x = (i / (priceHistory.length - 1)) * w;
-        const y = h - ((p.price - min) / (max - min || 1)) * (h - 8) - 4;
-        return <circle key={i} cx={x} cy={y} r={2} fill="currentColor" />;
-      })}
-    </svg>
-  );
-}
-
 export function mergeGamePrice<
   T extends {
     price: number | null;
@@ -220,6 +203,11 @@ function GameDetail() {
       catalogGame.isSteamLibrary
         ? getSteamPriceHistory(catalogGame.id)
         : getPriceHistory(catalogGame.id),
+  });
+  const similarQuery = useQuery({
+    queryKey: ["catalog-similar-games", catalogGame.id],
+    queryFn: () => getSimilarCatalogGames(catalogGame.id),
+    enabled: !catalogGame.isSteamLibrary,
   });
   const queryClient = useQueryClient();
   const [showAlertForm, setShowAlertForm] = useState(false);
@@ -323,27 +311,19 @@ function GameDetail() {
     online: boolean;
     activity?: string;
   }> = [];
-  const similar: Array<{
-    id: string;
-    title: string;
-    coverUrl?: string;
-    coverFrom: string;
-    coverTo: string;
-    genres: string[];
-    price?: number | null;
-    originalPrice?: number | null;
-    discount?: number | null;
-    currency?: string;
-    store?: string;
-  }> = [];
   const priceUnavailable = game.price == null;
   const platformSummary = summarizePlatforms(game.platforms);
-  const priceHistory = (priceQuery.data?.history ?? [])
-    .map((deal, index) => ({
-      price: deal?.price?.amount,
-      date: deal?.timestamp ?? `Update ${index + 1}`,
-    }))
-    .filter((point): point is { price: number; date: string } => typeof point.price === "number");
+  const rating = formatCatalogRating(game.rating);
+  const releaseDate = formatCatalogReleaseDate(game.releaseDate);
+  const heroMetadata = [
+    ...platformSummary.visible,
+    ...(releaseDate === "Unknown" ? [] : [releaseDate]),
+    ...(rating === "Not rated yet" ? [] : [`${rating} critic score`]),
+  ];
+  const priceHistory = presentPriceHistory(priceQuery.data?.history ?? []);
+  const similar = (similarQuery.data?.results ?? [])
+    .filter((candidate) => candidate.id != null && String(candidate.id) !== catalogGame.id)
+    .slice(0, 4);
 
   return (
     <AppShell>
@@ -376,11 +356,7 @@ function GameDetail() {
             ))}
           </div>
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">{game.title}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            {platformSummary.visible.join(" · ")}
-            {game.releaseDate ? ` · ${game.releaseDate}` : ""}
-            {game.rating > 0 ? ` · ${game.rating} critic score` : ""}
-          </p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{heroMetadata.join(" · ")}</p>
         </div>
       </section>
 
@@ -405,8 +381,8 @@ function GameDetail() {
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {[
                   { l: "Genres", v: game.genres.join(", ") },
-                  { l: "Rating", v: game.rating > 0 ? `${game.rating} / 100` : "Not rated yet" },
-                  { l: "Release date", v: game.releaseDate ?? "Unknown" },
+                  { l: "Rating", v: rating },
+                  { l: "Release date", v: releaseDate },
                 ].map((r) => (
                   <div
                     key={r.l}
@@ -479,42 +455,42 @@ function GameDetail() {
           <section>
             <SectionHeader title="Price history" hint="Trend across storefronts" />
             <div className="rounded-2xl border border-border bg-surface p-6">
-              {priceUnavailable ? (
-                <EmptyState
-                  title="Price unavailable"
-                  description="We have no current price for this title in your region."
-                />
+              {priceQuery.isPending ? (
+                <p className="text-sm text-muted-foreground">Loading price history…</p>
+              ) : priceQuery.isError ? (
+                <div className="text-sm text-muted-foreground">
+                  <p>Price history is unavailable.</p>
+                  <button
+                    type="button"
+                    onClick={() => void priceQuery.refetch()}
+                    className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+                  >
+                    Retry price history
+                  </button>
+                </div>
               ) : (
                 <>
-                  <div className="mb-4">
-                    <PriceBlock
-                      price={game.price}
-                      originalPrice={game.originalPrice}
-                      discount={game.discount}
-                      currency={game.currency}
-                      store={game.store}
-                      size="lg"
-                      align="left"
-                    />
-                  </div>
-                  {priceHistory.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No price history is available yet.
-                    </p>
-                  ) : priceHistory.length === 1 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Recorded on {priceHistory[0].date}.
-                    </p>
+                  {priceUnavailable ? (
+                    <div className="mb-4">
+                      <EmptyState
+                        title="Price unavailable"
+                        description="We have no current price for this title in your region."
+                      />
+                    </div>
                   ) : (
-                    <>
-                      <Sparkline priceHistory={priceHistory} />
-                      <div className="mt-3 flex justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                        {priceHistory.map((p) => (
-                          <span key={p.date}>{p.date}</span>
-                        ))}
-                      </div>
-                    </>
+                    <div className="mb-4">
+                      <PriceBlock
+                        price={game.price}
+                        originalPrice={game.originalPrice}
+                        discount={game.discount}
+                        currency={game.currency}
+                        store={game.store}
+                        size="lg"
+                        align="left"
+                      />
+                    </div>
                   )}
+                  <PriceHistoryChart points={priceHistory.points} currency={game.currency} />
                 </>
               )}
             </div>
@@ -522,27 +498,45 @@ function GameDetail() {
 
           <section>
             <SectionHeader title="You might also like" />
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {similar.map((g) => (
-                <GameCard
-                  key={g.id}
-                  aspect="aspect-[16/9]"
-                  game={{
-                    gameId: g.id,
-                    title: g.title,
-                    coverUrl: g.coverUrl,
-                    coverFrom: g.coverFrom,
-                    coverTo: g.coverTo,
-                    genres: g.genres,
-                    price: g.price,
-                    originalPrice: g.originalPrice,
-                    discount: g.discount,
-                    currency: g.currency,
-                    store: g.store,
-                  }}
-                />
-              ))}
-            </div>
+            {catalogGame.isSteamLibrary ? (
+              <p className="text-sm text-muted-foreground">
+                Similar catalog games are unavailable for this Steam-only title.
+              </p>
+            ) : similarQuery.isPending ? (
+              <p className="text-sm text-muted-foreground">Loading similar games…</p>
+            ) : similarQuery.isError ? (
+              <div className="text-sm text-muted-foreground">
+                <p>Similar games are unavailable.</p>
+                <button
+                  type="button"
+                  onClick={() => void similarQuery.refetch()}
+                  className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+                >
+                  Retry similar games
+                </button>
+              </div>
+            ) : similar.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No similar games are available yet.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                {similar.map((candidate) => (
+                  <GameCard
+                    key={candidate.id}
+                    aspect="aspect-[16/9]"
+                    showPrice={false}
+                    game={{
+                      gameId: String(candidate.id),
+                      title: candidate.name,
+                      coverUrl: candidate.background_image ?? undefined,
+                      coverFrom: "#1d4ed8",
+                      coverTo: "#111827",
+                      genres: candidate.genres,
+                      platforms: candidate.platforms,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </section>
         </div>
 
