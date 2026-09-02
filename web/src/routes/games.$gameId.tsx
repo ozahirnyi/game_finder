@@ -449,11 +449,10 @@ function GameDetail() {
                       </p>
                     </div>
                     <Link
-                      to="/friends/$friendId"
-                      params={{ friendId: f.id }}
+                      to="/friends"
                       className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold hover:bg-foreground/5"
                     >
-                      Profile
+                      Friends
                     </Link>
                   </div>
                 ))}

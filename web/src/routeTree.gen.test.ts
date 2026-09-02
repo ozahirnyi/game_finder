@@ -4,6 +4,8 @@ import { routeTree } from "./routeTree.gen";
 
 describe("route tree", () => {
   it("registers the canonical anonymous public-profile route", () => {
-    expect(routeTree.children.map((child) => child.options.id)).toContain("/users/$publicId");
+    expect(Object.values(routeTree.children ?? {}).map((child) => child.options.id)).toContain(
+      "/users/$publicId",
+    );
   });
 });

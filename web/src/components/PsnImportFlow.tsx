@@ -6,15 +6,15 @@ import { confirmPsnImport, previewPsnImport, type PsnImportPreviewItem } from ".
 export function PsnImportFlow() {
   const client = useQueryClient();
   const [items, setItems] = useState<PsnImportPreviewItem[] | null>(null);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
   const [fileName, setFileName] = useState("");
   const preview = useMutation({
     mutationFn: previewPsnImport,
     onSuccess: (data) => {
       setItems(data.items);
-      setSelectedIds(
+      setSelectedTokens(
         data.items.flatMap((item) =>
-          item.status === "confirmed" && item.igdb_id ? [item.igdb_id] : [],
+          item.recommended_action !== "skip" ? [item.candidate_token] : [],
         ),
       );
     },
@@ -23,9 +23,11 @@ export function PsnImportFlow() {
     mutationFn: confirmPsnImport,
     onSuccess: () => client.invalidateQueries({ queryKey: ["library"] }),
   });
-  const toggleGame = (igdbId: number) =>
-    setSelectedIds((current) =>
-      current.includes(igdbId) ? current.filter((id) => id !== igdbId) : [...current, igdbId],
+  const toggleGame = (candidateToken: string) =>
+    setSelectedTokens((current) =>
+      current.includes(candidateToken)
+        ? current.filter((token) => token !== candidateToken)
+        : [...current, candidateToken],
     );
 
   return (
@@ -58,26 +60,26 @@ export function PsnImportFlow() {
         ) : (
           <>
             <p className="mb-4 text-sm text-muted-foreground">
-              Confirmed catalog matches are selected. Review items are not imported automatically.
+              Plausible games are selected. Suggested non-games are left out automatically.
             </p>
             <div className="max-h-96 space-y-2 overflow-auto pr-1">
               {items
-                .filter((item) => item.status === "confirmed" && item.igdb_id)
+                .filter((item) => item.recommended_action !== "skip")
                 .map((item) => (
                   <label
-                    key={item.igdb_id}
+                    key={item.candidate_token}
                     className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 p-3"
                   >
                     <input
-                      checked={selectedIds.includes(item.igdb_id!)}
+                      checked={selectedTokens.includes(item.candidate_token)}
                       type="checkbox"
-                      onChange={() => toggleGame(item.igdb_id!)}
+                      onChange={() => toggleGame(item.candidate_token)}
                     />
                     <span className="text-sm font-medium">{item.title}</span>
                   </label>
                 ))}
               {items
-                .filter((item) => item.status !== "confirmed")
+                .filter((item) => item.recommended_action === "skip")
                 .map((item) => (
                   <p
                     key={item.source_title}
@@ -90,18 +92,32 @@ export function PsnImportFlow() {
             <div className="mt-5 flex flex-wrap gap-3">
               <button
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60"
-                disabled={selectedIds.length === 0 || confirm.isPending}
-                onClick={() => confirm.mutate(selectedIds.map((catalog_id) => ({ catalog_id })))}
+                disabled={selectedTokens.length === 0 || confirm.isPending}
+                onClick={() =>
+                  confirm.mutate(
+                    items
+                      .filter((item) => selectedTokens.includes(item.candidate_token))
+                      .map((item) =>
+                        item.recommended_action === "catalog" && item.igdb_id
+                          ? {
+                              candidate_token: item.candidate_token,
+                              action: "catalog" as const,
+                              catalog_id: item.igdb_id,
+                            }
+                          : { candidate_token: item.candidate_token, action: "raw" as const },
+                      ),
+                  )
+                }
               >
                 {confirm.isPending
                   ? "Importing…"
-                  : `Import ${selectedIds.length} game${selectedIds.length === 1 ? "" : "s"}`}
+                  : `Import ${selectedTokens.length} game${selectedTokens.length === 1 ? "" : "s"}`}
               </button>
               <button
                 className="rounded-lg border border-border px-4 py-2 text-sm font-bold"
                 onClick={() => {
                   setItems(null);
-                  setSelectedIds([]);
+                  setSelectedTokens([]);
                 }}
               >
                 Choose another file

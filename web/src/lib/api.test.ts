@@ -257,7 +257,10 @@ describe("apiRequest", () => {
     const file = new File(["title"], "library.csv", { type: "text/csv" });
 
     await previewPsnImport(file);
-    await confirmPsnImport([{ catalog_id: 101 }, { source_title: "Hades" }]);
+    await confirmPsnImport([
+      { candidate_token: "catalog-token", action: "catalog", catalog_id: 101 },
+      { candidate_token: "raw-token", action: "raw" },
+    ]);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -268,7 +271,12 @@ describe("apiRequest", () => {
       2,
       "/api/psn/import/confirm",
       expect.objectContaining({
-        body: JSON.stringify({ selections: [{ catalog_id: 101 }, { source_title: "Hades" }] }),
+        body: JSON.stringify({
+          selections: [
+            { candidate_token: "catalog-token", action: "catalog", catalog_id: 101 },
+            { candidate_token: "raw-token", action: "raw" },
+          ],
+        }),
         method: "POST",
       }),
     );
