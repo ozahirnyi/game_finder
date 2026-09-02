@@ -1,5 +1,12 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, clearToken, getRecommendationQuota, getRecommendations, setToken } from "./api";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import {
+  ApiError,
+  clearToken,
+  getRecommendationQuota,
+  getRecommendations,
+  setToken,
+  type RecommendationQuotaErrorDetail,
+} from "./api";
 
 const validToken = `header.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.signature`;
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -37,13 +44,19 @@ describe("AI recommendation errors", () => {
 
   it("keeps structured quota detail on 429", async () => {
     setToken(validToken);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ detail: {
+    const expectedDetail: RecommendationQuotaErrorDetail = {
       code: "ai_daily_quota_exhausted", message: "Daily AI search limit reached.",
       quota: { limit: 3, remaining: 0, cooldown_until: null, reset_at: "2026-09-02T00:00:00Z" },
-    }}, 429)));
+      next_allowed_at: "2026-09-02T00:00:00Z",
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      detail: expectedDetail,
+    }, 429)));
     const error = await getRecommendations("cozy").catch((reason) => reason);
     expect(error).toBeInstanceOf(ApiError);
-    expect(error.detail.code).toBe("ai_daily_quota_exhausted");
-    expect(error.detail.quota.remaining).toBe(0);
+    expect(error.detail).toEqual(expectedDetail);
+    const detail = error.detail as RecommendationQuotaErrorDetail;
+    expectTypeOf(detail.next_allowed_at).toEqualTypeOf<string>();
+    expect(detail.next_allowed_at).toBe("2026-09-02T00:00:00Z");
   });
 });

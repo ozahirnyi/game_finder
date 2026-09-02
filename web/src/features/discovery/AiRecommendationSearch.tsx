@@ -14,12 +14,13 @@ import { StatePanel } from "@/components/ui";
 import { Chip } from "@/components/ui-bits";
 import {
   ApiError,
-  getAuthSnapshot,
+  getAuthSessionSnapshot,
   getRecommendationQuota,
   getRecommendations,
   subscribeToAuthChanges,
   type RecommendationItem,
   type RecommendationQuota,
+  type RecommendationQuotaErrorDetail,
 } from "@/lib/api";
 
 function isRecommendationQuota(value: unknown): value is RecommendationQuota {
@@ -36,9 +37,13 @@ function isRecommendationQuota(value: unknown): value is RecommendationQuota {
 
 function isQuotaDetail(
   value: unknown,
-): value is { quota: RecommendationQuota } {
+): value is RecommendationQuotaErrorDetail {
   if (!value || typeof value !== "object") return false;
-  return isRecommendationQuota((value as Record<string, unknown>).quota);
+  const detail = value as Record<string, unknown>;
+  return (
+    isRecommendationQuota(detail.quota) &&
+    typeof detail.next_allowed_at === "string"
+  );
 }
 
 function RecommendationCard({ item }: { item: RecommendationItem }) {
@@ -102,11 +107,12 @@ function RecommendationCard({ item }: { item: RecommendationItem }) {
 }
 
 export function AiRecommendationSearch() {
-  const authenticated = useSyncExternalStore(
+  const authSessionIdentity = useSyncExternalStore(
     subscribeToAuthChanges,
-    getAuthSnapshot,
-    () => false,
+    getAuthSessionSnapshot,
+    () => null,
   );
+  const authenticated = authSessionIdentity !== null;
   const [quota, setQuota] = useState<RecommendationQuota | null>(null);
   const [quotaState, setQuotaState] = useState<
     "idle" | "loading" | "success" | "error"
@@ -119,21 +125,25 @@ export function AiRecommendationSearch() {
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const authGenerationRef = useRef(0);
+  const refreshedResetRef = useRef<string | null>(null);
 
-  const loadQuotaForGeneration = useCallback(async (generation: number) => {
-    setQuotaState("loading");
-    try {
-      const nextQuota = await getRecommendationQuota();
-      if (generation !== authGenerationRef.current) return;
-      setQuota(nextQuota);
-      setNow(Date.now());
-      setQuotaState("success");
-    } catch {
-      if (generation !== authGenerationRef.current) return;
-      setQuota(null);
-      setQuotaState("error");
-    }
-  }, []);
+  const loadQuotaForGeneration = useCallback(
+    async (generation: number, clearQuotaOnError = true) => {
+      setQuotaState("loading");
+      try {
+        const nextQuota = await getRecommendationQuota();
+        if (generation !== authGenerationRef.current) return;
+        setQuota(nextQuota);
+        setNow(Date.now());
+        setQuotaState("success");
+      } catch {
+        if (generation !== authGenerationRef.current) return;
+        if (clearQuotaOnError) setQuota(null);
+        setQuotaState("error");
+      }
+    },
+    [],
+  );
 
   const loadQuota = useCallback(() => {
     void loadQuotaForGeneration(authGenerationRef.current);
@@ -149,6 +159,7 @@ export function AiRecommendationSearch() {
     setPending(false);
     setError("");
     setNow(Date.now());
+    refreshedResetRef.current = null;
     if (authenticated) {
       void loadQuotaForGeneration(generation);
     }
@@ -157,7 +168,7 @@ export function AiRecommendationSearch() {
         authGenerationRef.current += 1;
       }
     };
-  }, [authenticated, loadQuotaForGeneration]);
+  }, [authSessionIdentity, authenticated, loadQuotaForGeneration]);
 
   const cooldownSeconds = quota?.cooldown_until
     ? Math.max(0, Math.ceil((Date.parse(quota.cooldown_until) - now) / 1000))
@@ -168,6 +179,24 @@ export function AiRecommendationSearch() {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [cooldownSeconds]);
+
+  useEffect(() => {
+    if (
+      quotaState !== "success" ||
+      quota?.remaining !== 0 ||
+      refreshedResetRef.current === quota.reset_at
+    ) {
+      return;
+    }
+    const resetAt = Date.parse(quota.reset_at);
+    if (!Number.isFinite(resetAt)) return;
+    const generation = authGenerationRef.current;
+    const timer = window.setTimeout(() => {
+      refreshedResetRef.current = quota.reset_at;
+      void loadQuotaForGeneration(generation);
+    }, Math.max(0, resetAt - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [loadQuotaForGeneration, quota, quotaState]);
 
   const disabled =
     pending ||
@@ -191,9 +220,9 @@ export function AiRecommendationSearch() {
       setNow(Date.now());
     } catch (reason) {
       if (generation !== authGenerationRef.current) return;
+      const rateLimited = reason instanceof ApiError && reason.status === 429;
       if (
-        reason instanceof ApiError &&
-        reason.status === 429 &&
+        rateLimited &&
         isQuotaDetail(reason.detail)
       ) {
         setQuota(reason.detail.quota);
@@ -202,6 +231,9 @@ export function AiRecommendationSearch() {
       setError(
         reason instanceof Error ? reason.message : "AI search is unavailable.",
       );
+      if (!rateLimited) {
+        await loadQuotaForGeneration(generation, false);
+      }
     } finally {
       if (generation === authGenerationRef.current) {
         setPending(false);

@@ -5,10 +5,11 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   getAuthSnapshot,
+  getAuthSessionSnapshot,
   getRecommendationQuota,
   getRecommendations,
   type AIRecommendationResponse,
@@ -18,6 +19,7 @@ import { AiRecommendationSearch } from "./AiRecommendationSearch";
 
 const authStore = vi.hoisted(() => ({
   authenticated: false,
+  identity: null as string | null,
   listeners: new Set<() => void>(),
 }));
 
@@ -26,6 +28,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return {
     ...actual,
     getAuthSnapshot: vi.fn(() => authStore.authenticated),
+    getAuthSessionSnapshot: vi.fn(() =>
+      authStore.authenticated ? (authStore.identity ?? "test-token") : null,
+    ),
     subscribeToAuthChanges: vi.fn((listener: () => void) => {
       authStore.listeners.add(listener);
       return () => authStore.listeners.delete(listener);
@@ -55,6 +60,15 @@ function fillAndSubmit(prompt: string) {
 function setAuthenticated(authenticated: boolean) {
   act(() => {
     authStore.authenticated = authenticated;
+    authStore.identity = authenticated ? "test-token" : null;
+    authStore.listeners.forEach((listener) => listener());
+  });
+}
+
+function setAuthIdentity(identity: string | null) {
+  act(() => {
+    authStore.authenticated = identity !== null;
+    authStore.identity = identity;
     authStore.listeners.forEach((listener) => listener());
   });
 }
@@ -79,10 +93,16 @@ function renderAiSearch() {
 }
 
 describe("AiRecommendationSearch", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     authStore.authenticated = false;
+    authStore.identity = null;
     authStore.listeners.clear();
     vi.mocked(getAuthSnapshot).mockClear();
+    vi.mocked(getAuthSessionSnapshot).mockClear();
     vi.mocked(getRecommendationQuota).mockReset();
     vi.mocked(getRecommendations).mockReset();
   });
@@ -201,6 +221,87 @@ describe("AiRecommendationSearch", () => {
     expect(screen.getByRole("heading", { name: "Hades II" })).toBeVisible();
   });
 
+  it("refreshes authoritative quota after a provider failure", async () => {
+    authStore.authenticated = true;
+    const cooldownUntil = new Date(Date.now() + 60_000).toISOString();
+    vi.mocked(getRecommendationQuota)
+      .mockResolvedValueOnce(availableQuota())
+      .mockResolvedValueOnce(availableQuota(1, cooldownUntil));
+    vi.mocked(getRecommendations)
+      .mockResolvedValueOnce({
+        recommendations: [
+          {
+            title: "Hades II",
+            reason: "Fast runs",
+            tags: ["Action"],
+            game: null,
+          },
+        ],
+        quota: availableQuota(2),
+      })
+      .mockRejectedValueOnce(
+        new ApiError("OpenAI is temporarily unavailable.", 503),
+      );
+
+    renderAiSearch();
+    await screen.findByText(/3 of 3 AI searches remaining/i);
+    fillAndSubmit("fast runs");
+    expect(
+      await screen.findByRole("heading", { name: "Hades II" }),
+    ).toBeVisible();
+
+    fillAndSubmit("another request");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "OpenAI is temporarily unavailable.",
+    );
+    expect(await screen.findByText(/1 of 3 AI searches remaining/i)).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /try again in/i }),
+    ).toBeDisabled();
+    expect(screen.getByRole("heading", { name: "Hades II" })).toBeVisible();
+    expect(getRecommendationQuota).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows retryable unavailable quota after a failed provider-error refresh", async () => {
+    authStore.authenticated = true;
+    vi.mocked(getRecommendationQuota)
+      .mockResolvedValueOnce(availableQuota())
+      .mockRejectedValueOnce(new Error("quota endpoint offline"));
+    vi.mocked(getRecommendations)
+      .mockResolvedValueOnce({
+        recommendations: [
+          {
+            title: "Hades II",
+            reason: "Fast runs",
+            tags: ["Action"],
+            game: null,
+          },
+        ],
+        quota: availableQuota(2),
+      })
+      .mockRejectedValueOnce(
+        new ApiError("OpenAI is temporarily unavailable.", 503),
+      );
+
+    renderAiSearch();
+    await screen.findByText(/3 of 3 AI searches remaining/i);
+    fillAndSubmit("fast runs");
+    expect(
+      await screen.findByRole("heading", { name: "Hades II" }),
+    ).toBeVisible();
+
+    fillAndSubmit("another request");
+
+    expect(
+      await screen.findByText("AI search allowance is unavailable"),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Find games" })).toBeDisabled();
+    expect(screen.getByRole("heading", { name: "Hades II" })).toBeVisible();
+    expect(getRecommendationQuota).toHaveBeenCalledTimes(2);
+  });
+
   it("uses ordinary catalog search for an unmatched recommendation", async () => {
     authStore.authenticated = true;
     vi.mocked(getRecommendationQuota).mockResolvedValue(availableQuota());
@@ -239,6 +340,7 @@ describe("AiRecommendationSearch", () => {
         code: "ai_daily_quota_exhausted",
         message: "Daily AI search limit reached.",
         quota: availableQuota(0),
+        next_allowed_at: "2026-09-02T00:00:00Z",
       }),
     );
 
@@ -251,6 +353,39 @@ describe("AiRecommendationSearch", () => {
     );
     expect(screen.getByText(/0 of 3 AI searches remaining/i)).toBeVisible();
     expect(screen.getByRole("button", { name: /resets/i })).toBeDisabled();
+  });
+
+  it("reloads exhausted quota at reset and allows a new submission", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-01T23:59:59Z"));
+    authStore.authenticated = true;
+    vi.mocked(getRecommendationQuota)
+      .mockResolvedValueOnce({
+        ...availableQuota(0),
+        reset_at: "2026-09-02T00:00:00Z",
+      })
+      .mockResolvedValueOnce({
+        ...availableQuota(3),
+        reset_at: "2026-09-03T00:00:00Z",
+      });
+    vi.mocked(getRecommendations).mockResolvedValue({
+      recommendations: [],
+      quota: availableQuota(2),
+    });
+
+    renderAiSearch();
+    await act(async () => undefined);
+    expect(screen.getByText(/0 of 3 AI searches remaining/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /resets/i })).toBeDisabled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(screen.getByText(/3 of 3 AI searches remaining/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Find games" })).toBeEnabled();
+    fillAndSubmit("fresh UTC day");
+    expect(getRecommendations).toHaveBeenCalledWith("fresh UTC day");
   });
 
   it("clears account-scoped cards and quota across logout and login", async () => {
@@ -361,6 +496,51 @@ describe("AiRecommendationSearch", () => {
     });
 
     expect(screen.queryByText("Stale Game")).not.toBeInTheDocument();
+    expect(screen.getByText(/2 of 3 AI searches remaining/i)).toBeVisible();
+  });
+
+  it("resets account state and rejects stale work when one token replaces another", async () => {
+    authStore.authenticated = true;
+    authStore.identity = "token-a";
+    const oldRecommendations = deferred<AIRecommendationResponse>();
+    vi.mocked(getRecommendationQuota)
+      .mockResolvedValueOnce(availableQuota())
+      .mockResolvedValueOnce(availableQuota(2));
+    vi.mocked(getRecommendations).mockImplementationOnce(
+      () => oldRecommendations.promise,
+    );
+
+    renderAiSearch();
+    await screen.findByText(/3 of 3 AI searches remaining/i);
+    fillAndSubmit("old account prompt");
+    expect(screen.getByRole("button", { name: /finding games/i })).toBeDisabled();
+
+    setAuthIdentity("token-b");
+
+    expect(
+      await screen.findByText(/2 of 3 AI searches remaining/i),
+    ).toBeVisible();
+    expect(screen.getByLabelText(/describe what you want to play/i)).toHaveValue(
+      "",
+    );
+    expect(screen.getByRole("button", { name: "Find games" })).toBeEnabled();
+
+    oldRecommendations.resolve({
+      recommendations: [
+        {
+          title: "Token A Game",
+          reason: "From the replaced token",
+          tags: ["Stale"],
+          game: null,
+        },
+      ],
+      quota: availableQuota(0),
+    });
+    await act(async () => {
+      await oldRecommendations.promise;
+    });
+
+    expect(screen.queryByText("Token A Game")).not.toBeInTheDocument();
     expect(screen.getByText(/2 of 3 AI searches remaining/i)).toBeVisible();
   });
 

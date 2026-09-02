@@ -11,14 +11,17 @@ describe("GameCover", () => {
       "src",
       "https://cdn.example/hades.jpg",
     );
+    expect(screen.getByText("Hades II").closest('[aria-hidden="true"]')).not.toBeNull();
   });
 
   it("keeps the styled fallback when src is absent", () => {
     render(<GameCover title="Unknown Game" src={null} />);
 
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(
-      screen.getByLabelText("Unknown Game cover unavailable"),
+      screen.getByRole("img", { name: "Unknown Game cover unavailable" }),
     ).toBeVisible();
+    expect(
+      screen.queryByRole("img", { name: "Unknown Game cover" }),
+    ).not.toBeInTheDocument();
   });
 });

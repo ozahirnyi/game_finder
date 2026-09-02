@@ -6,9 +6,13 @@ import uuid
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 import app.main as main
-from app.recommendation_quota import QuotaDenied, QuotaSnapshot
+from app.database import AIRecommendationQuota, Base, User
+from app.recommendation_quota import QuotaDenied, QuotaSnapshot, get_quota_status
 
 
 client = TestClient(main.app)
@@ -24,6 +28,31 @@ def authenticated_ai_request():
         yield user, db
     finally:
         main.app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def authenticated_ai_db_request():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        user = User(
+            email=f"provider-failure-{uuid.uuid4()}@example.test",
+            password_hash="hash",
+        )
+        db.add(user)
+        db.commit()
+        main.app.dependency_overrides[main.get_current_user] = lambda: user
+        main.app.dependency_overrides[main.get_db] = lambda: db
+        try:
+            yield user, db
+        finally:
+            main.app.dependency_overrides.clear()
+    Base.metadata.drop_all(engine)
+    engine.dispose()
 
 
 def quota_snapshot(remaining: int) -> QuotaSnapshot:
@@ -54,6 +83,32 @@ def test_ai_recommendation_quota_denial_is_structured(monkeypatch, authenticated
     assert response.status_code == 429
     assert response.json()["detail"]["code"] == "ai_daily_quota_exhausted"
     assert response.json()["detail"]["quota"]["remaining"] == 0
+    assert response.json()["detail"]["next_allowed_at"] == "2026-09-02T00:00:00Z"
+
+
+def test_ai_recommendation_cooldown_uses_cooldown_as_next_allowed_at(
+    monkeypatch, authenticated_ai_request
+):
+    snapshot = QuotaSnapshot(
+        limit=3,
+        remaining=2,
+        cooldown_until=datetime(2026, 9, 1, 8, 1, tzinfo=timezone.utc),
+        reset_at=datetime(2026, 9, 2, tzinfo=timezone.utc),
+    )
+
+    def deny(*_args, **_kwargs):
+        raise QuotaDenied(
+            "ai_recommendation_cooldown",
+            "Please wait before searching again.",
+            snapshot,
+        )
+
+    monkeypatch.setattr(main, "reserve_quota", deny)
+    response = client.post("/recommendations", json={"prompt": "cozy co-op"})
+
+    assert response.status_code == 429
+    assert response.json()["detail"]["code"] == "ai_recommendation_cooldown"
+    assert response.json()["detail"]["next_allowed_at"] == "2026-09-01T08:01:00Z"
 
 
 def test_ai_response_contains_quota_catalog_cover_reason_and_tags(monkeypatch, authenticated_ai_request):
@@ -94,9 +149,10 @@ def test_blank_prompt_does_not_reserve_quota(monkeypatch, authenticated_ai_reque
     reserve.assert_not_called()
 
 
-def test_provider_failure_keeps_reserved_attempt(monkeypatch, authenticated_ai_request):
-    reserve = Mock(return_value=quota_snapshot(remaining=2))
-    monkeypatch.setattr(main, "reserve_quota", reserve)
+def test_provider_failure_keeps_reserved_attempt(
+    monkeypatch, authenticated_ai_db_request
+):
+    user, db = authenticated_ai_db_request
     monkeypatch.setattr(
         main,
         "get_recommendation",
@@ -105,8 +161,12 @@ def test_provider_failure_keeps_reserved_attempt(monkeypatch, authenticated_ai_r
         })),
     )
     response = client.post("/recommendations", json={"prompt": "cozy"})
+
     assert response.status_code == 503
-    reserve.assert_called_once()
+    assert get_quota_status(db, user.id).remaining == 2
+    quota_row = db.get(AIRecommendationQuota, (user.id, datetime.now(timezone.utc).date()))
+    assert quota_row is not None
+    assert quota_row.attempt_count == 1
 
 
 def test_search_uses_steam_results_when_rawg_times_out(monkeypatch):

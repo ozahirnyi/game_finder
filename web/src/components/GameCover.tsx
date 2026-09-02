@@ -24,13 +24,20 @@ export function GameCover({
   return (
     <div
       className={`relative overflow-hidden ${className}`}
+      role={src ? undefined : "img"}
       aria-label={src ? undefined : `${title} cover unavailable`}
       style={{
         background: `radial-gradient(120% 90% at 15% 10%, ${from}55 0%, transparent 55%), linear-gradient(135deg, ${to} 0%, ${from}22 100%), ${to}`,
       }}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_90%,rgba(255,255,255,0.08),transparent_50%)]" />
-      <div className="absolute inset-0 flex flex-col justify-between p-3">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[radial-gradient(circle_at_80%_90%,rgba(255,255,255,0.08),transparent_50%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 flex flex-col justify-between p-3"
+      >
         <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/50">
           GF · {title.split(" ")[0].slice(0, 4).toUpperCase()}
         </span>

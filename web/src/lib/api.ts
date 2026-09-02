@@ -112,6 +112,13 @@ export type RecommendationQuota = {
   reset_at: string;
 };
 
+export type RecommendationQuotaErrorDetail = {
+  code: "ai_recommendation_cooldown" | "ai_daily_quota_exhausted";
+  message: string;
+  quota: RecommendationQuota;
+  next_allowed_at: string;
+};
+
 export type RecommendationGame = {
   id: number;
   name: string;
@@ -295,6 +302,10 @@ export function subscribeToAuthChanges(callback: () => void) {
 
 export function getAuthSnapshot() {
   return isAuthenticated();
+}
+
+export function getAuthSessionSnapshot() {
+  return getToken();
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {

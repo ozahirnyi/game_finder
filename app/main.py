@@ -966,8 +966,18 @@ async def recommendations(
     try:
         quota = reserve_quota(db, current_user.id)
     except QuotaDenied as exc:
+        next_allowed_at = (
+            exc.snapshot.cooldown_until
+            if exc.code == "ai_recommendation_cooldown"
+            else exc.snapshot.reset_at
+        )
         raise HTTPException(status_code=429, detail=jsonable_encoder({
-            "code": exc.code, "message": exc.message, "quota": asdict(exc.snapshot),
+            "code": exc.code,
+            "message": exc.message,
+            "quota": asdict(exc.snapshot),
+            "next_allowed_at": next_allowed_at.astimezone(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z"),
         })) from exc
     generated = await asyncio.to_thread(get_recommendation, prompt, data.liked_game_ids)
 
