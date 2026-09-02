@@ -108,6 +108,8 @@ For guests, the section does not render an enabled prompt form and does not call
 
 Backend tests cover mandatory authentication, quota status, three allowed daily reservations, fourth-request rejection, 60-second cooldown, UTC reset, invalid-prompt non-consumption, provider-failure consumption, and parallel-request enforcement.
 
+The default test database is SQLite, which does not implement PostgreSQL's row-level `SELECT FOR UPDATE` semantics. The unit suite therefore asserts the PostgreSQL lock statement and session-refresh behavior without claiming to simulate contending database transactions. Before changing quota-locking code, run an opt-in PostgreSQL integration test with independent sessions to validate parallel reservations against the production locking model.
+
 Enrichment tests cover normalized exact matching, rejection of similar titles, populated ID and cover fields, preservation of reason and tags, and partial catalog failure.
 
 Frontend tests cover the guest sign-in state, authenticated quota display, pending-submit protection, cooldown countdown, exhausted daily quota, preservation of existing results after errors, matched internal links, cover rendering, AI reason and tags, and unmatched catalog-search actions.

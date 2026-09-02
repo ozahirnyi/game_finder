@@ -130,6 +130,7 @@ def test_naive_datetime_is_rejected(session, user):
 
 
 def test_reservation_locks_the_user_row_for_postgresql(session, user, monkeypatch):
+    """Assert the production lock SQL; SQLite cannot emulate PostgreSQL row locks."""
     compiled_lock_queries = []
     original_with_for_update = Query.with_for_update
 
