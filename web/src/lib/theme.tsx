@@ -63,7 +63,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           if (a) setAccentState(a);
         }
       }
-    } catch {}
+    } catch {
+      // Defaults remain active when browser storage is unavailable or malformed.
+    }
   }, []);
 
   // Apply to <html>
@@ -81,7 +83,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     html.style.setProperty("--primary-foreground", primaryForeground);
     try {
       localStorage.setItem(KEY, JSON.stringify({ mode, accentId: accent.id }));
-    } catch {}
+    } catch {
+      // The current theme remains applied when browser storage cannot persist it.
+    }
   }, [mode, accent]);
 
 

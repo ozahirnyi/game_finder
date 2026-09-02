@@ -1,4 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from "@tanstack/react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FriendsScreen } from "./FriendsScreen";
 import { ApiError, getSteamSocial, isAuthenticated } from "@/lib/api";
@@ -18,6 +24,16 @@ const api = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/api", () => api);
+
+function renderFriendsScreen() {
+  const rootRoute = createRootRoute({ component: FriendsScreen });
+  const router = createRouter({
+    routeTree: rootRoute,
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+
+  return render(<RouterProvider router={router} />);
+}
 
 const linkedSteam = {
   linked: true,
@@ -50,7 +66,7 @@ describe("FriendsScreen", () => {
   it("renders Steam friend results from the social endpoint", async () => {
     vi.mocked(getSteamSocial).mockResolvedValue({ steam: linkedSteam, friends: [friend], top_friend_games: [], public_libraries: 1, private_libraries: 0 });
 
-    render(<FriendsScreen />);
+    renderFriendsScreen();
 
     expect(await screen.findByText(friend.persona_name!)).toBeVisible();
     expect(screen.getByText("4 games in common")).toBeVisible();
@@ -62,20 +78,20 @@ describe("FriendsScreen", () => {
   it("shows the Steam connect state for the backend's unlinked-account response", async () => {
     vi.mocked(getSteamSocial).mockRejectedValue(new ApiError("Connect Steam first", 409));
 
-    render(<FriendsScreen />);
+    renderFriendsScreen();
 
     expect(await screen.findByText("Connect Steam to see friends")).toBeVisible();
     expect(screen.getByRole("link", { name: "Connect Steam" })).toHaveAttribute("href", "/steam");
     expect(screen.queryByText("Sasha K.")).not.toBeInTheDocument();
   });
 
-  it("does not request Steam social data when signed out", () => {
+  it("does not request Steam social data when signed out", async () => {
     vi.mocked(isAuthenticated).mockReturnValue(false);
 
-    render(<FriendsScreen />);
+    renderFriendsScreen();
 
     expect(getSteamSocial).not.toHaveBeenCalled();
-    expect(screen.getByText("Sign in to see friends")).toBeVisible();
+    expect(await screen.findByText("Sign in to see friends")).toBeVisible();
   });
 
   it("offers a retry when Steam social data is unavailable", async () => {
@@ -83,7 +99,7 @@ describe("FriendsScreen", () => {
       .mockRejectedValueOnce(new ApiError("Steam service is unavailable", 503))
       .mockResolvedValueOnce({ steam: linkedSteam, friends: [], top_friend_games: [], public_libraries: 0, private_libraries: 0 });
 
-    render(<FriendsScreen />);
+    renderFriendsScreen();
 
     expect(await screen.findByText("Friends are unavailable")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));

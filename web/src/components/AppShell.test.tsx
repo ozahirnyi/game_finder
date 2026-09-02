@@ -1,47 +1,65 @@
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
+import { ThemeProvider } from "@/lib/theme";
 
-let pathname = "/";
-const getAuthSnapshot = vi.fn<() => boolean>();
+function renderAppShell(path: "/deals" | "/friends") {
+  const rootRoute = createRootRoute({
+    component: () => (
+      <ThemeProvider>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+      </ThemeProvider>
+    ),
+  });
+  const pageRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path,
+    component: () => <main>{path}</main>,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([pageRoute]),
+    history: createMemoryHistory({ initialEntries: [path] }),
+  });
 
-vi.mock("next/navigation", () => ({
-  usePathname: () => pathname,
-}));
-
-vi.mock("@/lib/api", () => ({
-  getAuthSnapshot: () => getAuthSnapshot(),
-  subscribeToAuthChanges: () => () => undefined,
-}));
-
-function mockAuth(authenticated: boolean) {
-  getAuthSnapshot.mockReturnValue(authenticated);
-}
-
-function renderWithPath(path: string, ui: React.ReactNode) {
-  pathname = path;
-  return render(ui);
+  return render(<RouterProvider router={router} />);
 }
 
 describe("AppShell", () => {
   beforeEach(() => {
-    pathname = "/";
-    mockAuth(true);
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
   });
 
-  it("shows all product destinations and marks the current route", () => {
-    renderWithPath("/deals", <AppShell><main>Deals</main></AppShell>);
+  it("shows all product destinations and marks the current route", async () => {
+    renderAppShell("/deals");
 
-    expect(screen.getByRole("link", { name: "Deals" })).toHaveAttribute("aria-current", "page");
+    const dealLinks = await screen.findAllByRole("link", { name: "Deals" });
+    expect(dealLinks).toHaveLength(2);
+    dealLinks.forEach((link) => {
+      expect(link).toHaveAttribute("aria-current", "page");
+    });
     expect(screen.getByRole("link", { name: "Friends" })).toHaveAttribute("href", "/friends");
     expect(screen.getByRole("link", { name: "PSN" })).toHaveAttribute("href", "/psn");
   });
 
-  it("shows sign in instead of protected destinations when unauthenticated", () => {
-    mockAuth(false);
-    renderWithPath("/", <AppShell><main>Home</main></AppShell>);
+  it("marks a different router location as current", async () => {
+    renderAppShell("/friends");
 
-    expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Friends" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Friends" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    screen.getAllByRole("link", { name: "Home" }).forEach((link) => {
+      expect(link).toHaveAttribute("href", "/");
+    });
   });
 });
