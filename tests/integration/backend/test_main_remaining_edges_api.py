@@ -1,11 +1,13 @@
 import asyncio
 import uuid
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 from fastapi import Request
 
 from app.database import Favorite, FriendRequest, Game, GameInvite, OAuthIdentity, WishlistItem
+from app.recommendation_quota import QuotaDenied, QuotaSnapshot
 
 
 pytestmark = pytest.mark.integration
@@ -213,14 +215,16 @@ def test_price_alert_validation(api_client, user_factory, auth_as, db_session):
     assert api_client.patch(f"/price-alerts/{created.json()['id']}", json={"target_price": None, "target_discount": None}).status_code == 422
 
 
-def test_recommendations_empty_and_provider_error(api_client, app_main, monkeypatch):
+def test_recommendations_empty_and_provider_error(api_client, app_main, monkeypatch, user_factory, auth_as):
+    auth_as(user_factory(email="recommendations-empty@example.com"))
     monkeypatch.setattr(app_main, "get_recommendation", lambda *_args, **_kwargs: {"recommendations": []})
     response = api_client.post("/recommendations", json={"prompt": "cozy games"})
     assert response.status_code == 200
     assert response.json()["recommendations"] == []
 
 
-def test_recommendations_expose_detail_link_only_for_an_exact_catalog_match(api_client, app_main, monkeypatch):
+def test_recommendations_expose_detail_link_only_for_an_exact_catalog_match(api_client, app_main, monkeypatch, user_factory, auth_as):
+    auth_as(user_factory(email="recommendations-match@example.com"))
     monkeypatch.setattr(
         app_main,
         "get_recommendation",
@@ -236,6 +240,37 @@ def test_recommendations_expose_detail_link_only_for_an_exact_catalog_match(api_
     response = api_client.post("/recommendations", json={"prompt": "fast roguelikes"})
 
     assert response.status_code == 200
-    assert response.json()["recommendations"] == [
-        {"title": "Hades", "reason": "Fast runs", "tags": ["roguelike"], "igdb_id": 2, "cover_url": "https://img.test/hades.jpg"}
-    ]
+    recommendation = response.json()["recommendations"][0]
+    assert recommendation["title"] == "Hades"
+    assert recommendation["reason"] == "Fast runs"
+    assert recommendation["tags"] == ["roguelike"]
+    assert recommendation["game"]["id"] == 2
+    assert recommendation["game"]["background_image"] == "https://img.test/hades.jpg"
+
+
+def test_recommendations_return_structured_quota_denial(api_client, app_main, monkeypatch, user_factory, auth_as):
+    auth_as(user_factory(email="recommendations-denied@example.com"))
+    snapshot = QuotaSnapshot(3, 0, None, datetime(2026, 9, 3, tzinfo=timezone.utc))
+    monkeypatch.setattr(
+        app_main, "reserve_quota",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            QuotaDenied("ai_daily_quota_exhausted", "Daily AI search limit reached.", snapshot)
+        ),
+    )
+
+    response = api_client.post("/recommendations", json={"prompt": "cozy games"})
+
+    assert response.status_code == 429
+    assert response.json()["detail"]["code"] == "ai_daily_quota_exhausted"
+    assert response.json()["detail"]["quota"]["remaining"] == 0
+
+
+def test_recommendation_quota_returns_authenticated_status(api_client, app_main, monkeypatch, user_factory, auth_as):
+    auth_as(user_factory(email="recommendations-status@example.com"))
+    snapshot = QuotaSnapshot(3, 3, None, datetime(2026, 9, 3, tzinfo=timezone.utc))
+    monkeypatch.setattr(app_main, "get_quota_status", lambda *_args, **_kwargs: snapshot)
+
+    response = api_client.get("/recommendations/quota")
+
+    assert response.status_code == 200
+    assert response.json()["remaining"] == 3
