@@ -278,6 +278,23 @@ async def test_igdb_helpers_query_strict_steam_id_and_catalog_lists(monkeypatch)
 
 
 @pytest.mark.anyio
+async def test_igdb_batch_steam_lookup_quotes_string_external_ids(monkeypatch):
+    statements = []
+
+    async def query(_endpoint, statement):
+        statements.append(statement)
+        return [{"id": 77, "name": "Exact", "external_games": [{"category": 1, "uid": "123"}]}]
+
+    monkeypatch.setattr(__import__("app.integrations.igdb", fromlist=["_query"]), "_query", query)
+    from app.integrations import igdb as client
+
+    result = await client.fetch_igdb_games_by_steam_appids([123, 456])
+
+    assert result[123]["id"] == 77
+    assert 'external_games.uid = ("123","456")' in statements[0]
+
+
+@pytest.mark.anyio
 async def test_igdb_legacy_mock_seam_and_list_helpers(monkeypatch):
     import app.integrations.igdb as client
 
