@@ -1652,26 +1652,39 @@ def test_dashboard_keeps_steam_external_failure_as_error(monkeypatch):
     assert response.json()["steam"]["status"] == "error"
 
 
-def test_dashboard_generates_recommendations_for_linked_steam_games(monkeypatch):
+def test_dashboard_passes_favorites_and_wishlist_to_personalized_recommendations(monkeypatch):
     user = SimpleNamespace(id=uuid.uuid4(), email="player@example.com", created_at=datetime.now(timezone.utc), steam_id="76561198000000000", steam_persona_name="Steam Player", steam_avatar=None, steam_country_code="US", steam_linked_at=datetime.now(timezone.utc), telegram_chat_id=None, telegram_username=None, telegram_linked_at=None, bio=None, platforms=[], favorite_genres=[])
 
+    favorite = SimpleNamespace(catalog_game_id=11, title="Favorite")
+    wishlist = SimpleNamespace(catalog_game_id=12, title="Wishlist")
+
     class Query:
+        def __init__(self, model):
+            self.model = model
+
         def filter(self, *_args): return self
         def order_by(self, *_args): return self
-        def all(self): return []
+        def all(self):
+            if self.model is main.Favorite:
+                return [favorite]
+            if self.model is main.WishlistItem:
+                return [wishlist]
+            return []
         def first(self): return None
 
     async def steam_games(_steam_id):
         return [{"appid": 10, "name": "Portal", "playtime_forever": 120, "playtime_2weeks": 30, "img_icon_url": None}]
 
-    async def cached(recommendation_user, saved_games, games):
+    async def cached(recommendation_user, saved_games, games, favorites, wishlist_items):
         assert recommendation_user.id == user.id
         assert saved_games == []
         assert games[0]["appid"] == 10
+        assert favorites == [favorite]
+        assert wishlist_items == [wishlist]
         return {"recommendations": [{"title": "Hades", "reason": "Action", "tags": ["Action"]}]}
 
     main.app.dependency_overrides[main.get_current_user] = lambda: user
-    main.app.dependency_overrides[main.get_db] = lambda: SimpleNamespace(query=lambda _model: Query())
+    main.app.dependency_overrides[main.get_db] = lambda: SimpleNamespace(query=lambda model: Query(model))
     monkeypatch.setattr(main, "fetch_owned_games", steam_games)
     monkeypatch.setattr(main, "fetch_steam_store_deals", lambda **_kwargs: [])
     monkeypatch.setattr(main, "get_personalized_recommendations", cached)

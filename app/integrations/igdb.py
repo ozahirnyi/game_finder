@@ -210,6 +210,68 @@ async def fetch_igdb_game_detail(igdb_id: int) -> dict[str, Any]:
     return normalize_igdb_game(games[0])
 
 
+async def fetch_igdb_games_by_ids(igdb_ids: list[int]) -> dict[int, dict[str, Any]]:
+    """Resolve catalog records in bounded IGDB queries rather than per-game requests."""
+    unique_ids = list(dict.fromkeys(value for value in igdb_ids if isinstance(value, int) and value > 0))
+    results: dict[int, dict[str, Any]] = {}
+    for offset in range(0, len(unique_ids), 100):
+        batch = unique_ids[offset:offset + 100]
+        games = await _query("games", f"{_FIELDS} where id = ({','.join(map(str, batch))}); limit {len(batch)};")
+        for game in games:
+            normalized = normalize_igdb_game(game)
+            if isinstance(normalized.get("id"), int):
+                results[normalized["id"]] = normalized
+    return results
+
+
+async def fetch_igdb_games_by_steam_appids(appids: list[int]) -> dict[int, dict[str, Any]]:
+    """Resolve Steam app IDs in bounded catalog queries for library matching."""
+    unique_appids = list(dict.fromkeys(value for value in appids if isinstance(value, int) and value > 0))
+    results: dict[int, dict[str, Any]] = {}
+    for offset in range(0, len(unique_appids), 100):
+        batch = unique_appids[offset:offset + 100]
+        external_ids = ",".join(f'"{appid}"' for appid in batch)
+        games = await _query(
+            "games",
+            f"{_FIELDS} where external_games.uid = ({external_ids}) & external_games.category = 1; limit 100;",
+        )
+        for game in games:
+            normalized = normalize_igdb_game(game)
+            appid = normalized.get("steam_appid")
+            if isinstance(appid, int) and appid in batch:
+                results[appid] = normalized
+    return results
+
+
+async def fetch_igdb_similar_games(igdb_id: int, *, limit: int = 12) -> list[dict[str, Any]]:
+    """Return only catalog records IGDB itself marks as similar to this game."""
+    if igdb_id < 1:
+        return []
+    source_games = await _query("games", f"fields similar_games; where id = {igdb_id}; limit 1;")
+    if not source_games:
+        raise IGDBError("IGDB game not found", 404)
+    similar_ids = [
+        value if isinstance(value, int) else value.get("id")
+        for value in source_games[0].get("similar_games") or []
+        if isinstance(value, int) or isinstance(value, dict)
+    ]
+    unique_ids = list(dict.fromkeys(value for value in similar_ids if isinstance(value, int) and value > 0))[:limit]
+    resolved = await asyncio.gather(
+        *(fetch_igdb_game_detail(candidate_id) for candidate_id in unique_ids),
+        return_exceptions=True,
+    )
+    games: list[dict[str, Any]] = []
+    for result in resolved:
+        if isinstance(result, IGDBError):
+            if result.status_code == 404:
+                continue
+            raise result
+        if isinstance(result, Exception):
+            raise result
+        games.append(result)
+    return games
+
+
 async def fetch_igdb_game_by_steam_appid(appid: int) -> dict[str, Any] | None:
     if appid < 1:
         return None
