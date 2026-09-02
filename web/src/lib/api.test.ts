@@ -7,6 +7,7 @@ import {
   confirmPsnImport,
   createSocialFriendRequest,
   getDashboard,
+  getSimilarCatalogGames,
   getGoogleLoginUrl,
   getFavorites,
   getLibraryOverview,
@@ -134,6 +135,19 @@ describe("apiRequest", () => {
     );
   });
 
+  it("loads related catalog games through the Phase 1 similar-games contract", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ results: [] }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getSimilarCatalogGames(274755);
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/catalog/games/274755/similar", expect.any(Object));
+  });
+
   it("loads the authenticated onboarding summary", async () => {
     setToken("token");
     const fetchMock = vi.fn().mockResolvedValue(
@@ -243,7 +257,10 @@ describe("apiRequest", () => {
     const file = new File(["title"], "library.csv", { type: "text/csv" });
 
     await previewPsnImport(file);
-    await confirmPsnImport([{ catalog_id: 101 }, { source_title: "Hades" }]);
+    await confirmPsnImport([
+      { candidate_token: "catalog-token", action: "catalog", catalog_id: 101 },
+      { candidate_token: "raw-token", action: "raw" },
+    ]);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -254,7 +271,12 @@ describe("apiRequest", () => {
       2,
       "/api/psn/import/confirm",
       expect.objectContaining({
-        body: JSON.stringify({ selections: [{ catalog_id: 101 }, { source_title: "Hades" }] }),
+        body: JSON.stringify({
+          selections: [
+            { candidate_token: "catalog-token", action: "catalog", catalog_id: 101 },
+            { candidate_token: "raw-token", action: "raw" },
+          ],
+        }),
         method: "POST",
       }),
     );

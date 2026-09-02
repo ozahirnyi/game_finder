@@ -22,9 +22,13 @@ const nav = [
 ] as const;
 
 function scheduleIdle(callback: () => void) {
-  if ("requestIdleCallback" in window) {
-    const idleCallback = window.requestIdleCallback(callback);
-    return () => window.cancelIdleCallback(idleCallback);
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: () => void) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
+  if (typeof idleWindow.requestIdleCallback === "function") {
+    const idleCallback = idleWindow.requestIdleCallback(callback);
+    return () => idleWindow.cancelIdleCallback?.(idleCallback);
   }
   const timeout = window.setTimeout(callback, 0);
   return () => window.clearTimeout(timeout);

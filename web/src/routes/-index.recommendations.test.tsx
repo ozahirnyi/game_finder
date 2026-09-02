@@ -28,7 +28,11 @@ vi.mock("@/lib/api", () => api);
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock("@/components/GameCover", () => ({ GameCover: () => <div /> }));
+vi.mock("@/components/GameCover", () => ({
+  GameCover: ({ image, title }: { image?: string; title: string }) => (
+    <div data-testid={`cover-${title}`} data-image={image ?? "fallback"} />
+  ),
+}));
 vi.mock("@/components/GameCard", () => ({
   GameCard: ({ game }: { game: { title: string; gameId?: string } }) => (
     <div data-game-id={game.gameId}>{game.title}</div>
@@ -136,6 +140,26 @@ describe("Home recommendations", () => {
     expect(screen.getByRole("link", { name: "Search this title" })).toHaveAttribute(
       "href",
       "/search?q=Unknown+title",
+    );
+  });
+
+  it("renders fallback art for a verified recommendation without a provider cover", async () => {
+    api.getAuthSnapshot.mockReturnValue(true);
+    api.getDashboard.mockResolvedValue({
+      recommendations: {
+        status: "ready",
+        data: {
+          recommendations: [
+            { title: "Coverless", reason: "Fits", tags: [], igdb_id: 124, cover_url: null },
+          ],
+        },
+      },
+    });
+
+    renderHome();
+
+    expect((await screen.findByTestId("cover-Coverless")).getAttribute("data-image")).toBe(
+      "fallback",
     );
   });
 

@@ -110,7 +110,7 @@ function PsnImportPage() {
     );
   const gameRows = rows.filter((row) => row.status !== "suggested_skip" || row.restored);
   const suggestedNonGames = rows.filter((row) => row.status === "suggested_skip" && !row.restored);
-  const decisions: PsnImportSelection[] = rows.flatMap((row) =>
+  const decisions: PsnImportSelection[] = rows.flatMap<PsnImportSelection>((row) =>
     row.decision === "catalog" && row.catalogId
       ? [
           {

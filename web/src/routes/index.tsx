@@ -436,15 +436,13 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
     Number.isInteger(recommendation.igdb_id) && Number(recommendation.igdb_id) > 0;
   const content = (
     <Panel interactive={hasVerifiedCatalogId} className="h-full p-5">
-      {recommendation.cover_url && (
-        <GameCover
-          title={recommendation.title}
-          image={recommendation.cover_url}
-          from="#c75f28"
-          to="#22243a"
-          className="mb-4 aspect-[16/9] w-full"
-        />
-      )}
+      <GameCover
+        title={recommendation.title}
+        image={recommendation.cover_url ?? undefined}
+        from="#c75f28"
+        to="#22243a"
+        className="mb-4 aspect-[16/9] w-full"
+      />
       <h3 className="text-lg font-bold">{recommendation.title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{recommendation.reason}</p>
       {recommendation.tags.length > 0 && (
