@@ -148,16 +148,26 @@ def _itad_game_identity(game: Any, fallback_title: str | None = None) -> tuple[s
     return game_id, game_title
 
 
-async def resolve_itad_game_id(
+def _itad_game_url(game: Any) -> str | None:
+    if not isinstance(game, dict):
+        return None
+    urls = game.get("urls")
+    url = urls.get("game") if isinstance(urls, dict) else None
+    return url if isinstance(url, str) and url.strip() else None
+
+
+async def _resolve_itad_game(
     client: httpx.AsyncClient, title: str, steam_appid: int | None
-) -> tuple[str, str]:
-    async def lookup(params: dict[str, str | int]) -> tuple[str, str] | None:
+) -> tuple[str, str, str | None]:
+    async def lookup(params: dict[str, str | int]) -> tuple[str, str, str | None] | None:
         response = await client.get(f"{ITAD_BASE_URL}/games/lookup/v1", params=params)
         response.raise_for_status()
         data = response.json()
         if not isinstance(data, dict) or not data.get("found"):
             return None
-        return _itad_game_identity(data.get("game"), title)
+        game = data.get("game")
+        identity = _itad_game_identity(game, title)
+        return (*identity, _itad_game_url(game)) if identity else None
 
     if steam_appid is not None:
         game = await lookup({"appid": steam_appid})
@@ -179,9 +189,16 @@ async def resolve_itad_game_id(
                 and candidate.get("type") == "game"
                 and identity[1].casefold() == title.casefold()
             ):
-                return identity
+                return *identity, _itad_game_url(candidate)
 
     raise HTTPException(status_code=404, detail="Price data not found for this game")
+
+
+async def resolve_itad_game_id(
+    client: httpx.AsyncClient, title: str, steam_appid: int | None
+) -> tuple[str, str]:
+    game_id, game_title, _game_url = await _resolve_itad_game(client, title, steam_appid)
+    return game_id, game_title
 
 
 async def fetch_game_price_history(title: str, country: str = "US", steam_appid: int | None = None) -> dict[str, Any]:
@@ -193,7 +210,7 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
     since = price_history_since()
     try:
         async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
-            game_id, game_title = await resolve_itad_game_id(client, title, steam_appid)
+            game_id, game_title, game_url = await _resolve_itad_game(client, title, steam_appid)
             prices = await client.post(
                 f"{ITAD_BASE_URL}/games/prices/v3",
                 params={"country": country, "capacity": 5, "vouchers": "true"},
@@ -242,7 +259,7 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
     return {
         "itad_id": game_id,
         "title": game_title,
-        "url": f"https://isthereanydeal.com/game/id:{game_id}/",
+        "url": game_url or f"https://isthereanydeal.com/game/id:{game_id}/",
         "current": current,
         "history_low_all": _money(history_low.get("all")),
         "history_low_1y": _money(history_low.get("y1")),

@@ -43,6 +43,23 @@ async def test_itad_game_id_resolution_prefers_steam_app_mapping():
 
 
 @pytest.mark.anyio
+async def test_itad_game_id_resolution_uses_title_lookup_first_without_steam_appid():
+    from app.prices import ITAD_BASE_URL, resolve_itad_game_id
+
+    client = _ItadClient([
+        {"found": True, "game": {"id": "itad-id", "title": "Grand Theft Auto V"}},
+    ])
+
+    assert await resolve_itad_game_id(client, "Grand Theft Auto V", None) == (
+        "itad-id",
+        "Grand Theft Auto V",
+    )
+    assert client.calls == [
+        (f"{ITAD_BASE_URL}/games/lookup/v1", {"title": "Grand Theft Auto V"}),
+    ]
+
+
+@pytest.mark.anyio
 async def test_itad_game_id_resolution_falls_back_to_casefold_exact_search():
     from app.prices import ITAD_BASE_URL, resolve_itad_game_id
 
@@ -81,6 +98,42 @@ async def test_itad_game_id_resolution_rejects_fuzzy_search_results():
         await resolve_itad_game_id(client, "Grand Theft Auto V", 3240220)
 
     assert exc.value.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_itad_price_history_preserves_provider_game_url(monkeypatch):
+    from app import prices
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, _url, *, params):
+            if "appid" in params:
+                return _ItadResponse({
+                    "found": True,
+                    "game": {
+                        "id": "itad-id",
+                        "title": "Grand Theft Auto V Enhanced",
+                        "urls": {"game": "https://itad.example/gta-v-enhanced"},
+                    },
+                })
+            return _ItadResponse([])
+
+        async def post(self, _url, **_kwargs):
+            return _ItadResponse([{"deals": [], "historyLow": {}}])
+
+    monkeypatch.setenv("ITAD_API_KEY", "key")
+    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *_args, **_kwargs: Client())
+
+    result = await prices.fetch_game_price_history(
+        "Grand Theft Auto V", steam_appid=3240220
+    )
+
+    assert result["url"] == "https://itad.example/gta-v-enhanced"
 
 
 def test_price_helpers_keep_invalid_amounts_and_provider_errors_safe(monkeypatch):
