@@ -225,6 +225,35 @@ async def test_store_game_price_success_no_price_not_found_and_error(monkeypatch
 
 
 @pytest.mark.anyio
+async def test_store_game_price_prefers_a_priced_title_match_over_an_unpriced_result(monkeypatch):
+    search = {
+        "items": [
+            {"id": 5006530, "type": "app", "name": "The Witcher 3: Wild Hunt — Songs of the Past"},
+            {
+                "id": 292030,
+                "type": "app",
+                "name": "The Witcher 3: Wild Hunt - Complete Edition",
+                "price": {"currency": "USD", "initial": 4999, "final": 4999},
+            },
+        ]
+    }
+    detail = {
+        "292030": {
+            "data": {
+                "name": "The Witcher 3: Wild Hunt - Complete Edition",
+                "price_overview": {"final": 4999, "initial": 4999, "currency": "USD"},
+            }
+        }
+    }
+    client = client_factory(monkeypatch, steam_store, [FakeResponse(search), FakeResponse(detail)])
+
+    result = await steam_store.fetch_steam_store_game_price("The Witcher 3: Wild Hunt")
+
+    assert result["appid"] == 292030
+    assert client.calls[1][2]["params"]["appids"] == 292030
+
+
+@pytest.mark.anyio
 async def test_store_candidates_error(monkeypatch):
     client_factory(monkeypatch, steam_store, [FakeResponse(status_code=503)])
     with pytest.raises(HTTPException, match="503"):

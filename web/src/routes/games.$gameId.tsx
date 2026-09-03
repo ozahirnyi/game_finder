@@ -135,7 +135,7 @@ export const Route = createFileRoute("/games/$gameId")({
           title: catalog.name,
           coverFrom: "#1d4ed8",
           coverTo: "#111827",
-          coverUrl: catalog.background_image ?? undefined,
+          coverUrl: catalog.hero_image ?? catalog.background_image ?? undefined,
           fallbackCoverUrl: undefined,
           genres: catalog.genres ?? [],
           platforms: catalog.platforms ?? [],

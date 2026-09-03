@@ -91,9 +91,23 @@ async def fetch_steam_store_game_price(title: str, country: str = "US") -> dict[
             search = await client.get(f"{STEAM_STORE_BASE_URL}/api/storesearch/", params=params)
             search.raise_for_status()
             items = search.json().get("items") or []
+            candidates = [
+                candidate
+                for candidate in items
+                if candidate.get("id") and candidate.get("type") in {"game", "app"}
+            ]
+            normalized_title = title.casefold()
             item = next(
-                (candidate for candidate in items if (candidate.get("name") or "").casefold() == title.casefold()),
-                next((candidate for candidate in items if candidate.get("type") in {"game", "app"}), None),
+                (candidate for candidate in candidates if (candidate.get("name") or "").casefold() == normalized_title),
+                next(
+                    (
+                        candidate
+                        for candidate in candidates
+                        if candidate.get("price")
+                        and (candidate.get("name") or "").casefold().startswith(normalized_title)
+                    ),
+                    next((candidate for candidate in candidates if candidate.get("price")), candidates[0] if candidates else None),
+                ),
             )
             if not item or not item.get("id"):
                 raise HTTPException(status_code=404, detail="Steam price data not found for this game")
