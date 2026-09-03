@@ -507,6 +507,25 @@ def test_catalog_game_detail_returns_normalized_igdb_data(monkeypatch):
     }
 
 
+def test_catalog_game_detail_uses_versioned_json_cache_key(monkeypatch):
+    cache_keys = []
+
+    async def fake_cache(key, _ttl, fetch):
+        cache_keys.append(key)
+        return await fetch()
+
+    async def fake_fetch_igdb_game_detail(igdb_id: int):
+        return {"id": igdb_id, "name": "Hades", "genres": [], "platforms": []}
+
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch_igdb_game_detail)
+
+    response = client.get("/catalog/games/274755")
+
+    assert response.status_code == 200
+    assert cache_keys == [main.build_cache_key("catalog_game_v2", igdb_id=274755)]
+
+
 def test_upcoming_games_returns_igdb_results(monkeypatch):
     async def fake_cache(_key, _ttl, fetch):
         return await fetch()
