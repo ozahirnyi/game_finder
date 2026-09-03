@@ -52,7 +52,7 @@ from app.psn_classification import psn_purchase_exclusion_reason, psn_repair_qua
 from app.psn_resolution import classify_psn_candidate
 from app.psn_resolution import resolve_psn_catalog_titles
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
-from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
+from app.genre_deals import _apply_catalog_media, build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportPreviewItem, PsnImportResult, PsnImportSelection, \
@@ -3614,7 +3614,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
                             )
                         except IGDBError:
                             match = None
-            return {
+            return _apply_catalog_media({
                 "id": match.get("id") if match else None,
                 "steam_appid": deal.get("steam_appid"),
                 "name": deal["name"],
@@ -3623,7 +3623,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
                 "url": deal.get("url"),
                 "current": deal.get("current"),
                 "history_low_all": deal.get("history_low_all"),
-            }
+            }, match)
 
         return {
             "results": await asyncio.gather(*(attach_igdb_id(deal) for deal in steam_deals)),

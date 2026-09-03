@@ -42,6 +42,7 @@ export type Deal = {
   steam_appid?: number | null;
   name: string;
   background_image?: string | null;
+  hero_image?: string | null;
   url?: string | null;
   current?: {
     shop?: string | null;

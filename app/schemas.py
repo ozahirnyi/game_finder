@@ -553,6 +553,7 @@ class HomeDealItem(BaseModel):
     name: str
     released: str | None = None
     background_image: str | None = None
+    hero_image: str | None = None
     url: str | None = None
     current: PriceDeal | None = None
     history_low_all: PriceMoney | None = None

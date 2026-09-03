@@ -267,6 +267,26 @@ describe("Home recommendations", () => {
     await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("US", 13));
   });
 
+  it("uses the catalog hero image for the Project Zomboid price-drop card", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getDeals.mockResolvedValue({
+      results: [
+        {
+          id: 108600,
+          name: "Project Zomboid",
+          background_image: "https://images.test/steam-capsule.jpg",
+          hero_image: "https://images.test/wide.jpg",
+        },
+      ],
+    });
+
+    renderHome();
+
+    expect((await screen.findByTestId("cover-Project Zomboid")).getAttribute("data-image")).toBe(
+      "https://images.test/wide.jpg",
+    );
+  });
+
   it("shows a loading state while selected-region deals are pending", async () => {
     api.getAuthSnapshot.mockReturnValue(false);
     api.getDeals.mockImplementation(() => new Promise(() => {}));

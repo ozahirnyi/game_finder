@@ -27,6 +27,14 @@ def select_deal_genres(favorite_genres: list[str] | None) -> list[str]:
     return selected
 
 
+def _apply_catalog_media(deal: dict[str, Any], catalog: dict[str, Any] | None) -> dict[str, Any]:
+    enriched = dict(deal)
+    hero_image = catalog.get("hero_image") if catalog else None
+    if isinstance(hero_image, str) and hero_image:
+        enriched["hero_image"] = hero_image
+    return enriched
+
+
 async def _enrich_deal(
     deal: dict[str, Any],
     fetch_igdb_games: Callable[[str, int], Awaitable[dict[str, Any]]],
@@ -42,7 +50,7 @@ async def _enrich_deal(
     except IGDBError:
         match = None
         igdb_failed = True
-    item = {
+    item = _apply_catalog_media({
         "id": match.get("id") if match else None,
         "steam_appid": deal["steam_appid"],
         "name": deal["name"],
@@ -51,7 +59,7 @@ async def _enrich_deal(
         "url": deal.get("url"),
         "current": deal.get("current"),
         "history_low_all": deal.get("history_low_all"),
-    }
+    }, match)
     return item, {normalize_genre(genre) for genre in (match or {}).get("genres", [])}, igdb_failed
 
 
