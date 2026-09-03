@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { PriceHistoryChart } from "./PriceHistoryChart";
@@ -9,6 +9,27 @@ describe("PriceHistoryChart", () => {
     render(<PriceHistoryChart points={[]} currency="USD" />);
 
     expect(screen.getByText("No price history is available yet.")).toBeInTheDocument();
+  });
+
+  it("reports unavailable history instead of claiming no price changes for a current-price fallback", () => {
+    render(
+      <PriceHistoryChart
+        points={[]}
+        currency="USD"
+        currentPrice={19.79}
+        historyAvailable={false}
+      />,
+    );
+
+    expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no price changes/i)).not.toBeInTheDocument();
+  });
+
+  it("reports unavailable history without inventing a current price", () => {
+    const { container } = render(<PriceHistoryChart points={[]} historyAvailable={false} />);
+
+    expect(within(container).getByText(/temporarily unavailable/i)).toBeInTheDocument();
+    expect(within(container).queryByText(/current price/i)).not.toBeInTheDocument();
   });
 
   it("renders a readable single observation", () => {

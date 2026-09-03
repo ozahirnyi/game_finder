@@ -252,7 +252,7 @@ function SearchPage() {
                       title: game.name,
                       coverFrom: "#312e81",
                       coverTo: "#111827",
-                      coverUrl: game.background_image ?? undefined,
+                      coverUrl: game.hero_image ?? game.background_image ?? undefined,
                       genres: game.genres,
                       platforms: game.platforms,
                     }}

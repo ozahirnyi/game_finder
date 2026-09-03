@@ -142,6 +142,75 @@ def test_steam_library_maps_external_http_error(
     assert response.json()["detail"] == "Steam library unavailable"
 
 
+def test_resolve_steam_library_game_requires_a_connected_account(api_client, user_factory, auth_as):
+    auth_as(user_factory(email="resolve-unlinked@example.com"))
+
+    response = api_client.post("/library/steam-games/10/resolve")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Steam is not connected"
+
+
+def test_resolve_steam_library_game_maps_owned_library_failures(
+    api_client, app_main, user_factory, auth_as, monkeypatch
+):
+    user = linked_user(user_factory, "resolve-library-error@example.com")
+    auth_as(user)
+
+    async def unavailable(_steam_id):
+        raise RuntimeError("Steam outage")
+
+    monkeypatch.setattr(app_main, "fetch_owned_games", unavailable)
+
+    response = api_client.post("/library/steam-games/10/resolve")
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Steam library is temporarily unavailable"
+
+
+def test_resolve_steam_library_game_rejects_unowned_and_unmapped_games(
+    api_client, app_main, user_factory, auth_as, monkeypatch
+):
+    user = linked_user(user_factory, "resolve-misses@example.com")
+    auth_as(user)
+
+    async def owned(_steam_id):
+        return steam_games()
+
+    monkeypatch.setattr(app_main, "fetch_owned_games", owned)
+
+    unowned = api_client.post("/library/steam-games/999/resolve")
+
+    assert unowned.status_code == 404
+    monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", lambda _appid: __import__("asyncio").sleep(0, result=None))
+    unmapped = api_client.post("/library/steam-games/10/resolve")
+
+    assert unmapped.status_code == 422
+    assert unmapped.json()["detail"] == "No catalog mapping exists for this Steam appid"
+
+
+def test_resolve_steam_library_game_returns_igdb_mapping(
+    api_client, app_main, user_factory, auth_as, monkeypatch
+):
+    user = linked_user(user_factory, "resolve-success@example.com")
+    auth_as(user)
+
+    async def owned(_steam_id):
+        return steam_games()
+
+    async def catalog(appid):
+        assert appid == 10
+        return {"id": 42}
+
+    monkeypatch.setattr(app_main, "fetch_owned_games", owned)
+    monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", catalog)
+
+    response = api_client.post("/library/steam-games/10/resolve")
+
+    assert response.status_code == 200
+    assert response.json() == {"game_id": 42}
+
+
 def test_steam_library_sync_removes_legacy_imports_and_keeps_response_games(
     api_client, app_main, db_session, user_factory, auth_as, monkeypatch
 ):

@@ -144,4 +144,29 @@ describe("DealsPage genre deals", () => {
     ).toHaveAttribute("href", "/games/620?source=steam&title=Steam fallback");
     expect(screen.getByTestId("selected-genre-deals")).not.toHaveClass("xl:grid-cols-5");
   });
+
+  it("uses catalog hero media for a genre deal card", async () => {
+    api.getGenreDeals.mockResolvedValue({
+      popular: [
+        {
+          ...deal("Project Zomboid", 108600),
+          background_image: "https://images.test/steam-capsule.jpg",
+          hero_image: "https://images.test/wide.jpg",
+        },
+      ],
+      sections: [],
+    });
+    const DealsPage = Route.options.component!;
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <DealsPage />
+      </QueryClientProvider>,
+    );
+
+    expect((await screen.findByAltText("Project Zomboid")).getAttribute("src")).toBe(
+      "https://images.test/wide.jpg",
+    );
+  });
 });

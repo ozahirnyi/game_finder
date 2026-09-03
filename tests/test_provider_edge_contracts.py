@@ -4,6 +4,138 @@ import pytest
 from fastapi import HTTPException
 
 
+class _ItadResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self.payload
+
+
+class _ItadClient:
+    def __init__(self, responses):
+        self.responses = iter(responses)
+        self.calls = []
+
+    async def get(self, url, *, params):
+        self.calls.append((url, params))
+        return _ItadResponse(next(self.responses))
+
+
+@pytest.mark.anyio
+async def test_itad_game_id_resolution_prefers_steam_app_mapping():
+    from app.prices import ITAD_BASE_URL, resolve_itad_game_id
+
+    client = _ItadClient([
+        {"found": True, "game": {"id": "itad-id", "title": "Grand Theft Auto V Enhanced"}},
+    ])
+
+    assert await resolve_itad_game_id(client, "Grand Theft Auto V", 3240220) == (
+        "itad-id",
+        "Grand Theft Auto V Enhanced",
+    )
+    assert client.calls == [
+        (f"{ITAD_BASE_URL}/games/lookup/v1", {"appid": 3240220}),
+    ]
+
+
+@pytest.mark.anyio
+async def test_itad_game_id_resolution_uses_title_lookup_first_without_steam_appid():
+    from app.prices import ITAD_BASE_URL, resolve_itad_game_id
+
+    client = _ItadClient([
+        {"found": True, "game": {"id": "itad-id", "title": "Grand Theft Auto V"}},
+    ])
+
+    assert await resolve_itad_game_id(client, "Grand Theft Auto V", None) == (
+        "itad-id",
+        "Grand Theft Auto V",
+    )
+    assert client.calls == [
+        (f"{ITAD_BASE_URL}/games/lookup/v1", {"title": "Grand Theft Auto V"}),
+    ]
+
+
+@pytest.mark.anyio
+async def test_itad_game_id_resolution_falls_back_to_casefold_exact_search():
+    from app.prices import ITAD_BASE_URL, resolve_itad_game_id
+
+    client = _ItadClient([
+        {"found": False},
+        {"found": False},
+        [
+            {"id": "wrong-id", "title": "Grand Theft Auto V Enhanced", "type": "game"},
+            {"id": "wrong-type", "title": "Grand Theft Auto V", "type": "dlc"},
+            {"id": "itad-id", "title": "Grand Theft Auto V", "type": "game"},
+        ],
+    ])
+
+    assert await resolve_itad_game_id(client, "Grand Theft Auto V", 3240220) == (
+        "itad-id",
+        "Grand Theft Auto V",
+    )
+    assert client.calls == [
+        (f"{ITAD_BASE_URL}/games/lookup/v1", {"appid": 3240220}),
+        (f"{ITAD_BASE_URL}/games/lookup/v1", {"title": "Grand Theft Auto V"}),
+        (f"{ITAD_BASE_URL}/games/search/v1", {"title": "Grand Theft Auto V"}),
+    ]
+
+
+@pytest.mark.anyio
+async def test_itad_game_id_resolution_rejects_fuzzy_search_results():
+    from app.prices import resolve_itad_game_id
+
+    client = _ItadClient([
+        {"found": False},
+        {"found": False},
+        [{"id": "wrong-id", "title": "Grand Theft Auto V Enhanced", "type": "game"}],
+    ])
+
+    with pytest.raises(HTTPException, match="Price data not found") as exc:
+        await resolve_itad_game_id(client, "Grand Theft Auto V", 3240220)
+
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_itad_price_history_preserves_provider_game_url(monkeypatch):
+    from app import prices
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, _url, *, params):
+            if "appid" in params:
+                return _ItadResponse({
+                    "found": True,
+                    "game": {
+                        "id": "itad-id",
+                        "title": "Grand Theft Auto V Enhanced",
+                        "urls": {"game": "https://itad.example/gta-v-enhanced"},
+                    },
+                })
+            return _ItadResponse([])
+
+        async def post(self, _url, **_kwargs):
+            return _ItadResponse([{"deals": [], "historyLow": {}}])
+
+    monkeypatch.setenv("ITAD_API_KEY", "key")
+    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *_args, **_kwargs: Client())
+
+    result = await prices.fetch_game_price_history(
+        "Grand Theft Auto V", steam_appid=3240220
+    )
+
+    assert result["url"] == "https://itad.example/gta-v-enhanced"
+
+
 def test_price_helpers_keep_invalid_amounts_and_provider_errors_safe(monkeypatch):
     from app import prices
 
@@ -15,6 +147,17 @@ def test_price_helpers_keep_invalid_amounts_and_provider_errors_safe(monkeypatch
             raise ValueError("not json")
 
     assert prices._itad_error_message(InvalidJsonResponse()) == "request failed"
+
+
+def test_itad_game_identity_and_url_reject_malformed_provider_values():
+    from app import prices
+
+    assert prices._itad_game_identity(None) is None
+    assert prices._itad_game_identity({"id": "", "title": "Hades"}) is None
+    assert prices._itad_game_identity({"id": "itad-id"}) is None
+    assert prices._itad_game_identity({"id": "itad-id"}, "Hades") == ("itad-id", "Hades")
+    assert prices._itad_game_url(None) is None
+    assert prices._itad_game_url({"urls": {"game": ""}}) is None
 @pytest.mark.anyio
 async def test_price_provider_refuses_missing_key(monkeypatch):
     from app.prices import fetch_game_price_history

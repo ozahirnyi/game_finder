@@ -264,7 +264,7 @@ function Home() {
                 game={{
                   gameId: String(game.id),
                   title: game.name,
-                  coverUrl: game.background_image ?? undefined,
+                  coverUrl: game.hero_image ?? game.background_image ?? undefined,
                   coverFrom: "#c75f28",
                   coverTo: "#22243a",
                 }}
@@ -384,7 +384,7 @@ function Home() {
                     gameId: target?.gameId,
                     source: target?.source,
                     title: deal.name,
-                    coverUrl: deal.background_image ?? undefined,
+                    coverUrl: deal.hero_image ?? deal.background_image ?? undefined,
                     coverFrom: "#c75f28",
                     coverTo: "#22243a",
                     price: deal.current?.price?.amount ?? undefined,
@@ -504,7 +504,7 @@ function FeaturedDeal({
         from="#c75f28"
         to="#22243a"
         title={deal.name}
-        image={deal.background_image ?? undefined}
+        image={deal.hero_image ?? deal.background_image ?? undefined}
         bare
         className="aspect-[16/9] w-full"
       />

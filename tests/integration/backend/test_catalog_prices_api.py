@@ -295,10 +295,11 @@ def test_price_history_uses_itad_success(api_client, app_main, monkeypatch):
     history = {"itad_id": "itad-1", "title": "Hades", "deals": []}
     fetch_history = AsyncMock(return_value=history)
     fallback = AsyncMock()
+    cached = AsyncMock(side_effect=run_cached)
     monkeypatch.setattr(app_main, "fetch_igdb_game_detail", detail)
     monkeypatch.setattr(app_main, "fetch_game_price_history", fetch_history)
     monkeypatch.setattr(app_main, "fetch_steam_store_game_price", fallback)
-    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+    monkeypatch.setattr(app_main, "get_json_cached", cached)
 
     response = api_client.get("/prices/games/42", params={"country": " ua "})
 
@@ -306,8 +307,26 @@ def test_price_history_uses_itad_success(api_client, app_main, monkeypatch):
     assert response.json()["itad_id"] == history["itad_id"]
     assert response.json()["title"] == history["title"]
     assert response.json()["deals"] == []
-    fetch_history.assert_awaited_once_with("1145350", country="UA", steam_appid=1145350)
+    assert cached.await_args.args[0].startswith("price_history_v2:")
+    assert response.json()["history_available"] is True
+    fetch_history.assert_awaited_once_with("Hades", country="UA", steam_appid=1145350)
     fallback.assert_not_awaited()
+
+
+def test_price_history_uses_catalog_title_when_app_id_resolution_needs_a_title(api_client, app_main, monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_game_detail",
+        AsyncMock(return_value={"name": "Hades", "steam_appid": 1145350}),
+    )
+    history = AsyncMock(return_value={"itad_id": "itad-1", "title": "Hades", "deals": []})
+    monkeypatch.setattr(app_main, "fetch_game_price_history", history)
+    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+
+    response = api_client.get("/prices/games/42")
+
+    assert response.status_code == 200
+    history.assert_awaited_once_with("Hades", country="US", steam_appid=1145350)
 
 
 def test_price_history_falls_back_to_steam_on_itad_502(api_client, app_main, monkeypatch):
@@ -324,7 +343,35 @@ def test_price_history_falls_back_to_steam_on_itad_502(api_client, app_main, mon
     assert response.json()["itad_id"] == steam["itad_id"]
     assert response.json()["title"] == steam["title"]
     assert response.json()["deals"] == []
-    fallback.assert_awaited_once_with("1145350", country="US")
+    assert response.json()["history_available"] is False
+    fallback.assert_awaited_once_with("Hades", country="US")
+
+
+def test_price_history_falls_back_to_steam_on_itad_404(api_client, app_main, monkeypatch):
+    monkeypatch.setattr(app_main, "fetch_igdb_game_detail", AsyncMock(return_value={"name": "Hades", "steam_appid": 1145350}))
+    monkeypatch.setattr(app_main, "fetch_game_price_history", AsyncMock(side_effect=HTTPException(404, "ITAD game missing")))
+    steam = {"itad_id": "steam:42", "title": "Hades", "deals": []}
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_price", AsyncMock(return_value=steam))
+    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+
+    response = api_client.get("/prices/games/42")
+
+    assert response.status_code == 200
+    assert response.json()["history_available"] is False
+
+
+def test_steam_price_history_uses_steam_title_and_falls_back_on_itad_404(api_client, app_main, monkeypatch):
+    detail = AsyncMock(return_value={"itad_id": "steam:1145350", "title": "Hades", "deals": []})
+    history = AsyncMock(side_effect=HTTPException(404, "ITAD game missing"))
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_detail", detail)
+    monkeypatch.setattr(app_main, "fetch_game_price_history", history)
+
+    response = api_client.get("/prices/steam-games/1145350")
+
+    assert response.status_code == 200
+    assert response.json()["history_available"] is False
+    history.assert_awaited_once_with("Hades", country="US", steam_appid=1145350)
+    detail.assert_awaited_once_with(1145350, country="US")
 
 
 def test_price_history_uses_itad_title_lookup_when_igdb_has_no_steam_appid(api_client, app_main, monkeypatch):
@@ -343,6 +390,7 @@ def test_price_history_uses_itad_title_lookup_when_igdb_has_no_steam_appid(api_c
 
     assert response.status_code == 200
     assert response.json()["title"] == "Black Myth: Wukong"
+    assert response.json()["history_available"] is True
     history.assert_awaited_once_with("Black Myth: Wukong", country="UA")
     fallback.assert_not_awaited()
 
@@ -361,21 +409,25 @@ def test_price_history_falls_back_to_steam_when_itad_title_lookup_is_unavailable
     response = api_client.get("/prices/games/136879")
 
     assert response.status_code == 200
+    assert response.json()["history_available"] is False
     fallback.assert_awaited_once_with("Black Myth: Wukong", country="US")
 
 
 def test_homepage_deals_enriches_and_normalizes_payload(api_client, app_main, monkeypatch):
-    deal = {"steam_appid": 1145360, "name": "Hades", "background_image": None, "url": "https://deal.test", "current": None, "history_low_all": None}
+    deal = {"steam_appid": 108600, "name": "Project Zomboid", "background_image": "https://images.test/steam-capsule.jpg", "url": "https://deal.test", "current": None, "history_low_all": None}
     monkeypatch.setattr(app_main, "fetch_steam_store_deals", AsyncMock(return_value=[deal]))
-    igdb = AsyncMock(return_value={"id": 42, "name": "Hades", "released": "2020-09-17", "background_image": "https://img.test"})
+    igdb = AsyncMock(return_value={"id": 42, "name": "Project Zomboid", "background_image": "https://images.test/catalog.jpg", "hero_image": "https://images.test/wide.jpg"})
     monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", igdb)
-    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+    cached = AsyncMock(side_effect=run_cached)
+    monkeypatch.setattr(app_main, "get_json_cached", cached)
 
     response = api_client.get("/prices/deals", params={"country": "ua", "page_size": 1})
 
     assert response.status_code == 200
+    assert cached.await_args.args[0].startswith("steam_store_deals_v2:")
     assert response.json()["results"][0]["id"] == 42
-    igdb.assert_awaited_once_with(1145360)
+    assert response.json()["results"][0]["hero_image"] == "https://images.test/wide.jpg"
+    igdb.assert_awaited_once_with(108600)
 
 
 def test_homepage_deals_falls_back_to_an_exact_catalog_title(api_client, app_main, monkeypatch):
@@ -400,13 +452,16 @@ def test_genre_deals_uses_authenticated_favorite_genres(api_client, app_main, mo
     auth_as(user)
     candidate = {"steam_appid": 42, "name": "Hades", "background_image": None, "url": "https://deal.test", "current": None, "history_low_all": None}
     monkeypatch.setattr(app_main, "fetch_steam_store_deal_candidates", AsyncMock(return_value={"candidates": [candidate], "popular": [candidate]}))
-    igdb = AsyncMock(return_value={"results": [{"id": 42, "name": "Hades", "genres": ["RPG"]}]})
+    igdb = AsyncMock(return_value={"results": [{"id": 42, "name": "Hades", "genres": ["RPG"], "hero_image": "https://images.test/hades-wide.jpg"}]})
     monkeypatch.setattr(app_main, "fetch_igdb_games", igdb)
-    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+    cached = AsyncMock(side_effect=run_cached)
+    monkeypatch.setattr(app_main, "get_json_cached", cached)
 
     response = api_client.get("/prices/genre-deals")
 
     assert response.status_code == 200
     assert response.json()["sections"][0]["genre"] == "RPG"
     assert response.json()["sections"][0]["results"][0]["id"] == 42
+    assert response.json()["sections"][0]["results"][0]["hero_image"] == "https://images.test/hades-wide.jpg"
+    assert cached.await_args.args[0].startswith("steam_genre_deals_v5:")
     igdb.assert_awaited_with("Hades", 1)

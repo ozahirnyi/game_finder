@@ -52,7 +52,7 @@ from app.psn_classification import psn_purchase_exclusion_reason, psn_repair_qua
 from app.psn_resolution import classify_psn_candidate
 from app.psn_resolution import resolve_psn_catalog_titles
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
-from app.genre_deals import build_genre_deal_groups, normalize_genre, select_deal_genres
+from app.genre_deals import _apply_catalog_media, build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportPreviewItem, PsnImportResult, PsnImportSelection, \
@@ -3488,35 +3488,38 @@ async def game_price_history(igdb_id: int, country: str = "US", db: Session = De
     except IGDBError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
+    title = str(game.get("name") or "").strip()
     steam_appid = game.get("steam_appid")
     if not isinstance(steam_appid, int) or steam_appid < 1:
-        title = str(game.get("name") or "").strip()
         if not title:
             raise HTTPException(status_code=404, detail="No price lookup title is available for this catalog game")
+        title_key = build_cache_key("price_history_title_v2", title=title, country=normalized_country)
 
-        title_price_key = build_cache_key("price_history_title", title=title, country=normalized_country)
-
-        async def fetch_price_by_title():
-            return await fetch_game_price_history(title, country=normalized_country)
+        async def fetch_title_price():
+            history = await fetch_game_price_history(title, country=normalized_country)
+            return {**history, "history_available": True}
 
         try:
-            return await get_json_cached(title_price_key, CACHE_TTL, fetch_price_by_title)
+            return await get_json_cached(title_key, CACHE_TTL, fetch_title_price)
         except HTTPException as exc:
             if exc.status_code not in {404, 502, 503}:
                 raise
-            return await fetch_steam_store_game_price(title, country=normalized_country)
+            price = await fetch_steam_store_game_price(title, country=normalized_country)
+            return {**price, "history_available": False}
 
-    price_key = build_cache_key("price_history", steam_appid=steam_appid, country=normalized_country)
+    price_key = build_cache_key("price_history_v2", steam_appid=steam_appid, country=normalized_country)
 
     async def fetch_price():
-        return await fetch_game_price_history(str(steam_appid), country=normalized_country, steam_appid=steam_appid)
+        history = await fetch_game_price_history(title or str(steam_appid), country=normalized_country, steam_appid=steam_appid)
+        return {**history, "history_available": True}
 
     try:
         return await get_json_cached(price_key, CACHE_TTL, fetch_price)
     except HTTPException as exc:
-        if exc.status_code not in {502, 503}:
+        if exc.status_code not in {404, 502, 503}:
             raise
-        return await fetch_steam_store_game_price(str(steam_appid), country=normalized_country)
+        price = await fetch_steam_store_game_price(title or str(steam_appid), country=normalized_country)
+        return {**price, "history_available": False}
 
 
 @app.get("/prices/steam-games/{appid}", response_model=GamePriceHistory)
@@ -3524,12 +3527,15 @@ async def steam_game_price_history(appid: int, country: str = "US"):
     normalized_country = country.strip().upper()
     if appid < 1:
         raise HTTPException(status_code=400, detail="appid must be >= 1")
+    steam_detail = await fetch_steam_store_game_detail(appid, country=normalized_country)
+    title = str(steam_detail.get("title") or steam_detail.get("name") or appid).strip()
     try:
-        return await fetch_game_price_history(str(appid), country=normalized_country, steam_appid=appid)
+        history = await fetch_game_price_history(title, country=normalized_country, steam_appid=appid)
+        return {**history, "history_available": True}
     except HTTPException as exc:
-        if exc.status_code not in {502, 503}:
+        if exc.status_code not in {404, 502, 503}:
             raise
-        return await fetch_steam_store_game_detail(appid, country=normalized_country)
+        return {**steam_detail, "history_available": False}
 
 
 
@@ -3576,7 +3582,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
     if page_size < 1 or page_size > 13:
         raise HTTPException(status_code=400, detail="page_size must be between 1 and 13")
 
-    key = build_cache_key("steam_store_deals", country=normalized_country, page_size=page_size)
+    key = build_cache_key("steam_store_deals_v2", country=normalized_country, page_size=page_size)
 
     async def fetch():
         steam_deals = await fetch_steam_store_deals(country=normalized_country, page_size=page_size)
@@ -3609,7 +3615,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
                             )
                         except IGDBError:
                             match = None
-            return {
+            return _apply_catalog_media({
                 "id": match.get("id") if match else None,
                 "steam_appid": deal.get("steam_appid"),
                 "name": deal["name"],
@@ -3618,7 +3624,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
                 "url": deal.get("url"),
                 "current": deal.get("current"),
                 "history_low_all": deal.get("history_low_all"),
-            }
+            }, match)
 
         return {
             "results": await asyncio.gather(*(attach_igdb_id(deal) for deal in steam_deals)),
@@ -3633,7 +3639,7 @@ async def genre_deals(current_user: User | None = Depends(get_optional_current_u
     country = ((current_user.steam_country_code if current_user else None) or "US").strip().upper()
     genres = select_deal_genres(current_user.favorite_genres if current_user else [])
     key = build_cache_key(
-        "steam_genre_deals_v4",
+        "steam_genre_deals_v5",
         country=country,
         genres=[normalize_genre(genre) for genre in genres],
     )

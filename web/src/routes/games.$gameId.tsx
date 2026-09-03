@@ -531,6 +531,7 @@ function GameDetail() {
                     points={priceHistory.points}
                     currency={game.currency}
                     currentPrice={game.price}
+                    historyAvailable={priceQuery.data?.history_available}
                   />
                 </>
               )}

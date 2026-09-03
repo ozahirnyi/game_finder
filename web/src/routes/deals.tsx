@@ -46,7 +46,7 @@ function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
           from="#dc2626"
           to="#111827"
           title={deal.name}
-          image={deal.background_image ?? undefined}
+          image={deal.hero_image ?? deal.background_image ?? undefined}
           compact={!large}
           className={large ? "aspect-[4/3] w-full rounded-xl" : "size-20 shrink-0 rounded-xl"}
         />

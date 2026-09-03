@@ -1,3 +1,4 @@
+import logging
 import os
 from calendar import monthrange
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ from fastapi import HTTPException
 
 
 ITAD_BASE_URL = "https://api.isthereanydeal.com"
+logger = logging.getLogger(__name__)
 
 
 def get_itad_api_key() -> str:
@@ -77,6 +79,12 @@ def price_history_since(now: datetime | None = None) -> str:
     ).isoformat()
 
 
+def _itad_history_points(payload: Any) -> list[dict[str, Any]]:
+    """Extract valid event objects from either documented ITAD history envelope."""
+    values = payload if isinstance(payload, list) else payload.get("history") if isinstance(payload, dict) else []
+    return [point for point in values if isinstance(point, dict)] if isinstance(values, list) else []
+
+
 def normalize_price_history(deals: list[dict[str, Any]], history_points: list[dict[str, Any]], *, now: datetime | None = None) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     """Keep valid provider data compact, chronological, and safe for charting."""
     valid_deals = [deal for deal in (_deal(value) for value in deals) if deal and deal.get("price")]
@@ -126,25 +134,83 @@ def _itad_error_message(response: httpx.Response) -> str:
     return "request failed"
 
 
+def _itad_game_identity(game: Any, fallback_title: str | None = None) -> tuple[str, str] | None:
+    if not isinstance(game, dict):
+        return None
+    game_id = game.get("id")
+    game_title = game.get("title")
+    if not isinstance(game_id, str) or not game_id.strip():
+        return None
+    if not isinstance(game_title, str) or not game_title.strip():
+        if fallback_title is None:
+            return None
+        game_title = fallback_title
+    return game_id, game_title
+
+
+def _itad_game_url(game: Any) -> str | None:
+    if not isinstance(game, dict):
+        return None
+    urls = game.get("urls")
+    url = urls.get("game") if isinstance(urls, dict) else None
+    return url if isinstance(url, str) and url.strip() else None
+
+
+async def _resolve_itad_game(
+    client: httpx.AsyncClient, title: str, steam_appid: int | None
+) -> tuple[str, str, str | None]:
+    async def lookup(params: dict[str, str | int]) -> tuple[str, str, str | None] | None:
+        response = await client.get(f"{ITAD_BASE_URL}/games/lookup/v1", params=params)
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict) or not data.get("found"):
+            return None
+        game = data.get("game")
+        identity = _itad_game_identity(game, title)
+        return (*identity, _itad_game_url(game)) if identity else None
+
+    if steam_appid is not None:
+        game = await lookup({"appid": steam_appid})
+        if game:
+            return game
+
+    game = await lookup({"title": title})
+    if game:
+        return game
+
+    response = await client.get(f"{ITAD_BASE_URL}/games/search/v1", params={"title": title})
+    response.raise_for_status()
+    results = response.json()
+    if isinstance(results, list):
+        for candidate in results:
+            identity = _itad_game_identity(candidate)
+            if (
+                identity
+                and candidate.get("type") == "game"
+                and identity[1].casefold() == title.casefold()
+            ):
+                return *identity, _itad_game_url(candidate)
+
+    raise HTTPException(status_code=404, detail="Price data not found for this game")
+
+
+async def resolve_itad_game_id(
+    client: httpx.AsyncClient, title: str, steam_appid: int | None
+) -> tuple[str, str]:
+    game_id, game_title, _game_url = await _resolve_itad_game(client, title, steam_appid)
+    return game_id, game_title
+
+
 async def fetch_game_price_history(title: str, country: str = "US", steam_appid: int | None = None) -> dict[str, Any]:
     api_key = get_itad_api_key()
     if not api_key:
         raise HTTPException(status_code=503, detail="ITAD_API_KEY is not configured")
 
     headers = {"ITAD-API-Key": api_key}
+    since = price_history_since()
     try:
         async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
-            lookup = await client.get(
-                f"{ITAD_BASE_URL}/games/lookup/v1",
-                params={"appid": steam_appid} if steam_appid else {"title": title},
-            )
-            lookup.raise_for_status()
-            lookup_data = lookup.json()
-            if not lookup_data.get("found") or not lookup_data.get("game"):
-                raise HTTPException(status_code=404, detail="Price data not found for this game")
-
-            game = lookup_data["game"]
-            game_id = game["id"]
+            game_id, game_title, game_url = await _resolve_itad_game(client, title, steam_appid)
             prices = await client.post(
                 f"{ITAD_BASE_URL}/games/prices/v3",
                 params={"country": country, "capacity": 5, "vouchers": "true"},
@@ -153,7 +219,7 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
             prices.raise_for_status()
             history = await client.get(
                 f"{ITAD_BASE_URL}/games/history/v2",
-                params={"id": game_id, "country": country, "since": price_history_since()},
+                params={"id": game_id, "country": country, "since": since},
             )
             history.raise_for_status()
     except HTTPException:
@@ -176,16 +242,24 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
     item = price_items[0]
     history_low = item.get("historyLow") or {}
     history_data = history.json()
-    history_points = history_data if isinstance(history_data, list) else history_data.get("history", [])
-    history_points = history_points if isinstance(history_points, list) else []
+    raw_history_count = len(history_data) if isinstance(history_data, list) else len(history_data.get("history", [])) if isinstance(history_data, dict) and isinstance(history_data.get("history"), list) else 0
+    history_points = _itad_history_points(history_data)
     deal_values = item.get("deals") if isinstance(item.get("deals"), list) else []
     current, normalized_history = normalize_price_history(deal_values, history_points)
+    logger.info(
+        "ITAD price history normalized game_id=%s country=%s since=%s raw_count=%d normalized_count=%d",
+        game_id,
+        country,
+        since,
+        raw_history_count,
+        len(normalized_history),
+    )
     deals = [deal for deal in (_deal(value) for value in deal_values) if deal and deal.get("price")]
 
     return {
         "itad_id": game_id,
-        "title": game.get("title") or title,
-        "url": (game.get("urls") or {}).get("game") or f"https://isthereanydeal.com/game/id:{game_id}/",
+        "title": game_title,
+        "url": game_url or f"https://isthereanydeal.com/game/id:{game_id}/",
         "current": current,
         "history_low_all": _money(history_low.get("all")),
         "history_low_1y": _money(history_low.get("y1")),

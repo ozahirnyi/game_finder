@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import httpx
 import pytest
@@ -125,6 +126,40 @@ async def test_itad_price_history_normalizes_deals(monkeypatch):
     assert result["current"]["shop"] == "Store"
     assert result["history_low_all"] == {"amount": 5, "currency": "USD"}
     assert result["history"][0]["timestamp"] == "2026-08-01T00:00:00+00:00"
+
+
+@pytest.mark.anyio
+async def test_itad_price_history_retains_documented_history_wrapper(monkeypatch):
+    monkeypatch.setenv("ITAD_API_KEY", "key")
+    responses = [
+        FakeResponse({"found": True, "game": {"id": "g1", "title": "Game", "urls": {"game": "url"}}}),
+        FakeResponse([{"historyLow": {}, "deals": []}]),
+        FakeResponse({"history": [{"timestamp": "2026-06-25T12:00:00+00:00", "shop": {"name": "Store"}, "deal": {"price": {"amount": 6, "currency": "USD"}}}]}),
+    ]
+    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(responses=responses))
+
+    result = await prices.fetch_game_price_history("Game")
+
+    assert len(result["history"]) == 1
+
+
+@pytest.mark.anyio
+async def test_itad_price_history_logs_raw_source_count_before_retention(monkeypatch, caplog):
+    monkeypatch.setenv("ITAD_API_KEY", "key")
+    responses = [
+        FakeResponse({"found": True, "game": {"id": "g1", "title": "Game", "urls": {"game": "url"}}}),
+        FakeResponse([{"historyLow": {}, "deals": []}]),
+        FakeResponse([
+            {"timestamp": "2026-08-01T00:00:00+00:00", "shop": {"name": "Store"}, "deal": {"price": {"amount": 6, "currency": "USD"}}},
+            "malformed provider entry",
+        ]),
+    ]
+    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(responses=responses))
+    caplog.set_level(logging.INFO, logger=prices.__name__)
+
+    await prices.fetch_game_price_history("Game")
+
+    assert "raw_count=2 normalized_count=1" in caplog.text
 
 
 @pytest.mark.anyio
