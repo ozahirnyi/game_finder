@@ -305,6 +305,7 @@ class GameSearchItem(BaseModel):
     name: str | None = None
     released: str | None = None
     background_image: str | None = None
+    hero_image: str | None = None
     source: str | None = None
     steam_appid: int | None = None
     url: str | None = None
@@ -323,6 +324,8 @@ class GameCatalogDetail(BaseModel):
     name: str
     released: str | None = None
     background_image: str | None = None
+    hero_image: str | None = None
+    steam_appid: int | None = None
     description_raw: str | None = None
     rating: float | None = None
     genres: list[str] = Field(default_factory=list)

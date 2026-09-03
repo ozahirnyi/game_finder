@@ -27,6 +27,7 @@ export type CatalogGame = {
   name: string;
   released?: string | null;
   background_image?: string | null;
+  hero_image?: string | null;
   description_raw?: string | null;
   rating?: number | null;
   genres?: string[];
@@ -651,6 +652,7 @@ export function getSteamGame(appid: string | number) {
     platforms: string[];
     released?: string | null;
     rating?: number | null;
+    catalog_game_id?: number | null;
     current?: Deal["current"];
     url?: string | null;
   }>(`/steam/games/${appid}`);

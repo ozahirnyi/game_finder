@@ -53,6 +53,35 @@ export const Route = createFileRoute("/games/$gameId")({
     try {
       if (deps.source === "steam") {
         const steamGame = await getSteamGame(params.gameId);
+        if (steamGame.catalog_game_id) {
+          const catalog = await getCatalogGame(steamGame.catalog_game_id);
+          if (hasCatalogId(catalog)) {
+            return {
+              game: {
+                id: String(catalog.id),
+                title: catalog.name,
+                coverFrom: "#1d4ed8",
+                coverTo: "#111827",
+                coverUrl: catalog.hero_image ?? catalog.background_image ?? undefined,
+                fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/library_hero.jpg`,
+                genres: catalog.genres ?? steamGame.genres ?? [],
+                platforms: catalog.platforms ?? steamGame.platforms ?? ["PC"],
+                releaseDate: catalog.released ?? steamGame.released ?? undefined,
+                rating: catalog.rating ?? steamGame.rating ?? 0,
+                description:
+                  catalog.description_raw ?? steamGame.description_raw ?? "Steam Store game.",
+                price: steamGame.current?.price?.amount ?? null,
+                originalPrice: steamGame.current?.regular?.amount ?? null,
+                discount: steamGame.current?.cut ?? null,
+                currency: steamGame.current?.price?.currency,
+                store: steamGame.current?.shop ?? "Steam",
+                storeUrl: steamGame.current?.url ?? steamGame.url ?? undefined,
+                coop: false,
+                isSteamLibrary: false,
+              },
+            };
+          }
+        }
         return {
           game: {
             id: params.gameId,
@@ -328,7 +357,7 @@ function GameDetail() {
     ...(releaseDate === "Unknown" ? [] : [releaseDate]),
     ...(rating === "Not rated yet" ? [] : [`${rating} critic score`]),
   ];
-  const priceHistory = presentPriceHistory(priceQuery.data?.history ?? []);
+  const priceHistory = presentPriceHistory(priceQuery.data?.history ?? [], current?.price);
   const similar = (similarQuery.data?.results ?? [])
     .filter((candidate) => candidate.id != null && String(candidate.id) !== catalogGame.id)
     .slice(0, 4);
@@ -498,7 +527,11 @@ function GameDetail() {
                       />
                     </div>
                   )}
-                  <PriceHistoryChart points={priceHistory.points} currency={game.currency} />
+                  <PriceHistoryChart
+                    points={priceHistory.points}
+                    currency={game.currency}
+                    currentPrice={game.price}
+                  />
                 </>
               )}
             </div>

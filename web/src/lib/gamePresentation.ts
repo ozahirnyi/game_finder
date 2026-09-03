@@ -44,7 +44,10 @@ export function formatHistoryDate(timestamp: string): string {
   return date ? `${date.getUTCDate()} ${shortMonth.format(date)}` : "";
 }
 
-export function presentPriceHistory(history: PriceHistoryApiPoint[]) {
+export function presentPriceHistory(
+  history: PriceHistoryApiPoint[],
+  current?: { amount?: number | null; currency?: string | null } | null,
+) {
   const points = history
     .flatMap((item) => {
       const date =
@@ -69,5 +72,7 @@ export function presentPriceHistory(history: PriceHistoryApiPoint[]) {
     points,
     labels,
     historicalLow: points.length ? Math.min(...points.map((point) => point.price)) : undefined,
+    isCurrentOnly:
+      points.length === 0 && typeof current?.amount === "number" && Number.isFinite(current.amount),
   };
 }

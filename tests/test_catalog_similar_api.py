@@ -47,6 +47,33 @@ def test_catalog_similar_propagates_igdb_provider_error(monkeypatch):
     assert response.json() == {"detail": "provider unavailable"}
 
 
+def test_catalog_similar_falls_back_to_catalog_candidates_when_igdb_has_no_relations(monkeypatch):
+    async def detail(_igdb_id):
+        return {"id": 10, "name": "Source", "genres": ["RPG"], "platforms": ["PC"]}
+
+    async def similar(_igdb_id, *, limit):
+        assert limit == 12
+        return []
+
+    async def fallback(source, *, limit):
+        assert source["id"] == 10
+        assert limit == 12
+        return [
+            {"id": 11, "name": "Fallback", "genres": ["RPG"], "platforms": ["PC"]},
+        ]
+
+    monkeypatch.setattr(main, "fetch_igdb_game_detail", detail)
+    monkeypatch.setattr(main, "fetch_igdb_similar_games", similar)
+    monkeypatch.setattr(main, "fetch_igdb_related_fallback_games", fallback)
+
+    response = client.get("/catalog/games/10/similar")
+
+    assert response.status_code == 200
+    assert response.json()["results"] == [
+        {"id": 11, "name": "Fallback", "genres": ["RPG"], "platforms": ["PC"]},
+    ]
+
+
 @pytest.mark.anyio
 async def test_igdb_similar_games_drops_a_stale_related_id(monkeypatch):
     async def query(_endpoint, _query):

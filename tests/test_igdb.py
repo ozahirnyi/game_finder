@@ -26,6 +26,24 @@ def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
     assert result["game_type"] == 0
 
 
+def test_normalize_igdb_game_prefers_wide_artwork_for_the_detail_hero():
+    from app.integrations.igdb import normalize_igdb_game
+
+    result = normalize_igdb_game(
+        {
+            "id": 1,
+            "name": "Wide Game",
+            "cover": {"url": "//images.igdb.com/igdb/image/upload/t_thumb/cover.jpg"},
+            "artworks": [
+                {"url": "//images.igdb.com/igdb/image/upload/t_thumb/artwork.jpg"},
+            ],
+        }
+    )
+
+    assert result["background_image"] == "https://images.igdb.com/igdb/image/upload/t_cover_big/cover.jpg"
+    assert result["hero_image"] == "https://images.igdb.com/igdb/image/upload/t_1080p/artwork.jpg"
+
+
 def test_normalize_igdb_game_uses_total_rating_when_critic_rating_is_missing():
     from app.integrations.igdb import normalize_igdb_game
 

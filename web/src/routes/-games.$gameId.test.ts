@@ -20,6 +20,42 @@ vi.mock("@/lib/api", () => ({
 import { mergeGamePrice, Route } from "./games.$gameId";
 
 describe("Steam library game loader", () => {
+  it("promotes a linked Steam game to its canonical catalog detail", async () => {
+    api.getSteamGame.mockResolvedValue({
+      appid: 620,
+      name: "Portal 2",
+      catalog_game_id: 72,
+      current: { shop: "Steam", price: { amount: 9.99, currency: "USD" } },
+    });
+    api.getCatalogGame.mockResolvedValue({
+      id: 72,
+      name: "Portal 2",
+      hero_image: "https://images.example.test/portal-hero.jpg",
+      released: "2011-04-18",
+      rating: 91.2,
+      genres: ["Puzzle"],
+      platforms: ["PC"],
+    });
+
+    const loader = Route.options.loader;
+    if (typeof loader !== "function") throw new Error("Expected a route loader");
+
+    const result = await loader({
+      params: { gameId: "620" },
+      deps: { source: "steam" },
+    } as never);
+
+    expect(api.getCatalogGame).toHaveBeenCalledWith(72);
+    expect(result.game).toMatchObject({
+      id: "72",
+      isSteamLibrary: false,
+      coverUrl: "https://images.example.test/portal-hero.jpg",
+      releaseDate: "2011-04-18",
+      rating: 91.2,
+      price: 9.99,
+    });
+  });
+
   it("loads Steam Store details and price for a Steam search result", async () => {
     api.getSteamGame.mockResolvedValue({
       appid: 1145360,

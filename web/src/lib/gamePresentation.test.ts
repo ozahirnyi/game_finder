@@ -51,6 +51,14 @@ describe("price history presentation", () => {
       ],
       labels: ["1 Aug", "25 Sep"],
       historicalLow: 19.99,
+      isCurrentOnly: false,
+    });
+  });
+
+  it("marks a current price without source changes as a current-only state", () => {
+    expect(presentPriceHistory([], { amount: 9.99, currency: "USD" })).toMatchObject({
+      points: [],
+      isCurrentOnly: true,
     });
   });
 });
