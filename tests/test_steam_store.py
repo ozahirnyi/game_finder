@@ -304,3 +304,31 @@ async def test_steam_genre_lookup_filters_invalid_ids_and_tolerates_request_erro
         10: ["Action"],
         20: [],
     }
+
+
+@pytest.mark.anyio
+async def test_steam_deals_returns_the_requested_candidate_slice(monkeypatch):
+    async def candidates(country):
+        assert country == "UA"
+        return {"popular": [], "candidates": [{"steam_appid": 1}, {"steam_appid": 2}]}
+
+    monkeypatch.setattr(steam_store, "fetch_steam_store_deal_candidates", candidates)
+
+    assert await steam_store.fetch_steam_store_deals("UA", page_size=1) == [{"steam_appid": 1}]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("request", [steam_store.fetch_steam_store_game_price, steam_store.fetch_steam_store_game_detail])
+async def test_steam_store_maps_transport_errors_to_bad_gateway(monkeypatch, request):
+    async def fake_get(self, _url, *, params):
+        raise steam_store.httpx.RequestError("offline")
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    with pytest.raises(HTTPException, match="Steam Store request failed") as exc:
+        if request is steam_store.fetch_steam_store_game_price:
+            await request("Portal")
+        else:
+            await request(10)
+
+    assert exc.value.status_code == 502
