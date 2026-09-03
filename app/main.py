@@ -31,6 +31,7 @@ from app.integrations.igdb import (
     fetch_igdb_game_detail,
     fetch_igdb_games,
     fetch_igdb_games_batch,
+    fetch_igdb_related_fallback_games,
     fetch_igdb_similar_games,
     fetch_igdb_trending_games,
     fetch_igdb_upcoming_games,
@@ -3405,6 +3406,8 @@ async def catalog_similar_games(igdb_id: int):
     try:
         source = await fetch_igdb_game_detail(igdb_id)
         candidates = await fetch_igdb_similar_games(igdb_id, limit=12)
+        if not candidates:
+            candidates = await fetch_igdb_related_fallback_games(source, limit=12)
     except IGDBError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
@@ -3428,7 +3431,7 @@ async def catalog_similar_games(igdb_id: int):
             "platforms": platforms,
             "_score": score,
         }
-        for field in ("released", "background_image", "rating"):
+        for field in ("released", "background_image", "hero_image", "rating"):
             if candidate.get(field) is not None:
                 result[field] = candidate[field]
         results.append(result)

@@ -15,11 +15,21 @@ function formatPrice(amount: number, currency?: string) {
 export function PriceHistoryChart({
   points,
   currency,
+  currentPrice,
 }: {
   points: PriceHistoryPoint[];
   currency?: string;
+  currentPrice?: number | null;
 }) {
   if (points.length === 0) {
+    if (typeof currentPrice === "number" && Number.isFinite(currentPrice)) {
+      return (
+        <p className="text-sm text-muted-foreground">
+          No price changes in the last 6 months. Current price:{" "}
+          {formatPrice(currentPrice, currency)}.
+        </p>
+      );
+    }
     return <p className="text-sm text-muted-foreground">No price history is available yet.</p>;
   }
   if (points.length === 1) {

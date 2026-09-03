@@ -245,6 +245,8 @@ def test_catalog_detail_normalizes_response(api_client, app_main, monkeypatch):
         "name": "Hades",
         "released": "2020-09-17",
         "background_image": "https://img.test/hades.jpg",
+        "hero_image": None,
+        "steam_appid": None,
         "description_raw": "A dungeon crawler",
         "rating": 4.5,
         "genres": ["Action"],

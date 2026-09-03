@@ -471,6 +471,8 @@ def test_catalog_game_detail_returns_normalized_igdb_data(monkeypatch):
         "name": "Hades",
         "released": "2020-09-17",
         "background_image": "https://example.com/hades.jpg",
+        "hero_image": None,
+        "steam_appid": None,
         "description_raw": "A roguelike dungeon crawler.",
         "rating": 4.42,
         "genres": ["Action", "RPG"],

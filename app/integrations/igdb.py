@@ -6,6 +6,7 @@ wire format.
 """
 import asyncio
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -129,19 +130,33 @@ async def _query(endpoint: str, query: str) -> list[dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
+def _igdb_image_url(value: Any, size: str) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    url = f"https:{value}" if value.startswith("//") else value
+    return re.sub(r"t_[^/]+(?=/)", size, url)
+
+
 def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
-    cover = (game.get("cover") or {}).get("url")
-    if isinstance(cover, str) and cover.startswith("//"):
-        cover = f"https:{cover}"
-    if isinstance(cover, str):
-        cover = cover.replace("t_thumb", "t_cover_big")
+    cover = _igdb_image_url((game.get("cover") or {}).get("url"), "t_cover_big")
+    artwork = next(
+        (
+            item.get("url")
+            for item in game.get("artworks") or []
+            if isinstance(item, dict) and isinstance(item.get("url"), str)
+        ),
+        None,
+    )
+    hero_image = _igdb_image_url(artwork, "t_1080p") or _igdb_image_url(
+        (game.get("cover") or {}).get("url"), "t_720p"
+    )
     release = game.get("first_release_date")
     released = datetime.fromtimestamp(release, timezone.utc).date().isoformat() if isinstance(release, (int, float)) else None
     steam_appid = next((int(item["uid"]) for item in game.get("external_games", [])
                         if item.get("category") == 1 and str(item.get("uid", "")).isdigit()), None)
     return {
         "id": game.get("id"), "name": game.get("name"), "released": released,
-        "background_image": cover, "description_raw": game.get("summary"),
+        "background_image": cover, "hero_image": hero_image, "description_raw": game.get("summary"),
         "rating": game.get("rating") if game.get("rating") is not None else game.get("total_rating"), "genres": [x["name"] for x in game.get("genres", []) if x.get("name")],
         "platforms": [x.get("name") or (x.get("platform") or {}).get("name") for x in game.get("platforms", []) if x.get("name") or (x.get("platform") or {}).get("name")],
         "game_type": (game.get("game_type") or {}).get("type") if isinstance(game.get("game_type"), dict) else game.get("game_type"),
@@ -151,7 +166,7 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-_FIELDS = "fields id,name,first_release_date,summary,rating,total_rating,cover.url,genres.name,platforms.name,game_type.type,game_modes.name,keywords.name,external_games.category,external_games.uid;"
+_FIELDS = "fields id,name,first_release_date,summary,rating,total_rating,cover.url,artworks.url,genres.name,platforms.name,game_type.type,game_modes.name,keywords.name,external_games.category,external_games.uid;"
 
 
 async def fetch_igdb_games(
@@ -270,6 +285,19 @@ async def fetch_igdb_similar_games(igdb_id: int, *, limit: int = 12) -> list[dic
             raise result
         games.append(result)
     return games
+
+
+async def fetch_igdb_related_fallback_games(source: dict[str, Any], *, limit: int = 12) -> list[dict[str, Any]]:
+    """Return catalogue candidates when IGDB has no explicit similar-game links."""
+    genre_names = {str(value).casefold() for value in source.get("genres") or []}
+    platform_names = {str(value).casefold() for value in source.get("platforms") or []}
+    genres = tuple(name for name in _GENRE_IDS if name in genre_names)
+    platforms = ("pc",) if any("pc" in name or "windows" in name for name in platform_names) else ()
+    results = await fetch_igdb_games(
+        "",
+        filters=CatalogSearchFilters(platforms=platforms, genres=genres),
+    )
+    return results["results"][:limit]
 
 
 async def fetch_igdb_game_by_steam_appid(appid: int) -> dict[str, Any] | None:

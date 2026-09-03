@@ -60,6 +60,23 @@ def _timestamp(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def price_history_since(now: datetime | None = None) -> str:
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    current = current.astimezone(timezone.utc)
+    month = current.month - 6
+    year = current.year
+    if month < 1:
+        month += 12
+        year -= 1
+    return current.replace(
+        year=year,
+        month=month,
+        day=min(current.day, monthrange(year, month)[1]),
+    ).isoformat()
+
+
 def normalize_price_history(deals: list[dict[str, Any]], history_points: list[dict[str, Any]], *, now: datetime | None = None) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     """Keep valid provider data compact, chronological, and safe for charting."""
     valid_deals = [deal for deal in (_deal(value) for value in deals) if deal and deal.get("price")]
@@ -134,7 +151,10 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
                 json=[game_id],
             )
             prices.raise_for_status()
-            history = await client.get(f"{ITAD_BASE_URL}/games/history/v2", params={"id": game_id, "country": country})
+            history = await client.get(
+                f"{ITAD_BASE_URL}/games/history/v2",
+                params={"id": game_id, "country": country, "since": price_history_since()},
+            )
             history.raise_for_status()
     except HTTPException:
         raise
