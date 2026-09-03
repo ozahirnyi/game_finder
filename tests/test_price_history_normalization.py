@@ -3,6 +3,15 @@ from datetime import datetime, timezone
 from app import prices
 
 
+def test_itad_history_points_retains_documented_top_level_response_list():
+    points = prices._itad_history_points([
+        {"timestamp": "2026-06-25T12:00:00+00:00", "shop": {"name": "Store"}},
+        "malformed provider entry",
+    ])
+
+    assert [point["timestamp"] for point in points] == ["2026-06-25T12:00:00+00:00"]
+
+
 def test_price_history_keeps_cheapest_valid_current_deal_and_weekly_points():
     current, history = prices.normalize_price_history(
         [
