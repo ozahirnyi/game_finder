@@ -26,6 +26,28 @@ async def test_steam_search_uses_portrait_library_cover(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_price_lookup_accepts_store_search_app_results(monkeypatch):
+    async def fake_get(self, url, *, params):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                if url.endswith("storesearch/"):
+                    return {"items": [{"id": 3240220, "name": "Grand Theft Auto V Enhanced", "type": "app"}]}
+                return {"3240220": {"data": {"name": "Grand Theft Auto V Enhanced", "price_overview": {"final": 1979, "initial": 4499, "currency": "USD"}}}}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    result = await steam_store.fetch_steam_store_game_price("Grand Theft Auto V")
+
+    assert result["appid"] == 3240220
+    assert result["current"]["price"] == {"amount": 19.79, "currency": "USD"}
+
+
+@pytest.mark.anyio
 async def test_popular_deals_fill_from_specials_after_discounted_top_sellers(monkeypatch):
     async def fake_get(self, *_args, **_kwargs):
         class Response:
