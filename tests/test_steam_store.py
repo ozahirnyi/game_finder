@@ -260,3 +260,47 @@ async def test_steam_price_lookup_rejects_missing_store_price(monkeypatch):
         await steam_store.fetch_steam_store_game_price("Portal")
 
     assert exc.value.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_steam_price_lookup_rejects_an_empty_search_result(monkeypatch):
+    async def fake_get(self, _url, *, params):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"items": []}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    with pytest.raises(HTTPException, match="Steam price data not found") as exc:
+        await steam_store.fetch_steam_store_game_price("Missing")
+
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_steam_genre_lookup_filters_invalid_ids_and_tolerates_request_errors(monkeypatch):
+    async def fake_get(self, _url, *, params):
+        if params["appids"] == 20:
+            raise steam_store.httpx.RequestError("offline")
+
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"10": {"data": {"genres": [{"description": "Action"}]}}}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    assert await steam_store.fetch_steam_store_game_genres([], "US") == {}
+    assert await steam_store.fetch_steam_store_game_genres([10, 20, 10, 0], "US") == {
+        10: ["Action"],
+        20: [],
+    }
