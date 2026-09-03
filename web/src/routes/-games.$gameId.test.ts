@@ -20,6 +20,27 @@ vi.mock("@/lib/api", () => ({
 import { mergeGamePrice, Route } from "./games.$gameId";
 
 describe("Steam library game loader", () => {
+  it("uses IGDB artwork for a catalog game detail banner", async () => {
+    api.getCatalogGame.mockResolvedValue({
+      id: 72,
+      name: "Portal 2",
+      background_image: "https://images.example.test/portal-cover.jpg",
+      hero_image: "https://images.example.test/portal-hero.jpg",
+      genres: ["Puzzle"],
+      platforms: ["PC"],
+    });
+
+    const loader = Route.options.loader;
+    if (typeof loader !== "function") throw new Error("Expected a route loader");
+
+    const result = await loader({
+      params: { gameId: "72" },
+      deps: {},
+    } as never);
+
+    expect(result.game.coverUrl).toBe("https://images.example.test/portal-hero.jpg");
+  });
+
   it("promotes a linked Steam game to its canonical catalog detail", async () => {
     api.getSteamGame.mockResolvedValue({
       appid: 620,
