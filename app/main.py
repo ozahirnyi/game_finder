@@ -3388,7 +3388,7 @@ async def search(
 async def catalog_game_detail(igdb_id: int, db: Session = Depends(get_db)):
     if igdb_id < 1:
         raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
-    key = build_cache_key("catalog_game", igdb_id=igdb_id)
+    key = build_cache_key("catalog_game_v2", igdb_id=igdb_id)
 
     async def fetch():
         return await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
