@@ -28,7 +28,7 @@ def test_steam_game_routes_use_app_id(monkeypatch):
         }
 
     async def fake_history(title: str, country: str = "US", steam_appid: int | None = None):
-        assert title == "1091500"
+        assert title == "Cyberpunk 2077"
         assert country == "UA"
         assert steam_appid == 1091500
         return {"itad_id": "itad-1091500", "title": "Cyberpunk 2077", "deals": [], "history": []}
@@ -607,7 +607,7 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
         }
 
     async def fake_fetch_game_price_history(title: str, country: str, steam_appid: int):
-        assert title == "1145350"
+        assert title == "Hades"
         assert steam_appid == 1145350
         assert country == "US"
         return {
@@ -652,7 +652,7 @@ def test_game_price_history_uses_steam_when_itad_is_unavailable(monkeypatch):
         raise HTTPException(status_code=502, detail="IsThereAnyDeal rejected the API key")
 
     async def steam_price(title: str, country: str):
-        assert (title, country) == ("1145350", "US")
+        assert (title, country) == ("Hades II", "US")
         return {
             "itad_id": "steam:1145350",
             "title": "Hades II",
@@ -939,7 +939,7 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
     assert len(first.json()["sections"][0]["results"]) == 5
     assert second.status_code == 200
     assert cache_keys[0] == cache_keys[1]
-    assert cache_keys[0].startswith("steam_genre_deals_v4:")
+    assert cache_keys[0].startswith("steam_genre_deals_v5:")
 
 
 def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
