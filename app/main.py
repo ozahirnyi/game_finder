@@ -3532,6 +3532,19 @@ async def get_steam_game(appid: int, country: str = "US"):
     steam_detail = await fetch_steam_store_game_detail(appid, country=country.strip().upper())
     try:
         catalog = await fetch_igdb_game_by_steam_appid(appid)
+        if catalog is None:
+            title = str(steam_detail.get("name") or "").strip()
+            if title:
+                search = await fetch_igdb_games(title, page=1, filters=CatalogSearchFilters())
+                catalog = next(
+                    (
+                        item
+                        for item in search.get("results") or []
+                        if str(item.get("name") or "").casefold() == title.casefold()
+                        and isinstance(item.get("id"), int)
+                    ),
+                    None,
+                )
         if catalog:
             igdb_id = catalog["id"]
             steam_detail.update({
