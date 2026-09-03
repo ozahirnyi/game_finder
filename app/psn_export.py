@@ -174,6 +174,7 @@ def _parse_xlsx_export_candidates(content: bytes) -> list[PsnExportCandidate]:
         ]
     try:
         for worksheet in workbook.worksheets:
+            worksheet.reset_dimensions()
             rows = worksheet.iter_rows(values_only=True)
             buffered_rows: list[tuple[object, ...]] = []
             for _ in range(20):
