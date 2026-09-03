@@ -332,3 +332,16 @@ async def test_steam_store_maps_transport_errors_to_bad_gateway(monkeypatch, ope
             await operation(10)
 
     assert exc.value.status_code == 502
+
+
+@pytest.mark.anyio
+async def test_steam_deal_candidates_map_transport_errors_to_bad_gateway(monkeypatch):
+    async def fake_get(self, _url, *, params):
+        raise steam_store.httpx.RequestError("offline")
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    with pytest.raises(HTTPException, match="Steam Store request failed") as exc:
+        await steam_store.fetch_steam_store_deal_candidates("US")
+
+    assert exc.value.status_code == 502
