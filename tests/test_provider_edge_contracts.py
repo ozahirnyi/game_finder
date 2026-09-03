@@ -147,6 +147,17 @@ def test_price_helpers_keep_invalid_amounts_and_provider_errors_safe(monkeypatch
             raise ValueError("not json")
 
     assert prices._itad_error_message(InvalidJsonResponse()) == "request failed"
+
+
+def test_itad_game_identity_and_url_reject_malformed_provider_values():
+    from app import prices
+
+    assert prices._itad_game_identity(None) is None
+    assert prices._itad_game_identity({"id": "", "title": "Hades"}) is None
+    assert prices._itad_game_identity({"id": "itad-id"}) is None
+    assert prices._itad_game_identity({"id": "itad-id"}, "Hades") == ("itad-id", "Hades")
+    assert prices._itad_game_url(None) is None
+    assert prices._itad_game_url({"urls": {"game": ""}}) is None
 @pytest.mark.anyio
 async def test_price_provider_refuses_missing_key(monkeypatch):
     from app.prices import fetch_game_price_history
