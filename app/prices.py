@@ -184,7 +184,9 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
 
     item = price_items[0]
     history_low = item.get("historyLow") or {}
-    history_points = _itad_history_points(history.json())
+    history_data = history.json()
+    raw_history_count = len(history_data) if isinstance(history_data, list) else len(history_data.get("history", [])) if isinstance(history_data, dict) and isinstance(history_data.get("history"), list) else 0
+    history_points = _itad_history_points(history_data)
     deal_values = item.get("deals") if isinstance(item.get("deals"), list) else []
     current, normalized_history = normalize_price_history(deal_values, history_points)
     logger.info(
@@ -192,7 +194,7 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
         game_id,
         country,
         since,
-        len(history_points),
+        raw_history_count,
         len(normalized_history),
     )
     deals = [deal for deal in (_deal(value) for value in deal_values) if deal and deal.get("price")]
