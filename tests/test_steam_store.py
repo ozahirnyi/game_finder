@@ -135,3 +135,79 @@ async def test_steam_genre_lookup_returns_store_categories_and_tolerates_missing
 
     assert await steam_store.fetch_steam_store_game_genres([10, 20], "US") == {10: ["Action", "RPG"], 20: []}
     assert sorted(requested_appids) == [10, 20]
+
+
+def test_steam_deal_helpers_reject_incomplete_data_and_enforce_regional_currency():
+    assert steam_store._money_from_steam_cents(None, "USD") is None
+    assert steam_store._money_from_steam_cents(1999, None) is None
+    assert steam_store._money_from_steam_cents(1999, "USD") == {"amount": 19.99, "currency": "USD"}
+    assert steam_store._steam_deal({"id": 1, "name": "Game", "type": 1, "discount_percent": 50}) is None
+    assert steam_store._steam_deal({"id": 1, "name": "Game", "type": 0, "discount_percent": 0}) is None
+
+    deal = steam_store._steam_deal({
+        "id": 1,
+        "name": "Game",
+        "type": 0,
+        "discount_percent": 50,
+        "currency": "UAH",
+        "final_price": 19900,
+        "original_price": 39900,
+        "large_capsule_image": "https://images.test/wide.jpg",
+    })
+
+    assert deal["background_image"] == "https://images.test/wide.jpg"
+    assert steam_store._has_expected_currency(deal, "UA") is True
+    assert steam_store._has_expected_currency({**deal, "current": {**deal["current"], "price": {"amount": 19.99, "currency": "USD"}}}, "UA") is False
+
+
+@pytest.mark.anyio
+async def test_steam_store_game_detail_maps_catalog_fields(monkeypatch):
+    async def fake_get(self, _url, *, params):
+        assert params == {"appids": 10, "cc": "UA", "l": "english"}
+
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"10": {"data": {
+                    "name": "Portal",
+                    "header_image": "https://images.test/portal.jpg",
+                    "short_description": "A puzzle game",
+                    "genres": [{"description": "Puzzle"}],
+                    "platforms": {"windows": True, "mac": False},
+                    "release_date": {"date": "10 Oct, 2007"},
+                    "metacritic": {"score": 90},
+                    "price_overview": {"final": 499, "initial": 999, "currency": "UAH", "discount_percent": 50},
+                }}}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    detail = await steam_store.fetch_steam_store_game_detail(10, "UA")
+
+    assert detail["title"] == "Portal"
+    assert detail["platforms"] == ["windows"]
+    assert detail["current"]["price"] == {"amount": 4.99, "currency": "UAH"}
+    assert detail["current"]["regular"] == {"amount": 9.99, "currency": "UAH"}
+
+
+@pytest.mark.anyio
+async def test_steam_store_game_detail_returns_not_found_for_empty_payload(monkeypatch):
+    async def fake_get(self, _url, *, params):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"10": {"data": {}}}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    with pytest.raises(HTTPException, match="Steam game not found") as exc:
+        await steam_store.fetch_steam_store_game_detail(10)
+
+    assert exc.value.status_code == 404
