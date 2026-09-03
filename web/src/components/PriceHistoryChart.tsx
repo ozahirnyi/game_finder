@@ -22,13 +22,18 @@ export function PriceHistoryChart({
   currency?: string;
   currentPrice?: number | null;
   historyAvailable?: boolean;
-  }) {
+}) {
   if (points.length === 0) {
     if (historyAvailable === false) {
-      const currentPriceSuffix = typeof currentPrice === "number" && Number.isFinite(currentPrice)
-        ? ` Current price: ${formatPrice(currentPrice, currency)}.`
-        : "";
-      return <p className="text-sm text-muted-foreground">Price history is temporarily unavailable.{currentPriceSuffix}</p>;
+      const currentPriceSuffix =
+        typeof currentPrice === "number" && Number.isFinite(currentPrice)
+          ? ` Current price: ${formatPrice(currentPrice, currency)}.`
+          : "";
+      return (
+        <p className="text-sm text-muted-foreground">
+          Price history is temporarily unavailable.{currentPriceSuffix}
+        </p>
+      );
     }
     if (typeof currentPrice === "number" && Number.isFinite(currentPrice)) {
       return (
