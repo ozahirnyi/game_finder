@@ -211,3 +211,52 @@ async def test_steam_store_game_detail_returns_not_found_for_empty_payload(monke
         await steam_store.fetch_steam_store_game_detail(10)
 
     assert exc.value.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_steam_search_skips_incomplete_results_and_obeys_page_size(monkeypatch):
+    async def fake_get(self, _url, *, params):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"items": [
+                    {"id": None, "name": "Missing id"},
+                    {"id": 1, "name": ""},
+                    {"id": 2, "name": "First"},
+                    {"id": 3, "name": "Second"},
+                ]}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    assert await steam_store.fetch_steam_store_search("first", page_size=1) == [{
+        "steam_appid": 2,
+        "name": "First",
+        "background_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/2/library_600x900.jpg",
+        "url": "https://store.steampowered.com/app/2/",
+    }]
+
+
+@pytest.mark.anyio
+async def test_steam_price_lookup_rejects_missing_store_price(monkeypatch):
+    async def fake_get(self, url, *, params):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                if url.endswith("storesearch/"):
+                    return {"items": [{"id": 10, "name": "Portal", "type": "game"}]}
+                return {"10": {"data": {"name": "Portal", "price_overview": {}}}}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    with pytest.raises(HTTPException, match="Steam price data not found") as exc:
+        await steam_store.fetch_steam_store_game_price("Portal")
+
+    assert exc.value.status_code == 404
