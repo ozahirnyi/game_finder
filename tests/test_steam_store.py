@@ -345,3 +345,19 @@ async def test_steam_deal_candidates_map_transport_errors_to_bad_gateway(monkeyp
         await steam_store.fetch_steam_store_deal_candidates("US")
 
     assert exc.value.status_code == 502
+
+
+@pytest.mark.anyio
+async def test_steam_search_includes_upstream_status_in_bad_gateway_error(monkeypatch):
+    request = steam_store.httpx.Request("GET", "https://store.test/search")
+    response = steam_store.httpx.Response(503, request=request)
+
+    async def fake_get(self, _url, *, params):
+        raise steam_store.httpx.HTTPStatusError("unavailable", request=request, response=response)
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    with pytest.raises(HTTPException, match="503") as exc:
+        await steam_store.fetch_steam_store_search("Portal")
+
+    assert exc.value.status_code == 502
