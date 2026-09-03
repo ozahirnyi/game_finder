@@ -66,6 +66,33 @@ def test_steam_detail_enriches_only_verified_igdb_store_match(monkeypatch):
     assert response.json()["platforms"] == ["PC", "PlayStation 5"]
 
 
+def test_steam_detail_falls_back_to_an_exact_catalog_title_match(monkeypatch):
+    async def steam_detail(appid: int, country: str = "US"):
+        return {"appid": appid, "name": "Portal 2", "genres": ["Action"], "platforms": ["Windows"]}
+
+    async def no_appid_match(_appid: int):
+        return None
+
+    async def title_search(query: str, *, page: int, filters):
+        assert query == "Portal 2"
+        assert page == 1
+        assert filters == main.CatalogSearchFilters()
+        return {"results": [
+            {"id": 72, "name": "Portal 2", "released": "2011-04-18", "rating": 91.2, "genres": ["Puzzle"], "platforms": ["PC"]},
+            {"id": 99, "name": "Portal Stories: Mel", "genres": [], "platforms": []},
+        ]}
+
+    monkeypatch.setattr(main, "fetch_steam_store_game_detail", steam_detail)
+    monkeypatch.setattr(main, "fetch_igdb_game_by_steam_appid", no_appid_match)
+    monkeypatch.setattr(main, "fetch_igdb_games", title_search)
+
+    response = client.get("/steam/games/620")
+
+    assert response.status_code == 200
+    assert response.json()["catalog_game_id"] == 72
+    assert response.json()["released"] == "2011-04-18"
+
+
 def test_steam_detail_keeps_steam_metadata_when_igdb_is_unavailable(monkeypatch):
     async def steam_detail(appid: int, country: str = "US"):
         return {"appid": appid, "name": "Example Game", "genres": ["Action"], "platforms": ["Windows"], "released": "2020", "rating": 80, "deals": [], "history": []}

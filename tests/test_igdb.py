@@ -276,6 +276,40 @@ async def test_catalog_cache_handles_simple_doubles_and_new_entries():
 
 
 @pytest.mark.anyio
+async def test_catalog_cache_refreshes_a_fresh_snapshot_from_the_previous_format():
+    from app.catalog_cache import get_cached_snapshot
+
+    cached = type(
+        "Cached",
+        (),
+        {"snapshot": {"id": 12, "name": "Old"}, "steam_appid": None, "fetched_at": datetime.now(timezone.utc)},
+    )()
+
+    class Db:
+        committed = False
+
+        def get(self, *_):
+            return cached
+
+        def commit(self):
+            self.committed = True
+
+    async def fresh(_):
+        return {"id": 12, "name": "Fresh", "hero_image": "hero", "steam_appid": 620}
+
+    db = Db()
+    assert await get_cached_snapshot(db, 12, fresh) == {
+        "id": 12,
+        "name": "Fresh",
+        "hero_image": "hero",
+        "steam_appid": 620,
+    }
+    assert cached.snapshot["hero_image"] == "hero"
+    assert cached.steam_appid == 620
+    assert db.committed
+
+
+@pytest.mark.anyio
 async def test_igdb_helpers_query_strict_steam_id_and_catalog_lists(monkeypatch):
     import app.integrations.igdb as client
 
@@ -357,7 +391,11 @@ async def test_catalog_cache_returns_stale_snapshot_when_igdb_is_down():
 async def test_catalog_cache_uses_fresh_and_refreshes_stale_entries():
     from app.catalog_cache import get_cached_snapshot
     from app.database import CatalogGameCache
-    fresh = CatalogGameCache(igdb_id=8, snapshot={"id": 8}, fetched_at=datetime.now(timezone.utc))
+    fresh = CatalogGameCache(
+        igdb_id=8,
+        snapshot={"id": 8, "_catalog_snapshot_format": 2},
+        fetched_at=datetime.now(timezone.utc),
+    )
     class Db:
         def __init__(self, cached): self.cached, self.commits = cached, 0
         def get(self, *_): return self.cached
