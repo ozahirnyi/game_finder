@@ -16,13 +16,22 @@ export function PriceHistoryChart({
   points,
   currency,
   currentPrice,
+  historyAvailable,
 }: {
   points: PriceHistoryPoint[];
   currency?: string;
   currentPrice?: number | null;
+  historyAvailable?: boolean;
 }) {
   if (points.length === 0) {
     if (typeof currentPrice === "number" && Number.isFinite(currentPrice)) {
+      if (historyAvailable !== true) {
+        return (
+          <p className="text-sm text-muted-foreground">
+            Price history is temporarily unavailable. Current price: {formatPrice(currentPrice, currency)}.
+          </p>
+        );
+      }
       return (
         <p className="text-sm text-muted-foreground">
           No price changes in the last 6 months. Current price:{" "}

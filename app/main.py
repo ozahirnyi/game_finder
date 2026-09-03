@@ -3493,30 +3493,33 @@ async def game_price_history(igdb_id: int, country: str = "US", db: Session = De
         title = str(game.get("name") or "").strip()
         if not title:
             raise HTTPException(status_code=404, detail="No price lookup title is available for this catalog game")
+        title_key = build_cache_key("price_history_title_v2", title=title, country=normalized_country)
 
-        title_price_key = build_cache_key("price_history_title", title=title, country=normalized_country)
-
-        async def fetch_price_by_title():
-            return await fetch_game_price_history(title, country=normalized_country)
+        async def fetch_title_price():
+            history = await fetch_game_price_history(title, country=normalized_country)
+            return {**history, "history_available": True}
 
         try:
-            return await get_json_cached(title_price_key, CACHE_TTL, fetch_price_by_title)
+            return await get_json_cached(title_key, CACHE_TTL, fetch_title_price)
         except HTTPException as exc:
             if exc.status_code not in {404, 502, 503}:
                 raise
-            return await fetch_steam_store_game_price(title, country=normalized_country)
+            price = await fetch_steam_store_game_price(title, country=normalized_country)
+            return {**price, "history_available": False}
 
-    price_key = build_cache_key("price_history", steam_appid=steam_appid, country=normalized_country)
+    price_key = build_cache_key("price_history_v2", steam_appid=steam_appid, country=normalized_country)
 
     async def fetch_price():
-        return await fetch_game_price_history(str(steam_appid), country=normalized_country, steam_appid=steam_appid)
+        history = await fetch_game_price_history(str(steam_appid), country=normalized_country, steam_appid=steam_appid)
+        return {**history, "history_available": True}
 
     try:
         return await get_json_cached(price_key, CACHE_TTL, fetch_price)
     except HTTPException as exc:
         if exc.status_code not in {502, 503}:
             raise
-        return await fetch_steam_store_game_price(str(steam_appid), country=normalized_country)
+        price = await fetch_steam_store_game_price(str(steam_appid), country=normalized_country)
+        return {**price, "history_available": False}
 
 
 @app.get("/prices/steam-games/{appid}", response_model=GamePriceHistory)
@@ -3525,11 +3528,13 @@ async def steam_game_price_history(appid: int, country: str = "US"):
     if appid < 1:
         raise HTTPException(status_code=400, detail="appid must be >= 1")
     try:
-        return await fetch_game_price_history(str(appid), country=normalized_country, steam_appid=appid)
+        history = await fetch_game_price_history(str(appid), country=normalized_country, steam_appid=appid)
+        return {**history, "history_available": True}
     except HTTPException as exc:
         if exc.status_code not in {502, 503}:
             raise
-        return await fetch_steam_store_game_detail(appid, country=normalized_country)
+        price = await fetch_steam_store_game_detail(appid, country=normalized_country)
+        return {**price, "history_available": False}
 
 
 

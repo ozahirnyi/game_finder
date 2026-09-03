@@ -672,6 +672,7 @@ export function getPriceHistory(id: string | number, country = "US") {
   return apiRequest<{
     current?: Deal["current"];
     deals: Deal["current"][];
+    history_available: boolean;
     history_low_all?: Money | null;
     history: Array<{
       timestamp?: string | null;
@@ -686,6 +687,7 @@ export function getSteamPriceHistory(appid: string | number, country = "US") {
   return apiRequest<{
     current?: Deal["current"];
     deals: Deal["current"][];
+    history_available: boolean;
     history_low_all?: Money | null;
     history: Array<{
       timestamp?: string | null;

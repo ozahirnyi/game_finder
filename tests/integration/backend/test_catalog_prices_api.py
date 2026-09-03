@@ -295,10 +295,11 @@ def test_price_history_uses_itad_success(api_client, app_main, monkeypatch):
     history = {"itad_id": "itad-1", "title": "Hades", "deals": []}
     fetch_history = AsyncMock(return_value=history)
     fallback = AsyncMock()
+    cached = AsyncMock(side_effect=run_cached)
     monkeypatch.setattr(app_main, "fetch_igdb_game_detail", detail)
     monkeypatch.setattr(app_main, "fetch_game_price_history", fetch_history)
     monkeypatch.setattr(app_main, "fetch_steam_store_game_price", fallback)
-    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+    monkeypatch.setattr(app_main, "get_json_cached", cached)
 
     response = api_client.get("/prices/games/42", params={"country": " ua "})
 
@@ -306,6 +307,8 @@ def test_price_history_uses_itad_success(api_client, app_main, monkeypatch):
     assert response.json()["itad_id"] == history["itad_id"]
     assert response.json()["title"] == history["title"]
     assert response.json()["deals"] == []
+    assert cached.await_args.args[0].startswith("price_history_v2:")
+    assert response.json()["history_available"] is True
     fetch_history.assert_awaited_once_with("1145350", country="UA", steam_appid=1145350)
     fallback.assert_not_awaited()
 
@@ -324,6 +327,7 @@ def test_price_history_falls_back_to_steam_on_itad_502(api_client, app_main, mon
     assert response.json()["itad_id"] == steam["itad_id"]
     assert response.json()["title"] == steam["title"]
     assert response.json()["deals"] == []
+    assert response.json()["history_available"] is False
     fallback.assert_awaited_once_with("1145350", country="US")
 
 
@@ -343,6 +347,7 @@ def test_price_history_uses_itad_title_lookup_when_igdb_has_no_steam_appid(api_c
 
     assert response.status_code == 200
     assert response.json()["title"] == "Black Myth: Wukong"
+    assert response.json()["history_available"] is True
     history.assert_awaited_once_with("Black Myth: Wukong", country="UA")
     fallback.assert_not_awaited()
 
@@ -361,6 +366,7 @@ def test_price_history_falls_back_to_steam_when_itad_title_lookup_is_unavailable
     response = api_client.get("/prices/games/136879")
 
     assert response.status_code == 200
+    assert response.json()["history_available"] is False
     fallback.assert_awaited_once_with("Black Myth: Wukong", country="US")
 
 

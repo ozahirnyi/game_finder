@@ -523,6 +523,7 @@ class PriceHistoryPoint(BaseModel):
 class GamePriceHistory(BaseModel):
     itad_id: str
     title: str
+    history_available: bool
     url: str | None = None
     current: PriceDeal | None = None
     history_low_all: PriceMoney | None = None

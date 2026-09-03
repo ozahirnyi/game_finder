@@ -11,6 +11,20 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByText("No price history is available yet.")).toBeInTheDocument();
   });
 
+  it("reports unavailable history instead of claiming no price changes for a current-price fallback", () => {
+    render(
+      <PriceHistoryChart
+        points={[]}
+        currency="USD"
+        currentPrice={19.79}
+        historyAvailable={false}
+      />,
+    );
+
+    expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no price changes/i)).not.toBeInTheDocument();
+  });
+
   it("renders a readable single observation", () => {
     render(
       <PriceHistoryChart
