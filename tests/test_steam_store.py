@@ -364,6 +364,19 @@ async def test_steam_search_includes_upstream_status_in_bad_gateway_error(monkey
 
 
 @pytest.mark.anyio
+async def test_steam_search_maps_transport_errors_to_bad_gateway(monkeypatch):
+    async def fake_get(self, _url, *, params):
+        raise steam_store.httpx.RequestError("offline")
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    with pytest.raises(HTTPException, match="Steam Store request failed") as exc:
+        await steam_store.fetch_steam_store_search("Portal")
+
+    assert exc.value.status_code == 502
+
+
+@pytest.mark.anyio
 async def test_steam_deal_candidates_include_upstream_status_in_bad_gateway_error(monkeypatch):
     request = steam_store.httpx.Request("GET", "https://store.test/deals")
     response = steam_store.httpx.Response(429, request=request)
