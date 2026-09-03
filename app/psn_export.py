@@ -61,6 +61,7 @@ def parse_psn_export(content: bytes) -> list[str]:
     titles: dict[str, str] = {}
     try:
         for worksheet in workbook.worksheets:
+            worksheet.reset_dimensions()
             rows = worksheet.iter_rows(values_only=True)
             buffered_rows: list[tuple[object, ...]] = []
             for _ in range(20):
