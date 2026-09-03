@@ -3493,10 +3493,18 @@ async def game_price_history(igdb_id: int, country: str = "US", db: Session = De
         title = str(game.get("name") or "").strip()
         if not title:
             raise HTTPException(status_code=404, detail="No price lookup title is available for this catalog game")
+
+        title_price_key = build_cache_key("price_history_title", title=title, country=normalized_country)
+
+        async def fetch_price_by_title():
+            return await fetch_game_price_history(title, country=normalized_country)
+
         try:
+            return await get_json_cached(title_price_key, CACHE_TTL, fetch_price_by_title)
+        except HTTPException as exc:
+            if exc.status_code not in {404, 502, 503}:
+                raise
             return await fetch_steam_store_game_price(title, country=normalized_country)
-        except HTTPException:
-            raise
 
     price_key = build_cache_key("price_history", steam_appid=steam_appid, country=normalized_country)
 

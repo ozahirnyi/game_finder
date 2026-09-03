@@ -327,13 +327,15 @@ def test_price_history_falls_back_to_steam_on_itad_502(api_client, app_main, mon
     fallback.assert_awaited_once_with("1145350", country="US")
 
 
-def test_price_history_uses_catalog_title_when_igdb_has_no_steam_appid(api_client, app_main, monkeypatch):
+def test_price_history_uses_itad_title_lookup_when_igdb_has_no_steam_appid(api_client, app_main, monkeypatch):
     monkeypatch.setattr(
         app_main,
         "fetch_igdb_game_detail",
         AsyncMock(return_value={"name": "Black Myth: Wukong", "steam_appid": None}),
     )
-    fallback = AsyncMock(return_value={"itad_id": "steam:2358720", "title": "Black Myth: Wukong", "deals": []})
+    history = AsyncMock(return_value={"itad_id": "itad-2358720", "title": "Black Myth: Wukong", "deals": [], "history": []})
+    fallback = AsyncMock()
+    monkeypatch.setattr(app_main, "fetch_game_price_history", history)
     monkeypatch.setattr(app_main, "fetch_steam_store_game_price", fallback)
     monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
 
@@ -341,7 +343,25 @@ def test_price_history_uses_catalog_title_when_igdb_has_no_steam_appid(api_clien
 
     assert response.status_code == 200
     assert response.json()["title"] == "Black Myth: Wukong"
-    fallback.assert_awaited_once_with("Black Myth: Wukong", country="UA")
+    history.assert_awaited_once_with("Black Myth: Wukong", country="UA")
+    fallback.assert_not_awaited()
+
+
+def test_price_history_falls_back_to_steam_when_itad_title_lookup_is_unavailable(api_client, app_main, monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_game_detail",
+        AsyncMock(return_value={"name": "Black Myth: Wukong", "steam_appid": None}),
+    )
+    monkeypatch.setattr(app_main, "fetch_game_price_history", AsyncMock(side_effect=HTTPException(502, "ITAD down")))
+    fallback = AsyncMock(return_value={"itad_id": "steam:2358720", "title": "Black Myth: Wukong", "deals": []})
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_price", fallback)
+    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+
+    response = api_client.get("/prices/games/136879")
+
+    assert response.status_code == 200
+    fallback.assert_awaited_once_with("Black Myth: Wukong", country="US")
 
 
 def test_homepage_deals_enriches_and_normalizes_payload(api_client, app_main, monkeypatch):
