@@ -60,7 +60,13 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult
-from app.recommendation_quota import QuotaDenied, get_quota_status, reserve_quota
+from app.recommendation_quota import (
+    QuotaDenied,
+    check_quota_available,
+    consume_quota,
+    get_quota_status,
+    reserve_quota,
+)
 from app.recommendations import enrich_recommendations
 from app.steam import (
     build_steam_login_url,
@@ -3629,7 +3635,7 @@ async def recommendations(
     if not data.prompt.strip():
         raise HTTPException(status_code=400,detail="prompt cannot be empty")
     try:
-        quota = reserve_quota(db, current_user.id)
+        quota = check_quota_available(db, current_user.id)
     except QuotaDenied as exc:
         raise HTTPException(status_code=429, detail=jsonable_encoder({
             "code": exc.code, "message": exc.message, "quota": asdict(exc.snapshot),
@@ -3641,6 +3647,13 @@ async def recommendations(
         return await get_json_cached(key, CACHE_TTL, lambda: fetch_igdb_games(title, page=1))
 
     enriched = await enrich_recommendations(generated.get("recommendations", []), cached_search)
+    if any(item.get("game") is not None for item in enriched):
+        try:
+            quota = consume_quota(db, current_user.id)
+        except QuotaDenied as exc:
+            raise HTTPException(status_code=429, detail=jsonable_encoder({
+                "code": exc.code, "message": exc.message, "quota": asdict(exc.snapshot),
+            })) from exc
     return {"recommendations": enriched, "quota": asdict(quota)}
 
 

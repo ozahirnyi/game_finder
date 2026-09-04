@@ -1,15 +1,117 @@
 import json
 import uuid
+from dataclasses import asdict
+from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
 
 import app.openai_client as openai_client
+import app.main as app_main
 import app.steam_recommendations as steam_recommendations
+from app.recommendation_quota import QuotaSnapshot
+from app.schemas import RecommendationRequest
 
 
 def _games():
     return [{"appid": 10, "name": "Owned", "playtime_forever": 60}]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "generated,enriched",
+    [
+        ({"recommendations": []}, []),
+        ({"recommendations": [{"title": "Missing"}]}, [{"title": "Missing", "game": None}]),
+    ],
+)
+async def test_recommendations_only_consume_quota_after_a_resolved_catalog_card(
+    monkeypatch, generated, enriched
+):
+    snapshot = QuotaSnapshot(3, 3, None, datetime(2026, 9, 2, tzinfo=timezone.utc))
+    calls = {"checked": 0, "consumed": 0}
+    user = type("User", (), {"id": uuid.uuid4()})()
+
+    def check_quota(_db, user_id):
+        assert user_id == user.id
+        calls["checked"] += 1
+        return snapshot
+
+    def consume_quota(_db, user_id):
+        assert user_id == user.id
+        calls["consumed"] += 1
+        return snapshot
+
+    monkeypatch.setattr(app_main, "check_quota_available", check_quota)
+    monkeypatch.setattr(app_main, "consume_quota", consume_quota)
+    monkeypatch.setattr(app_main, "get_recommendation", lambda *_args: generated)
+
+    async def enrich(*_args):
+        return enriched
+
+    monkeypatch.setattr(app_main, "enrich_recommendations", enrich)
+
+    result = await app_main.recommendations.__wrapped__(
+        object(), RecommendationRequest(prompt="cozy games"), object(), user
+    )
+
+    assert result == {"recommendations": enriched, "quota": asdict(snapshot)}
+    assert calls == {"checked": 1, "consumed": 0}
+
+
+@pytest.mark.anyio
+async def test_recommendations_do_not_consume_quota_when_provider_fails(monkeypatch):
+    snapshot = QuotaSnapshot(3, 3, None, datetime(2026, 9, 2, tzinfo=timezone.utc))
+    user = type("User", (), {"id": uuid.uuid4()})()
+    consumed = False
+    monkeypatch.setattr(app_main, "check_quota_available", lambda *_args: snapshot)
+
+    def consume_quota(*_args):
+        nonlocal consumed
+        consumed = True
+
+    def provider_failure(*_args):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(app_main, "consume_quota", consume_quota)
+    monkeypatch.setattr(app_main, "get_recommendation", provider_failure)
+
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        await app_main.recommendations.__wrapped__(
+            object(), RecommendationRequest(prompt="cozy games"), object(), user
+        )
+
+    assert not consumed
+
+
+@pytest.mark.anyio
+async def test_recommendations_do_not_consume_quota_when_catalog_resolution_fails(monkeypatch):
+    snapshot = QuotaSnapshot(3, 3, None, datetime(2026, 9, 2, tzinfo=timezone.utc))
+    user = type("User", (), {"id": uuid.uuid4()})()
+    consumed = False
+    monkeypatch.setattr(app_main, "check_quota_available", lambda *_args: snapshot)
+    monkeypatch.setattr(
+        app_main,
+        "get_recommendation",
+        lambda *_args: {"recommendations": [{"title": "Hades"}]},
+    )
+
+    def consume_quota(*_args):
+        nonlocal consumed
+        consumed = True
+
+    async def catalog_failure(*_args):
+        raise RuntimeError("catalog unavailable")
+
+    monkeypatch.setattr(app_main, "consume_quota", consume_quota)
+    monkeypatch.setattr(app_main, "enrich_recommendations", catalog_failure)
+
+    with pytest.raises(RuntimeError, match="catalog unavailable"):
+        await app_main.recommendations.__wrapped__(
+            object(), RecommendationRequest(prompt="cozy games"), object(), user
+        )
+
+    assert not consumed
 
 
 @pytest.mark.anyio
