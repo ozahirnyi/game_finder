@@ -13,6 +13,7 @@ import {
   getLibraryOverview,
   getOnboardingSummary,
   getPublicProfile,
+  getRecommendations,
   getSteamLinkUrl,
   getAuthSnapshot,
   getToken,
@@ -41,6 +42,27 @@ describe("apiRequest", () => {
     await apiRequest("/catalog/trending-games");
 
     expect(fetchMock).toHaveBeenCalledWith("/api/catalog/trending-games", expect.any(Object));
+  });
+
+  it("bounds an AI recommendation request with a client timeout", async () => {
+    const signal = new AbortController().signal;
+    const timeout = vi.fn(() => signal);
+    vi.stubGlobal("AbortSignal", { timeout });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ recommendations: [] }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    setToken("token");
+
+    await getRecommendations("something calm and strange");
+
+    expect(timeout).toHaveBeenCalledWith(30_000);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/recommendations",
+      expect.objectContaining({ signal }),
+    );
   });
 
   it("sends the JWT and clears it after an authenticated 401", async () => {

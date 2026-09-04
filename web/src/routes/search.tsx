@@ -282,28 +282,31 @@ function SearchPage() {
               description="Try describing a different mood, genre, or platform."
             />
           )}
-          {recommendationMutation.data?.recommendations.map((item) => (
-            <article key={item.title} className="rounded-xl border border-border bg-surface p-4">
-              <h3 className="font-bold">{item.title}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{item.reason}</p>
-              <p className="mt-3 text-xs text-primary">{item.tags.join(" · ")}</p>
-              {item.igdb_id != null ? (
-                <a
-                  className="mt-3 inline-block text-sm font-bold text-primary"
-                  href={`/games/${item.igdb_id}`}
-                >
-                  View {item.title} details
-                </a>
-              ) : (
-                <a
-                  className="mt-3 inline-block text-sm font-bold text-primary"
-                  href={`/search?q=${encodeURIComponent(item.title)}`}
-                >
-                  Search for {item.title}
-                </a>
-              )}
-            </article>
-          ))}
+          {recommendationMutation.data?.recommendations && (
+            <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-5">
+              {recommendationMutation.data.recommendations.flatMap((item) => {
+                const game = item.game;
+                if (!game || !Number.isInteger(game.id)) return [];
+                return [
+                  <div key={game.id} className="space-y-2">
+                    <GameCard
+                      aspect="aspect-[3/4]"
+                      showPrice={false}
+                      game={{
+                        gameId: String(game.id),
+                        title: game.name,
+                        coverFrom: "#312e81",
+                        coverTo: "#111827",
+                        coverUrl: game.background_image ?? undefined,
+                        platforms: game.platforms,
+                      }}
+                    />
+                    <p className="text-sm text-muted-foreground">{item.reason}</p>
+                  </div>,
+                ];
+              })}
+            </div>
+          )}
         </div>
       )}
     </AppShell>
