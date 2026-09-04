@@ -231,11 +231,11 @@ def test_recommendations_expose_detail_link_only_for_an_exact_catalog_match(api_
         lambda *_args, **_kwargs: {"recommendations": [{"title": "Hades", "reason": "Fast runs", "tags": ["roguelike"]}]},
     )
 
-    async def fetch_catalog(title, **_kwargs):
-        assert title == "Hades"
-        return {"results": [{"id": 1, "name": "Hades II"}, {"id": 2, "name": "Hades", "background_image": "https://img.test/hades.jpg"}]}
+    async def fetch_catalog(titles):
+        assert titles == ["Hades"]
+        return {"Hades": [{"id": 1, "name": "Hades II"}, {"id": 2, "name": "Hades", "background_image": "https://img.test/hades.jpg"}]}
 
-    monkeypatch.setattr(app_main, "fetch_igdb_games", fetch_catalog)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", fetch_catalog)
 
     response = api_client.post("/recommendations", json={"prompt": "fast roguelikes"})
 
@@ -252,7 +252,7 @@ def test_recommendations_return_structured_quota_denial(api_client, app_main, mo
     auth_as(user_factory(email="recommendations-denied@example.com"))
     snapshot = QuotaSnapshot(3, 0, None, datetime(2026, 9, 3, tzinfo=timezone.utc))
     monkeypatch.setattr(
-        app_main, "reserve_quota",
+        app_main, "check_quota_available",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             QuotaDenied("ai_daily_quota_exhausted", "Daily AI search limit reached.", snapshot)
         ),

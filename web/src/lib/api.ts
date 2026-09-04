@@ -8,6 +8,7 @@ type RequestOptions = {
   body?: unknown;
   formBody?: BodyInit;
   method?: string;
+  signal?: AbortSignal;
 };
 
 export type TokenResponse = {
@@ -466,6 +467,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
     },
     body:
       options.formBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
+    signal: options.signal,
   });
   if (!response.ok) throw await toApiError(response, options.auth === true);
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
@@ -615,6 +617,7 @@ export function getRecommendations(prompt: string) {
     method: "POST",
     auth: true,
     body: { prompt, liked_game_ids: [] },
+    signal: AbortSignal.timeout(30_000),
   });
 }
 

@@ -81,7 +81,11 @@ async def test_igdb_multiquery_keeps_only_valid_returned_aliases(monkeypatch):
     result = await igdb.fetch_igdb_games_batch([*expected_titles, "Ten", "Eleven", "One"])
 
     assert captured[0][0] == "multiquery"
-    assert all(f'query games "psn_{index}"' in captured[0][1] and f'search "{title}"' in captured[0][1] for index, title in enumerate(expected_titles))
+    assert all(
+        f'query games "psn_{index}"' in captured[0][1]
+        and f'where name ~ "{title}"' in captured[0][1]
+        for index, title in enumerate(expected_titles)
+    )
     assert "psn_10" not in captured[0][1]
     assert result["One"][0]["name"] == "One"
     assert result["Empty"] == []

@@ -5,6 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+vi.mock("@/components/GameCard", () => ({
+  GameCard: ({ game }: { game: { gameId?: string; title: string } }) => (
+    <a href={`/games/${game.gameId}`}>{game.title}</a>
+  ),
+}));
 import { Route } from "./search";
 
 function renderSearch() {
@@ -49,7 +54,18 @@ describe("SearchPage", () => {
             url.includes("/recommendations")
               ? {
                   recommendations: [
-                    { title: "Recommended title", reason: "Fits your prompt", tags: ["Co-op"] },
+                    {
+                      title: "Recommended title",
+                      reason: "Fits your prompt",
+                      tags: ["Co-op"],
+                      game: {
+                        id: 42,
+                        name: "Recommended title",
+                        released: null,
+                        background_image: null,
+                        platforms: [],
+                      },
+                    },
                   ],
                 }
               : { results: [] },
@@ -151,7 +167,7 @@ describe("SearchPage", () => {
     );
   });
 
-  it("offers a title-search fallback for every AI recommendation", async () => {
+  it("renders only resolved AI results as catalog cards", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string) =>
@@ -161,7 +177,19 @@ describe("SearchPage", () => {
               url.includes("/recommendations")
                 ? {
                     recommendations: [
-                      { title: "Hades", reason: "Match", tags: [], igdb_id: 30 },
+                      {
+                        title: "Hades",
+                        reason: "Match",
+                        tags: [],
+                        game: {
+                          id: 30,
+                          name: "Hades",
+                          genres: ["Roguelike"],
+                          platforms: ["PC"],
+                          hero_image: null,
+                          background_image: null,
+                        },
+                      },
                       { title: "Unknown Game", reason: "Match", tags: [] },
                     ],
                   }
@@ -179,14 +207,11 @@ describe("SearchPage", () => {
     });
     fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
 
-    expect(await screen.findByRole("link", { name: "View Hades details" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: /hades/i })).toHaveAttribute(
       "href",
-      "/games/30",
+      expect.stringContaining("/games/30"),
     );
-    expect(screen.getByRole("link", { name: "Search for Unknown Game" })).toHaveAttribute(
-      "href",
-      "/search?q=Unknown%20Game",
-    );
+    expect(screen.queryByText("Unknown Game")).not.toBeInTheDocument();
   });
 
   it("distinguishes an AI no-match response from provider unavailability", async () => {

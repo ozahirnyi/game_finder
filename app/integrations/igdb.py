@@ -205,7 +205,7 @@ async def fetch_igdb_games_batch(titles: list[str]) -> dict[str, list[dict[str, 
         alias = f"psn_{index}"
         aliases[alias] = title
         safe_title = title.replace('"', "").replace("\\", "")
-        queries.append(f'query games "{alias}" {{ {_FIELDS} search "{safe_title}"; limit 20; }};')
+        queries.append(f'query games "{alias}" {{ {_FIELDS} where name ~ "{safe_title}"; limit 20; }};')
     responses = await _query("multiquery", "".join(queries))
     results: dict[str, list[dict[str, Any]]] = {}
     for response in responses:

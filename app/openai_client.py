@@ -63,7 +63,7 @@ def build_prompt(prompt: str, liked_game_ids: list[int]) -> str:
       ]
     }}
     CONSTRAINTS:
-    - Exactly 8 recommendations
+    - Return up to 10 recommendations; return fewer when the request is narrow, ambiguous, or unusual
     - Use liked games as preference signal
     - If no liked games, rely only on request
     LIKED GAMES:
@@ -226,7 +226,9 @@ def get_recommendation(prompt: str, liked_game_ids: list[int]) -> dict:
         raw = response.output_text
         data = parse_ai_response(raw)
         validated = RecommendationResponse(**data)
-        return validated.model_dump()
+        result = validated.model_dump()
+        result["recommendations"] = result["recommendations"][:10]
+        return result
     except RateLimitError:
         return fallback_or_raise(prompt, "OpenAI rate limit reached")
     except (APIConnectionError, APITimeoutError):

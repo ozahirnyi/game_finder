@@ -1,4 +1,3 @@
-import asyncio
 import unicodedata
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import Any
@@ -21,29 +20,29 @@ def normalize_catalog_title(value: str) -> str:
 
 async def enrich_recommendations(
     items: Iterable[Mapping[str, Any]],
-    search_title: Callable[[str], Awaitable[Mapping[str, Any]]],
-    concurrency: int = 3,
+    resolve_titles: Callable[[list[str]], Awaitable[Mapping[str, list[Mapping[str, Any]]]]],
 ) -> list[dict[str, Any]]:
-    semaphore = asyncio.Semaphore(concurrency)
+    candidates = [dict(item) for item in items if str(item.get("title") or "").strip()][:10]
+    if not candidates:
+        return []
+    try:
+        catalog_by_title = await resolve_titles([str(item["title"]).strip() for item in candidates])
+    except Exception:
+        return []
 
-    async def enrich(item: Mapping[str, Any]) -> dict[str, Any]:
-        try:
-            async with semaphore:
-                payload = await search_title(item["title"])
-            wanted = normalize_catalog_title(item["title"])
-            match = next(
-                (
-                    candidate
-                    for candidate in payload.get("results", [])
-                    if candidate.get("id") is not None
-                    and normalize_catalog_title(candidate.get("name") or "") == wanted
-                ),
-                None,
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            match = None
-        return {**item, "game": match}
-
-    return await asyncio.gather(*(enrich(item) for item in items))
+    resolved: list[dict[str, Any]] = []
+    for item in candidates:
+        title = str(item["title"]).strip()
+        wanted = normalize_catalog_title(title)
+        match = next(
+            (
+                candidate
+                for candidate in catalog_by_title.get(title, [])
+                if isinstance(candidate.get("id"), int)
+                and normalize_catalog_title(str(candidate.get("name") or "")) == wanted
+            ),
+            None,
+        )
+        if match is not None:
+            resolved.append({**item, "game": match})
+    return resolved
