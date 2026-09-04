@@ -8,7 +8,12 @@ from sqlalchemy.orm import Query, Session
 from sqlalchemy.pool import StaticPool
 
 from app.database import AIRecommendationQuota, Base, User
-from app.recommendation_quota import QuotaDenied, get_quota_status, reserve_quota
+from app.recommendation_quota import (
+    QuotaDenied,
+    check_quota_available,
+    consume_quota,
+    get_quota_status,
+)
 
 
 @pytest.fixture
@@ -32,31 +37,31 @@ def user(session):
 
 def test_three_attempts_are_available_and_fourth_is_denied(session, user):
     start = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
-    first = reserve_quota(session, user.id, start)
-    second = reserve_quota(session, user.id, start + timedelta(seconds=60))
-    third = reserve_quota(session, user.id, start + timedelta(seconds=120))
+    first = consume_quota(session, user.id, start)
+    second = consume_quota(session, user.id, start + timedelta(seconds=60))
+    third = consume_quota(session, user.id, start + timedelta(seconds=120))
 
     assert [first.remaining, second.remaining, third.remaining] == [2, 1, 0]
     with pytest.raises(QuotaDenied) as exc:
-        reserve_quota(session, user.id, start + timedelta(seconds=180))
+        consume_quota(session, user.id, start + timedelta(seconds=180))
     assert exc.value.code == "ai_daily_quota_exhausted"
     assert exc.value.snapshot.reset_at == datetime(2026, 9, 2, tzinfo=timezone.utc)
 
 
 def test_cooldown_denies_without_consuming_an_attempt(session, user):
     start = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
-    reserve_quota(session, user.id, start)
+    consume_quota(session, user.id, start)
 
     with pytest.raises(QuotaDenied) as exc:
-        reserve_quota(session, user.id, start + timedelta(seconds=59))
+        consume_quota(session, user.id, start + timedelta(seconds=59))
 
     assert exc.value.code == "ai_recommendation_cooldown"
     assert get_quota_status(session, user.id, start + timedelta(seconds=59)).remaining == 2
 
 
 def test_utc_day_creates_a_fresh_quota(session, user):
-    reserve_quota(session, user.id, datetime(2026, 9, 1, 23, 59, tzinfo=timezone.utc))
-    snapshot = reserve_quota(session, user.id, datetime(2026, 9, 2, 0, 0, tzinfo=timezone.utc))
+    consume_quota(session, user.id, datetime(2026, 9, 1, 23, 59, tzinfo=timezone.utc))
+    snapshot = consume_quota(session, user.id, datetime(2026, 9, 2, 0, 0, tzinfo=timezone.utc))
     assert snapshot.remaining == 2
     assert snapshot.reset_at == datetime(2026, 9, 3, tzinfo=timezone.utc)
 
@@ -64,7 +69,7 @@ def test_utc_day_creates_a_fresh_quota(session, user):
 def test_status_preserves_cooldown_across_utc_midnight(session, user):
     previous = datetime(2026, 9, 1, 23, 59, 50, tzinfo=timezone.utc)
     midnight = datetime(2026, 9, 2, 0, 0, tzinfo=timezone.utc)
-    reserve_quota(session, user.id, previous)
+    consume_quota(session, user.id, previous)
 
     snapshot = get_quota_status(session, user.id, midnight)
 
@@ -76,10 +81,10 @@ def test_status_preserves_cooldown_across_utc_midnight(session, user):
 def test_cross_midnight_cooldown_denies_until_sixty_seconds(session, user):
     previous = datetime(2026, 9, 1, 23, 59, 50, tzinfo=timezone.utc)
     midnight = datetime(2026, 9, 2, 0, 0, tzinfo=timezone.utc)
-    reserve_quota(session, user.id, previous)
+    consume_quota(session, user.id, previous)
 
     with pytest.raises(QuotaDenied) as exc:
-        reserve_quota(session, user.id, midnight)
+        consume_quota(session, user.id, midnight)
 
     assert exc.value.code == "ai_recommendation_cooldown"
     assert exc.value.snapshot.remaining == 3
@@ -87,7 +92,7 @@ def test_cross_midnight_cooldown_denies_until_sixty_seconds(session, user):
         2026, 9, 2, 0, 0, 50, tzinfo=timezone.utc
     )
 
-    snapshot = reserve_quota(session, user.id, previous + timedelta(seconds=60))
+    snapshot = consume_quota(session, user.id, previous + timedelta(seconds=60))
     assert snapshot.remaining == 2
     assert snapshot.cooldown_until == datetime(
         2026, 9, 2, 0, 1, 50, tzinfo=timezone.utc
@@ -103,6 +108,15 @@ def test_initial_status_does_not_persist_a_quota_row(session, user):
     assert snapshot.remaining == 3
     assert snapshot.cooldown_until is None
     assert snapshot.reset_at == datetime(2026, 9, 2, tzinfo=timezone.utc)
+    assert session.get(AIRecommendationQuota, (user.id, now.date())) is None
+
+
+def test_availability_check_does_not_persist_or_consume_quota(session, user):
+    now = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
+
+    snapshot = check_quota_available(session, user.id, now)
+
+    assert snapshot.remaining == 3
     assert session.get(AIRecommendationQuota, (user.id, now.date())) is None
 
 
@@ -126,10 +140,11 @@ def test_status_clamps_remaining_and_omits_expired_cooldown(session, user):
 
 def test_naive_datetime_is_rejected(session, user):
     with pytest.raises(ValueError, match="timezone-aware"):
-        reserve_quota(session, user.id, datetime(2026, 9, 1, 8, 0))
+        consume_quota(session, user.id, datetime(2026, 9, 1, 8, 0))
 
 
-def test_reservation_locks_the_user_row_for_postgresql(session, user, monkeypatch):
+@pytest.mark.parametrize("operation", [check_quota_available, consume_quota])
+def test_quota_operations_lock_the_user_row_for_postgresql(session, user, monkeypatch, operation):
     compiled_lock_queries = []
     original_with_for_update = Query.with_for_update
 
@@ -147,7 +162,7 @@ def test_reservation_locks_the_user_row_for_postgresql(session, user, monkeypatc
 
     monkeypatch.setattr(Query, "with_for_update", capture_for_update)
 
-    reserve_quota(
+    operation(
         session,
         user.id,
         datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc),
@@ -158,9 +173,9 @@ def test_reservation_locks_the_user_row_for_postgresql(session, user, monkeypatc
     assert compiled_lock_queries[0].endswith("FOR UPDATE")
 
 
-def test_reservation_refreshes_a_cached_quota_after_locking(session, user):
+def test_consumption_refreshes_a_cached_quota_after_locking(session, user):
     start = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
-    reserve_quota(session, user.id, start)
+    consume_quota(session, user.id, start)
     cached = session.get(AIRecommendationQuota, (user.id, start.date()))
     assert cached.attempt_count == 1
 
@@ -170,7 +185,7 @@ def test_reservation_refreshes_a_cached_quota_after_locking(session, user):
         latest.last_attempt_at = start + timedelta(seconds=60)
         concurrent.commit()
 
-    snapshot = reserve_quota(session, user.id, start + timedelta(seconds=120))
+    snapshot = consume_quota(session, user.id, start + timedelta(seconds=120))
 
     assert snapshot.remaining == 0
     session.expire_all()
@@ -179,7 +194,7 @@ def test_reservation_refreshes_a_cached_quota_after_locking(session, user):
 
 def test_status_refreshes_a_cached_quota(session, user):
     start = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
-    reserve_quota(session, user.id, start)
+    consume_quota(session, user.id, start)
     cached = session.get(AIRecommendationQuota, (user.id, start.date()))
     assert cached.attempt_count == 1
 
