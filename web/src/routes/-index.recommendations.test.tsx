@@ -267,6 +267,16 @@ describe("Home recommendations", () => {
     await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("US", 13));
   });
 
+  it("does not show the friends panel in Price drops", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    api.getDeals.mockResolvedValue({ results: [{ id: 1, name: "Deal" }] });
+
+    renderHome();
+
+    await screen.findByText("Deal");
+    expect(screen.queryByText("Sign in to see friends")).not.toBeInTheDocument();
+  });
+
   it("uses the catalog hero image for the Project Zomboid price-drop card", async () => {
     api.getAuthSnapshot.mockReturnValue(false);
     api.getDeals.mockResolvedValue({

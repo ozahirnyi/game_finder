@@ -424,7 +424,7 @@ def test_homepage_deals_enriches_and_normalizes_payload(api_client, app_main, mo
     response = api_client.get("/prices/deals", params={"country": "ua", "page_size": 1})
 
     assert response.status_code == 200
-    assert cached.await_args.args[0].startswith("steam_store_deals_v2:")
+    assert cached.await_args.args[0].startswith("steam_store_deals_v3:")
     assert response.json()["results"][0]["id"] == 42
     assert response.json()["results"][0]["hero_image"] == "https://images.test/wide.jpg"
     igdb.assert_awaited_once_with(108600)
