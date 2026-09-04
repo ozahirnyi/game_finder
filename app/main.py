@@ -3715,11 +3715,9 @@ async def recommendations(
         })) from exc
     generated = await asyncio.to_thread(get_recommendation, data.prompt, data.liked_game_ids)
 
-    async def cached_search(title: str):
-        key = build_cache_key("recommendation_catalog_search", q=title)
-        return await get_json_cached(key, CACHE_TTL, lambda: fetch_igdb_games(title, page=1))
-
-    enriched = await enrich_recommendations(generated.get("recommendations", []), cached_search)
+    enriched = await enrich_recommendations(
+        generated.get("recommendations", []), fetch_igdb_games_batch
+    )
     if any(item.get("game") is not None for item in enriched):
         try:
             quota = consume_quota(db, current_user.id)
