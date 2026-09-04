@@ -39,11 +39,38 @@ def get_quota_status(
     return _snapshot(row, current, _latest_attempt_at(db, user_id))
 
 
-def reserve_quota(
+def check_quota_available(
     db: Session, user_id: uuid.UUID, now: datetime | None = None
 ) -> QuotaSnapshot:
     current = _utc(now)
-    db.query(User.id).filter(User.id == user_id).with_for_update().one()
+    _lock_user(db, user_id)
+    row = db.get(
+        AIRecommendationQuota,
+        (user_id, current.date()),
+        populate_existing=True,
+    )
+    snapshot = _snapshot(row, current, _latest_attempt_at(db, user_id))
+    if row is not None and row.attempt_count >= DAILY_LIMIT:
+        db.rollback()
+        raise QuotaDenied(
+            "ai_daily_quota_exhausted", "Daily AI search limit reached.", snapshot
+        )
+    if snapshot.cooldown_until and current < snapshot.cooldown_until:
+        db.rollback()
+        raise QuotaDenied(
+            "ai_recommendation_cooldown",
+            "Please wait before searching again.",
+            snapshot,
+        )
+    db.rollback()
+    return snapshot
+
+
+def consume_quota(
+    db: Session, user_id: uuid.UUID, now: datetime | None = None
+) -> QuotaSnapshot:
+    current = _utc(now)
+    _lock_user(db, user_id)
     row = db.get(
         AIRecommendationQuota,
         (user_id, current.date()),
@@ -70,6 +97,16 @@ def reserve_quota(
     row.last_attempt_at = current
     db.commit()
     return _snapshot(row, current, current)
+
+
+def reserve_quota(
+    db: Session, user_id: uuid.UUID, now: datetime | None = None
+) -> QuotaSnapshot:
+    return consume_quota(db, user_id, now)
+
+
+def _lock_user(db: Session, user_id: uuid.UUID) -> None:
+    db.query(User.id).filter(User.id == user_id).with_for_update().one()
 
 
 def _utc(value: datetime | None) -> datetime:
