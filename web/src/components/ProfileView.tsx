@@ -71,6 +71,7 @@ export type ProfileData = {
   activity?: { id: number | string; text: string; time: string }[];
   sharedLibrary?: SharedLibrary;
   friendId?: string;
+  steamProfileUrl?: string;
   settings?: {
     displayName: string;
     bio: string;
@@ -255,6 +256,17 @@ export function ProfileView({
             </>
           ) : (
             <>
+              {profile.steamProfileUrl && (
+                <a
+                  href={profile.steamProfileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open Steam profile"
+                  className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold transition hover:border-primary/50"
+                >
+                  Steam profile
+                </a>
+              )}
               {canAddFriend && (
                 <button
                   onClick={viewer?.onAddFriend}

@@ -2924,7 +2924,7 @@ async def steam_sign_in_callback(request: Request, state: str | None = None, db:
         if not user:
             profile = await fetch_steam_profile(steam_id)
             user = User(
-                email=steam_sign_in_email(steam_id), password_hash=None, display_name=build_display_name(db, steam_sign_in_email(steam_id)), steam_id=steam_id,
+                email=steam_sign_in_email(steam_id), password_hash=None, display_name=build_display_name(db, profile["persona_name"] or steam_sign_in_email(steam_id)), steam_id=steam_id,
                 steam_persona_name=profile["persona_name"], public_nickname=build_public_nickname(db, profile["persona_name"]), steam_avatar=profile["avatar"],
                 steam_country_code=profile["country_code"], steam_linked_at=datetime.now(timezone.utc),
             )

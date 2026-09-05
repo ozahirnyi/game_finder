@@ -64,6 +64,22 @@ const renderProfile = (isSelf: boolean) =>
   );
 
 describe("ProfileView library visibility", () => {
+  it("links a friend's connected Steam profile", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{ ...profile, steamProfileUrl: "https://steamcommunity.com/profiles/765" }}
+          isSelf={false}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Open Steam profile" })).toHaveAttribute(
+      "href",
+      "https://steamcommunity.com/profiles/765",
+    );
+  });
+
   it("shows only Add friend for an eligible stranger", () => {
     const onAddFriend = vi.fn();
 
