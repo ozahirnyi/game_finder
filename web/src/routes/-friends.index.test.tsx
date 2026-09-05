@@ -22,6 +22,7 @@ const api = vi.hoisted(() => ({
   },
   acceptFriendRequest: vi.fn(),
   createFriendRequest: vi.fn(),
+  createSocialFriendRequest: vi.fn(),
   getFriends: vi.fn(),
   getGameInvites: vi.fn(),
   getFriendActivity: vi.fn(),
@@ -107,6 +108,7 @@ describe("FriendsPage", () => {
     });
     api.searchUsers.mockResolvedValue([{ id: "player-1", display_name: "Sam" }]);
     api.createFriendRequest.mockResolvedValue({ id: "request-1" });
+    api.createSocialFriendRequest.mockResolvedValue({ id: "request-1" });
     api.acceptFriendRequest.mockResolvedValue({ user: { id: "player-1", display_name: "Sam" } });
   });
 
@@ -386,6 +388,31 @@ describe("FriendsPage", () => {
       "href",
       "https://steamcommunity.com/profiles/765",
     );
+  });
+
+  it("lets a registered Steam friend be added on Playfinder", async () => {
+    api.getSteamSocial.mockResolvedValue({
+      friends: [
+        {
+          steam_id: "765",
+          public_id: "steam-sam",
+          persona_name: "Steam Sam",
+          taste_match_percent: 67,
+          common_games_count: 3,
+          library_public: true,
+        },
+      ],
+      friends_total: 1,
+      friends_has_more: false,
+      top_friend_games: [],
+    });
+    renderFriends();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Steam friends" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add Steam Sam on Playfinder" }));
+
+    await waitFor(() => expect(api.createSocialFriendRequest).toHaveBeenCalledWith("steam-sam"));
+    expect(await screen.findByText("Friend request sent to Steam Sam")).toBeInTheDocument();
   });
 
   it("loads the next page of Steam friends", async () => {

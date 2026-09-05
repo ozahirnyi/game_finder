@@ -10,6 +10,7 @@ import {
   acceptFriendRequest,
   ApiError,
   createFriendRequest,
+  createSocialFriendRequest,
   getConversations,
   getFriendSocialSummary,
   getGameInvites,
@@ -85,6 +86,11 @@ function FriendsPage() {
       setStatus("Request sent");
       setSearchTerm("");
     },
+  });
+  const steamRequestMutation = useMutation({
+    mutationFn: ({ publicId }: { publicId: string; name: string }) =>
+      createSocialFriendRequest(publicId),
+    onSuccess: (_, { name }) => setStatus(`Friend request sent to ${name}`),
   });
   const acceptMutation = useMutation({
     mutationFn: (id: string) => acceptFriendRequest(id),
@@ -393,32 +399,51 @@ function FriendsPage() {
               {steamFriends.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {visibleSteamFriends.map((friend) => (
-                    <a
+                    <div
                       key={friend.steam_id}
-                      href={`https://steamcommunity.com/profiles/${friend.steam_id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={friend.persona_name ?? "Steam friend"}
                       className="hover-lift flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
                     >
-                      <Avatar
-                        from="#2563eb"
-                        to="#111827"
-                        name={friend.persona_name ?? "Steam friend"}
-                        image={friend.avatar ?? undefined}
-                        className="size-12 rounded-full"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate font-bold">
-                          {friend.persona_name ?? "Steam friend"}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {friend.library_public
-                            ? `${friend.taste_match_percent}% match · ${friend.common_games_count} shared`
-                            : "Library is private"}
-                        </p>
-                      </div>
-                    </a>
+                      <a
+                        href={`https://steamcommunity.com/profiles/${friend.steam_id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={friend.persona_name ?? "Steam friend"}
+                        className="flex min-w-0 flex-1 items-center gap-3"
+                      >
+                        <Avatar
+                          from="#2563eb"
+                          to="#111827"
+                          name={friend.persona_name ?? "Steam friend"}
+                          image={friend.avatar ?? undefined}
+                          className="size-12 rounded-full"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate font-bold">
+                            {friend.persona_name ?? "Steam friend"}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {friend.library_public
+                              ? `${friend.taste_match_percent}% match · ${friend.common_games_count} shared`
+                              : "Library is private"}
+                          </p>
+                        </div>
+                      </a>
+                      {friend.public_id && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            steamRequestMutation.mutate({
+                              publicId: friend.public_id!,
+                              name: friend.persona_name ?? "Steam friend",
+                            })
+                          }
+                          disabled={steamRequestMutation.isPending}
+                          className="shrink-0 rounded-md border border-primary px-3 py-1.5 text-xs font-bold text-primary"
+                        >
+                          Add {friend.persona_name ?? "Steam friend"} on Playfinder
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               ) : (

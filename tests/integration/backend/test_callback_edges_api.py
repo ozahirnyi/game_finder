@@ -142,6 +142,7 @@ def test_steam_sign_in_callback_creates_user_and_exchange_result(api_client, app
 
     assert response.status_code == 303 and "exchange_code=steam-result" in location(response)
     user = db_session.query(User).filter_by(steam_id="76561198000000001").one()
+    assert user.display_name == "steam-player"
     assert user.steam_persona_name == "Steam Player"
     assert db_session.query(OAuthAuthorizationTransaction).filter_by(exchange_code="steam-result", result_user_id=user.id).count() == 1
 

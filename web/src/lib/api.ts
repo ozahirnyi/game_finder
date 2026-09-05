@@ -329,6 +329,7 @@ export type SteamLibrarySync = SteamAccount & {
 };
 export type SteamSocialFriend = {
   steam_id: string;
+  public_id?: string | null;
   persona_name?: string | null;
   avatar?: string | null;
   library_public: boolean;

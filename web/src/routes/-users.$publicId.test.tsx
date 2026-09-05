@@ -112,6 +112,15 @@ describe("PublicProfilePage", () => {
     expect(screen.queryByRole("button", { name: "Add friend" })).not.toBeInTheDocument();
   });
 
+  it("renders a legacy public profile that has no Steam block", async () => {
+    const legacyProfile = { ...publicProfile("none"), steam: undefined };
+    api.getPublicProfile.mockResolvedValue(legacyProfile);
+
+    renderProfile();
+
+    expect(await screen.findByRole("heading", { name: "ProfileView" })).toBeInTheDocument();
+  });
+
   it("keeps settings available on the owner profile", async () => {
     api.getPublicProfile.mockResolvedValue(publicProfile("self"));
     renderProfile();
