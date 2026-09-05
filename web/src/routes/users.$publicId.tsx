@@ -97,7 +97,7 @@ function PublicProfilePage() {
     friendId: friend?.id,
     sharedLibrary: sharedQuery.data,
     steamProfileUrl:
-      publicProfile.steam.status === "ready"
+      publicProfile.steam?.status === "ready"
         ? (publicProfile.steam.data?.profile_url ?? undefined)
         : undefined,
     favorites: isSelf ? publicProfile.favorites.data : undefined,
