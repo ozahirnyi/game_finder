@@ -1,17 +1,21 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCatalogGame, getGamePriceHistory, getHomepageDeals, getTrendingGames, getUpcomingGames, searchGames } from "@/lib/api";
 import { DealsScreen } from "./DealsScreen";
 import { DiscoveryScreen } from "./DiscoveryScreen";
 import { GameDetailScreen } from "./GameDetailScreen";
 import { SearchScreen } from "./SearchScreen";
-import SearchPage from "@/app/search/page";
 
-const navigationState = vi.hoisted(() => ({ params: new URLSearchParams() }));
-
-vi.mock("next/navigation", () => ({
-  useSearchParams: () => navigationState.params,
-}));
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  return {
+    ...actual,
+    Link: ({ children, params, to, ...props }: { children: ReactNode; params?: { gameId?: string }; to: string }) => (
+      <a {...props} href={to.replace("$gameId", params?.gameId ?? "$gameId")}>{children}</a>
+    ),
+  };
+});
 
 vi.mock("@/lib/api", () => ({
   getCatalogGame: vi.fn(),
@@ -92,15 +96,19 @@ describe("discovery API regions", () => {
     expect(getGamePriceHistory).toHaveBeenCalledTimes(priceCalls);
   });
 
-  it("updates search results when App Router query params change", async () => {
-    navigationState.params = new URLSearchParams("q=hades");
+  it("updates search results when its active route query changes", async () => {
     vi.mocked(searchGames).mockResolvedValue({ results: [{ id: 1, name: "Hades II", released: null, background_image: null }] });
-    const view = render(<SearchPage />);
+    const view = render(<SearchScreen initialQuery="hades" />);
     expect(await screen.findByRole("heading", { name: "Hades II" })).toBeVisible();
-    navigationState.params = new URLSearchParams("q=celeste");
     vi.mocked(searchGames).mockResolvedValue({ results: [{ id: 2, name: "Celeste", released: null, background_image: null }] });
-    view.rerender(<SearchPage />);
+    view.rerender(<SearchScreen initialQuery="celeste" />);
     expect(await screen.findByRole("heading", { name: "Celeste" })).toBeVisible();
     expect(searchGames).toHaveBeenLastCalledWith("celeste");
+  });
+
+  it("uses a concrete catalog URL for a game card", async () => {
+    vi.mocked(getTrendingGames).mockResolvedValue({ results: [{ id: 3498, name: "GameFinder", released: null, background_image: null }] });
+    render(<DiscoveryScreen />);
+    expect(await screen.findByRole("link", { name: "View details" })).toHaveAttribute("href", "/games/3498");
   });
 });

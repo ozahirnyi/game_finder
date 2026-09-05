@@ -39,6 +39,7 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     email: str
+    display_name: str
     created_at: datetime
     google_linked: bool = False
 
@@ -46,6 +47,36 @@ class UserRead(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+
+
+class FriendRequestCreate(BaseModel):
+    recipient_id: uuid.UUID
+
+
+class SocialUserRead(BaseModel):
+    id: uuid.UUID
+    display_name: str
+    avatar: str | None = None
+    steam_profile_url: str | None = None
+    steam_add_url: str | None = None
+
+
+class FriendRequestRead(BaseModel):
+    id: uuid.UUID
+    sender: SocialUserRead
+    recipient: SocialUserRead
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class SocialSnapshotRead(BaseModel):
+    me: SocialUserRead
+    friends: list[SocialUserRead] = Field(default_factory=list)
+    incoming_requests: list[FriendRequestRead] = Field(default_factory=list)
+    outgoing_requests: list[FriendRequestRead] = Field(default_factory=list)
+    steam_suggestions: list[SocialUserRead] = Field(default_factory=list)
+    steam_suggestions_error: str | None = None
 
 
 class GoogleStatusRead(BaseModel):

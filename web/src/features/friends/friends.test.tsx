@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FriendsScreen } from "./FriendsScreen";
-import { ApiError, getSteamSocial, isAuthenticated } from "@/lib/api";
+import { acceptFriendRequest, ApiError, declineFriendRequest, getSocialSnapshot, getSteamSocial, isAuthenticated, sendFriendRequest } from "@/lib/api";
 
 const api = vi.hoisted(() => {
   class MockApiError extends Error {
@@ -14,10 +14,13 @@ const api = vi.hoisted(() => {
     }
   }
 
-  return { ApiError: MockApiError, getSteamSocial: vi.fn(), isAuthenticated: vi.fn() };
+  return { ApiError: MockApiError, acceptFriendRequest: vi.fn(), declineFriendRequest: vi.fn(), getSocialSnapshot: vi.fn(), getSteamSocial: vi.fn(), isAuthenticated: vi.fn(), sendFriendRequest: vi.fn() };
 });
 
 vi.mock("@/lib/api", () => api);
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => <a {...props} href={to}>{children}</a>,
+}));
 
 const linkedSteam = {
   linked: true,
@@ -45,6 +48,10 @@ describe("FriendsScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(isAuthenticated).mockReturnValue(true);
+    vi.mocked(getSocialSnapshot).mockResolvedValue({
+      me: { id: "me", display_name: "Me", avatar: null, steam_profile_url: null, steam_add_url: null },
+      friends: [], incoming_requests: [], outgoing_requests: [], steam_suggestions: [], steam_suggestions_error: null,
+    });
   });
 
   it("renders Steam friend results from the social endpoint", async () => {
@@ -57,6 +64,44 @@ describe("FriendsScreen", () => {
     expect(screen.getByText("75% taste match")).toBeVisible();
     expect(screen.getByText("Deep Rock Galactic")).toBeVisible();
     expect(screen.getByRole("img", { name: "Alex's Steam avatar" })).toHaveAttribute("src", friend.avatar);
+  });
+
+  it("renders GameFinder relationships and replaces its social snapshot after actions", async () => {
+    const accepted = { id: "friend-1", display_name: "Alex", avatar: null, steam_profile_url: "https://steamcommunity.com/profiles/765", steam_add_url: "https://steamcommunity.com/profiles/765/friends/add" };
+    vi.mocked(getSocialSnapshot).mockResolvedValue({
+      me: { id: "me", display_name: "Me", avatar: null, steam_profile_url: null, steam_add_url: null },
+      friends: [accepted],
+      incoming_requests: [{ id: "request-1", sender: { id: "sender-1", display_name: "Sam", avatar: null, steam_profile_url: null, steam_add_url: null } }],
+      outgoing_requests: [],
+      steam_suggestions: [{ id: "suggestion-1", display_name: "Taylor", avatar: null, steam_profile_url: null, steam_add_url: null }],
+      steam_suggestions_error: null,
+    });
+    vi.mocked(acceptFriendRequest).mockResolvedValue({ me: { id: "me", display_name: "Me", avatar: null, steam_profile_url: null, steam_add_url: null }, friends: [accepted], incoming_requests: [], outgoing_requests: [], steam_suggestions: [{ id: "suggestion-1", display_name: "Taylor", avatar: null, steam_profile_url: null, steam_add_url: null }], steam_suggestions_error: null });
+    vi.mocked(sendFriendRequest).mockResolvedValue({ me: { id: "me", display_name: "Me", avatar: null, steam_profile_url: null, steam_add_url: null }, friends: [accepted], incoming_requests: [], outgoing_requests: [], steam_suggestions: [], steam_suggestions_error: null });
+
+    render(<FriendsScreen />);
+
+    expect(await screen.findByRole("heading", { name: "Incoming friend requests" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "My GameFinder friends" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Friends from Steam on GameFinder" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open Steam profile" })).toHaveAttribute("href", accepted.steam_profile_url);
+    expect(screen.getByRole("link", { name: "Open Steam profile" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("link", { name: "Add on Steam" })).toHaveAttribute("href", accepted.steam_add_url);
+    expect(screen.getByRole("link", { name: "Add on Steam" })).toHaveAttribute("rel", "noopener noreferrer");
+    fireEvent.click(screen.getByRole("button", { name: "Accept Sam" }));
+    await waitFor(() => expect(acceptFriendRequest).toHaveBeenCalledWith("request-1"));
+    expect(screen.queryByText("Sam")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add friend: Taylor" }));
+    await waitFor(() => expect(sendFriendRequest).toHaveBeenCalledWith("suggestion-1"));
+  });
+
+  it("keeps existing friends visible when a friend action fails", async () => {
+    vi.mocked(getSocialSnapshot).mockResolvedValue({ me: { id: "me", display_name: "Me", avatar: null, steam_profile_url: null, steam_add_url: null }, friends: [], incoming_requests: [], outgoing_requests: [], steam_suggestions: [{ id: "suggestion-1", display_name: "Taylor", avatar: null, steam_profile_url: null, steam_add_url: null }], steam_suggestions_error: null });
+    vi.mocked(sendFriendRequest).mockRejectedValue(new Error("Request unavailable"));
+    render(<FriendsScreen />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add friend: Taylor" }));
+    expect(await screen.findByText("Request unavailable")).toBeVisible();
+    expect(screen.getByText("Taylor")).toBeVisible();
   });
 
   it("shows the Steam connect state for the backend's unlinked-account response", async () => {

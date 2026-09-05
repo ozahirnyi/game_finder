@@ -26,11 +26,11 @@ from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_search
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, engine, wait_for_db
+from app.database import FriendRequest, Friendship, get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest
+    FriendRequestCreate, FriendRequestRead, HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, SocialSnapshotRead, SocialUserRead
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -132,7 +132,112 @@ def steam_account_response(user: User) -> SteamAccountRead:
 def user_response(user: User, google_linked: bool | None = None, db: Session | None = None) -> UserRead:
     if google_linked is None:
         google_linked = bool(db and db.query(OAuthIdentity).filter(OAuthIdentity.user_id == user.id, OAuthIdentity.provider == "google").first())
-    return UserRead(id=user.id, email=user.email, created_at=user.created_at, google_linked=google_linked)
+    display_name = (user.steam_persona_name or "").strip() or "GameFinder player"
+    return UserRead(id=user.id, email=user.email, display_name=display_name, created_at=user.created_at, google_linked=google_linked)
+
+
+def social_user_response(user: User) -> SocialUserRead:
+    steam_id = (getattr(user, "steam_id", None) or "").strip()
+    persona_name = (getattr(user, "steam_persona_name", None) or "").strip()
+    steam_profile_url = f"https://steamcommunity.com/profiles/{steam_id}" if steam_id else None
+    return SocialUserRead(
+        id=user.id,
+        display_name=persona_name or "GameFinder player",
+        avatar=getattr(user, "steam_avatar", None),
+        steam_profile_url=steam_profile_url,
+        steam_add_url=f"{steam_profile_url}/friends/add" if steam_profile_url else None,
+    )
+
+
+def friendship_pair(first_user_id: uuid.UUID, second_user_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
+    return (first_user_id, second_user_id) if first_user_id.int < second_user_id.int else (second_user_id, first_user_id)
+
+
+def friend_request_response(db: Session, request: FriendRequest) -> FriendRequestRead:
+    sender = db.get(User, request.sender_id)
+    recipient = db.get(User, request.recipient_id)
+    if not sender or not recipient:
+        raise HTTPException(status_code=404, detail="Social user not found")
+    return FriendRequestRead(
+        id=request.id,
+        sender=social_user_response(sender),
+        recipient=social_user_response(recipient),
+        status=request.status,
+        created_at=request.created_at,
+        updated_at=request.updated_at,
+    )
+
+
+def social_snapshot_response(
+    db: Session,
+    current_user: User,
+    steam_suggestions: list[SocialUserRead] | None = None,
+    steam_suggestions_error: str | None = None,
+) -> SocialSnapshotRead:
+    friendships = [
+        *db.query(Friendship).filter_by(user_low_id=current_user.id).all(),
+        *db.query(Friendship).filter_by(user_high_id=current_user.id).all(),
+    ]
+    friend_ids = [
+        friendship.user_high_id if friendship.user_low_id == current_user.id else friendship.user_low_id
+        for friendship in friendships
+    ]
+    friends = [social_user_response(friend) for friend_id in friend_ids if (friend := db.get(User, friend_id))]
+    incoming_requests = db.query(FriendRequest).filter_by(recipient_id=current_user.id, status="pending").all()
+    outgoing_requests = db.query(FriendRequest).filter_by(sender_id=current_user.id, status="pending").all()
+    return SocialSnapshotRead(
+        me=social_user_response(current_user),
+        friends=friends,
+        incoming_requests=[friend_request_response(db, request) for request in incoming_requests],
+        outgoing_requests=[friend_request_response(db, request) for request in outgoing_requests],
+        steam_suggestions=steam_suggestions or [],
+        steam_suggestions_error=steam_suggestions_error,
+    )
+
+
+async def steam_suggestions_response(db: Session, current_user: User) -> tuple[list[SocialUserRead], str | None]:
+    if not current_user.steam_id:
+        return [], None
+    try:
+        steam_friends = await fetch_steam_friends(current_user.steam_id, limit=50)
+    except HTTPException as exc:
+        return [], str(exc.detail)
+    except Exception:
+        return [], "Steam friends are unavailable right now"
+
+    steam_ids = {str(friend.get("steam_id")) for friend in steam_friends if friend.get("steam_id")}
+    if not steam_ids:
+        return [], None
+    friendships = [
+        *db.query(Friendship).filter_by(user_low_id=current_user.id).all(),
+        *db.query(Friendship).filter_by(user_high_id=current_user.id).all(),
+    ]
+    friend_ids = {
+        friendship.user_high_id if friendship.user_low_id == current_user.id else friendship.user_low_id
+        for friendship in friendships
+    }
+    pending_requests = db.query(FriendRequest).filter(
+        FriendRequest.status == "pending",
+        (FriendRequest.sender_id == current_user.id) | (FriendRequest.recipient_id == current_user.id),
+    ).all()
+    excluded_ids = friend_ids | {current_user.id}
+    for request in pending_requests:
+        excluded_ids.add(request.recipient_id if request.sender_id == current_user.id else request.sender_id)
+    candidates = db.query(User).filter(User.steam_id.in_(steam_ids)).all()
+    return [social_user_response(user) for user in candidates if user.id not in excluded_ids], None
+
+
+async def current_social_snapshot(db: Session, current_user: User) -> SocialSnapshotRead:
+    suggestions, error = await steam_suggestions_response(db, current_user)
+    return social_snapshot_response(db, current_user, suggestions, error)
+
+
+def commit_social_mutation(db: Session) -> None:
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def google_frontend_redirect(**params: str) -> RedirectResponse:
@@ -359,6 +464,96 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 @app.get("/auth/me", response_model=UserRead)
 def current_user_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return user_response(current_user, db=db)
+
+
+@app.get("/social/me", response_model=SocialSnapshotRead)
+async def social_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return await current_social_snapshot(db, current_user)
+
+
+@app.post("/social/friend-requests", response_model=SocialSnapshotRead, status_code=201)
+async def create_friend_request(
+    payload: FriendRequestCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if payload.recipient_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot send a friend request to yourself")
+    recipient = db.get(User, payload.recipient_id)
+    if not recipient:
+        raise HTTPException(status_code=404, detail="Recipient not found")
+    low_user_id, high_user_id = friendship_pair(current_user.id, payload.recipient_id)
+    if db.query(Friendship).filter_by(user_low_id=low_user_id, user_high_id=high_user_id).first():
+        raise HTTPException(status_code=409, detail="Users are already friends")
+    existing_outgoing = db.query(FriendRequest).filter_by(
+        sender_id=current_user.id,
+        recipient_id=payload.recipient_id,
+        status="pending",
+    ).first()
+    existing_incoming = db.query(FriendRequest).filter_by(
+        sender_id=payload.recipient_id,
+        recipient_id=current_user.id,
+        status="pending",
+    ).first()
+    if existing_outgoing or existing_incoming:
+        raise HTTPException(status_code=409, detail="Friend request already exists")
+    now = datetime.now(timezone.utc)
+    db.add(FriendRequest(
+        id=uuid.uuid4(),
+        sender_id=current_user.id,
+        recipient_id=payload.recipient_id,
+        status="pending",
+        created_at=now,
+        updated_at=now,
+    ))
+    commit_social_mutation(db)
+    return await current_social_snapshot(db, current_user)
+
+
+async def update_friend_request(
+    request_id: uuid.UUID,
+    status: str,
+    current_user: User,
+    db: Session,
+) -> SocialSnapshotRead:
+    request = db.get(FriendRequest, request_id)
+    if not request:
+        raise HTTPException(status_code=404, detail="Friend request not found")
+    if request.recipient_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the request recipient can respond")
+    if request.status != "pending":
+        raise HTTPException(status_code=409, detail="Friend request is no longer pending")
+    request.status = status
+    request.updated_at = datetime.now(timezone.utc)
+    if status == "accepted":
+        low_user_id, high_user_id = friendship_pair(request.sender_id, request.recipient_id)
+        if not db.query(Friendship).filter_by(user_low_id=low_user_id, user_high_id=high_user_id).first():
+            db.add(Friendship(
+                id=uuid.uuid4(),
+                user_low_id=low_user_id,
+                user_high_id=high_user_id,
+                created_at=request.updated_at,
+            ))
+    commit_social_mutation(db)
+    return await current_social_snapshot(db, current_user)
+
+
+@app.post("/social/friend-requests/{request_id}/accept", response_model=SocialSnapshotRead)
+async def accept_friend_request(
+    request_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await update_friend_request(request_id, "accepted", current_user, db)
+
+
+@app.post("/social/friend-requests/{request_id}/decline", response_model=SocialSnapshotRead)
+async def decline_friend_request(
+    request_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await update_friend_request(request_id, "declined", current_user, db)
 
 
 def create_google_transaction(db: Session, mode: str, user_id: uuid.UUID | None = None) -> OAuthLoginUrl:

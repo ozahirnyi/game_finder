@@ -1,12 +1,13 @@
 type Props = {
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
   title: string;
+  src?: string | null;
   className?: string;
   compact?: boolean;
 };
 
-export function GameCover({ from, to, title, className = "", compact = false }: Props) {
+export function GameCover({ from = "#312e81", to = "#0f172a", title, src, className = "", compact = false }: Props) {
   const initials = title
     .split(/\s|:/)
     .filter(Boolean)
@@ -15,11 +16,14 @@ export function GameCover({ from, to, title, className = "", compact = false }: 
     .join("");
   return (
     <div
+      aria-label={!src ? `${title} cover unavailable` : undefined}
+      role={!src ? "img" : undefined}
       className={`relative overflow-hidden ${className}`}
       style={{
         background: `radial-gradient(120% 90% at 15% 10%, ${from}55 0%, transparent 55%), linear-gradient(135deg, ${to} 0%, ${from}22 100%), ${to}`,
       }}
     >
+      {src ? <img src={src} alt={title} className="absolute inset-0 size-full object-cover" /> : null}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_90%,rgba(255,255,255,0.08),transparent_50%)]" />
       <div className="absolute inset-0 flex flex-col justify-between p-3">
         <span

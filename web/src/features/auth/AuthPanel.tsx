@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { FormEvent, useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
 import {
@@ -51,7 +50,7 @@ const copy = {
 };
 
 export function AuthPanel({ mode, notice }: AuthPanelProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const content = copy[mode];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -76,7 +75,7 @@ export function AuthPanel({ mode, notice }: AuthPanelProps) {
       }
       const data = await loginUser(email, password);
       setToken(data.access_token);
-      router.push("/");
+      navigate({ to: "/" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : content.error);
     } finally {
@@ -145,7 +144,7 @@ export function AuthPanel({ mode, notice }: AuthPanelProps) {
         </div>
         {googleConfiguration === "unconfigured" && <p className="muted" role="status">Google sign-in is not configured right now.</p>}
         <p className="muted auth-switch">
-          {content.prompt} <Link href={content.href}>{content.linkLabel}</Link>.
+          {content.prompt} <Link to={content.href}>{content.linkLabel}</Link>.
         </p>
       </div>
     </section>

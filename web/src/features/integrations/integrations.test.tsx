@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfileScreen } from "./ProfileScreen";
 import { PsnScreen } from "./PsnScreen";
 import { SteamScreen } from "./SteamScreen";
-import PsnPage from "@/app/psn/page";
 
 const api = vi.hoisted(() => ({
   confirmPsnImport: vi.fn(),
@@ -32,7 +31,7 @@ describe("integration screens", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth(true);
-    api.getCurrentUser.mockResolvedValue({ id: "user-1", email: "player@example.com", created_at: "2026-01-01", google_linked: false });
+    api.getCurrentUser.mockResolvedValue({ id: "user-1", email: "steam-765@steam.invalid", display_name: "Player One", created_at: "2026-01-01", google_linked: false });
     api.getGoogleStatus.mockResolvedValue({ configured: true });
     api.getTelegramAccount.mockResolvedValue({ linked: false, configured: true, username: null, linked_at: null });
     api.getSteamAccount.mockResolvedValue({ linked: false, steam_id: null, persona_name: null, avatar: null, country_code: null, linked_at: null });
@@ -69,9 +68,9 @@ describe("integration screens", () => {
     expect(screen.getByText("PlayStation import complete: 1 added, 0 updated, 0 already in your library.")).toBeVisible();
   });
 
-  it("mounts the PSN screen at the PSN route instead of the available-soon placeholder", () => {
+  it("renders the PSN sign-in state from the active screen", () => {
     mockAuth(false);
-    render(<PsnPage />);
+    render(<PsnScreen />);
     expect(screen.getByText("Sign in to import PlayStation games")).toBeVisible();
     expect(screen.queryByText("PlayStation Network imports will be available here soon.")).not.toBeInTheDocument();
   });
@@ -132,7 +131,7 @@ describe("integration screens", () => {
 
     render(<ProfileScreen />);
 
-    expect(await screen.findByRole("heading", { name: "player@example.com" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Player One" })).toBeVisible();
     expect(screen.getByText("Google is unavailable")).toBeVisible();
     expect(screen.getByText("Telegram alerts are unavailable")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Retry Google" }));
@@ -141,7 +140,7 @@ describe("integration screens", () => {
     await waitFor(() => expect(api.getTelegramAccount).toHaveBeenCalledTimes(2));
     expect(screen.queryByText("Google is unavailable")).not.toBeInTheDocument();
     expect(screen.queryByText("Telegram alerts are unavailable")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "player@example.com" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Player One" })).toBeVisible();
   });
 
   it("keeps profile and Google visible when connecting Telegram fails", async () => {
@@ -151,7 +150,7 @@ describe("integration screens", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Connect Telegram" }));
     expect(await screen.findByText("Telegram alerts are unavailable")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "player@example.com" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Player One" })).toBeVisible();
     expect(screen.getByText("Google sign-in is available.")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Retry Telegram" }));
     expect(await screen.findByRole("button", { name: "Connect Telegram" })).toBeVisible();
@@ -165,7 +164,7 @@ describe("integration screens", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Send test" }));
     expect(await screen.findByText("Telegram alerts are unavailable")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "player@example.com" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Player One" })).toBeVisible();
     expect(screen.getByText("Google sign-in is available.")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Retry Telegram" }));
     expect(await screen.findByRole("button", { name: "Send test" })).toBeVisible();
@@ -179,7 +178,7 @@ describe("integration screens", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
     expect(await screen.findByText("Telegram alerts are unavailable")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "player@example.com" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Player One" })).toBeVisible();
     expect(screen.getByText("Google sign-in is available.")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Retry Telegram" }));
     expect(await screen.findByRole("button", { name: "Disconnect" })).toBeVisible();

@@ -12,6 +12,9 @@ vi.mock("@/lib/api", () => ({
   listSavedGames: vi.fn(),
   updateSavedGame: vi.fn(),
 }));
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => <a {...props} href={to}>{children}</a>,
+}));
 
 const hades = {
   id: "g1",
