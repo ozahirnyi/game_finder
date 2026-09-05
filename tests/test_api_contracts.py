@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
+import asyncio
 import uuid
 
 from fastapi.testclient import TestClient
@@ -8,6 +9,179 @@ import app.main as main
 
 
 client = TestClient(main.app)
+
+
+def test_social_friend_requests_expose_steam_profiles_and_require_authorization():
+    alice_id, bob_id, charlie_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    users = {
+        alice_id: SimpleNamespace(
+            id=alice_id,
+            email="steam-76561198000000001@steam.invalid",
+            steam_id="76561198000000001",
+            steam_persona_name="Alice on Steam",
+            steam_avatar="https://cdn.example/alice.jpg",
+        ),
+        bob_id: SimpleNamespace(
+            id=bob_id,
+            email="bob@example.com",
+            steam_id="76561198000000002",
+            steam_persona_name="Bob on Steam",
+            steam_avatar="https://cdn.example/bob.jpg",
+        ),
+        charlie_id: SimpleNamespace(
+            id=charlie_id,
+            email="charlie@example.com",
+            steam_id=None,
+            steam_persona_name=None,
+            steam_avatar=None,
+        ),
+    }
+
+    class Query:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def filter_by(self, **criteria):
+            return Query([row for row in self.rows if all(getattr(row, key) == value for key, value in criteria.items())])
+
+        def filter(self, *_criteria):
+            return self
+
+        def all(self):
+            return list(self.rows)
+
+        def first(self):
+            return self.rows[0] if self.rows else None
+
+    class Db:
+        def __init__(self):
+            self.requests = []
+            self.friendships = []
+
+        def get(self, model, identifier):
+            if model.__name__ == "User":
+                return users.get(identifier)
+            if model.__name__ == "FriendRequest":
+                return next((request for request in self.requests if request.id == identifier), None)
+            return None
+
+        def query(self, model):
+            if model.__name__ == "FriendRequest":
+                return Query(self.requests)
+            if model.__name__ == "Friendship":
+                return Query(self.friendships)
+            if model.__name__ == "User":
+                return Query(users.values())
+            raise AssertionError(f"unexpected query model: {model}")
+
+        def add(self, row):
+            (self.requests if hasattr(row, "sender_id") else self.friendships).append(row)
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            raise AssertionError("social mutations should not roll back")
+
+    db = Db()
+    current_user = {"value": users[alice_id]}
+    main.app.dependency_overrides[main.get_current_user] = lambda: current_user["value"]
+    main.app.dependency_overrides[main.get_db] = lambda: db
+
+    try:
+        snapshot = client.get("/social/me")
+        assert snapshot.status_code == 200
+        assert snapshot.json()["me"] == {
+            "id": str(alice_id),
+            "display_name": "Alice on Steam",
+            "avatar": "https://cdn.example/alice.jpg",
+            "steam_profile_url": "https://steamcommunity.com/profiles/76561198000000001",
+            "steam_add_url": "https://steamcommunity.com/profiles/76561198000000001/friends/add",
+        }
+        assert "steam-76561198000000001@steam.invalid" not in str(snapshot.json())
+        assert snapshot.json()["friends"] == []
+        assert snapshot.json()["incoming_requests"] == []
+        assert snapshot.json()["outgoing_requests"] == []
+
+        assert client.post("/social/friend-requests", json={"recipient_id": str(alice_id)}).status_code == 400
+
+        created = client.post("/social/friend-requests", json={"recipient_id": str(bob_id)})
+        assert created.status_code == 201
+        request_id = created.json()["outgoing_requests"][0]["id"]
+        assert created.json()["outgoing_requests"][0]["recipient"]["display_name"] == "Bob on Steam"
+        assert client.post("/social/friend-requests", json={"recipient_id": str(bob_id)}).status_code == 409
+
+        current_user["value"] = users[charlie_id]
+        assert client.post(f"/social/friend-requests/{request_id}/accept").status_code == 403
+
+        current_user["value"] = users[bob_id]
+        accepted = client.post(f"/social/friend-requests/{request_id}/accept")
+        assert accepted.status_code == 200
+        assert accepted.json()["friends"][0]["id"] == str(alice_id)
+        assert accepted.json()["incoming_requests"] == []
+
+        current_user["value"] = users[alice_id]
+        declined_request = client.post("/social/friend-requests", json={"recipient_id": str(charlie_id)})
+        assert declined_request.status_code == 201
+        current_user["value"] = users[charlie_id]
+        declined = client.post(f"/social/friend-requests/{declined_request.json()['outgoing_requests'][0]['id']}/decline")
+        assert declined.status_code == 200
+        assert declined.json()["incoming_requests"] == []
+    finally:
+        main.app.dependency_overrides.clear()
+
+
+def test_steam_suggestions_match_registered_contacts_and_exclude_relationships(monkeypatch):
+    viewer_id, contact_id = uuid.uuid4(), uuid.uuid4()
+    viewer = SimpleNamespace(id=viewer_id, steam_id="viewer", steam_persona_name="Viewer", steam_avatar=None)
+    contact = SimpleNamespace(id=contact_id, steam_id="registered", steam_persona_name="Registered", steam_avatar=None)
+
+    class Query:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def filter_by(self, **criteria):
+            return Query([row for row in self.rows if all(getattr(row, key) == value for key, value in criteria.items())])
+
+        def filter(self, *_criteria):
+            return self
+
+        def all(self):
+            return list(self.rows)
+
+    class Db:
+        def __init__(self):
+            self.friendships = []
+            self.requests = []
+
+        def query(self, model):
+            if model.__name__ == "Friendship":
+                return Query(self.friendships)
+            if model.__name__ == "FriendRequest":
+                return Query(self.requests)
+            if model.__name__ == "User":
+                return Query([contact])
+            raise AssertionError(model)
+
+    async def fake_steam_friends(_steam_id, limit):
+        assert limit == 50
+        return [{"steam_id": "registered"}, {"steam_id": "unregistered"}]
+
+    monkeypatch.setattr(main, "fetch_steam_friends", fake_steam_friends)
+    db = Db()
+    suggestions, error = asyncio.run(main.steam_suggestions_response(db, viewer))
+    assert error is None
+    assert [user.id for user in suggestions] == [contact_id]
+
+    db.requests = [SimpleNamespace(sender_id=viewer_id, recipient_id=contact_id, status="pending")]
+    suggestions, _ = asyncio.run(main.steam_suggestions_response(db, viewer))
+    assert suggestions == []
+
+    db.requests = []
+    low_id, high_id = main.friendship_pair(viewer_id, contact_id)
+    db.friendships = [SimpleNamespace(user_low_id=low_id, user_high_id=high_id)]
+    suggestions, _ = asyncio.run(main.steam_suggestions_response(db, viewer))
+    assert suggestions == []
 
 
 def test_search_uses_steam_results_when_rawg_times_out(monkeypatch):
