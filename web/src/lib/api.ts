@@ -1,4 +1,5 @@
-const API_URL = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
+const DEFAULT_API_URL = typeof window === "undefined" ? "http://app:8000" : "/api";
+const API_URL = (import.meta.env.VITE_API_URL ?? DEFAULT_API_URL).replace(/\/$/, "");
 const TOKEN_KEY = "game_finder_token";
 const AUTH_EVENT = "game-finder-auth";
 
