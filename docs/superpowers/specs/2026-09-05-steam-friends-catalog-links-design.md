@@ -5,15 +5,34 @@
 Make catalog game URLs usable outside the current browser tab, identify Steam
 friends who already use GameFinder, support GameFinder friend requests, and
 show a Steam user's persona instead of the technical Steam-only email address.
+Consolidate the frontend on its actual runtime, TanStack Start, and remove the
+unused Next.js-style application tree.
+
+## Frontend consolidation
+
+The deployed frontend is React, Vite, and TanStack Start/Router. `web/src/app`
+is an unmounted Next.js-style tree: Next.js is not a project dependency and the
+Vite build starts from `web/src/routes`. The frontend has one source of truth:
+
+- Active route files under `web/src/routes` render the reusable API-backed
+  screens under `web/src/features`.
+- Tests import the screens or active TanStack routes, never `src/app` pages.
+- Remove `web/src/app`, `web/next.config.ts`, `web/next-env.d.ts`, and
+  Next-specific README text only after their route behavior and test coverage
+  have been moved to the TanStack runtime.
+
+This migration is deliberately limited to the existing pages and tests. It does
+not redesign the UI or replace TanStack Start with another framework.
 
 ## Scope
 
 ### Catalog game links
 
-The Next.js frontend must use native Next links for catalog detail routes.
-Every catalog card links to `/games/<rawg-id>`, including links opened with
+TanStack route links must resolve every catalog card to `/games/<rawg-id>`.
+The active `/games/$gameId` route renders the API-backed `GameDetailScreen`,
+rather than looking up a static mock entry. Links opened with
 Ctrl/Cmd-click, copied to the clipboard, or loaded in a fresh tab. The existing
-`app/games/[id]` page remains the canonical direct-entry route.
+TanStack game route remains the canonical direct-entry route.
 
 ### Steam persona labels
 
@@ -77,6 +96,12 @@ The Friends screen loads the unified social response. It renders, in order:
 Actions update local screen state after a successful response and show a clear
 inline error without hiding existing data when an action fails.
 
+The active TanStack routes for discovery, search, game detail, Friends, profile,
+Steam, PSN, library, wishlist, authentication, and callback pages render their
+existing API-backed feature screens. The root layout remains the TanStack root
+route/AppShell. No active route imports mock game/friend data for the migrated
+screens.
+
 ## Error handling and privacy
 
 - Steam not linked: GameFinder friend lists still load; Steam suggestions and
@@ -92,8 +117,9 @@ inline error without hiding existing data when an action fails.
 - Backend contract tests cover Steam persona display labels, direct suggestion
   matching/exclusion, request lifecycle, duplicate/self/unauthorized actions,
   and Steam link fields for confirmed friends.
-- Frontend tests cover native `/games/<id>` hrefs, direct detail-page rendering,
-  persona-name profile rendering, request actions, Steam suggestions, and the
-  Steam-link visibility rules.
+- Frontend tests cover active TanStack `/games/<id>` hrefs, direct detail-page
+  rendering, persona-name profile rendering, request actions, Steam
+  suggestions, Steam-link visibility, and the absence of imports from the
+  removed `src/app` tree.
 - Run the focused backend and frontend tests, then their relevant full suites
   before delivery.
