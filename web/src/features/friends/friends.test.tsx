@@ -18,6 +18,9 @@ const api = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/api", () => api);
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => <a {...props} href={to}>{children}</a>,
+}));
 
 const linkedSteam = {
   linked: true,

@@ -82,8 +82,6 @@ export function FriendsScreen() {
           <Panel as="article" key={friend.steam_id} className="stack">
             <div>
               {friend.avatar ? (
-                // Steam provides remote avatar URLs that are not configured for Next's image optimizer.
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={friend.avatar} alt={`${friend.persona_name ?? "Steam friend"}'s Steam avatar`} width={48} height={48} />
               ) : null}
               <h2>{friend.persona_name ?? "Steam friend"}</h2>

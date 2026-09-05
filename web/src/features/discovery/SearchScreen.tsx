@@ -14,6 +14,11 @@ export function SearchScreen({ initialQuery = "" }: { initialQuery?: string }) {
   const [retry, setRetry] = useState(0);
   const [results, setResults] = useState<RemoteState<SearchGame[]> | null>(initialQuery ? { status: "loading" } : null);
   useEffect(() => {
+    setQuery(initialQuery);
+    setRequestedQuery(initialQuery);
+    setResults(initialQuery ? { status: "loading" } : null);
+  }, [initialQuery]);
+  useEffect(() => {
     if (!requestedQuery.trim()) return;
     let active = true;
     void searchGames(requestedQuery.trim()).then((data) => active && setResults({ status: "success", data: data.results })).catch(() => active && setResults({ status: "error", message: "Search is unavailable. Please try again." }));

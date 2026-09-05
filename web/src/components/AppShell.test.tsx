@@ -1,47 +1,36 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
+import { ThemeProvider } from "@/lib/theme";
 
 let pathname = "/";
-const getAuthSnapshot = vi.fn<() => boolean>();
 
-vi.mock("next/navigation", () => ({
-  usePathname: () => pathname,
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => <a {...props} href={to}>{children}</a>,
+  useRouterState: ({ select }: { select: (state: { location: { pathname: string } }) => string }) => select({ location: { pathname } }),
 }));
-
-vi.mock("@/lib/api", () => ({
-  getAuthSnapshot: () => getAuthSnapshot(),
-  subscribeToAuthChanges: () => () => undefined,
-}));
-
-function mockAuth(authenticated: boolean) {
-  getAuthSnapshot.mockReturnValue(authenticated);
-}
 
 function renderWithPath(path: string, ui: React.ReactNode) {
   pathname = path;
-  return render(ui);
+  return render(<ThemeProvider>{ui}</ThemeProvider>);
 }
 
 describe("AppShell", () => {
   beforeEach(() => {
     pathname = "/";
-    mockAuth(true);
   });
 
   it("shows all product destinations and marks the current route", () => {
     renderWithPath("/deals", <AppShell><main>Deals</main></AppShell>);
 
-    expect(screen.getByRole("link", { name: "Deals" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getAllByRole("link", { name: "Deals" }).some((link) => link.className.includes("bg-white/5"))).toBe(true);
     expect(screen.getByRole("link", { name: "Friends" })).toHaveAttribute("href", "/friends");
     expect(screen.getByRole("link", { name: "PSN" })).toHaveAttribute("href", "/psn");
   });
 
-  it("shows sign in instead of protected destinations when unauthenticated", () => {
-    mockAuth(false);
+  it("keeps product navigation available from the root app shell", () => {
     renderWithPath("/", <AppShell><main>Home</main></AppShell>);
 
-    expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Friends" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Friends" })).toHaveAttribute("href", "/friends");
   });
 });
