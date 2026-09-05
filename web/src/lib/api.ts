@@ -1,8 +1,35 @@
 export type UserRead = {
   id: string;
   email: string;
+  display_name: string;
   created_at: string;
   google_linked: boolean;
+};
+
+export type SocialUser = {
+  id: string;
+  display_name: string;
+  avatar: string | null;
+  steam_profile_url: string | null;
+  steam_add_url: string | null;
+};
+
+export type SocialFriendRequest = {
+  id: string;
+  sender: SocialUser;
+  recipient: SocialUser;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SocialSnapshot = {
+  me: SocialUser;
+  friends: SocialUser[];
+  incoming_requests: SocialFriendRequest[];
+  outgoing_requests: SocialFriendRequest[];
+  steam_suggestions: SocialUser[];
+  steam_suggestions_error: string | null;
 };
 
 export type GoogleStatus = { configured: boolean };
@@ -336,6 +363,26 @@ export function loginUser(email: string, password: string) {
 
 export function getCurrentUser() {
   return request<UserRead>("/auth/me", { auth: true });
+}
+
+export function getSocialSnapshot() {
+  return request<SocialSnapshot>("/social/me", { auth: true });
+}
+
+export function sendFriendRequest(recipientId: string) {
+  return request<SocialSnapshot>("/social/friend-requests", {
+    method: "POST",
+    auth: true,
+    body: { recipient_id: recipientId },
+  });
+}
+
+export function acceptFriendRequest(requestId: string) {
+  return request<SocialSnapshot>(`/social/friend-requests/${encodeURIComponent(requestId)}/accept`, { method: "POST", auth: true });
+}
+
+export function declineFriendRequest(requestId: string) {
+  return request<SocialSnapshot>(`/social/friend-requests/${encodeURIComponent(requestId)}/decline`, { method: "POST", auth: true });
 }
 
 export function getGoogleStatus() {
