@@ -3588,7 +3588,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
     if page_size < 1 or page_size > 13:
         raise HTTPException(status_code=400, detail="page_size must be between 1 and 13")
 
-    key = build_cache_key("steam_store_deals_v2", country=normalized_country, page_size=page_size)
+    key = build_cache_key("steam_store_deals_v3", country=normalized_country, page_size=page_size)
 
     async def fetch():
         steam_deals = await fetch_steam_store_deals(country=normalized_country, page_size=page_size)

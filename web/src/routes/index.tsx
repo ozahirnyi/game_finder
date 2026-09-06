@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Search, Tag, Users } from "lucide-react";
+import { ArrowRight, Search, Tag } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
@@ -343,32 +343,6 @@ function Home() {
                 <Stat label="Deals" value={deals.length} />
                 <Stat label="Region" value={region} />
               </div>
-            </Panel>
-            <Panel className="flex-1 p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="flex items-center gap-2 text-lg font-bold">
-                  <Users className="size-4 text-primary" /> Friends online
-                </h3>
-                <Link to="/friends" className="label-mono text-primary">
-                  All
-                </Link>
-              </div>
-              {signedIn ? (
-                <p className="text-sm text-muted-foreground">
-                  {friendsQuery.isPending
-                    ? "Your friends are loading."
-                    : friendsQuery.isError
-                      ? "Your friends are unavailable."
-                      : friendsQuery.data?.length
-                        ? `${friendsQuery.data.length} friends are connected.`
-                        : "Add friends to see shared games and activity."}
-                </p>
-              ) : (
-                <EmptyState
-                  title="Sign in to see friends"
-                  description="Your friends and their activity appear here."
-                />
-              )}
             </Panel>
           </div>
           {rest.map((deal, index) => {
