@@ -290,17 +290,14 @@ describe("FriendsPage", () => {
       "href",
       "/messages?friend=player-2",
     );
-    expect(screen.getByRole("link", { name: "View Alex's profile" })).toHaveAttribute(
-      "href",
-      "/users/alex-public",
-    );
+    expect(screen.queryByRole("link", { name: "View Alex's profile" })).not.toBeInTheDocument();
   });
 
   it("enables message and invite actions for an existing friend", async () => {
     api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
     renderFriends();
 
-    expect(await screen.findByRole("link", { name: "Message" })).toBeEnabled();
+    expect(await screen.findByRole("link", { name: "Open chat" })).toBeEnabled();
     expect(screen.getAllByRole("button", { name: "Invite to play" })[0]).toBeEnabled();
   });
 
@@ -308,8 +305,8 @@ describe("FriendsPage", () => {
     api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
     renderFriends();
 
-    await screen.findByRole("link", { name: "Message" });
-    expect(screen.queryByText("Compatibility")).not.toBeInTheDocument();
+    await screen.findByRole("link", { name: "Open chat" });
+    expect(screen.getByText("Compat")).toBeInTheDocument();
     expect(screen.queryByText("Shared: вЂ”")).not.toBeInTheDocument();
     expect(screen.queryByTitle("Messaging is coming soon")).not.toBeInTheDocument();
   });
@@ -374,12 +371,12 @@ describe("FriendsPage", () => {
     });
     renderFriends();
 
-    await screen.findByRole("button", { name: "Select Sam" });
+    await screen.findByRole("button", { name: "Select SamOnSteam" });
 
     const selectedFriendLink = screen.getByRole("link", {
       name: "Open selected friend's profile",
     });
-    expect(within(selectedFriendLink).getByRole("img", { name: "Sam" })).toHaveAttribute(
+    expect(within(selectedFriendLink).getByRole("img", { name: "SamOnSteam" })).toHaveAttribute(
       "src",
       "https://cdn.example/sam.png",
     );
