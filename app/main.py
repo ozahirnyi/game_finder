@@ -2064,20 +2064,45 @@ def friend_social_context(db: Session, current_user: User, user_id: uuid.UUID) -
 
 
 @app.get("/friends/{user_id}/social-summary", response_model=FriendSocialSummaryRead)
-def get_friend_social_summary(
+async def get_friend_social_summary(
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     friend, _ = friend_social_context(db, current_user, user_id)
+    library_visible = can_view_section(friend, current_user, friend.library_visibility, db)
+    steam_visible = library_visible and can_view_section(friend, current_user, friend.steam_visibility, db)
     own_ids = {
         (game.source, game.external_id)
         for game in db.query(Game).filter(Game.owner_id == current_user.id, Game.external_id.is_not(None), Game.external_id != "")
     }
-    friend_ids = {
-        (game.source, game.external_id)
-        for game in db.query(Game).filter(Game.owner_id == friend.id, Game.external_id.is_not(None), Game.external_id != "")
-    }
+    friend_game_query = db.query(Game).filter(
+        Game.owner_id == friend.id,
+        Game.external_id.is_not(None),
+        Game.external_id != "",
+    )
+    own_game_query = db.query(Game).filter(
+        Game.owner_id == current_user.id,
+        Game.external_id.is_not(None),
+        Game.external_id != "",
+    )
+    if not steam_visible:
+        friend_game_query = friend_game_query.filter(Game.source != "steam")
+        own_game_query = own_game_query.filter(Game.source != "steam")
+    own_ids = {(game.source, game.external_id) for game in own_game_query}
+    friend_ids = {(game.source, game.external_id) for game in friend_game_query}
+
+    if steam_visible and current_user.steam_id and friend.steam_id:
+        try:
+            own_steam_games, friend_steam_games = await asyncio.gather(
+                fetch_owned_games(current_user.steam_id),
+                fetch_owned_games(friend.steam_id),
+            )
+        except Exception:
+            pass
+        else:
+            own_ids.update(("steam", str(game["appid"])) for game in own_steam_games if game.get("appid") is not None)
+            friend_ids.update(("steam", str(game["appid"])) for game in friend_steam_games if game.get("appid") is not None)
     shared_games = len(own_ids & friend_ids)
     compatibility_percent = round(shared_games / max(1, min(len(own_ids), len(friend_ids))) * 100)
     wishlist_count = db.query(WishlistItem).filter(WishlistItem.user_id == friend.id).count() if can_view_section(friend, current_user, friend.wishlist_visibility, db) else None

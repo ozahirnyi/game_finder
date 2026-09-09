@@ -13,7 +13,6 @@ import {
   getConversations,
   getFriendSocialSummary,
   getGameInvites,
-  getSharedGames,
   respondToGameInvite,
   markNotificationRead,
   searchUsers,
@@ -129,11 +128,6 @@ function FriendsPage() {
   const selectedSummaryQuery = useQuery({
     queryKey: ["friend-social-summary", selectedId],
     queryFn: () => getFriendSocialSummary(selectedId!),
-    enabled: !!selectedId,
-  });
-  const selectedSharedGamesQuery = useQuery({
-    queryKey: ["friend-shared-games", selectedId],
-    queryFn: () => getSharedGames(selectedId!),
     enabled: !!selectedId,
   });
   const summaryValue = (value: number | null | undefined, fallback = "Private") => {
@@ -456,37 +450,6 @@ function FriendsPage() {
                     </p>
                   </div>
                 </div>
-                <section aria-label="Shared games" className="border-t border-border pt-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="label-mono text-muted-foreground">Shared games</p>
-                    {selectedSharedGamesQuery.data?.status === "ready" && (
-                      <span className="text-xs text-muted-foreground">
-                        {selectedSharedGamesQuery.data.data.length} found
-                      </span>
-                    )}
-                  </div>
-                  {selectedSharedGamesQuery.isPending && (
-                    <p className="mt-2 text-sm text-muted-foreground">Loading shared games…</p>
-                  )}
-                  {selectedSharedGamesQuery.isError && (
-                    <p className="mt-2 text-sm text-muted-foreground">Shared games unavailable.</p>
-                  )}
-                  {selectedSharedGamesQuery.data?.status === "ready" && (
-                    <ul className="mt-2 space-y-1 text-sm">
-                      {selectedSharedGamesQuery.data.data.slice(0, 5).map((game) => (
-                        <li key={`${game.source}:${game.external_id}`} className="truncate">
-                          {game.title}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {selectedSharedGamesQuery.data &&
-                    selectedSharedGamesQuery.data.status !== "ready" && (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {selectedSharedGamesQuery.data.message ?? "No shared games yet."}
-                      </p>
-                    )}
-                </section>
                 <div className="flex gap-2">
                   <button
                     onClick={() =>
