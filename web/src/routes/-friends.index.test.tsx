@@ -306,7 +306,7 @@ describe("FriendsPage", () => {
     renderFriends();
 
     await screen.findByRole("link", { name: "Open chat" });
-    expect(screen.getByText("Compat")).toBeInTheDocument();
+    expect(screen.getByText("Compatibility")).toBeInTheDocument();
     expect(screen.queryByText("Shared: вЂ”")).not.toBeInTheDocument();
     expect(screen.queryByTitle("Messaging is coming soon")).not.toBeInTheDocument();
   });
@@ -369,6 +369,11 @@ describe("FriendsPage", () => {
       compatibility_percent: 86,
       wishlist_count: 4,
     });
+    api.getSharedGames.mockResolvedValue({
+      status: "ready",
+      data: [{ source: "steam", external_id: "620", title: "Portal 2", cover_url: null }],
+      message: null,
+    });
     renderFriends();
 
     await screen.findByRole("button", { name: "Select SamOnSteam" });
@@ -385,6 +390,10 @@ describe("FriendsPage", () => {
     expect(await screen.findByText("86%")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByText("Compatibility")).toBeInTheDocument();
+    expect(screen.getAllByText("Shared games")).not.toHaveLength(0);
+    expect(await screen.findByText("Portal 2")).toBeInTheDocument();
+    expect(api.getSharedGames).toHaveBeenCalledWith("player-1");
   });
 
   it("shows unavailable rather than fabricated social-summary data", async () => {
