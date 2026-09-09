@@ -233,7 +233,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div
           className={
             pathname.startsWith("/messages")
-              ? "mx-auto min-h-[calc(100vh-4rem)] w-full max-w-none px-0 pb-20 lg:pb-0"
+              ? "mx-auto min-h-[calc(100dvh-4rem)] w-full max-w-none px-0"
               : "animate-reveal mx-auto max-w-7xl px-5 py-8 pb-28 lg:px-10 lg:py-10"
           }
         >
