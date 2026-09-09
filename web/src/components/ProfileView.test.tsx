@@ -153,6 +153,32 @@ describe("ProfileView library visibility", () => {
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
     expect(screen.getByRole("dialog", { name: /profile settings/i })).toBeInTheDocument();
   });
+
+  it("shows the persistent price region control in profile settings", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{
+            ...profile,
+            settings: {
+              displayName: "Player",
+              bio: "",
+              libraryVisibility: "public",
+              favoritesVisibility: "public",
+              wishlistVisibility: "public",
+              steamVisibility: "public",
+              platforms: [],
+              favoriteGenres: [],
+              priceCountryCode: "UA",
+            },
+          }}
+          isSelf
+        />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    expect(screen.getByLabelText("Price region")).toHaveValue("UA");
+  });
   it("shows the owner's favorites separately from the library", () => {
     render(
       <QueryClientProvider client={new QueryClient()}>

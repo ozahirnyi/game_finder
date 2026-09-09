@@ -49,6 +49,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [sidebarDealsReady, setSidebarDealsReady] = useState(false);
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
   const queryClient = useQueryClient();
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+    enabled: signedIn,
+  });
+  const priceCountry = profileQuery.data?.price_country_code ?? "US";
   const prefetchDestination = (to: (typeof nav)[number]["to"]) => {
     if (to === "/library") {
       void queryClient.prefetchQuery(libraryOverviewQueryOptions());
@@ -71,17 +77,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => scheduleIdle(() => setSidebarDealsReady(true)), []);
   const dealsQuery = useQuery({
-    queryKey: ["deals", "US", "sidebar"],
-    queryFn: () => getDeals("US"),
+    queryKey: ["deals", priceCountry, "sidebar"],
+    queryFn: () => getDeals(priceCountry),
     enabled: sidebarDealsReady,
   });
   const deals = dealsQuery.data?.results ?? [];
   const dealsAge = relativeDealsAge(dealsQuery.data?.cached_at);
-  const profileQuery = useQuery({
-    queryKey: ["profile", "shell"],
-    queryFn: getProfile,
-    enabled: signedIn,
-  });
   const profile = profileQuery.data;
 
   return (
@@ -230,8 +231,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <main className="lg:pl-64">
         <div
-          key={pathname}
-          className="animate-reveal mx-auto max-w-7xl px-5 py-8 pb-28 lg:px-10 lg:py-10"
+          className={
+            pathname.startsWith("/messages")
+              ? "mx-auto min-h-[calc(100vh-4rem)] w-full max-w-none px-0 pb-20 lg:pb-0"
+              : "animate-reveal mx-auto max-w-7xl px-5 py-8 pb-28 lg:px-10 lg:py-10"
+          }
         >
           {children}
         </div>

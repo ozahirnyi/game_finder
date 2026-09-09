@@ -6,7 +6,7 @@ import pytest
 def test_alembic_has_a_single_upgrade_head():
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["af42c8d9e510"]
+    assert script.get_heads() == ["bc72e81f4a10"]
 
 
 def test_social_contact_migration_round_trip(monkeypatch):

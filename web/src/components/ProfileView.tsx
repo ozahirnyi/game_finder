@@ -10,6 +10,7 @@ import { formatPlaytime } from "@/lib/profileLibrary";
 import type { GameDetailTarget } from "@/lib/gameRoute";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { createGameInvite, clearToken, type SharedLibrary, updateProfile } from "@/lib/api";
+import { PRICE_COUNTRIES } from "@/lib/priceRegion";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
 const GENRE_OPTIONS = [
@@ -73,6 +74,7 @@ export type ProfileData = {
     steamVisibility: "public" | "friends" | "private";
     platforms: string[];
     favoriteGenres: string[];
+    priceCountryCode?: string;
   };
 };
 
@@ -111,6 +113,9 @@ export function ProfileView({
   );
   const [platforms, setPlatforms] = useState(profile.settings?.platforms ?? []);
   const [favoriteGenres, setFavoriteGenres] = useState(profile.settings?.favoriteGenres ?? []);
+  const [priceCountryCode, setPriceCountryCode] = useState(
+    profile.settings?.priceCountryCode ?? "US",
+  );
   const [inviteOpen, setInviteOpen] = useState(initialComposer === "invite");
   const [selectedGameKey, setSelectedGameKey] = useState("");
   const queryClient = useQueryClient();
@@ -124,6 +129,7 @@ export function ProfileView({
     setSteamVisibility(profile.settings.steamVisibility);
     setPlatforms(profile.settings.platforms);
     setFavoriteGenres(profile.settings.favoriteGenres);
+    setPriceCountryCode(profile.settings.priceCountryCode ?? "US");
   }, [profile.settings]);
   useEffect(() => {
     if (!inviteOpen || selectedGameKey || !profile.sharedLibrary?.data[0]) return;
@@ -136,6 +142,10 @@ export function ProfileView({
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["genre-deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["price-history"] });
+      queryClient.invalidateQueries({ queryKey: ["steam-price-history"] });
+      queryClient.invalidateQueries({ queryKey: ["price-alerts"] });
       setSettingsOpen(false);
     },
   });
@@ -289,6 +299,7 @@ export function ProfileView({
                 steam_visibility: steamVisibility,
                 platforms,
                 favorite_genres: favoriteGenres,
+                price_country_code: priceCountryCode,
               });
             }}
             className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl"
@@ -319,6 +330,21 @@ export function ProfileView({
               selected={favoriteGenres}
               onToggle={(value) => setFavoriteGenres(toggle(favoriteGenres, value))}
             />
+            <label className="mt-4 block text-sm font-semibold">
+              Price region
+              <select
+                aria-label="Price region"
+                value={priceCountryCode}
+                onChange={(event) => setPriceCountryCode(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-border bg-surface-2 px-3 py-2"
+              >
+                {PRICE_COUNTRIES.map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label} ({code})
+                  </option>
+                ))}
+              </select>
+            </label>
             <PreferenceChips
               label="Platforms"
               options={PLATFORM_OPTIONS}

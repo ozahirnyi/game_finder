@@ -53,6 +53,7 @@ from app.psn_resolution import classify_psn_candidate
 from app.psn_resolution import resolve_psn_catalog_titles
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import _apply_catalog_media, build_genre_deal_groups, normalize_genre, select_deal_genres
+from app.price_region import effective_price_country
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
 from app.database import SocialBlock, SteamFriendSuppression
@@ -208,6 +209,7 @@ def user_profile_response(user: User, google_linked: bool | None = None, db: Ses
         platforms.append("Steam")
     return UserProfileRead(
         **base.model_dump(),
+        price_country_code=getattr(user, "price_country_code", None) or "US",
         bio=getattr(user, "bio", None),
         platforms=platforms,
         favorite_genres=list(getattr(user, "favorite_genres", None) or []),
@@ -2879,7 +2881,7 @@ def onboarding_summary(
 @app.get("/dashboard", response_model=DashboardRead)
 async def dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
-        deals = await fetch_steam_store_deals(country=current_user.steam_country_code or "US", page_size=6)
+        deals = await fetch_steam_store_deals(country=effective_price_country(current_user), page_size=6)
         deals_block = DataBlock(status="ready" if deals else "empty", data={"results": deals})
     except Exception:
         deals_block = DataBlock(status="error", data=[], message="Deals are temporarily unavailable.")
@@ -3544,6 +3546,7 @@ async def search(
     genre: list[str] = Query(default=[]),
     on_sale: bool = False,
     country: str = "US",
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     q = q.strip().lower()
     if page < 1:
@@ -3553,7 +3556,7 @@ async def search(
     allowed_genres = {"adventure", "rpg", "roguelike", "shooter", "strategy"}
     if set(platform) - allowed_platforms or set(feature) - allowed_features or set(genre) - allowed_genres:
         raise HTTPException(status_code=400, detail="unknown discovery filter")
-    normalized_country = country.strip().upper()
+    normalized_country = effective_price_country(current_user, country)
     if len(normalized_country) != 2:
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
@@ -3665,10 +3668,15 @@ async def trending_games(request: Request, page: int = 1, page_size: int = 8):
 
 
 @app.get("/prices/games/{igdb_id}", response_model=GamePriceHistory)
-async def game_price_history(igdb_id: int, country: str = "US", db: Session = Depends(get_db)):
+async def game_price_history(
+    igdb_id: int,
+    country: str = "US",
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     if igdb_id < 1:
         raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
-    normalized_country = country.strip().upper()
+    normalized_country = effective_price_country(current_user, country)
     if len(normalized_country) != 2:
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
 
@@ -3712,8 +3720,12 @@ async def game_price_history(igdb_id: int, country: str = "US", db: Session = De
 
 
 @app.get("/prices/steam-games/{appid}", response_model=GamePriceHistory)
-async def steam_game_price_history(appid: int, country: str = "US"):
-    normalized_country = country.strip().upper()
+async def steam_game_price_history(
+    appid: int,
+    country: str = "US",
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    normalized_country = effective_price_country(current_user, country)
     if appid < 1:
         raise HTTPException(status_code=400, detail="appid must be >= 1")
     steam_detail = await fetch_steam_store_game_detail(appid, country=normalized_country)
@@ -3729,10 +3741,16 @@ async def steam_game_price_history(appid: int, country: str = "US"):
 
 
 @app.get("/steam/games/{appid}", response_model=SteamStoreGameDetail)
-async def get_steam_game(appid: int, country: str = "US"):
+async def get_steam_game(
+    appid: int,
+    country: str = "US",
+    current_user: User | None = Depends(get_optional_current_user),
+):
     if appid < 1:
         raise HTTPException(status_code=400, detail="appid must be >= 1")
-    steam_detail = await fetch_steam_store_game_detail(appid, country=country.strip().upper())
+    steam_detail = await fetch_steam_store_game_detail(
+        appid, country=effective_price_country(current_user, country)
+    )
     try:
         catalog = await fetch_igdb_game_by_steam_appid(appid)
         if catalog is None:
@@ -3764,8 +3782,12 @@ async def get_steam_game(appid: int, country: str = "US"):
 
 
 @app.get("/prices/deals", response_model=HomeDealResponse)
-async def homepage_deals(country: str = "US", page_size: int = 6):
-    normalized_country = country.strip().upper()
+async def homepage_deals(
+    country: str = "US",
+    page_size: int = 6,
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    normalized_country = effective_price_country(current_user, country)
     if len(normalized_country) != 2:
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     if page_size < 1 or page_size > 13:
@@ -3825,7 +3847,7 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
 
 @app.get("/prices/genre-deals", response_model=GenreDealResponse)
 async def genre_deals(current_user: User | None = Depends(get_optional_current_user)):
-    country = ((current_user.steam_country_code if current_user else None) or "US").strip().upper()
+    country = effective_price_country(current_user)
     genres = select_deal_genres(current_user.favorite_genres if current_user else [])
     key = build_cache_key(
         "steam_genre_deals_v5",

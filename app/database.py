@@ -97,6 +97,7 @@ class User(Base):
     steam_persona_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     steam_avatar: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     steam_country_code: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
+    price_country_code: Mapped[str] = mapped_column(String(2), nullable=False, default="US", server_default="US")
     steam_linked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     steam_friends_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     telegram_chat_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, unique=True)

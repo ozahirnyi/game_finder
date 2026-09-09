@@ -260,6 +260,7 @@ export type Profile = {
   favorites_visibility?: Visibility;
   wishlist_visibility?: Visibility;
   steam_visibility?: Visibility;
+  price_country_code?: string;
 };
 
 export type ProfileUpdate = Pick<
@@ -272,6 +273,7 @@ export type ProfileUpdate = Pick<
   | "steam_visibility"
   | "platforms"
   | "favorite_genres"
+  | "price_country_code"
 >;
 export type RecommendationItem = {
   title: string;

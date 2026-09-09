@@ -44,9 +44,9 @@ export function MessagesScreen({
     refetchOnWindowFocus: "always",
   });
   return (
-    <div className="grid min-h-[70vh] gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="grid min-h-[calc(100vh-4rem)] gap-0 md:grid-cols-[280px_minmax(0,1fr)]">
       <aside
-        className={`${conversationId ? "hidden md:block" : ""} rounded-2xl border border-border bg-surface p-4`}
+        className={`${conversationId ? "hidden md:block" : ""} border-r border-border bg-surface p-4`}
       >
         <h1 className="mb-4 text-2xl font-bold">Messages</h1>
         {conversations.isPending && <p role="status">Loading conversations…</p>}
@@ -237,7 +237,7 @@ function ConversationThread({
       </section>
     );
   return (
-    <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface">
+    <section className="flex min-w-0 flex-col overflow-hidden border-border bg-surface md:border-l">
       <header className="flex items-center gap-3 border-b border-border p-4">
         <button className={`${button} md:hidden`} onClick={onBack}>
           Back
@@ -251,7 +251,7 @@ function ConversationThread({
         role="log"
         aria-label="Conversation history"
         aria-live="polite"
-        className="max-h-[60vh] min-h-64 flex-1 space-y-3 overflow-y-auto p-4"
+        className="min-h-64 flex-1 space-y-3 overflow-y-auto p-4"
         onScroll={() => {
           const el = viewport.current;
           if (el) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;

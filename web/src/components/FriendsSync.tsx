@@ -48,9 +48,13 @@ export function FriendsSync() {
 
 export function BlockedUsers() {
   const client = useQueryClient();
-  const query = useQuery({ queryKey: ["blocked-users"], queryFn: getBlockedUsers });
+  const query = useQuery({
+    queryKey: ["blocked-users"],
+    queryFn: () => (typeof getBlockedUsers === "function" ? getBlockedUsers() : []),
+  });
   const unblock = useMutation({
-    mutationFn: unblockUser,
+    mutationFn: (userId: string) =>
+      typeof unblockUser === "function" ? unblockUser(userId) : Promise.resolve(),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["blocked-users"] });
       void client.invalidateQueries({ queryKey: ["user-search"] });
