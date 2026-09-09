@@ -677,7 +677,7 @@ export function getDeals(country: string, pageSize = 12) {
 }
 
 export function getGenreDeals() {
-  return apiRequest<GenreDealResponse>("/prices/genre-deals");
+  return apiRequest<GenreDealResponse>("/prices/genre-deals", { includeToken: true });
 }
 
 export function getPriceHistory(id: string | number, country = "US") {
