@@ -13,7 +13,7 @@ vi.mock("@/lib/api", async () => ({ ...(await vi.importActual("@/lib/api")), ...
 import { MessagesScreen } from "./MessagesScreen";
 const conversation = {
   id: "chat",
-  participant: { id: "friend", display_name: "Alex" },
+  participant: { id: "friend", display_name: "76561198000000001", steam_persona_name: "Alex" },
   can_message: true,
   updated_at: "2026-09-01",
 };
@@ -79,5 +79,14 @@ it("can load older history after revisiting a cached conversation", async () => 
 
 it("keeps a short conversation stretched to the full chat viewport", async () => {
   mount();
-  expect(await screen.findByRole("log", { name: "Conversation history" })).toHaveClass("min-h-0");
+  const log = await screen.findByRole("log", { name: "Conversation history" });
+  expect(log).toHaveClass("min-h-0");
+  expect(log.closest("section")).toHaveClass("h-full");
+  expect(log.closest("#messages-screen")).toHaveClass("lg:h-screen");
+});
+
+it("uses the Steam persona name throughout the conversation UI", async () => {
+  mount();
+  expect(await screen.findByText("Alex")).toBeInTheDocument();
+  expect(screen.queryByText("76561198000000001")).not.toBeInTheDocument();
 });

@@ -9,6 +9,7 @@ import {
   markConversationRead,
   type ConversationMessage,
 } from "@/lib/api";
+import { friendDisplayName } from "@/lib/friendIdentity";
 
 const button = "rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-50";
 function useVisible() {
@@ -44,7 +45,10 @@ export function MessagesScreen({
     refetchOnWindowFocus: "always",
   });
   return (
-    <div className="grid h-[calc(100dvh-4rem)] min-h-0 gap-0 md:grid-cols-[280px_minmax(0,1fr)]">
+    <div
+      id="messages-screen"
+      className="grid h-[calc(100dvh-4rem)] min-h-0 gap-0 md:grid-cols-[280px_minmax(0,1fr)] lg:h-screen"
+    >
       <aside
         className={`${conversationId ? "hidden md:block" : ""} border-r border-border bg-surface p-4`}
       >
@@ -71,7 +75,7 @@ export function MessagesScreen({
               aria-current={conversation.id === conversationId ? "page" : undefined}
               className={`block w-full rounded-xl p-3 text-left ${conversation.id === conversationId ? "bg-primary/15" : "bg-surface-2"}`}
             >
-              <span className="font-bold">{conversation.participant.display_name}</span>
+              <span className="font-bold">{friendDisplayName(conversation.participant)}</span>
               {!!conversation.unread_count && (
                 <span
                   className="ml-2 rounded-full bg-primary px-2 text-xs text-primary-foreground"
@@ -243,7 +247,7 @@ function ConversationThread({
           Back
         </button>
         <h2 className="text-xl font-bold">
-          {conversation.data?.participant.display_name ?? "Loading chat…"}
+          {conversation.data ? friendDisplayName(conversation.data.participant) : "Loading chat…"}
         </h2>
       </header>
       <div
@@ -282,7 +286,7 @@ function ConversationThread({
             <p className="mb-1 text-xs font-bold text-muted-foreground">
               {message.sender_id === me.data?.id
                 ? "You"
-                : conversation.data?.participant.display_name}
+                : conversation.data && friendDisplayName(conversation.data.participant)}
             </p>
             <p className="whitespace-pre-wrap break-words">{message.body}</p>
             <time
