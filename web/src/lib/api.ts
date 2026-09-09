@@ -121,6 +121,7 @@ export type PublicLibraryGame = Pick<
   "id" | "title" | "source" | "cover_url" | "playtime_forever"
 > & {
   detail_game_id?: string | null;
+  detail_source?: "steam" | null;
 };
 
 export type PublicSteamAccount = {
@@ -131,6 +132,7 @@ export type PublicSteamAccount = {
 };
 
 export type PublicProfile = {
+  user_id?: string;
   public_id: string;
   nickname: string;
   avatar?: string | null;
@@ -224,13 +226,14 @@ export type FriendRequest = {
 export type FriendProfile = {
   user: Friend["user"];
   library: {
-    status: "ready" | "empty" | "hidden";
-    data: LibraryGame[];
+    status: "ready" | "empty" | "hidden" | "partial" | "error";
+    data: PublicLibraryGame[];
     message?: string | null;
   };
 };
 
 export type Conversation = {
+  can_message?: boolean;
   id: string;
   participant: Friend["user"];
   updated_at: string;
@@ -246,6 +249,7 @@ export type ConversationMessage = {
 };
 
 export type Profile = {
+  google_linked?: boolean;
   id: string;
   email: string;
   display_name: string;
@@ -806,21 +810,37 @@ export function createConversation(recipient_id: string) {
   });
 }
 
-export function getConversations() {
-  return apiRequest<Conversation[]>("/conversations", { auth: true });
+export async function getConversations(limit = 20) {
+  const result: Conversation[] = [];
+  for (let offset = 0; offset < limit; offset += 50) {
+    const size = Math.min(50, limit - offset);
+    const page = await apiRequest<Conversation[]>(`/conversations?limit=${size}&offset=${offset}`, {
+      auth: true,
+    });
+    result.push(...page);
+    if (page.length < size) break;
+  }
+  return result;
 }
 
-export function getConversationMessages(conversationId: string) {
-  return apiRequest<ConversationMessage[]>(`/conversations/${conversationId}/messages`, {
-    auth: true,
-  });
+export function getConversationMessages(
+  conversationId: string,
+  cursor: { before_id?: string; after_id?: string } = {},
+) {
+  const query = new URLSearchParams(cursor).toString();
+  return apiRequest<ConversationMessage[]>(
+    `/conversations/${conversationId}/messages${query ? `?${query}` : ""}`,
+    {
+      auth: true,
+    },
+  );
 }
 
-export function createMessage(conversationId: string, body: string) {
-  return apiRequest(`/conversations/${conversationId}/messages`, {
+export function createMessage(conversationId: string, body: string, clientMessageId?: string) {
+  return apiRequest<ConversationMessage>(`/conversations/${conversationId}/messages`, {
     auth: true,
     method: "POST",
-    body: { body },
+    body: { body, ...(clientMessageId ? { client_message_id: clientMessageId } : {}) },
   });
 }
 
@@ -880,4 +900,36 @@ export function markNotificationRead(id: string) {
 
 export function markAllNotificationsRead() {
   return apiRequest<void>("/notifications/read-all", { auth: true, method: "POST" });
+}
+
+export function getConversation(id: string) {
+  return apiRequest<Conversation>(`/conversations/${id}`, { auth: true });
+}
+export function markConversationRead(id: string, messageId: string) {
+  return apiRequest<void>(`/conversations/${id}/read`, {
+    auth: true,
+    method: "POST",
+    body: { message_id: messageId },
+  });
+}
+export function removeFriend(id: string) {
+  return apiRequest<void>(`/friends/${id}`, { auth: true, method: "DELETE" });
+}
+export function blockUser(id: string) {
+  return apiRequest<void>(`/social/blocks/${id}`, { auth: true, method: "PUT" });
+}
+export function unblockUser(id: string) {
+  return apiRequest<void>(`/social/blocks/${id}`, { auth: true, method: "DELETE" });
+}
+export function getBlockedUsers() {
+  return apiRequest<{ user: Friend["user"]; created_at: string }[]>("/social/blocks", {
+    auth: true,
+  });
+}
+export function syncSteamFriends(force = false) {
+  return apiRequest<{
+    status: "synced" | "skipped" | "unavailable";
+    added: number;
+    message: string | null;
+  }>(`/steam/friends/sync${force ? "?force=true" : ""}`, { auth: true, method: "POST" });
 }

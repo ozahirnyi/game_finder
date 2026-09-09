@@ -150,6 +150,8 @@ def test_legacy_conversations_messages_persist_read_state_and_scope(
     messages = api_client.get(f"/conversations/{conversation_id}/messages")
     assert messages.status_code == 200
     assert messages.json()[0]["body"] == "hi"
+    assert db_session.query(Message).one().read_at is None
+    assert api_client.post(f"/conversations/{conversation_id}/read", json={"message_id": messages.json()[0]["id"]}).status_code == 204
     assert db_session.query(Message).one().read_at is not None
     auth_as(outsider)
     assert api_client.get(f"/conversations/{conversation_id}/messages").status_code == 404

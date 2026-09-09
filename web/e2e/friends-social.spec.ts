@@ -13,7 +13,9 @@ test("friend requests post their selected player identity", async ({ page, api }
   await expect
     .poll(() => api.requests.find((request) => request.path === "/friends/requests")?.jsonBody)
     .toEqual({ recipient_id: "friend-1" });
-  await expect(page.getByRole("status")).toContainText("Request sent");
+  await expect(page.getByRole("status").filter({ hasText: "Request sent" })).toContainText(
+    "Request sent",
+  );
 });
 
 test("friend profile message and invite mutations use the canonical friend id and show errors", async ({
@@ -54,10 +56,14 @@ test("friend profile message and invite mutations use the canonical friend id an
     .poll(
       () =>
         api.requests.find(
-          (request) => request.path === "/conversations/conversation-created/messages",
+          (request) =>
+            request.method === "POST" &&
+            request.path === "/conversations/conversation-created/messages",
         )?.jsonBody,
     )
-    .toEqual({ body: "Want to play?" });
+    .toEqual(
+      expect.objectContaining({ body: "Want to play?", client_message_id: expect.any(String) }),
+    );
 
   await page.goto("/users/sam-player?compose=invite");
   await waitForHydration(page);
@@ -80,9 +86,7 @@ test("friend profile message and invite mutations use the canonical friend id an
   api.state.statusByPath["/conversations"] = 500;
   await page.goto("/users/sam-player?compose=message");
   await waitForHydration(page);
-  await page.getByLabel("Message text").fill("Retry me");
-  await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByRole("alert")).toContainText("Could not send message.");
+  await expect(page.getByRole("alert")).toContainText("Could not open chat");
 
   api.state.statusByPath["/game-invites"] = 500;
   await page.goto("/users/sam-player?compose=invite");

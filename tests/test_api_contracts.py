@@ -1251,6 +1251,15 @@ def test_steam_social_builds_friend_overlap():
 
 
 def test_steam_social_returns_requested_friend_page_and_metadata(monkeypatch):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from sqlalchemy.pool import StaticPool
+    from app.database import Base
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = Session(engine)
+    main.app.dependency_overrides[main.get_db] = lambda: db
     linked_at = datetime.now(timezone.utc)
     main.app.dependency_overrides[main.get_current_user] = lambda: SimpleNamespace(
         id=uuid.uuid4(),
@@ -1291,6 +1300,8 @@ def test_steam_social_returns_requested_friend_page_and_metadata(monkeypatch):
         response = client.get("/steam/social?friends_limit=2&friends_offset=2")
     finally:
         main.app.dependency_overrides.clear()
+        db.close()
+        engine.dispose()
 
     assert response.status_code == 200
     payload = response.json()
