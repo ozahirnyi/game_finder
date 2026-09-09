@@ -6,7 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { GameCover } from "@/components/GameCover";
 import { OnboardingGuidance } from "@/components/OnboardingGuidance";
-import { Chip, EmptyState, Panel, PriceBlock, SectionHeader, Stat } from "@/components/ui-bits";
+import { Chip, EmptyState, Panel, PriceBlock, SectionHeader } from "@/components/ui-bits";
 import {
   getAuthSnapshot,
   getDashboard,
@@ -21,12 +21,12 @@ import {
   type DashboardRecommendation,
 } from "@/lib/api";
 import { gameDetailTarget } from "@/lib/gameRoute";
+import { normalizePriceCountry } from "@/lib/priceRegion";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
-  const [region, setRegion] = useState("US");
   const [query, setQuery] = useState("");
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile, enabled: signedIn });
   const libraryQuery = useQuery({
@@ -55,7 +55,11 @@ function Home() {
     queryFn: () => searchGames({ query }),
     enabled: query.trim().length >= 2,
   });
-  const dealsQuery = useQuery({ queryKey: ["deals", region], queryFn: () => getDeals(region, 13) });
+  const region = normalizePriceCountry(profileQuery.data?.price_country_code);
+  const dealsQuery = useQuery({
+    queryKey: ["deals", region, "home"],
+    queryFn: () => getDeals(region, 13),
+  });
   const deals = dealsQuery.data?.results ?? [];
   const results = searchQuery.data?.results ?? [];
   const best = deals[0];
@@ -285,21 +289,7 @@ function Home() {
           </p>
           <h2 className="text-3xl font-bold tracking-[-0.03em]">Price drops</h2>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="label-mono text-muted-foreground">Region</span>
-          <select
-            aria-label="Region"
-            value={region}
-            onChange={(event) => setRegion(event.target.value)}
-            className="rounded-xl border border-border bg-surface px-3 py-2 text-sm font-semibold outline-none focus:border-primary/60"
-          >
-            {["US", "UA", "GB", "EU"].map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </div>
+        <span className="label-mono text-muted-foreground">Region · {region}</span>
       </section>
       {dealsQuery.isPending ? (
         <Panel className="p-6 text-sm text-muted-foreground">Live deals · loading</Panel>
@@ -320,7 +310,7 @@ function Home() {
         </Panel>
       ) : best ? (
         <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
-          <div className="animate-reveal group lg:col-span-7">
+          <div className="animate-reveal group lg:col-span-12">
             {bestTarget ? (
               <Link
                 to="/games/$gameId"
@@ -337,20 +327,12 @@ function Home() {
               <FeaturedDeal deal={best} />
             )}
           </div>
-          <div className="animate-reveal flex flex-col gap-5 lg:col-span-5">
-            <Panel className="ember-glow grain p-5">
-              <div className="relative grid grid-cols-2 gap-4">
-                <Stat label="Deals" value={deals.length} />
-                <Stat label="Region" value={region} />
-              </div>
-            </Panel>
-          </div>
           {rest.map((deal, index) => {
             const target = gameDetailTarget(deal.id, deal.steam_appid);
             return (
               <div
                 key={deal.id ?? deal.steam_appid ?? deal.name}
-                className="animate-reveal lg:col-span-3"
+                className="animate-reveal sm:col-span-1 lg:col-span-3"
                 style={{ animationDelay: `${60 + index * 40}ms` }}
               >
                 <GameCard

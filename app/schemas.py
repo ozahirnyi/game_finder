@@ -76,6 +76,7 @@ Visibility = Literal["private", "friends", "public"]
 
 
 class UserProfileRead(UserRead):
+    price_country_code: str = "US"
     bio: str | None = None
     platforms: list[str] = Field(default_factory=list)
     favorite_genres: list[str] = Field(default_factory=list)
@@ -86,6 +87,7 @@ class UserProfileRead(UserRead):
 
 
 class UserProfileUpdate(BaseModel):
+    price_country_code: str | None = Field(default=None, min_length=2, max_length=2)
     display_name: str | None = Field(default=None, min_length=3, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9 _-]*$")
     bio: str | None = Field(default=None, max_length=1000)
     platforms: list[str] | None = Field(default=None, max_length=20)
@@ -94,6 +96,16 @@ class UserProfileUpdate(BaseModel):
     favorites_visibility: Visibility | None = None
     wishlist_visibility: Visibility | None = None
     steam_visibility: Visibility | None = None
+
+    @field_validator("price_country_code")
+    @classmethod
+    def validate_price_country_code(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().upper()
+        if normalized not in {"US", "UA", "GB", "DE", "PL", "TR", "AR", "KZ"}:
+            raise ValueError("Unsupported price country code")
+        return normalized
 
 
 class DataBlock(BaseModel):

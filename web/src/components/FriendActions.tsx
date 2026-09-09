@@ -15,10 +15,12 @@ export function FriendActions({
   userId,
   name,
   isFriend,
+  compact = false,
 }: {
   userId: string;
   name: string;
   isFriend: boolean;
+  compact?: boolean;
 }) {
   const [action, setAction] = useState<"remove" | "block" | null>(null);
   const [notice, setNotice] = useState("");
@@ -58,7 +60,7 @@ export function FriendActions({
     },
   });
   const button = "rounded-lg border border-border px-3 py-2 text-xs font-bold disabled:opacity-50";
-  return (
+  const controls = (
     <div className="flex flex-wrap gap-2">
       {isFriend && (
         <button
@@ -80,8 +82,20 @@ export function FriendActions({
       >
         Block user
       </button>
+    </div>
+  );
+  return (
+    <div className="mt-3">
+      {compact ? (
+        <details className="text-sm">
+          <summary className="cursor-pointer font-bold text-muted-foreground">More actions</summary>
+          <div className="mt-2">{controls}</div>
+        </details>
+      ) : (
+        controls
+      )}
       {notice && (
-        <p role="status" className="w-full text-sm">
+        <p role="status" className="mt-2 text-sm">
           {notice}
         </p>
       )}

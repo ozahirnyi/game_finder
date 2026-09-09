@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { OnboardingGuidance } from "@/components/OnboardingGuidance";
 import { ProfileView } from "@/components/ProfileView";
+import { BlockedUsers } from "@/components/FriendsSync";
 import { getFavorites, getLibraryOverview, getOnboardingSummary, getProfile } from "@/lib/api";
 import { libraryPlaytime } from "@/lib/collectionPresentation";
 
@@ -67,6 +68,7 @@ export function AccountPage() {
                 steamVisibility: profile.steam_visibility ?? "public",
                 platforms: profile.platforms,
                 favoriteGenres: profile.favorite_genres,
+                priceCountryCode: profile.price_country_code ?? "US",
               }
             : undefined,
           hours: libraryPlaytime(
@@ -97,6 +99,9 @@ export function AccountPage() {
           ],
         }}
       />
+      <section className="mt-8" aria-label="Privacy">
+        <BlockedUsers />
+      </section>
     </AppShell>
   );
 }

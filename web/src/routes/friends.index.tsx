@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FriendActions } from "@/components/FriendActions";
-import { FriendsSync, BlockedUsers } from "@/components/FriendsSync";
+import { FriendsSync } from "@/components/FriendsSync";
 import { Avatar } from "@/components/GameCover";
 import { UserProfileLink } from "@/components/UserProfileLink";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
@@ -105,11 +105,8 @@ function FriendsPage() {
   const friends = (friendsQuery.data ?? []).map(({ user }) => ({
     id: user.id,
     publicId: user.public_id,
-    name: user.display_name,
-    steamPersonaName:
-      user.steam_persona_name && user.steam_persona_name !== user.display_name
-        ? user.steam_persona_name
-        : null,
+    name: friendDisplayName(user),
+    steamPersonaName: null,
     bio: user.bio ?? null,
     avatarUrl: user.avatar ?? null,
     avatarFrom: "#7c3aed",
@@ -378,6 +375,12 @@ function FriendsPage() {
                       aria-label={`Select ${f.name}`}
                       aria-pressed={selectedId === f.id}
                       onClick={() => setSelectedFriendId(f.id)}
+                      onDoubleClick={() =>
+                        navigate({
+                          to: "/users/$publicId",
+                          params: { publicId: f.publicId },
+                        })
+                      }
                       className="flex min-w-0 items-center gap-4 text-left"
                     >
                       <div className="relative shrink-0">
@@ -391,46 +394,10 @@ function FriendsPage() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <UserProfileLink publicId={f.publicId} className="truncate font-bold">
-                            {f.name}
-                          </UserProfileLink>
-                          {f.steamPersonaName && (
-                            <span className="font-mono text-[10px] text-muted-foreground">
-                              Steam · {f.steamPersonaName}
-                            </span>
-                          )}
+                          <span className="truncate font-bold">{f.name}</span>
                         </div>
                       </div>
                     </button>
-                    <div className="flex flex-col gap-2">
-                      <UserProfileLink
-                        publicId={f.publicId}
-                        aria-label={`View ${f.name}'s profile`}
-                        className="rounded-md border border-border px-3 py-1.5 text-center text-xs font-bold"
-                      >
-                        View profile
-                      </UserProfileLink>
-                      <button
-                        onClick={() =>
-                          navigate({
-                            to: "/users/$publicId",
-                            params: { publicId: f.publicId },
-                            search: { compose: "invite" },
-                          })
-                        }
-                        className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
-                      >
-                        Invite to play
-                      </button>
-                      <Link
-                        to="/messages"
-                        search={{ friend: f.id }}
-                        className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold"
-                      >
-                        Message
-                      </Link>
-                      <FriendActions userId={f.id} name={f.name} isFriend />
-                    </div>
                   </div>
                 ))}
               </div>
@@ -456,11 +423,6 @@ function FriendsPage() {
                   />
                   <div>
                     <p className="font-bold">{selectedFriend.name}</p>
-                    {selectedFriend.steamPersonaName && (
-                      <p className="font-mono text-xs text-muted-foreground">
-                        Steam · {selectedFriend.steamPersonaName}
-                      </p>
-                    )}
                   </div>
                 </UserProfileLink>
                 {selectedFriend.bio && (
@@ -504,20 +466,19 @@ function FriendsPage() {
                   <Link
                     to="/messages"
                     search={{ friend: selectedFriend.id }}
-                    aria-label="Quick message"
-                    className="grid size-10 place-items-center rounded-lg border border-border"
+                    aria-label="Open chat"
+                    className="flex-1 rounded-lg border border-border px-3 py-2 text-center text-sm font-bold"
                   >
-                    <MessageCircle className="size-4" />
+                    Message
                   </Link>
                 </div>
+                <FriendActions
+                  userId={selectedFriend.id}
+                  name={selectedFriend.name}
+                  isFriend
+                  compact
+                />
               </section>
-              <Link
-                to="/messages"
-                search={{ friend: selectedFriend.id }}
-                className="font-bold text-primary"
-              >
-                Open chat
-              </Link>
             </>
           ) : (
             <EmptyState
@@ -526,7 +487,6 @@ function FriendsPage() {
               description="Add a friend to compare libraries."
             />
           )}
-          <BlockedUsers />
         </aside>
       </div>
     </AppShell>
