@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Home, Search, Library, Heart, Tag, Users, Palette } from "lucide-react";
+import { Home, Search, Library, Heart, Tag, Users, MessageCircle, Palette } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
 import { Avatar } from "./GameCover";
 import { getAuthSnapshot, getDeals, getProfile, subscribeToAuthChanges } from "@/lib/api";
@@ -9,7 +9,6 @@ import {
   friendsQueryOptions,
   incomingFriendRequestsQueryOptions,
   libraryOverviewQueryOptions,
-  steamSocialInfiniteQueryOptions,
 } from "@/lib/navigationQueries";
 
 const nav = [
@@ -19,6 +18,7 @@ const nav = [
   { to: "/wishlist", label: "Wishlist", icon: Heart },
   { to: "/deals", label: "Deals", icon: Tag },
   { to: "/friends", label: "Friends", icon: Users },
+  { to: "/messages", label: "Messages", icon: MessageCircle },
 ] as const;
 
 function scheduleIdle(callback: () => void) {
@@ -56,7 +56,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (to === "/friends") {
       void queryClient.prefetchQuery(friendsQueryOptions());
       void queryClient.prefetchQuery(incomingFriendRequestsQueryOptions());
-      void queryClient.prefetchInfiniteQuery(steamSocialInfiniteQueryOptions());
     }
   };
 

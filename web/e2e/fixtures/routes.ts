@@ -214,6 +214,26 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
       await route.fulfill({ json: conversation });
       return;
     }
+    if (request.method() === "GET" && path === "/social/blocks") {
+      await route.fulfill({ json: [] });
+      return;
+    }
+    if (request.method() === "POST" && path === "/steam/friends/sync") {
+      await route.fulfill({ json: { status: "synced", added: 0 } });
+      return;
+    }
+    const conversationDetail = path.match(/^\/conversations\/([^/]+)$/);
+    if (conversationDetail && request.method() === "GET") {
+      const conversation = state.conversations.find((item) => item.id === conversationDetail[1]);
+      await route.fulfill(
+        conversation ? { json: conversation } : { status: 404, json: { detail: "Not found" } },
+      );
+      return;
+    }
+    if (request.method() === "POST" && /^\/conversations\/[^/]+\/read$/.test(path)) {
+      await route.fulfill({ json: {} });
+      return;
+    }
     const conversationMessages = path.match(/^\/conversations\/([^/]+)\/messages$/);
     if (conversationMessages && request.method() === "GET") {
       await route.fulfill({ json: state.messages[conversationMessages[1]] ?? [] });

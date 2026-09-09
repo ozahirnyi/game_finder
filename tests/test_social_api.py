@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.main as main
-from app.database import Base, DirectMessage, Favorite, FriendRequest, Friendship, Game, GameInvite, Notification, OAuthIdentity, User, WishlistItem
+from app.database import Base, DirectMessage, Favorite, FriendRequest, Friendship, Game, GameInvite, Notification, OAuthIdentity, User, WishlistItem, SocialBlock, SteamFriendSuppression, Conversation, Message
 
 
 client = TestClient(main.app)
@@ -29,6 +29,10 @@ def social_db():
             User.__table__,
             FriendRequest.__table__,
             Friendship.__table__,
+            SocialBlock.__table__,
+            SteamFriendSuppression.__table__,
+            Conversation.__table__,
+            Message.__table__,
             DirectMessage.__table__,
             GameInvite.__table__,
             Notification.__table__,

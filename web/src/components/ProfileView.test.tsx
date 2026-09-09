@@ -26,7 +26,28 @@ vi.mock("@/lib/api", async () => ({
   getGameInvites: api.getGameInvites,
 }));
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Link: ({
+    children,
+    to,
+    params,
+    search,
+    ...props
+  }: {
+    children: ReactNode;
+    to: string;
+    params?: { gameId?: string };
+    search?: Record<string, string>;
+  }) => (
+    <a
+      {...props}
+      href={
+        to.replace("$gameId", params?.gameId ?? "") +
+        (search ? `?${new URLSearchParams(search)}` : "")
+      }
+    >
+      {children}
+    </a>
+  ),
 }));
 
 import { ProfileView, type ProfileData } from "./ProfileView";
@@ -100,7 +121,7 @@ describe("ProfileView library visibility", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add friend" }));
     expect(onAddFriend).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("button", { name: "Message Player" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Message Player" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Invite to play" })).not.toBeInTheDocument();
   });
 
@@ -115,7 +136,7 @@ describe("ProfileView library visibility", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Message Player" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Message Player" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Invite to play" })).toBeInTheDocument();
   });
 
@@ -244,92 +265,23 @@ describe("ProfileView library visibility", () => {
     renderProfile(false);
     expect(screen.getByText("2h 5m")).toBeInTheDocument();
   });
-  it("shows the message form above its backdrop", () => {
+  it("opens the dedicated chat from the profile", () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <ProfileView profile={{ ...profile, friendId: "friend-1" }} isSelf={false} />
       </QueryClientProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Message Player" }));
-    expect(screen.getByRole("dialog", { name: "Message Player" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Message Player" })).toBeVisible();
-  });
-  it("auto-sizes the message composer without allowing manual resize", () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <ProfileView profile={{ ...profile, friendId: "friend-1" }} isSelf={false} />
-      </QueryClientProvider>,
+    expect(screen.getByRole("link", { name: "Message Player" })).toHaveAttribute(
+      "href",
+      "/messages?friend=friend-1",
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Message Player" }));
-    const textarea = screen.getByLabelText("Message text");
-    Object.defineProperty(textarea, "scrollHeight", { configurable: true, value: 480 });
-    fireEvent.change(textarea, { target: { value: "A longer message" } });
-
-    expect(textarea).toHaveClass("resize-none", "overflow-y-auto");
-    expect(textarea).toHaveStyle({ height: "240px" });
-
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Message Player" }));
-    expect(screen.getByLabelText("Message text")).not.toHaveStyle({ height: "240px" });
-  });
-  it("shows the existing conversation and invitations on a friend profile", async () => {
-    api.getConversations.mockResolvedValue([
-      { id: "conversation-1", participant: { id: "friend-1", display_name: "Player" } },
-    ]);
-    api.getConversationMessages.mockResolvedValue([
-      {
-        id: "message-1",
-        sender_id: "friend-1",
-        body: "Earlier message",
-        created_at: "2026-08-14T12:00:00Z",
-      },
-    ]);
-    api.getGameInvites.mockResolvedValue([
-      {
-        id: "invite-1",
-        sender: { id: "friend-1", display_name: "Player" },
-        recipient: { id: "me", display_name: "Me" },
-        game_name: "Portal 2",
-        status: "pending",
-        created_at: "2026-08-14T11:00:00Z",
-      },
-    ]);
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <ProfileView profile={{ ...profile, friendId: "friend-1" }} isSelf={false} />
-      </QueryClientProvider>,
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open chat" })).toHaveAttribute(
+      "href",
+      "/messages?friend=friend-1",
     );
-
-    expect(await screen.findByText("Earlier message")).toBeInTheDocument();
-    expect(screen.getByText("Game invitation: Portal 2 · Pending")).toBeInTheDocument();
   });
 
-  it("refreshes the profile conversation after sending a message", async () => {
-    api.getConversations.mockResolvedValue([
-      { id: "conversation-1", participant: { id: "friend-1", display_name: "Player" } },
-    ]);
-    api.getConversationMessages.mockResolvedValue([]);
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <ProfileView profile={{ ...profile, friendId: "friend-1" }} isSelf={false} />
-      </QueryClientProvider>,
-    );
-
-    await screen.findByText("No messages yet");
-    fireEvent.click(screen.getByRole("button", { name: "Message Player" }));
-    fireEvent.change(screen.getByLabelText("Message text"), { target: { value: "New message" } });
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    await waitFor(() =>
-      expect(api.createMessage).toHaveBeenCalledWith("conversation-1", "New message"),
-    );
-    await waitFor(() => expect(api.getConversationMessages).toHaveBeenCalledTimes(2));
-  });
   it("shows the explicit shared library state for a private library", () => {
     render(
       <QueryClientProvider client={new QueryClient()}>

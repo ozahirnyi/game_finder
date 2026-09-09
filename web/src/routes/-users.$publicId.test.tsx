@@ -55,7 +55,14 @@ function renderProfile(path = "/users/owner") {
     component: Route.options.component,
   });
   const router = createRouter({
-    routeTree: rootRoute.addChildren([profileRoute]),
+    routeTree: rootRoute.addChildren([
+      profileRoute,
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/messages",
+        component: () => <p>Dedicated chat</p>,
+      }),
+    ]),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
   return render(
@@ -98,10 +105,9 @@ describe("PublicProfilePage", () => {
   it("loads a friend through the canonical route and opens the requested composer", async () => {
     api.getPublicProfile.mockResolvedValue(publicProfile("friends"));
     renderProfile("/users/owner?compose=message");
-    expect(await screen.findByRole("button", { name: "Message" })).toBeInTheDocument();
+    expect(await screen.findByText("Dedicated chat")).toBeInTheDocument();
     expect(api.getFriendProfileByPublicId).toHaveBeenCalledWith("owner");
-    expect(screen.getByText("message")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Invite" })).toBeInTheDocument();
+    expect(api.getFriendProfileByPublicId).toHaveBeenCalledWith("owner");
   });
 
   it("keeps anonymous strangers on ProfileView without friend actions", async () => {

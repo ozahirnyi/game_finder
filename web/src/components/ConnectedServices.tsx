@@ -4,6 +4,8 @@ import { Avatar } from "@/components/GameCover";
 import { Chip, InlineError, Panel, SectionHeader } from "@/components/ui-bits";
 import {
   getGoogleLinkUrl,
+  getProfile,
+  getOnboardingSummary,
   getTelegramAccount,
   getTelegramLinkUrl,
   getSteamAccount,
@@ -23,12 +25,14 @@ function ServiceRow({
   name,
   status,
   connected,
+  state = "success",
   children,
 }: {
   icon: React.ReactNode;
   name: string;
   status: React.ReactNode;
   connected: boolean;
+  state?: "pending" | "error" | "success";
   children: React.ReactNode;
 }) {
   return (
@@ -40,7 +44,9 @@ function ServiceRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-bold">{name}</p>
-            {connected ? (
+            {state !== "success" ? (
+              <Chip tone="outline">{state === "pending" ? "Loading…" : "Unavailable"}</Chip>
+            ) : connected ? (
               <Chip tone="primary">
                 <Check className="mr-1 size-3" /> Connected
               </Chip>
@@ -48,9 +54,15 @@ function ServiceRow({
               <Chip tone="outline">Not connected</Chip>
             )}
           </div>
-          <div className="label-mono mt-1.5 text-muted-foreground">{status}</div>
+          <div className="label-mono mt-1.5 text-muted-foreground">
+            {state === "pending"
+              ? "Checking connection…"
+              : state === "error"
+                ? "Could not load service status"
+                : status}
+          </div>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">{children}</div>
+        <div className="flex shrink-0 flex-wrap gap-2">{state === "success" ? children : null}</div>
       </div>
     </div>
   );
@@ -62,6 +74,11 @@ const btnPrimary =
 
 export function ConnectedServices() {
   const client = useQueryClient();
+  const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
+  const onboardingQuery = useQuery({
+    queryKey: ["onboarding-summary"],
+    queryFn: getOnboardingSummary,
+  });
   const steamQuery = useQuery({ queryKey: ["steam-account"], queryFn: getSteamAccount });
   const telegramQuery = useQuery({ queryKey: ["telegram-account"], queryFn: getTelegramAccount });
   const action = useMutation<
@@ -100,16 +117,26 @@ export function ConnectedServices() {
         <ServiceRow
           icon={<span className="font-display text-sm font-bold">G</span>}
           name="Google"
-          connected={false}
-          status="Use Google to sign in faster"
+          state={profileQuery.status}
+          connected={!!profileQuery.data?.google_linked}
+          status={
+            profileQuery.data?.google_linked
+              ? "Google sign-in connected"
+              : "Use Google to sign in faster"
+          }
         >
-          <button className={btnPrimary} onClick={() => action.mutate("google")}>
+          <button
+            disabled={action.isPending || profileQuery.data?.google_linked}
+            className={btnPrimary}
+            onClick={() => action.mutate("google")}
+          >
             Connect
           </button>
         </ServiceRow>
         <ServiceRow
           icon={<Gamepad2 className="size-4" />}
           name="Steam"
+          state={steamQuery.status}
           connected={!!steam?.linked}
           status={
             steam?.linked ? (
@@ -154,6 +181,7 @@ export function ConnectedServices() {
         <ServiceRow
           icon={<span className="font-display text-sm font-bold">TG</span>}
           name="Telegram"
+          state={telegramQuery.status}
           connected={!!telegram?.linked}
           status={
             !telegram?.configured
@@ -181,6 +209,22 @@ export function ConnectedServices() {
             </button>
           )}
         </ServiceRow>
+        {(profileQuery.isError ||
+          onboardingQuery.isError ||
+          steamQuery.isError ||
+          telegramQuery.isError) && (
+          <button
+            onClick={() => {
+              void profileQuery.refetch();
+              void onboardingQuery.refetch();
+              void steamQuery.refetch();
+              void telegramQuery.refetch();
+            }}
+          >
+            Retry service status
+          </button>
+        )}
+        {telegramAction.error && <InlineError>{telegramAction.error.message}</InlineError>}
         {action.error && (
           <div className="pl-1">
             <InlineError>Unable to update connected services.</InlineError>
@@ -189,8 +233,13 @@ export function ConnectedServices() {
         <ServiceRow
           icon={<span className="font-display text-sm font-bold">PS</span>}
           name="PlayStation"
-          connected={false}
-          status="Import your PlayStation library from an export file"
+          state={onboardingQuery.status}
+          connected={(onboardingQuery.data?.psn_library_games ?? 0) > 0}
+          status={
+            onboardingQuery.data?.psn_library_games
+              ? `${onboardingQuery.data.psn_library_games} imported games`
+              : "Import your PlayStation library from an export file"
+          }
         >
           <Link to="/psn-import" className={btnPrimary}>
             <Upload className="size-3.5" />

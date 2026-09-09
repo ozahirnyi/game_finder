@@ -98,6 +98,7 @@ class User(Base):
     steam_avatar: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     steam_country_code: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
     steam_linked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    steam_friends_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     telegram_chat_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, unique=True)
     telegram_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     telegram_link_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True)
@@ -183,6 +184,22 @@ class Friendship(Base):
         super().__init__(**kwargs)
 
 
+class SocialBlock(Base):
+    __tablename__ = "social_blocks"
+    blocker_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    blocked_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    __table_args__ = (CheckConstraint("blocker_id != blocked_id", name="ck_social_block_not_self"),)
+
+
+class SteamFriendSuppression(Base):
+    __tablename__ = "steam_friend_suppressions"
+    user_low_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    user_high_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    __table_args__ = (CheckConstraint("user_low_id < user_high_id", name="ck_steam_suppression_pair"),)
+
+
 class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = (UniqueConstraint("user_low_id", "user_high_id", name="uq_conversation_pair"),)
@@ -196,11 +213,16 @@ class Conversation(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (
+        UniqueConstraint("sender_id", "client_message_id", name="uq_message_sender_client"),
+        Index("ix_messages_conversation_cursor", "conversation_id", "created_at", "id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     sender_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     body: Mapped[str] = mapped_column(String(2000), nullable=False)
+    client_message_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 

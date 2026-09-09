@@ -154,6 +154,19 @@ async def test_friends_edges(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_friend_import_fetches_all_ids_without_profile_requests(monkeypatch):
+    monkeypatch.setenv("STEAM_API_KEY", "key")
+    friends = [{"steamid": str(i), "friend_since": i} for i in range(60)]
+    client_factory(monkeypatch, steam, [FakeResponse({"friendslist": {"friends": friends}})])
+    async def unexpected(*args):
+        pytest.fail("Import must not download profile batches")
+    monkeypatch.setattr(steam, "fetch_steam_profiles", unexpected)
+    result, total = await steam.fetch_steam_friends("owner", limit=None, include_profiles=False)
+    assert total == 60
+    assert {item["steam_id"] for item in result} == {str(i) for i in range(60)}
+
+
+@pytest.mark.anyio
 async def test_owned_games_edges(monkeypatch):
     monkeypatch.delenv("STEAM_API_KEY", raising=False)
     with pytest.raises(HTTPException):

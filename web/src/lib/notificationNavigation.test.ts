@@ -18,8 +18,8 @@ describe("notificationDestination", () => {
       params: { publicId: "sam" },
     });
     expect(notificationDestination(notification("message", { conversation_id: "c-1" }))).toEqual({
-      to: "/friends",
-      search: { conversation: "c-1", notification: "n" },
+      to: "/messages/$conversationId",
+      params: { conversationId: "c-1" },
     });
     expect(notificationDestination(notification("price_alert", { catalog_game_id: 42 }))).toEqual({
       to: "/games/$gameId",

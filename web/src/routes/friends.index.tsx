@@ -1,30 +1,24 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { FriendConversationHistory } from "@/components/FriendConversationHistory";
+import { FriendActions } from "@/components/FriendActions";
+import { FriendsSync, BlockedUsers } from "@/components/FriendsSync";
 import { Avatar } from "@/components/GameCover";
 import { UserProfileLink } from "@/components/UserProfileLink";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   acceptFriendRequest,
-  ApiError,
   createFriendRequest,
-  createSocialFriendRequest,
   getConversations,
   getFriendSocialSummary,
   getGameInvites,
-  getSteamSocial,
   respondToGameInvite,
   markNotificationRead,
   searchUsers,
 } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
-import {
-  friendsQueryOptions,
-  incomingFriendRequestsQueryOptions,
-  steamSocialInfiniteQueryOptions,
-} from "@/lib/navigationQueries";
+import { friendsQueryOptions, incomingFriendRequestsQueryOptions } from "@/lib/navigationQueries";
 import { Search, UserPlus, Gamepad2, MessageCircle, Users } from "lucide-react";
 
 export const Route = createFileRoute("/friends/")({
@@ -62,14 +56,11 @@ function FriendsPage() {
   const notificationSearch = Route.useSearch();
   const queryClient = useQueryClient();
   const [showAddFriend, setShowAddFriend] = useState(false);
-  const [friendSource, setFriendSource] = useState<"playfinder" | "steam">("playfinder");
-  const [steamExpanded, setSteamExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("");
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
   const markedNotificationIds = useRef(new Set<string>());
   const friendsQuery = useQuery(friendsQueryOptions());
-  const steamSocialQuery = useInfiniteQuery({ ...steamSocialInfiniteQueryOptions(), retry: false });
   const incomingQuery = useQuery(incomingFriendRequestsQueryOptions());
   const gameInvitesQuery = useQuery({
     queryKey: ["game-invites", "incoming"],
@@ -86,11 +77,6 @@ function FriendsPage() {
       setStatus("Request sent");
       setSearchTerm("");
     },
-  });
-  const steamRequestMutation = useMutation({
-    mutationFn: ({ publicId }: { publicId: string; name: string }) =>
-      createSocialFriendRequest(publicId),
-    onSuccess: (_, { name }) => setStatus(`Friend request sent to ${name}`),
   });
   const acceptMutation = useMutation({
     mutationFn: (id: string) => acceptFriendRequest(id),
@@ -132,7 +118,7 @@ function FriendsPage() {
   const list = friends;
   const conversationsQuery = useQuery({
     queryKey: ["conversations"],
-    queryFn: getConversations,
+    queryFn: () => getConversations(),
   });
   const matchingConversation = conversationsQuery.data?.find(
     (conversation) => conversation.id === notificationSearch.conversation,
@@ -178,20 +164,14 @@ function FriendsPage() {
       gameInvitesQuery.isError ||
       conversationsQuery.isError ||
       (incomingQuery.isSuccess && gameInvitesQuery.isSuccess && conversationsQuery.isSuccess));
-  const steamFriends = (steamSocialQuery.data?.pages.flatMap((page) => page.friends) ?? []).sort(
-    (a, b) =>
-      b.taste_match_percent - a.taste_match_percent || b.common_games_count - a.common_games_count,
-  );
-  const visibleSteamFriends = steamExpanded ? steamFriends : steamFriends.slice(0, 12);
-  const steamFriendsTotal = steamSocialQuery.data?.pages[0]?.friends_total ?? 0;
-  const steamState =
-    steamSocialQuery.error instanceof ApiError
-      ? steamSocialQuery.error.status === 409
-        ? "disconnected"
-        : steamSocialQuery.error.status === 403
-          ? "private"
-          : "error"
-      : null;
+  if (notificationSearch.conversation)
+    return (
+      <Navigate
+        to="/messages/$conversationId"
+        params={{ conversationId: notificationSearch.conversation }}
+        replace
+      />
+    );
 
   if (friendsQuery.isPending && !friendsQuery.data) {
     return (
@@ -208,6 +188,7 @@ function FriendsPage() {
 
   return (
     <AppShell>
+      <FriendsSync />
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
         <div className="space-y-10 lg:col-span-8">
           <div>
@@ -217,25 +198,11 @@ function FriendsPage() {
               action={
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setFriendSource("playfinder")}
-                    className={`rounded-lg px-3 py-2 text-xs font-bold ${friendSource === "playfinder" ? "bg-primary text-primary-foreground" : "border border-border"}`}
+                    onClick={() => setShowAddFriend(true)}
+                    className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
                   >
-                    Playfinder friends
+                    <UserPlus className="size-3.5" /> Add friend
                   </button>
-                  <button
-                    onClick={() => setFriendSource("steam")}
-                    className={`rounded-lg px-3 py-2 text-xs font-bold ${friendSource === "steam" ? "bg-primary text-primary-foreground" : "border border-border"}`}
-                  >
-                    Steam friends
-                  </button>
-                  {friendSource === "playfinder" && (
-                    <button
-                      onClick={() => setShowAddFriend(true)}
-                      className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
-                    >
-                      <UserPlus className="size-3.5" /> Add friend
-                    </button>
-                  )}
                 </div>
               }
             />
@@ -370,9 +337,7 @@ function FriendsPage() {
                 {status}
               </p>
             )}
-            <div
-              className={`mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 focus-within:border-primary/60 ${friendSource === "steam" ? "hidden" : ""}`}
-            >
+            <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 focus-within:border-primary/60">
               <Search className="size-4 text-muted-foreground" />
               <input
                 aria-label="Find players"
@@ -387,190 +352,89 @@ function FriendsPage() {
               />
             </div>
 
-            <section className={friendSource === "steam" ? "mb-8" : "hidden"}>
-              <SectionHeader
-                title="Steam friends"
-                hint={
-                  steamSocialQuery.data
-                    ? `${steamFriendsTotal} friends`
-                    : "Connect Steam to compare libraries"
+            {friends.length === 0 ? (
+              <EmptyState
+                icon={<Users className="size-5" />}
+                title="No friends yet"
+                description="Add friends to compare libraries and find games you can play together."
+                action={
+                  <button
+                    onClick={() => setShowAddFriend(true)}
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+                  >
+                    Add friend
+                  </button>
                 }
               />
-              {steamFriends.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {visibleSteamFriends.map((friend) => (
-                    <div
-                      key={friend.steam_id}
-                      className="hover-lift flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
-                    >
-                      <a
-                        href={`https://steamcommunity.com/profiles/${friend.steam_id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={friend.persona_name ?? "Steam friend"}
-                        className="flex min-w-0 flex-1 items-center gap-3"
-                      >
-                        <Avatar
-                          from="#2563eb"
-                          to="#111827"
-                          name={friend.persona_name ?? "Steam friend"}
-                          image={friend.avatar ?? undefined}
-                          className="size-12 rounded-full"
-                        />
-                        <div className="min-w-0">
-                          <p className="truncate font-bold">
-                            {friend.persona_name ?? "Steam friend"}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {friend.library_public
-                              ? `${friend.taste_match_percent}% match · ${friend.common_games_count} shared`
-                              : "Library is private"}
-                          </p>
-                        </div>
-                      </a>
-                      {friend.public_id && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            steamRequestMutation.mutate({
-                              publicId: friend.public_id!,
-                              name: friend.persona_name ?? "Steam friend",
-                            })
-                          }
-                          disabled={steamRequestMutation.isPending}
-                          className="shrink-0 rounded-md border border-primary px-3 py-1.5 text-xs font-bold text-primary"
-                        >
-                          Add {friend.persona_name ?? "Steam friend"} on Playfinder
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={<Users className="size-5" />}
-                  title="No Steam friends available"
-                  description={
-                    steamState === "disconnected"
-                      ? "Steam is not connected. Connect Steam to view friends."
-                      : steamState === "private"
-                        ? "Steam friends list is private. Make it public in Steam to compare libraries."
-                        : steamState === "error"
-                          ? "Steam could not be reached. Try again shortly."
-                          : "Connect Steam to compare libraries and taste match."
-                  }
-                />
-              )}
-              {(steamSocialQuery.hasNextPage || steamFriends.length > 12) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!steamExpanded) {
-                      setSteamExpanded(true);
-                      if (steamSocialQuery.hasNextPage) steamSocialQuery.fetchNextPage();
-                    } else if (steamSocialQuery.hasNextPage) steamSocialQuery.fetchNextPage();
-                    else setSteamExpanded(false);
-                  }}
-                  disabled={steamSocialQuery.isFetchingNextPage}
-                  className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold hover:border-primary/50"
-                >
-                  {steamSocialQuery.isFetchingNextPage
-                    ? "Loading…"
-                    : steamExpanded && !steamSocialQuery.hasNextPage
-                      ? "Show fewer Steam friends"
-                      : "Show more Steam friends"}
-                </button>
-              )}
-            </section>
-
-            {friendSource === "playfinder" &&
-              (friends.length === 0 ? (
-                <EmptyState
-                  icon={<Users className="size-5" />}
-                  title="No friends yet"
-                  description="Add friends to compare libraries and find games you can play together."
-                  action={
+            ) : (
+              <div className="stagger space-y-3">
+                {list.map((f) => (
+                  <div
+                    key={f.id}
+                    className="hover-lift grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
+                  >
                     <button
-                      onClick={() => setShowAddFriend(true)}
-                      className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+                      type="button"
+                      aria-label={`Select ${f.name}`}
+                      aria-pressed={selectedId === f.id}
+                      onClick={() => setSelectedFriendId(f.id)}
+                      className="flex min-w-0 items-center gap-4 text-left"
                     >
-                      Add friend
-                    </button>
-                  }
-                />
-              ) : (
-                <div className="stagger space-y-3">
-                  {list.map((f) => (
-                    <div
-                      key={f.id}
-                      className="hover-lift grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40"
-                    >
-                      <button
-                        type="button"
-                        aria-label={`Select ${f.name}`}
-                        aria-pressed={selectedId === f.id}
-                        onClick={() => setSelectedFriendId(f.id)}
-                        className="flex min-w-0 items-center gap-4 text-left"
-                      >
-                        <div className="relative shrink-0">
-                          <Avatar
-                            from={f.avatarFrom}
-                            to={f.avatarTo}
-                            name={f.name}
-                            image={f.avatarUrl ?? undefined}
-                            className="size-14 rounded-full"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <UserProfileLink publicId={f.publicId} className="truncate font-bold">
-                              {f.name}
-                            </UserProfileLink>
-                            {f.steamPersonaName && (
-                              <span className="font-mono text-[10px] text-muted-foreground">
-                                Steam · {f.steamPersonaName}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                      <div className="flex flex-col gap-2">
-                        <UserProfileLink
-                          publicId={f.publicId}
-                          aria-label={`View ${f.name}'s profile`}
-                          className="rounded-md border border-border px-3 py-1.5 text-center text-xs font-bold"
-                        >
-                          View profile
-                        </UserProfileLink>
-                        <button
-                          onClick={() =>
-                            navigate({
-                              to: "/users/$publicId",
-                              params: { publicId: f.publicId },
-                              search: { compose: "invite" },
-                            })
-                          }
-                          className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
-                        >
-                          Invite to play
-                        </button>
-                        <button
-                          onClick={() =>
-                            navigate({
-                              to: "/users/$publicId",
-                              params: { publicId: f.publicId },
-                              search: { compose: "message" },
-                            })
-                          }
-                          className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold"
-                        >
-                          Message
-                        </button>
+                      <div className="relative shrink-0">
+                        <Avatar
+                          from={f.avatarFrom}
+                          to={f.avatarTo}
+                          name={f.name}
+                          image={f.avatarUrl ?? undefined}
+                          className="size-14 rounded-full"
+                        />
                       </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <UserProfileLink publicId={f.publicId} className="truncate font-bold">
+                            {f.name}
+                          </UserProfileLink>
+                          {f.steamPersonaName && (
+                            <span className="font-mono text-[10px] text-muted-foreground">
+                              Steam · {f.steamPersonaName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                    <div className="flex flex-col gap-2">
+                      <UserProfileLink
+                        publicId={f.publicId}
+                        aria-label={`View ${f.name}'s profile`}
+                        className="rounded-md border border-border px-3 py-1.5 text-center text-xs font-bold"
+                      >
+                        View profile
+                      </UserProfileLink>
+                      <button
+                        onClick={() =>
+                          navigate({
+                            to: "/users/$publicId",
+                            params: { publicId: f.publicId },
+                            search: { compose: "invite" },
+                          })
+                        }
+                        className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
+                      >
+                        Invite to play
+                      </button>
+                      <Link
+                        to="/messages"
+                        search={{ friend: f.id }}
+                        className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-bold"
+                      >
+                        Message
+                      </Link>
+                      <FriendActions userId={f.id} name={f.name} isFriend />
                     </div>
-                  ))}
-                </div>
-              ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <aside className="space-y-8 lg:col-span-4">
@@ -637,22 +501,23 @@ function FriendsPage() {
                   >
                     Invite to play
                   </button>
-                  <button
+                  <Link
+                    to="/messages"
+                    search={{ friend: selectedFriend.id }}
                     aria-label="Quick message"
-                    onClick={() =>
-                      navigate({
-                        to: "/users/$publicId",
-                        params: { publicId: selectedFriend.publicId },
-                        search: { compose: "message" },
-                      })
-                    }
                     className="grid size-10 place-items-center rounded-lg border border-border"
                   >
                     <MessageCircle className="size-4" />
-                  </button>
+                  </Link>
                 </div>
               </section>
-              <FriendConversationHistory friendId={selectedFriend.id} />
+              <Link
+                to="/messages"
+                search={{ friend: selectedFriend.id }}
+                className="font-bold text-primary"
+              >
+                Open chat
+              </Link>
             </>
           ) : (
             <EmptyState
@@ -661,6 +526,7 @@ function FriendsPage() {
               description="Add a friend to compare libraries."
             />
           )}
+          <BlockedUsers />
         </aside>
       </div>
     </AppShell>

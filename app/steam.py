@@ -143,8 +143,9 @@ async def fetch_steam_profiles(steam_ids: list[str]) -> dict[str, dict[str, str 
 async def fetch_steam_friends(
     steam_id: str,
     *,
-    limit: int = 24,
+    limit: int | None = 24,
     offset: int = 0,
+    include_profiles: bool = True,
 ) -> tuple[list[dict[str, Any]], int]:
     api_key = get_steam_api_key()
     if not api_key:
@@ -170,8 +171,8 @@ async def fetch_steam_friends(
 
     sorted_friends = sorted(friends, key=lambda item: item.get("friend_since") or 0, reverse=True)
     total = len(sorted_friends)
-    selected = sorted_friends[offset : offset + limit]
-    profile_map = await fetch_steam_profiles([str(friend.get("steamid")) for friend in selected if friend.get("steamid")])
+    selected = sorted_friends[offset : None if limit is None else offset + limit]
+    profile_map = await fetch_steam_profiles([str(friend.get("steamid")) for friend in selected if friend.get("steamid")]) if include_profiles else {}
 
     return [
         {

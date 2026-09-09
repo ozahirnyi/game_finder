@@ -25,7 +25,10 @@ export function FriendConversationHistory({
   friendId,
   title = "Messages",
 }: FriendConversationHistoryProps) {
-  const conversationsQuery = useQuery({ queryKey: ["conversations"], queryFn: getConversations });
+  const conversationsQuery = useQuery({
+    queryKey: ["conversations"],
+    queryFn: () => getConversations(),
+  });
   const conversation = conversationsQuery.data?.find((item) => item.participant.id === friendId);
   const messagesQuery = useQuery({
     queryKey: ["conversation-messages", conversation?.id],
