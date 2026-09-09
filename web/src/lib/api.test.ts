@@ -12,6 +12,7 @@ import {
   getFavorites,
   getLibraryOverview,
   getOnboardingSummary,
+  getPriceHistory,
   getPublicProfile,
   getRecommendations,
   getSteamLinkUrl,
@@ -86,6 +87,25 @@ describe("apiRequest", () => {
       }),
     );
     expect(getToken()).toBeNull();
+  });
+
+  it("passes the signed-in token to price history so the API can apply the profile region", async () => {
+    setToken("token");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ history: [], deals: [], history_available: false }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getPriceHistory(123, "US");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/prices/games/123?country=US",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
   });
 
   it("submits login credentials as an OAuth form", async () => {

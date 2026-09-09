@@ -310,7 +310,7 @@ function Home() {
         </Panel>
       ) : best ? (
         <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
-          <div className="animate-reveal group lg:col-span-12">
+          <div className="animate-reveal group lg:col-span-6">
             {bestTarget ? (
               <Link
                 to="/games/$gameId"

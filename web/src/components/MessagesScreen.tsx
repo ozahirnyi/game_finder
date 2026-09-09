@@ -44,7 +44,7 @@ export function MessagesScreen({
     refetchOnWindowFocus: "always",
   });
   return (
-    <div className="grid min-h-[calc(100vh-4rem)] gap-0 md:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="grid min-h-[calc(100dvh-4rem)] gap-0 md:grid-cols-[280px_minmax(0,1fr)]">
       <aside
         className={`${conversationId ? "hidden md:block" : ""} border-r border-border bg-surface p-4`}
       >
