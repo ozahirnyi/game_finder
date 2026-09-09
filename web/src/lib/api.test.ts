@@ -12,6 +12,9 @@ import {
   getFavorites,
   getLibraryOverview,
   getOnboardingSummary,
+  getPriceHistory,
+  getSteamGame,
+  getSteamPriceHistory,
   getPublicProfile,
   getRecommendations,
   getSteamLinkUrl,
@@ -29,6 +32,30 @@ describe("apiRequest", () => {
   afterEach(() => {
     clearToken();
     vi.restoreAllMocks();
+  });
+
+  it("forwards the signed-in token to price endpoints so the server can apply profile pricing", async () => {
+    setToken("token");
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({}), { headers: { "content-type": "application/json" } }),
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getPriceHistory(274755);
+    await getSteamPriceHistory(730);
+    await getSteamGame(730);
+
+    for (const call of fetchMock.mock.calls) {
+      expect(call[1]).toEqual(
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: "Bearer token" }),
+        }),
+      );
+    }
   });
 
   it("uses the same-origin API proxy when no public API URL is configured", async () => {
