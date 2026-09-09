@@ -54,10 +54,11 @@ test("malformed notification targets stay unread and show a neutral unavailable 
   await page.goto("/account");
   await waitForHydration(page);
   await page.getByText("Game invite", { exact: true }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "This notification action is no longer available.",
-    { timeout: 15_000 },
-  );
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "This notification action is no longer available." }),
+  ).toContainText("This notification action is no longer available.", { timeout: 15_000 });
   await expect
     .poll(() => api.requests.some((request) => request.path === "/notifications/n-bad/read"))
     .toBe(false);
@@ -74,7 +75,7 @@ const notificationDestinations = [
     "message",
     "New message",
     { from: "Sam", conversation_id: "conversation-1" },
-    "**/friends?conversation=conversation-1&notification=n-target",
+    "**/messages/conversation-1",
   ],
   [
     "game_invite",
@@ -110,6 +111,15 @@ for (const [type, title, payload, url] of notificationDestinations) {
       wishlist: { status: "hidden", data: [] },
     };
     if (type === "message")
+      api.state.messages["conversation-1"] = [
+        {
+          id: "message-1",
+          sender_id: "friend-1",
+          body: "Hello",
+          created_at: "2026-08-21T00:00:00Z",
+        },
+      ];
+    if (type === "message")
       api.state.conversations = [
         {
           id: "conversation-1",
@@ -134,7 +144,15 @@ for (const [type, title, payload, url] of notificationDestinations) {
     await page.getByText(title, { exact: true }).click();
     await page.waitForURL(url);
     await expect
-      .poll(() => api.requests.some((request) => request.path === "/notifications/n-target/read"))
+      .poll(() =>
+        api.requests.some(
+          (request) =>
+            request.path ===
+            (type === "message"
+              ? "/conversations/conversation-1/read"
+              : "/notifications/n-target/read"),
+        ),
+      )
       .toBe(true);
   });
 }
@@ -155,10 +173,11 @@ test("deleted friend-request targets stay unread and report neutral unavailabili
   await page.goto("/account");
   await waitForHydration(page);
   await page.getByText("Friend request", { exact: true }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "This notification action is no longer available.",
-    { timeout: 15_000 },
-  );
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "This notification action is no longer available." }),
+  ).toContainText("This notification action is no longer available.", { timeout: 15_000 });
   await expect
     .poll(() => api.requests.some((request) => request.path === "/notifications/n-deleted/read"))
     .toBe(false);
@@ -181,9 +200,11 @@ test("unauthorized friend-request targets stay unread and report neutral unavail
   await page.goto("/account");
   await waitForHydration(page);
   await page.getByText("Friend request", { exact: true }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "This notification action is no longer available.",
-  );
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "This notification action is no longer available." }),
+  ).toContainText("This notification action is no longer available.");
   await expect
     .poll(() =>
       api.requests.some((request) => request.path === "/notifications/n-unauthorized/read"),

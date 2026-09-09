@@ -8,310 +8,350 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AccountRouteImport } from './routes/account'
-import { Route as DealsRouteImport } from './routes/deals'
-import { Route as LibraryRouteImport } from './routes/library'
-import { Route as PsnImportRouteImport } from './routes/psn-import'
-import { Route as PsnLibraryRepairRouteImport } from './routes/psn-library-repair'
-import { Route as SearchRouteImport } from './routes/search'
-import { Route as SignInRouteImport } from './routes/sign-in'
-import { Route as SignUpRouteImport } from './routes/sign-up'
-import { Route as WishlistRouteImport } from './routes/wishlist'
-import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
-import { Route as FriendsIndexRouteImport } from './routes/friends.index'
-import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
-import { Route as UsersPublicIdRouteImport } from './routes/users.$publicId'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as IndexRouteImport } from "./routes/index";
+import { Route as AccountRouteImport } from "./routes/account";
+import { Route as DealsRouteImport } from "./routes/deals";
+import { Route as LibraryRouteImport } from "./routes/library";
+import { Route as PsnImportRouteImport } from "./routes/psn-import";
+import { Route as PsnLibraryRepairRouteImport } from "./routes/psn-library-repair";
+import { Route as SearchRouteImport } from "./routes/search";
+import { Route as SignInRouteImport } from "./routes/sign-in";
+import { Route as SignUpRouteImport } from "./routes/sign-up";
+import { Route as WishlistRouteImport } from "./routes/wishlist";
+import { Route as AuthCallbackRouteImport } from "./routes/auth.callback";
+import { Route as FriendsIndexRouteImport } from "./routes/friends.index";
+import { Route as GamesGameIdRouteImport } from "./routes/games.$gameId";
+import { Route as MessagesIndexRouteImport } from "./routes/messages.index";
+import { Route as MessagesConversationIdRouteImport } from "./routes/messages.$conversationId";
+import { Route as UsersPublicIdRouteImport } from "./routes/users.$publicId";
 
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AccountRoute = AccountRouteImport.update({
-  id: '/account',
-  path: '/account',
+  id: "/account",
+  path: "/account",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const DealsRoute = DealsRouteImport.update({
-  id: '/deals',
-  path: '/deals',
+  id: "/deals",
+  path: "/deals",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const LibraryRoute = LibraryRouteImport.update({
-  id: '/library',
-  path: '/library',
+  id: "/library",
+  path: "/library",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PsnImportRoute = PsnImportRouteImport.update({
-  id: '/psn-import',
-  path: '/psn-import',
+  id: "/psn-import",
+  path: "/psn-import",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PsnLibraryRepairRoute = PsnLibraryRepairRouteImport.update({
-  id: '/psn-library-repair',
-  path: '/psn-library-repair',
+  id: "/psn-library-repair",
+  path: "/psn-library-repair",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SearchRoute = SearchRouteImport.update({
-  id: '/search',
-  path: '/search',
+  id: "/search",
+  path: "/search",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SignInRoute = SignInRouteImport.update({
-  id: '/sign-in',
-  path: '/sign-in',
+  id: "/sign-in",
+  path: "/sign-in",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SignUpRoute = SignUpRouteImport.update({
-  id: '/sign-up',
-  path: '/sign-up',
+  id: "/sign-up",
+  path: "/sign-up",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const WishlistRoute = WishlistRouteImport.update({
-  id: '/wishlist',
-  path: '/wishlist',
+  id: "/wishlist",
+  path: "/wishlist",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
-  id: '/auth/callback',
-  path: '/auth/callback',
+  id: "/auth/callback",
+  path: "/auth/callback",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const FriendsIndexRoute = FriendsIndexRouteImport.update({
-  id: '/friends/',
-  path: '/friends/',
+  id: "/friends/",
+  path: "/friends/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
-  id: '/games/$gameId',
-  path: '/games/$gameId',
+  id: "/games/$gameId",
+  path: "/games/$gameId",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
+const MessagesIndexRoute = MessagesIndexRouteImport.update({
+  id: "/messages/",
+  path: "/messages/",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
+  id: "/messages/$conversationId",
+  path: "/messages/$conversationId",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const UsersPublicIdRoute = UsersPublicIdRouteImport.update({
-  id: '/users/$publicId',
-  path: '/users/$publicId',
+  id: "/users/$publicId",
+  path: "/users/$publicId",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/account': typeof AccountRoute
-  '/deals': typeof DealsRoute
-  '/library': typeof LibraryRoute
-  '/psn-import': typeof PsnImportRoute
-  '/psn-library-repair': typeof PsnLibraryRepairRoute
-  '/search': typeof SearchRoute
-  '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
-  '/wishlist': typeof WishlistRoute
-  '/auth/callback': typeof AuthCallbackRoute
-  '/games/$gameId': typeof GamesGameIdRoute
-  '/users/$publicId': typeof UsersPublicIdRoute
-  '/friends/': typeof FriendsIndexRoute
+  "/": typeof IndexRoute;
+  "/account": typeof AccountRoute;
+  "/deals": typeof DealsRoute;
+  "/library": typeof LibraryRoute;
+  "/psn-import": typeof PsnImportRoute;
+  "/psn-library-repair": typeof PsnLibraryRepairRoute;
+  "/search": typeof SearchRoute;
+  "/sign-in": typeof SignInRoute;
+  "/sign-up": typeof SignUpRoute;
+  "/wishlist": typeof WishlistRoute;
+  "/auth/callback": typeof AuthCallbackRoute;
+  "/games/$gameId": typeof GamesGameIdRoute;
+  "/messages/$conversationId": typeof MessagesConversationIdRoute;
+  "/users/$publicId": typeof UsersPublicIdRoute;
+  "/friends/": typeof FriendsIndexRoute;
+  "/messages/": typeof MessagesIndexRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/account': typeof AccountRoute
-  '/deals': typeof DealsRoute
-  '/library': typeof LibraryRoute
-  '/psn-import': typeof PsnImportRoute
-  '/psn-library-repair': typeof PsnLibraryRepairRoute
-  '/search': typeof SearchRoute
-  '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
-  '/wishlist': typeof WishlistRoute
-  '/auth/callback': typeof AuthCallbackRoute
-  '/games/$gameId': typeof GamesGameIdRoute
-  '/users/$publicId': typeof UsersPublicIdRoute
-  '/friends': typeof FriendsIndexRoute
+  "/": typeof IndexRoute;
+  "/account": typeof AccountRoute;
+  "/deals": typeof DealsRoute;
+  "/library": typeof LibraryRoute;
+  "/psn-import": typeof PsnImportRoute;
+  "/psn-library-repair": typeof PsnLibraryRepairRoute;
+  "/search": typeof SearchRoute;
+  "/sign-in": typeof SignInRoute;
+  "/sign-up": typeof SignUpRoute;
+  "/wishlist": typeof WishlistRoute;
+  "/auth/callback": typeof AuthCallbackRoute;
+  "/games/$gameId": typeof GamesGameIdRoute;
+  "/messages/$conversationId": typeof MessagesConversationIdRoute;
+  "/users/$publicId": typeof UsersPublicIdRoute;
+  "/friends": typeof FriendsIndexRoute;
+  "/messages": typeof MessagesIndexRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/account': typeof AccountRoute
-  '/deals': typeof DealsRoute
-  '/library': typeof LibraryRoute
-  '/psn-import': typeof PsnImportRoute
-  '/psn-library-repair': typeof PsnLibraryRepairRoute
-  '/search': typeof SearchRoute
-  '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
-  '/wishlist': typeof WishlistRoute
-  '/auth/callback': typeof AuthCallbackRoute
-  '/games/$gameId': typeof GamesGameIdRoute
-  '/users/$publicId': typeof UsersPublicIdRoute
-  '/friends/': typeof FriendsIndexRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/account": typeof AccountRoute;
+  "/deals": typeof DealsRoute;
+  "/library": typeof LibraryRoute;
+  "/psn-import": typeof PsnImportRoute;
+  "/psn-library-repair": typeof PsnLibraryRepairRoute;
+  "/search": typeof SearchRoute;
+  "/sign-in": typeof SignInRoute;
+  "/sign-up": typeof SignUpRoute;
+  "/wishlist": typeof WishlistRoute;
+  "/auth/callback": typeof AuthCallbackRoute;
+  "/games/$gameId": typeof GamesGameIdRoute;
+  "/messages/$conversationId": typeof MessagesConversationIdRoute;
+  "/users/$publicId": typeof UsersPublicIdRoute;
+  "/friends/": typeof FriendsIndexRoute;
+  "/messages/": typeof MessagesIndexRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
-    | '/'
-    | '/account'
-    | '/deals'
-    | '/library'
-    | '/psn-import'
-    | '/psn-library-repair'
-    | '/search'
-    | '/sign-in'
-    | '/sign-up'
-    | '/wishlist'
-    | '/auth/callback'
-    | '/games/$gameId'
-    | '/users/$publicId'
-    | '/friends/'
-  fileRoutesByTo: FileRoutesByTo
+    | "/"
+    | "/account"
+    | "/deals"
+    | "/library"
+    | "/psn-import"
+    | "/psn-library-repair"
+    | "/search"
+    | "/sign-in"
+    | "/sign-up"
+    | "/wishlist"
+    | "/auth/callback"
+    | "/games/$gameId"
+    | "/messages/$conversationId"
+    | "/users/$publicId"
+    | "/friends/"
+    | "/messages/";
+  fileRoutesByTo: FileRoutesByTo;
   to:
-    | '/'
-    | '/account'
-    | '/deals'
-    | '/library'
-    | '/psn-import'
-    | '/psn-library-repair'
-    | '/search'
-    | '/sign-in'
-    | '/sign-up'
-    | '/wishlist'
-    | '/auth/callback'
-    | '/games/$gameId'
-    | '/users/$publicId'
-    | '/friends'
+    | "/"
+    | "/account"
+    | "/deals"
+    | "/library"
+    | "/psn-import"
+    | "/psn-library-repair"
+    | "/search"
+    | "/sign-in"
+    | "/sign-up"
+    | "/wishlist"
+    | "/auth/callback"
+    | "/games/$gameId"
+    | "/messages/$conversationId"
+    | "/users/$publicId"
+    | "/friends"
+    | "/messages";
   id:
-    | '__root__'
-    | '/'
-    | '/account'
-    | '/deals'
-    | '/library'
-    | '/psn-import'
-    | '/psn-library-repair'
-    | '/search'
-    | '/sign-in'
-    | '/sign-up'
-    | '/wishlist'
-    | '/auth/callback'
-    | '/games/$gameId'
-    | '/users/$publicId'
-    | '/friends/'
-  fileRoutesById: FileRoutesById
+    | "__root__"
+    | "/"
+    | "/account"
+    | "/deals"
+    | "/library"
+    | "/psn-import"
+    | "/psn-library-repair"
+    | "/search"
+    | "/sign-in"
+    | "/sign-up"
+    | "/wishlist"
+    | "/auth/callback"
+    | "/games/$gameId"
+    | "/messages/$conversationId"
+    | "/users/$publicId"
+    | "/friends/"
+    | "/messages/";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AccountRoute: typeof AccountRoute
-  DealsRoute: typeof DealsRoute
-  LibraryRoute: typeof LibraryRoute
-  PsnImportRoute: typeof PsnImportRoute
-  PsnLibraryRepairRoute: typeof PsnLibraryRepairRoute
-  SearchRoute: typeof SearchRoute
-  SignInRoute: typeof SignInRoute
-  SignUpRoute: typeof SignUpRoute
-  WishlistRoute: typeof WishlistRoute
-  AuthCallbackRoute: typeof AuthCallbackRoute
-  GamesGameIdRoute: typeof GamesGameIdRoute
-  UsersPublicIdRoute: typeof UsersPublicIdRoute
-  FriendsIndexRoute: typeof FriendsIndexRoute
+  IndexRoute: typeof IndexRoute;
+  AccountRoute: typeof AccountRoute;
+  DealsRoute: typeof DealsRoute;
+  LibraryRoute: typeof LibraryRoute;
+  PsnImportRoute: typeof PsnImportRoute;
+  PsnLibraryRepairRoute: typeof PsnLibraryRepairRoute;
+  SearchRoute: typeof SearchRoute;
+  SignInRoute: typeof SignInRoute;
+  SignUpRoute: typeof SignUpRoute;
+  WishlistRoute: typeof WishlistRoute;
+  AuthCallbackRoute: typeof AuthCallbackRoute;
+  GamesGameIdRoute: typeof GamesGameIdRoute;
+  MessagesConversationIdRoute: typeof MessagesConversationIdRoute;
+  UsersPublicIdRoute: typeof UsersPublicIdRoute;
+  FriendsIndexRoute: typeof FriendsIndexRoute;
+  MessagesIndexRoute: typeof MessagesIndexRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account': {
-      id: '/account'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof AccountRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/deals': {
-      id: '/deals'
-      path: '/deals'
-      fullPath: '/deals'
-      preLoaderRoute: typeof DealsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/library': {
-      id: '/library'
-      path: '/library'
-      fullPath: '/library'
-      preLoaderRoute: typeof LibraryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/psn-import': {
-      id: '/psn-import'
-      path: '/psn-import'
-      fullPath: '/psn-import'
-      preLoaderRoute: typeof PsnImportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/psn-library-repair': {
-      id: '/psn-library-repair'
-      path: '/psn-library-repair'
-      fullPath: '/psn-library-repair'
-      preLoaderRoute: typeof PsnLibraryRepairRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/search': {
-      id: '/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof SearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sign-in': {
-      id: '/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof SignInRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sign-up': {
-      id: '/sign-up'
-      path: '/sign-up'
-      fullPath: '/sign-up'
-      preLoaderRoute: typeof SignUpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/wishlist': {
-      id: '/wishlist'
-      path: '/wishlist'
-      fullPath: '/wishlist'
-      preLoaderRoute: typeof WishlistRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/callback': {
-      id: '/auth/callback'
-      path: '/auth/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/friends/': {
-      id: '/friends/'
-      path: '/friends'
-      fullPath: '/friends/'
-      preLoaderRoute: typeof FriendsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/games/$gameId': {
-      id: '/games/$gameId'
-      path: '/games/$gameId'
-      fullPath: '/games/$gameId'
-      preLoaderRoute: typeof GamesGameIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/users/$publicId': {
-      id: '/users/$publicId'
-      path: '/users/$publicId'
-      fullPath: '/users/$publicId'
-      preLoaderRoute: typeof UsersPublicIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/account": {
+      id: "/account";
+      path: "/account";
+      fullPath: "/account";
+      preLoaderRoute: typeof AccountRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/deals": {
+      id: "/deals";
+      path: "/deals";
+      fullPath: "/deals";
+      preLoaderRoute: typeof DealsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/library": {
+      id: "/library";
+      path: "/library";
+      fullPath: "/library";
+      preLoaderRoute: typeof LibraryRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/psn-import": {
+      id: "/psn-import";
+      path: "/psn-import";
+      fullPath: "/psn-import";
+      preLoaderRoute: typeof PsnImportRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/psn-library-repair": {
+      id: "/psn-library-repair";
+      path: "/psn-library-repair";
+      fullPath: "/psn-library-repair";
+      preLoaderRoute: typeof PsnLibraryRepairRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/search": {
+      id: "/search";
+      path: "/search";
+      fullPath: "/search";
+      preLoaderRoute: typeof SearchRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/sign-in": {
+      id: "/sign-in";
+      path: "/sign-in";
+      fullPath: "/sign-in";
+      preLoaderRoute: typeof SignInRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/sign-up": {
+      id: "/sign-up";
+      path: "/sign-up";
+      fullPath: "/sign-up";
+      preLoaderRoute: typeof SignUpRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/wishlist": {
+      id: "/wishlist";
+      path: "/wishlist";
+      fullPath: "/wishlist";
+      preLoaderRoute: typeof WishlistRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/auth/callback": {
+      id: "/auth/callback";
+      path: "/auth/callback";
+      fullPath: "/auth/callback";
+      preLoaderRoute: typeof AuthCallbackRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/friends/": {
+      id: "/friends/";
+      path: "/friends";
+      fullPath: "/friends/";
+      preLoaderRoute: typeof FriendsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/games/$gameId": {
+      id: "/games/$gameId";
+      path: "/games/$gameId";
+      fullPath: "/games/$gameId";
+      preLoaderRoute: typeof GamesGameIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/messages/": {
+      id: "/messages/";
+      path: "/messages";
+      fullPath: "/messages/";
+      preLoaderRoute: typeof MessagesIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/messages/$conversationId": {
+      id: "/messages/$conversationId";
+      path: "/messages/$conversationId";
+      fullPath: "/messages/$conversationId";
+      preLoaderRoute: typeof MessagesConversationIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/users/$publicId": {
+      id: "/users/$publicId";
+      path: "/users/$publicId";
+      fullPath: "/users/$publicId";
+      preLoaderRoute: typeof UsersPublicIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -328,19 +368,21 @@ const rootRouteChildren: RootRouteChildren = {
   WishlistRoute: WishlistRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   GamesGameIdRoute: GamesGameIdRoute,
+  MessagesConversationIdRoute: MessagesConversationIdRoute,
   UsersPublicIdRoute: UsersPublicIdRoute,
   FriendsIndexRoute: FriendsIndexRoute,
-}
+  MessagesIndexRoute: MessagesIndexRoute,
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
 
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
+import type { getRouter } from "./router.tsx";
+import type { startInstance } from "./start.ts";
+declare module "@tanstack/react-start" {
   interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+    ssr: true;
+    router: Awaited<ReturnType<typeof getRouter>>;
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>;
   }
 }

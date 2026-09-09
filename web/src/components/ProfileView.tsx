@@ -1,20 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { ConnectedServices } from "@/components/ConnectedServices";
-import { FriendConversationHistory } from "@/components/FriendConversationHistory";
+import { FriendActions } from "@/components/FriendActions";
+import { formatPlaytime } from "@/lib/profileLibrary";
+import type { GameDetailTarget } from "@/lib/gameRoute";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
-import {
-  createConversation,
-  createGameInvite,
-  createMessage,
-  clearToken,
-  type SharedLibrary,
-  updateProfile,
-} from "@/lib/api";
+import { createGameInvite, clearToken, type SharedLibrary, updateProfile } from "@/lib/api";
 import { LogOut, MessageCircle, Settings, UserPlus, Gamepad2, Library } from "lucide-react";
 
 const GENRE_OPTIONS = [
@@ -34,12 +29,6 @@ const PLATFORM_OPTIONS = ["PC", "PlayStation", "Xbox", "Nintendo Switch", "Mobil
 
 function toggle(values: string[], value: string) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
-}
-
-function formatPlaytime(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return hours > 0 ? (remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`) : `${remainder}m`;
 }
 
 export type ProfileData = {
@@ -62,6 +51,7 @@ export type ProfileData = {
     coverUrl?: string;
     playtime?: number | null;
     source?: string;
+    detail?: GameDetailTarget;
   }[];
   favorites?: {
     catalog_game_id: number;
@@ -71,6 +61,8 @@ export type ProfileData = {
   activity?: { id: number | string; text: string; time: string }[];
   sharedLibrary?: SharedLibrary;
   friendId?: string;
+  userId?: string;
+  libraryMessage?: string;
   steamProfileUrl?: string;
   settings?: {
     displayName: string;
@@ -119,9 +111,6 @@ export function ProfileView({
   );
   const [platforms, setPlatforms] = useState(profile.settings?.platforms ?? []);
   const [favoriteGenres, setFavoriteGenres] = useState(profile.settings?.favoriteGenres ?? []);
-  const [messageOpen, setMessageOpen] = useState(initialComposer === "message");
-  const [messageBody, setMessageBody] = useState("");
-  const messageTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [inviteOpen, setInviteOpen] = useState(initialComposer === "invite");
   const [selectedGameKey, setSelectedGameKey] = useState("");
   const queryClient = useQueryClient();
@@ -141,16 +130,6 @@ export function ProfileView({
     const game = profile.sharedLibrary.data[0];
     setSelectedGameKey(`${game.source}:${game.external_id}`);
   }, [inviteOpen, profile.sharedLibrary, selectedGameKey]);
-  const resetMessageComposer = () => {
-    setMessageBody("");
-    if (messageTextareaRef.current) messageTextareaRef.current.style.height = "";
-  };
-  const resizeMessageTextarea = () => {
-    const textarea = messageTextareaRef.current;
-    if (!textarea) return;
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 240)}px`;
-  };
   const saveSettings = useMutation({
     mutationFn: updateProfile,
     onSuccess: () => {
@@ -158,19 +137,6 @@ export function ProfileView({
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["genre-deals"] });
       setSettingsOpen(false);
-    },
-  });
-  const sendMessage = useMutation({
-    mutationFn: async () => {
-      if (!profile.friendId) throw new Error("Friend not available");
-      const conversation = await createConversation(profile.friendId);
-      return createMessage(conversation.id, messageBody.trim());
-    },
-    onSuccess: () => {
-      resetMessageComposer();
-      setMessageOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["conversation-messages"] });
     },
   });
   const sendInvite = useMutation({
@@ -291,13 +257,14 @@ export function ProfileView({
                 </button>
               )}
               {canMessage && profile.friendId && (
-                <button
-                  onClick={() => setMessageOpen(true)}
+                <Link
+                  to="/messages"
+                  search={{ friend: profile.friendId }}
                   aria-label={`Message ${profile.name}`}
                   className="grid size-11 place-items-center rounded-xl border border-border transition hover:border-primary/50"
                 >
                   <MessageCircle className="size-4" />
-                </button>
+                </Link>
               )}
             </>
           )}
@@ -422,63 +389,6 @@ export function ProfileView({
         </div>
       )}
       {!isSelf &&
-        messageOpen &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            role="dialog"
-            aria-label={`Message ${profile.name}`}
-            className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
-          >
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (messageBody.trim()) sendMessage.mutate();
-              }}
-              className="relative z-[60] w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl"
-            >
-              <h2 className="text-xl font-bold">Message {profile.name}</h2>
-              <textarea
-                aria-label="Message text"
-                ref={messageTextareaRef}
-                value={messageBody}
-                onChange={(event) => {
-                  setMessageBody(event.target.value);
-                  resizeMessageTextarea();
-                }}
-                required
-                maxLength={2000}
-                className="mt-4 min-h-28 w-full resize-none overflow-y-auto rounded-lg border border-border bg-surface-2 p-3"
-              />
-              {sendMessage.isError && (
-                <p role="alert" className="mt-2 text-sm text-destructive">
-                  Could not send message.
-                </p>
-              )}
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetMessageComposer();
-                    setMessageOpen(false);
-                  }}
-                  className="rounded-lg px-3 py-2 text-sm font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={sendMessage.isPending}
-                  className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground"
-                >
-                  Send
-                </button>
-              </div>
-            </form>
-          </div>,
-          document.body,
-        )}
-      {!isSelf &&
         inviteOpen &&
         typeof document !== "undefined" &&
         createPortal(
@@ -546,6 +456,15 @@ export function ProfileView({
           document.body,
         )}
 
+      {!isSelf && profile.userId && (
+        <div className="mb-4">
+          <FriendActions
+            userId={profile.userId}
+            name={profile.name}
+            isFriend={Boolean(profile.friendId)}
+          />
+        </div>
+      )}
       <div className="mb-8 flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl border border-border bg-surface-2 px-5 py-4">
         {[
           ...(!isSelf ? [{ l: "Games", v: profile.games.length }] : []),
@@ -624,7 +543,13 @@ export function ProfileView({
 
         {!isSelf && profile.friendId && (
           <Panel className="p-6 lg:col-span-12">
-            <FriendConversationHistory friendId={profile.friendId} />
+            <Link
+              to="/messages"
+              search={{ friend: profile.friendId }}
+              className="font-bold text-primary"
+            >
+              Open chat
+            </Link>
           </Panel>
         )}
 
@@ -681,6 +606,11 @@ export function ProfileView({
               title={isSelf ? "Your library" : "Their library"}
               hint={`${profile.games.length} games`}
             />
+            {profile.libraryMessage && (
+              <p role="status" className="mb-3 text-muted-foreground">
+                {profile.libraryMessage}
+              </p>
+            )}
             {profile.games.length === 0 ? (
               <EmptyState
                 icon={<Library className="size-5" />}
@@ -703,30 +633,52 @@ export function ProfileView({
               />
             ) : (
               <div className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {profile.games.map((g) => (
-                  <Link
-                    key={g.id}
-                    to="/games/$gameId"
-                    params={{ gameId: g.id }}
-                    className="hover-lift overflow-hidden rounded-xl border border-border bg-surface-2 hover:border-primary/40"
-                  >
-                    <GameCover
-                      from={g.coverFrom}
-                      to={g.coverTo}
-                      title={g.title}
-                      image={g.coverUrl}
-                      bare
-                      className="aspect-video w-full"
-                    />
-                    <div className="p-3">
-                      <p className="truncate text-sm font-bold">{g.title}</p>
-                      <p className="label-mono mt-1.5 flex items-center gap-1.5 text-muted-foreground">
-                        <Gamepad2 className="size-3" />
-                        {g.playtime != null ? formatPlaytime(g.playtime) : (g.source ?? "Owned")}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                {profile.games.map((g) => {
+                  const content = (
+                    <>
+                      <GameCover
+                        from={g.coverFrom}
+                        to={g.coverTo}
+                        title={g.title}
+                        image={g.coverUrl}
+                        bare
+                        className="aspect-video w-full"
+                      />
+                      <div className="p-3">
+                        <p className="truncate text-sm font-bold">{g.title}</p>
+                        <p className="label-mono mt-1.5 text-muted-foreground">
+                          {g.playtime != null ? formatPlaytime(g.playtime) : "Playtime unavailable"}
+                        </p>
+                        {!g.detail && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Catalog details unavailable
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  );
+                  return g.detail ? (
+                    <Link
+                      key={g.id}
+                      to="/games/$gameId"
+                      params={{ gameId: g.detail.gameId }}
+                      search={{
+                        title: g.title,
+                        ...(g.detail.source ? { source: g.detail.source } : {}),
+                      }}
+                      className="hover-lift overflow-hidden rounded-xl border border-border bg-surface-2 hover:border-primary/40"
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <article
+                      key={g.id}
+                      className="overflow-hidden rounded-xl border border-border bg-surface-2"
+                    >
+                      {content}
+                    </article>
+                  );
+                })}
               </div>
             )}
           </Panel>

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView, type ProfileData } from "@/components/ProfileView";
@@ -11,6 +11,7 @@ import {
   getPublicProfile,
   getSharedGames,
 } from "@/lib/api";
+import { profileLibraryGames, profileLibraryHours } from "@/lib/profileLibrary";
 import { friendDisplayName } from "@/lib/friendIdentity";
 
 export const Route = createFileRoute("/users/$publicId")({
@@ -61,10 +62,14 @@ function PublicProfilePage() {
         />
       </AppShell>
     );
-  if (
-    publicProfile.relationship === "friends" &&
-    (friendQuery.isLoading || friendQuery.isError || !friendQuery.data)
-  )
+  if (publicProfile.relationship === "friends" && friendQuery.isError)
+    return (
+      <AppShell>
+        <ErrorState title="Friend profile unavailable" description="Could not load this profile." />
+        <button onClick={() => void friendQuery.refetch()}>Retry profile</button>
+      </AppShell>
+    );
+  if (publicProfile.relationship === "friends" && (friendQuery.isLoading || !friendQuery.data))
     return (
       <AppShell>
         <Skeleton className="h-80 w-full" />
@@ -73,15 +78,9 @@ function PublicProfilePage() {
 
   const friend = friendQuery.data?.user;
   const library = friendQuery.data?.library ?? publicProfile.library;
-  const games: ProfileData["games"] = library.data.map((game) => ({
-    id: game.id,
-    title: game.title,
-    coverFrom: "#7c3aed",
-    coverTo: "#111827",
-    coverUrl: game.cover_url ?? undefined,
-    playtime: game.playtime_forever,
-    source: game.source,
-  }));
+  const games = profileLibraryGames(library.data);
+  if (compose === "message" && friend)
+    return <Navigate to="/messages" search={{ friend: friend.id }} replace />;
   const isSelf = publicProfile.relationship === "self";
   const name = friend ? friendDisplayName(friend) : publicProfile.nickname;
   const profile: ProfileData = {
@@ -92,9 +91,11 @@ function PublicProfilePage() {
     avatarUrl: friend?.avatar ?? publicProfile.avatar ?? undefined,
     bio: friend?.bio ?? undefined,
     region: "Global",
-    hours: games.length ? `${games.length} games` : "—",
+    hours: profileLibraryHours(library.data),
+    libraryMessage: library.message ?? undefined,
     games,
     friendId: friend?.id,
+    userId: friend?.id ?? publicProfile.user_id,
     sharedLibrary: sharedQuery.data,
     steamProfileUrl:
       publicProfile.steam?.status === "ready"

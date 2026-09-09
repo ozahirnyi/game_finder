@@ -20,6 +20,12 @@ const api = vi.hoisted(() => ({
       super(message);
     }
   },
+  getBlockedUsers: vi.fn().mockResolvedValue([]),
+  syncSteamFriends: vi.fn().mockResolvedValue({ status: "synced", added: 0, message: null }),
+  blockUser: vi.fn(),
+  removeFriend: vi.fn(),
+  unblockUser: vi.fn(),
+  markNotificationRead: vi.fn(),
   acceptFriendRequest: vi.fn(),
   createFriendRequest: vi.fn(),
   createSocialFriendRequest: vi.fn(),
@@ -55,7 +61,14 @@ function renderFriends(prefetchedSteamSocial?: unknown, initialEntry = "/") {
     component: Route.options.component,
   });
   const router = createRouter({
-    routeTree: rootRoute.addChildren([friendsRoute]),
+    routeTree: rootRoute.addChildren([
+      friendsRoute,
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/messages/$conversationId",
+        component: () => <p>Dedicated chat</p>,
+      }),
+    ]),
     history: createMemoryHistory({ initialEntries: [initialEntry] }),
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -187,7 +200,7 @@ describe("FriendsPage", () => {
     ]);
     renderFriends(undefined, "/?conversation=conversation-1");
 
-    expect(await screen.findByText("Ready tonight?")).toBeInTheDocument();
+    expect(await screen.findByText("Dedicated chat")).toBeInTheDocument();
   });
 
   it("focuses a deep-linked incoming invite", async () => {
@@ -273,7 +286,10 @@ describe("FriendsPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Select Alex" }));
 
-    expect(await screen.findByText("Alex's message")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Open chat" })).toHaveAttribute(
+      "href",
+      "/messages?friend=player-2",
+    );
     expect(screen.getByRole("link", { name: "View Alex's profile" })).toHaveAttribute(
       "href",
       "/users/alex-public",
@@ -284,7 +300,7 @@ describe("FriendsPage", () => {
     api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
     renderFriends();
 
-    expect(await screen.findByRole("button", { name: "Message" })).toBeEnabled();
+    expect(await screen.findByRole("link", { name: "Message" })).toBeEnabled();
     expect(screen.getAllByRole("button", { name: "Invite to play" })[0]).toBeEnabled();
   });
 
@@ -292,7 +308,7 @@ describe("FriendsPage", () => {
     api.getFriends.mockResolvedValue([{ user: { id: "player-1", display_name: "Sam" } }]);
     renderFriends();
 
-    await screen.findByRole("button", { name: "Message" });
+    await screen.findByRole("link", { name: "Message" });
     expect(screen.queryByText("Compatibility")).not.toBeInTheDocument();
     expect(screen.queryByText("Shared: вЂ”")).not.toBeInTheDocument();
     expect(screen.queryByTitle("Messaging is coming soon")).not.toBeInTheDocument();
@@ -329,8 +345,11 @@ describe("FriendsPage", () => {
 
     expect(await screen.findByText("Selected friend")).toBeInTheDocument();
     expect(await screen.findByText("100%")).toBeInTheDocument();
-    expect(screen.getByText("Game invitation: Portal 2 · Pending")).toBeInTheDocument();
-    expect(screen.getByText("Ready tonight?")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open chat" })).toHaveAttribute(
+      "href",
+      "/messages?friend=player-1",
+    );
+    expect(screen.getByRole("button", { name: "Accept Portal 2" })).toBeInTheDocument();
     expect(screen.queryByText("Activity")).not.toBeInTheDocument();
     expect(api.getFriendSocialSummary).toHaveBeenCalledWith("player-1");
   });
@@ -379,101 +398,14 @@ describe("FriendsPage", () => {
     expect(await screen.findAllByText("Unavailable")).toHaveLength(3);
   });
 
-  it("shows Steam friends with taste match and a Steam profile link", async () => {
+  it("automatically synchronizes contacts without the old Steam tab or request", async () => {
+    api.getSteamSocial.mockClear();
+    api.syncSteamFriends.mockClear();
     renderFriends();
-
-    expect(await screen.findByText("Steam Sam")).toBeInTheDocument();
-    expect(screen.getByText("67% match · 3 shared")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Steam Sam" })).toHaveAttribute(
-      "href",
-      "https://steamcommunity.com/profiles/765",
-    );
-  });
-
-  it("lets a registered Steam friend be added on Playfinder", async () => {
-    api.getSteamSocial.mockResolvedValue({
-      friends: [
-        {
-          steam_id: "765",
-          public_id: "steam-sam",
-          persona_name: "Steam Sam",
-          taste_match_percent: 67,
-          common_games_count: 3,
-          library_public: true,
-        },
-      ],
-      friends_total: 1,
-      friends_has_more: false,
-      top_friend_games: [],
-    });
-    renderFriends();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Steam friends" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Add Steam Sam on Playfinder" }));
-
-    await waitFor(() => expect(api.createSocialFriendRequest).toHaveBeenCalledWith("steam-sam"));
-    expect(await screen.findByText("Friend request sent to Steam Sam")).toBeInTheDocument();
-  });
-
-  it("loads the next page of Steam friends", async () => {
-    api.getSteamSocial.mockImplementation((_limit: number, offset: number) =>
-      Promise.resolve(
-        offset === 0
-          ? {
-              friends: [
-                {
-                  steam_id: "765",
-                  persona_name: "Steam Sam",
-                  taste_match_percent: 67,
-                  common_games_count: 3,
-                  library_public: true,
-                },
-              ],
-              friends_total: 2,
-              friends_has_more: true,
-              top_friend_games: [],
-            }
-          : {
-              friends: [
-                {
-                  steam_id: "766",
-                  persona_name: "Steam Pat",
-                  taste_match_percent: 42,
-                  common_games_count: 1,
-                  library_public: true,
-                },
-              ],
-              friends_total: 2,
-              friends_has_more: false,
-              top_friend_games: [],
-            },
-      ),
-    );
-    renderFriends();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Show more Steam friends" }));
-
-    expect(await screen.findByText("Steam Pat")).toBeInTheDocument();
-    expect(api.getSteamSocial).toHaveBeenLastCalledWith(12, 1);
-  });
-
-  it("does not crash after Steam friends were prefetched from navigation", async () => {
-    renderFriends({
-      friends: [
-        {
-          steam_id: "765",
-          persona_name: "Steam Sam",
-          taste_match_percent: 67,
-          common_games_count: 3,
-          library_public: true,
-        },
-      ],
-      friends_total: 1,
-      friends_has_more: false,
-      top_friend_games: [],
-    });
-
-    expect(await screen.findByText("Steam Sam")).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Friends" });
+    await waitFor(() => expect(api.syncSteamFriends).toHaveBeenCalledWith(false));
+    expect(screen.queryByRole("button", { name: "Steam friends" })).not.toBeInTheDocument();
+    expect(api.getSteamSocial).not.toHaveBeenCalled();
   });
 
   it("shows a Friends skeleton while its first request is pending", async () => {
@@ -482,37 +414,5 @@ describe("FriendsPage", () => {
     renderFriends();
 
     expect(await screen.findByTestId("friends-loading")).toBeInTheDocument();
-  });
-
-  it("uses a separate Steam tab and sorts friends by match", async () => {
-    api.getSteamSocial.mockResolvedValue({
-      friends: [
-        {
-          steam_id: "1",
-          persona_name: "Low match",
-          taste_match_percent: 12,
-          common_games_count: 1,
-          library_public: true,
-        },
-        {
-          steam_id: "2",
-          persona_name: "High match",
-          taste_match_percent: 88,
-          common_games_count: 8,
-          library_public: true,
-        },
-      ],
-      friends_total: 2,
-      friends_has_more: false,
-      top_friend_games: [],
-    });
-    renderFriends();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Steam friends" }));
-    const names = await screen.findAllByRole("link");
-    expect(names.map((link) => link.getAttribute("aria-label"))).toEqual([
-      "High match",
-      "Low match",
-    ]);
   });
 });

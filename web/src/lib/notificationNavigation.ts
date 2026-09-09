@@ -1,6 +1,7 @@
 import type { Notification } from "./api";
 
 export type NotificationDestination =
+  | { to: "/messages/$conversationId"; params: { conversationId: string } }
   | {
       to: "/friends";
       search: { request?: string; conversation?: string; invite?: string; notification?: string };
@@ -28,7 +29,7 @@ export function notificationDestination(
     case "message": {
       const conversation = stringField(notification.payload, "conversation_id");
       return conversation
-        ? { to: "/friends", search: { conversation, notification: notification.id } }
+        ? { to: "/messages/$conversationId", params: { conversationId: conversation } }
         : null;
     }
     case "game_invite":
