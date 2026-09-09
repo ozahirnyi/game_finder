@@ -76,3 +76,8 @@ it("can load older history after revisiting a cached conversation", async () => 
   mount(client);
   expect(await screen.findByRole("button", { name: "Older messages" })).toBeInTheDocument();
 });
+
+it("keeps a short conversation stretched to the full chat viewport", async () => {
+  mount();
+  expect(await screen.findByRole("log", { name: "Conversation history" })).toHaveClass("min-h-0");
+});
