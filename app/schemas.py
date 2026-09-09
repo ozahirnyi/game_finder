@@ -103,7 +103,7 @@ class DataBlock(BaseModel):
 
 
 class PublicDataBlock(BaseModel):
-    status: Literal["ready", "empty", "hidden"]
+    status: Literal["ready", "empty", "hidden", "partial", "error"]
     data: Any = None
     message: str | None = None
 
@@ -115,6 +115,7 @@ class PublicLibraryGameRead(BaseModel):
     cover_url: str | None = None
     playtime_forever: int | None = None
     detail_game_id: str | None = None
+    detail_source: Literal["steam"] | None = None
 
 
 class PublicSteamAccountRead(BaseModel):
@@ -125,6 +126,7 @@ class PublicSteamAccountRead(BaseModel):
 
 
 class PublicProfileRead(BaseModel):
+    user_id: uuid.UUID
     public_id: str
     nickname: str
     avatar: str | None = None
@@ -641,10 +643,16 @@ class ConversationRead(BaseModel):
     updated_at: datetime
     unread_count: int = 0
     last_message: str | None = None
+    can_message: bool = True
 
 
 class MessageCreate(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
+    client_message_id: uuid.UUID | None = None
+
+
+class ConversationReadUpdate(BaseModel):
+    message_id: uuid.UUID
 
 
 class MessageRead(BaseModel):
