@@ -692,7 +692,7 @@ export function getPriceHistory(id: string | number, country = "US") {
       price?: Money | null;
       regular?: Money | null;
     }>;
-  }>(`/prices/games/${id}?country=${encodeURIComponent(country)}`);
+  }>(`/prices/games/${id}?country=${encodeURIComponent(country)}`, { includeToken: true });
 }
 
 export function getSteamPriceHistory(appid: string | number, country = "US") {
@@ -707,7 +707,9 @@ export function getSteamPriceHistory(appid: string | number, country = "US") {
       price?: Money | null;
       regular?: Money | null;
     }>;
-  }>(`/prices/steam-games/${appid}?country=${encodeURIComponent(country)}`);
+  }>(`/prices/steam-games/${appid}?country=${encodeURIComponent(country)}`, {
+    includeToken: true,
+  });
 }
 
 export function getProfile() {
