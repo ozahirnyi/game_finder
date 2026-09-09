@@ -9,6 +9,7 @@ import {
   getDashboard,
   getSimilarCatalogGames,
   getGoogleLoginUrl,
+  getGenreDeals,
   getFavorites,
   getLibraryOverview,
   getOnboardingSummary,
@@ -102,6 +103,25 @@ describe("apiRequest", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/prices/games/123?country=US",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+  });
+
+  it("passes the signed-in token to genre deals so the API can apply the profile region", async () => {
+    setToken("token");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ popular: [], sections: [] }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getGenreDeals();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/prices/genre-deals",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
       }),
