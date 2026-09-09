@@ -327,7 +327,7 @@ function Home() {
               <FeaturedDeal deal={best} />
             )}
           </div>
-          {rest.map((deal, index) => {
+          {rest.slice(0, 10).map((deal, index) => {
             const target = gameDetailTarget(deal.id, deal.steam_appid);
             return (
               <div

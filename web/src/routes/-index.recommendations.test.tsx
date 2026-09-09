@@ -252,7 +252,7 @@ describe("Home recommendations", () => {
     await waitFor(() => expect(api.getTrendingGames.mock.calls.length).toBe(callsBeforeRetry + 1));
   });
 
-  it("requests a twelfth standard deal for the full Price drops grid", async () => {
+  it("caps the Price drops grid at ten standard deals plus the featured deal", async () => {
     api.getAuthSnapshot.mockReturnValue(false);
     api.getDeals.mockResolvedValue({
       results: Array.from({ length: 13 }, (_, index) => ({
@@ -263,7 +263,8 @@ describe("Home recommendations", () => {
 
     renderHome();
 
-    expect(await screen.findByText("Twelfth deal")).toBeInTheDocument();
+    expect(await screen.findByText("Deal 11")).toBeInTheDocument();
+    expect(screen.queryByText("Twelfth deal")).not.toBeInTheDocument();
     await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("US", 13));
   });
 
