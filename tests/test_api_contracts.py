@@ -1476,6 +1476,36 @@ def test_user_profile_patch_persists_profile_fields():
     assert response.json()["platforms"] == ["PC", "PS5"]
 
 
+def test_user_profile_patch_persists_price_country_code():
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        email="player@example.com",
+        created_at=datetime.now(timezone.utc),
+        bio=None,
+        platforms=[],
+        favorite_genres=[],
+        price_country_code="US",
+    )
+    db = SimpleNamespace(
+        query=lambda _model: SimpleNamespace(
+            filter=lambda *_args: SimpleNamespace(first=lambda: None)
+        ),
+        commit=lambda: None,
+        refresh=lambda _user: None,
+    )
+    main.app.dependency_overrides[main.get_current_user] = lambda: user
+    main.app.dependency_overrides[main.get_db] = lambda: db
+
+    try:
+        response = client.patch("/profile", json={"price_country_code": "UA"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["price_country_code"] == "UA"
+    assert user.price_country_code == "UA"
+
+
 def test_profile_summary_marks_unconfigured_profile_and_empty_collections():
     owner_id = uuid.uuid4()
     user = SimpleNamespace(
