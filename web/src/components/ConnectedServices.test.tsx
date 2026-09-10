@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({
   getOnboardingSummary: vi.fn(),
   getSteamAccount: vi.fn(),
   getTelegramAccount: vi.fn(),
+  unlinkGoogleAccount: vi.fn(),
 }));
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual("@/lib/api")), ...api }));
 vi.mock("@tanstack/react-router", () => ({
@@ -35,4 +36,5 @@ it("shows linked Google and imported PlayStation data", async () => {
   );
   expect(await screen.findByText("178 imported games")).toBeInTheDocument();
   expect(screen.getByText("Google sign-in connected")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Disconnect Google" })).toBeInTheDocument();
 });

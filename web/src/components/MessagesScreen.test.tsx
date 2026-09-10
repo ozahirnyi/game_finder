@@ -90,3 +90,18 @@ it("uses the Steam persona name throughout the conversation UI", async () => {
   expect(await screen.findByText("Alex")).toBeInTheDocument();
   expect(screen.queryByText("76561198000000001")).not.toBeInTheDocument();
 });
+
+it("shows a new-account empty state instead of a conversation picker", async () => {
+  api.getConversations.mockResolvedValue([]);
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MessagesScreen onSelect={vi.fn()} />
+    </QueryClientProvider>,
+  );
+  expect(
+    await screen.findByText("No conversations yet. Open a friend's profile to start a chat."),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Choose a conversation")).not.toBeInTheDocument();
+});
