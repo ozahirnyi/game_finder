@@ -40,7 +40,7 @@ function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
         />
       )}
       <div
-        className={`hover-lift group flex h-full ${large ? "flex-col" : "items-center"} gap-4 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40`}
+        className={`group flex h-full ${large ? "flex-col" : "items-center"} gap-4 rounded-2xl border border-border bg-surface p-4 transition-colors hover:border-primary/40`}
       >
         <GameCover
           from="#dc2626"
