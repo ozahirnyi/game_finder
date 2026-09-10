@@ -290,7 +290,10 @@ describe("FriendsPage", () => {
       "href",
       "/messages?friend=player-2",
     );
-    expect(screen.queryByRole("link", { name: "View Alex's profile" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View Alex's profile" })).toHaveAttribute(
+      "href",
+      "/users/alex-public",
+    );
   });
 
   it("enables message and invite actions for an existing friend", async () => {
@@ -387,6 +390,23 @@ describe("FriendsPage", () => {
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText("Compatibility")).toBeInTheDocument();
     expect(screen.getByText("Shared games")).toBeInTheDocument();
+  });
+
+  it("reveals a profile action on the friend card after selecting a friend", async () => {
+    api.getFriends.mockResolvedValue([
+      { user: { id: "player-1", public_id: "sam-public", display_name: "Sam" } },
+    ]);
+    renderFriends();
+
+    const selectFriend = await screen.findByRole("button", { name: "Select Sam" });
+    expect(screen.queryByRole("link", { name: "View Sam's profile" })).not.toBeInTheDocument();
+
+    fireEvent.click(selectFriend);
+
+    expect(screen.getByRole("link", { name: "View Sam's profile" })).toHaveAttribute(
+      "href",
+      "/users/sam-public",
+    );
   });
 
   it("shows unavailable rather than fabricated social-summary data", async () => {
