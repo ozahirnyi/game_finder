@@ -398,6 +398,16 @@ function FriendsPage() {
                         </div>
                       </div>
                     </button>
+                    {selectedFriendId === f.id && (
+                      <Link
+                        to="/users/$publicId"
+                        params={{ publicId: f.publicId }}
+                        aria-label={`View ${f.name}'s profile`}
+                        className="rounded-lg border border-border px-3 py-2 text-xs font-bold hover:border-primary/50"
+                      >
+                        View profile
+                      </Link>
+                    )}
                   </div>
                 ))}
               </div>

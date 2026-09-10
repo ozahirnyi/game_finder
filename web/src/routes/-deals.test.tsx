@@ -63,4 +63,6 @@ it("links a Steam deal without a catalog match to an in-site Steam game page", a
     "https://store.steampowered.com/app/620",
   );
   expect(screen.getByRole("link", { name: "Open in Steam" })).toHaveAttribute("target", "_blank");
+  expect(screen.getByText("—")).toBeInTheDocument();
+  expect(screen.queryByText("вЂ”")).not.toBeInTheDocument();
 });

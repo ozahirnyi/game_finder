@@ -69,12 +69,13 @@ describe("FriendConversationHistory", () => {
     expect(screen.queryByText("Unrelated game")).not.toBeInTheDocument();
   });
 
-  it("shows an empty state when the selected friend has no conversation or invites", async () => {
+  it("explains how a new account can start chatting when there is no history", async () => {
     api.getConversations.mockResolvedValue([]);
     api.getGameInvites.mockResolvedValue([]);
 
     renderHistory();
 
-    expect(await screen.findByText("No messages yet")).toBeInTheDocument();
+    expect(await screen.findByText("No conversations yet")).toBeInTheDocument();
+    expect(screen.getByText("Add a friend to start chatting.")).toBeInTheDocument();
   });
 });

@@ -86,10 +86,7 @@ export function FriendConversationHistory({
           )}
         </div>
       ) : (
-        <EmptyState
-          title="No messages yet"
-          description="Start a conversation or send a game invitation."
-        />
+        <EmptyState title="No conversations yet" description="Add a friend to start chatting." />
       )}
     </section>
   );
