@@ -30,7 +30,7 @@ async def test_recommendations_enqueue_without_calling_the_provider(monkeypatch)
         return snapshot
 
     monkeypatch.setattr(app_main, "check_quota_available", check_quota)
-    monkeypatch.setattr(app_main, "enqueue_or_get_job", lambda *_args: job)
+    monkeypatch.setattr(app_main, "enqueue_or_get_job", lambda *_args, **_kwargs: job)
     monkeypatch.setattr(
         app_main,
         "get_recommendation",
@@ -56,7 +56,7 @@ async def test_recommendations_do_not_call_the_provider_during_submission(monkey
     user = type("User", (), {"id": uuid.uuid4()})()
     job = SimpleNamespace(id=uuid.uuid4(), status="running", result=None, error=None)
     monkeypatch.setattr(app_main, "check_quota_available", lambda *_args: snapshot)
-    monkeypatch.setattr(app_main, "enqueue_or_get_job", lambda *_args: job)
+    monkeypatch.setattr(app_main, "enqueue_or_get_job", lambda *_args, **_kwargs: job)
     monkeypatch.setattr(app_main, "get_recommendation", lambda *_args: (_ for _ in ()).throw(AssertionError("inline provider call")))
 
     result = await app_main.recommendations.__wrapped__(
