@@ -5,6 +5,7 @@ import {
   getConversation,
   getConversationMessages,
   getConversations,
+  getAuthSnapshot,
   getProfile,
   markConversationRead,
   type ConversationMessage,
@@ -37,13 +38,25 @@ export function MessagesScreen({
   onSelect: (id?: string) => void;
 }) {
   const visible = useVisible();
+  const authenticated = getAuthSnapshot();
   const [limit, setLimit] = useState(20);
   const conversations = useQuery({
     queryKey: ["conversations", limit],
     queryFn: () => getConversations(limit),
+    enabled: authenticated,
     refetchInterval: visible ? 3000 : false,
     refetchOnWindowFocus: "always",
   });
+  if (!authenticated) {
+    return (
+      <div
+        id="messages-screen"
+        className="grid h-[calc(100dvh-4rem)] place-items-center bg-background px-4 lg:h-screen"
+      >
+        <p className="text-center text-muted-foreground">Sign in to view messages.</p>
+      </div>
+    );
+  }
   return (
     <div
       id="messages-screen"
