@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PsnImportPreview } from "@/lib/api";
-import { confirmPsnImport, isAuthenticated, previewPsnImport } from "@/lib/api";
+import { confirmPsnImport, isAuthenticated, previewPsnImport, waitForBackgroundJob } from "@/lib/api";
 import { Button, Panel, StatePanel } from "@/components/ui";
 
 export function PsnScreen() {
@@ -11,6 +11,9 @@ export function PsnScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const pollAbort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => pollAbort.current?.abort(), []);
 
   async function selectFile(file?: File) {
     if (!file) return;
@@ -23,7 +26,13 @@ export function PsnScreen() {
     if (!preview?.games.length) return;
     setBusy(true); setError("");
     try {
-      const result = await confirmPsnImport(preview.games);
+      pollAbort.current?.abort();
+      const controller = new AbortController();
+      pollAbort.current = controller;
+      const accepted = await confirmPsnImport(preview.games);
+      const completed = await waitForBackgroundJob(accepted.id, controller.signal);
+      if (completed.status === "failed") throw new Error(completed.error ?? "Could not import PlayStation games.");
+      const result = completed.result as unknown as { created: number; updated: number; skipped: number };
       setPreview(null);
       if (fileInput.current) fileInput.current.value = "";
       setMessage(`PlayStation import complete: ${result.created} added, ${result.updated} updated, ${result.skipped} already in your library.`);
@@ -35,7 +44,7 @@ export function PsnScreen() {
   return <div className="stack"><header className="section-header"><p className="eyebrow">PlayStation</p><h1>Import your PSN library</h1><p>Upload the Excel export from PlayStation Account Management. Your original file is not stored.</p></header>
     {error ? <StatePanel kind="error" title="PSN import failed" detail={error} /> : null}{message ? <p className="alert success">{message}</p> : null}
     <Panel><label className="button" htmlFor="psn-export">Choose PSN export</label><input ref={fileInput} id="psn-export" aria-label="Choose PSN export" hidden type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy} onChange={(event) => selectFile(event.target.files?.[0])} />
-      {busy ? <p>Reading export...</p> : null}
+      {busy ? <p>Queued - processing...</p> : null}
       {preview ? <div className="stack"><p>{preview.message ?? `${preview.total} games found.`}</p><ul>{preview.games.map((game) => <li key={game}>{game}</li>)}</ul><Button disabled={busy} onClick={importGames}>Import {preview.total} game{preview.total === 1 ? "" : "s"}</Button></div> : null}
     </Panel>
   </div>;

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RecommendationItem, SteamAccount, SteamGame, SteamSocial } from "@/lib/api";
-import { getSteamAccount, getSteamLibrary, getSteamLoginUrl, getSteamRecommendations, getSteamSocial, isAuthenticated } from "@/lib/api";
+import { getSteamAccount, getSteamLibrary, getSteamLoginUrl, getSteamRecommendations, getSteamSocial, isAuthenticated, waitForBackgroundJob } from "@/lib/api";
 import { Badge, Button, Panel, Section, StatePanel } from "@/components/ui";
 
 function failureMessage(error: unknown, fallback: string) {
@@ -20,6 +20,9 @@ export function SteamScreen() {
   const [error, setError] = useState("");
   const [socialError, setSocialError] = useState("");
   const [recommendationsError, setRecommendationsError] = useState("");
+  const pollAbort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => pollAbort.current?.abort(), []);
 
   async function loadSocial() {
     setSocialError("");
@@ -63,7 +66,15 @@ export function SteamScreen() {
 
   async function loadRecommendations() {
     setBusy(true); setRecommendationsError("");
-    try { setRecommendations((await getSteamRecommendations()).recommendations); }
+    pollAbort.current?.abort();
+    const controller = new AbortController();
+    pollAbort.current = controller;
+    try {
+      const accepted = await getSteamRecommendations();
+      const completed = await waitForBackgroundJob(accepted.id, controller.signal);
+      if (completed.status === "failed") throw new Error(completed.error ?? "Could not load recommendations.");
+      setRecommendations((completed.result as unknown as { recommendations: RecommendationItem[] }).recommendations);
+    }
     catch (reason) { setRecommendationsError(failureMessage(reason, "Could not load recommendations.")); }
     finally { setBusy(false); }
   }
@@ -81,7 +92,7 @@ export function SteamScreen() {
     <Section title="Friends' games" detail={social ? `${social.public_libraries} public friend librar${social.public_libraries === 1 ? "y" : "ies"} available.` : "Steam did not return friend-library data."}>
       {socialError ? <StatePanel kind="error" title="Friends' games are unavailable" detail={socialError} action={{ label: "Retry friends' games", onClick: loadSocial }} /> : social?.top_friend_games.length ? <div className="favorites-list">{social.top_friend_games.map((game) => <Panel as="article" key={game.appid}><h3>{game.name}</h3><p>{game.friends} friends own this game.</p></Panel>)}</div> : <p>No shared friend-library games returned.</p>}
     </Section>
-    <Section title="Recommendations" detail="Based on your connected library." action={<Button disabled={busy} onClick={loadRecommendations}>{busy ? "Loading..." : "Get recommendations"}</Button>}>
+    <Section title="Recommendations" detail="Based on your connected library." action={<Button disabled={busy} onClick={loadRecommendations}>{busy ? "Queued - processing..." : "Get recommendations"}</Button>}>
       {recommendationsError ? <StatePanel kind="error" title="Recommendations are unavailable" detail={recommendationsError} action={{ label: "Retry recommendations", onClick: loadRecommendations }} /> : recommendations.length ? <div className="favorites-list">{recommendations.map((item) => <Panel as="article" key={`${item.title}-${item.reason}`}><h3>{item.title}</h3><p>{item.reason}</p>{item.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</Panel>)}</div> : <p>No recommendations loaded yet.</p>}
     </Section>
   </div>;

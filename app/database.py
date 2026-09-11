@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import CheckConstraint, create_engine, String, DateTime, ForeignKey, Float, Integer, Index, text, UniqueConstraint
+from sqlalchemy import CheckConstraint, create_engine, String, DateTime, ForeignKey, Float, Integer, Index, JSON, text, UniqueConstraint
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.exc import OperationalError
 
@@ -106,6 +106,34 @@ class User(Base):
     telegram_link_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True)
     telegram_linked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
+
+
+class BackgroundJob(Base):
+    __tablename__ = "background_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    operation: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued", server_default="queued")
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('queued', 'running', 'succeeded', 'failed')", name="ck_background_jobs_status"),
+        Index("ix_background_jobs_owner_status", "owner_id", "status"),
+        Index(
+            "uq_background_jobs_active_idempotency",
+            "owner_id",
+            "operation",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+        ),
+    )
 
 
 class Friendship(Base):

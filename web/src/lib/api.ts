@@ -131,6 +131,15 @@ export type PsnImportResult = {
   total: number;
 };
 
+export type BackgroundJobAccepted = { id: string; status: "queued" | "running" | "succeeded" | "failed" };
+export type BackgroundJobRead = BackgroundJobAccepted & {
+  operation: string;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type RecommendationItem = {
   title: string;
   reason: string;
@@ -422,8 +431,9 @@ export function getTrendingGames(pageSize = 8) {
 }
 
 export function getRecommendations(prompt: string) {
-  return request<RecommendationResponse>("/recommendations", {
+  return request<BackgroundJobAccepted>("/recommendations", {
     method: "POST",
+    auth: true,
     body: { prompt, liked_game_ids: [] },
   });
 }
@@ -484,7 +494,7 @@ export function previewPsnImport(file: File) {
 }
 
 export function confirmPsnImport(games: string[]) {
-  return request<PsnImportResult>("/psn/import/confirm", {
+  return request<BackgroundJobAccepted>("/psn/import/confirm", {
     method: "POST",
     auth: true,
     body: { games },
@@ -511,7 +521,7 @@ export function getSteamLibrary() {
 }
 
 export function syncSteamLibrary() {
-  return request<SteamLibrarySync>("/steam/library/sync", { method: "POST", auth: true });
+  return request<BackgroundJobAccepted>("/steam/library/sync", { method: "POST", auth: true });
 }
 
 export function getSteamSocial(friendsLimit = 12) {
@@ -519,7 +529,7 @@ export function getSteamSocial(friendsLimit = 12) {
 }
 
 export function getSteamRecommendations(prompt?: string) {
-  return request<RecommendationResponse>("/steam/recommendations", {
+  return request<BackgroundJobAccepted>("/steam/recommendations", {
     method: "POST",
     auth: true,
     body: { prompt: prompt ?? "" },
@@ -545,8 +555,26 @@ export function unlinkTelegramAccount() {
 }
 
 export function sendTelegramTestAlert() {
-  return request<{ status: string }>("/telegram/test-alert", {
+  return request<BackgroundJobAccepted>("/telegram/test-alert", {
     method: "POST",
     auth: true,
   });
+}
+
+export function getBackgroundJob(id: string) {
+  return request<BackgroundJobRead>(`/jobs/${encodeURIComponent(id)}`, { auth: true });
+}
+
+export async function waitForBackgroundJob(id: string, signal?: AbortSignal): Promise<BackgroundJobRead> {
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new DOMException("Polling cancelled", "AbortError");
+    const job = await getBackgroundJob(id);
+    if (job.status === "succeeded" || job.status === "failed") return job;
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(resolve, 1000);
+      signal?.addEventListener("abort", () => { window.clearTimeout(timer); reject(new DOMException("Polling cancelled", "AbortError")); }, { once: true });
+    });
+  }
+  throw new Error("This action is taking too long. Please retry.");
 }

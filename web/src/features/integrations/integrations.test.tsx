@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   previewPsnImport: vi.fn(),
   sendTelegramTestAlert: vi.fn(),
   unlinkTelegramAccount: vi.fn(),
+  waitForBackgroundJob: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => api);
@@ -38,6 +39,7 @@ describe("integration screens", () => {
     api.getSteamLoginUrl.mockResolvedValue({ url: "https://steam.example/connect" });
     api.getSteamLibrary.mockResolvedValue({ steam: { linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null }, games: [] });
     api.getSteamSocial.mockResolvedValue({ steam: { linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null }, friends: [], top_friend_games: [], public_libraries: 0, private_libraries: 0 });
+    api.waitForBackgroundJob.mockResolvedValue({ status: "succeeded", result: { recommendations: [] }, error: null });
   });
 
   it("shows a sign-in state without requesting Steam data", () => {
@@ -58,7 +60,8 @@ describe("integration screens", () => {
 
   it("previews a PSN file then clears the preview after importing", async () => {
     api.previewPsnImport.mockResolvedValue({ games: ["Bloodborne"], total: 1, message: "One game found" });
-    api.confirmPsnImport.mockResolvedValue({ created: 1, updated: 0, skipped: 0, total: 1 });
+    api.confirmPsnImport.mockResolvedValue({ id: "job-psn", status: "queued" });
+    api.waitForBackgroundJob.mockResolvedValue({ status: "succeeded", result: { created: 1, updated: 0, skipped: 0, total: 1 }, error: null });
     render(<PsnScreen />);
     fireEvent.change(screen.getByLabelText("Choose PSN export"), { target: { files: [new File(["sheet"], "games.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })] } });
     expect(await screen.findByText("Bloodborne")).toBeVisible();
@@ -78,7 +81,8 @@ describe("integration screens", () => {
   it("renders returned Steam games and recommendations", async () => {
     api.getSteamAccount.mockResolvedValue({ linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null });
     api.getSteamLibrary.mockResolvedValue({ steam: { linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null }, games: [{ appid: 10, name: "Half-Life", playtime_forever: 120, playtime_2weeks: 0, img_icon_url: null }] });
-    api.getSteamRecommendations.mockResolvedValue({ recommendations: [{ title: "Portal", reason: "Puzzle favorite", tags: ["Puzzle"] }] });
+    api.getSteamRecommendations.mockResolvedValue({ id: "job-steam", status: "queued" });
+    api.waitForBackgroundJob.mockResolvedValue({ status: "succeeded", result: { recommendations: [{ title: "Portal", reason: "Puzzle favorite", tags: ["Puzzle"] }] }, error: null });
     render(<SteamScreen />);
     expect(await screen.findByText("Half-Life")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Get recommendations" }));
@@ -111,7 +115,8 @@ describe("integration screens", () => {
     api.getSteamAccount.mockResolvedValue({ linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null });
     api.getSteamLibrary.mockResolvedValue({ steam: { linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null }, games: [{ appid: 10, name: "Half-Life", playtime_forever: 120, playtime_2weeks: 0, img_icon_url: null }] });
     api.getSteamSocial.mockResolvedValue({ steam: { linked: true, steam_id: "1", persona_name: "Ada", avatar: null, country_code: null, linked_at: null }, friends: [], top_friend_games: [{ appid: 20, name: "Deep Rock Galactic", friends: 3, total_playtime_forever: 600, img_icon_url: null }], public_libraries: 3, private_libraries: 0 });
-    api.getSteamRecommendations.mockRejectedValueOnce(new Error("Recommendations unavailable")).mockResolvedValueOnce({ recommendations: [{ title: "Portal", reason: "Puzzle favorite", tags: ["Puzzle"] }] });
+    api.getSteamRecommendations.mockResolvedValue({ id: "job-steam", status: "queued" });
+    api.waitForBackgroundJob.mockResolvedValueOnce({ status: "failed", result: null, error: "Recommendations unavailable" }).mockResolvedValueOnce({ status: "succeeded", result: { recommendations: [{ title: "Portal", reason: "Puzzle favorite", tags: ["Puzzle"] }] }, error: null });
 
     render(<SteamScreen />);
 

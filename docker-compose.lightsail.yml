@@ -16,6 +16,19 @@ services:
       redis:
         condition: service_started
 
+  app-worker:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      BACKGROUND_JOB_CONCURRENCY: ${BACKGROUND_JOB_CONCURRENCY:-10}
+    command: arq app.worker.WorkerSettings
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   web:
     build: ./web
     restart: unless-stopped

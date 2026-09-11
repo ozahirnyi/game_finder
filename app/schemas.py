@@ -214,6 +214,19 @@ class PsnImportResult(BaseModel):
     total: int = 0
 
 
+class BackgroundJobAccepted(BaseModel):
+    id: uuid.UUID
+    status: str
+
+
+class BackgroundJobRead(BackgroundJobAccepted):
+    operation: str
+    result: dict | None = None
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class TelegramAccountRead(BaseModel):
     linked: bool
     configured: bool

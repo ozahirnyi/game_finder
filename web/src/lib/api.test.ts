@@ -5,6 +5,7 @@ describe("AI recommendation errors", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("uses the structured API error message for users", async () => {
+    window.localStorage.setItem("game_finder_token", "header.eyJleHAiOjQxMDI0NDQ4MDB9.signature");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       detail: { code: "ai_recommendations_unavailable", message: "OpenAI is temporarily unavailable." },
     }), { status: 503, headers: { "Content-Type": "application/json" } })));

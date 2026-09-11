@@ -2,6 +2,8 @@ import asyncio
 import os
 import uuid
 import contextlib
+import hashlib
+import json
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
@@ -27,11 +29,11 @@ from app.prices import fetch_game_price_history
 from app.psn_export import normalize_title, parse_psn_export, psn_external_id
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_search
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.database import FriendRequest, Friendship, get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, engine, wait_for_db
+from app.database import BackgroundJob, FriendRequest, Friendship, get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, engine, wait_for_db
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportResult, \
     RecommendationResponse, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, \
-    FriendRequestCreate, FriendRequestRead, HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, SocialSnapshotRead, SocialUserRead
+    BackgroundJobAccepted, BackgroundJobRead, FriendRequestCreate, FriendRequestRead, HomeDealResponse, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, SocialSnapshotRead, SocialUserRead
 from app.steam import (
     build_steam_login_url,
     create_steam_state,
@@ -52,6 +54,7 @@ from app.telegram import (
     telegram_linked_at,
 )
 from app.price_alerts import price_alert_watcher_loop, price_alerts_enabled
+from app.background_jobs import dispatch_job, enqueue_or_get_job
 from app.google_auth import (
     build_google_authorization_url,
     exchange_google_code,
@@ -325,6 +328,21 @@ def build_steam_recommendation_prompt(games: list[dict], extra_prompt: str | Non
     )
 
 
+def background_job_key(payload: dict) -> str:
+    """A stable key lets duplicate clicks converge on one active job."""
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+async def accepted_background_job(db: Session, owner_id: uuid.UUID, operation: str, payload: dict) -> BackgroundJobAccepted:
+    job = enqueue_or_get_job(db, owner_id, operation, background_job_key(payload), payload)
+    if job.status == "queued":
+        try:
+            await dispatch_job(job)
+        except Exception:
+            raise HTTPException(status_code=503, detail="Background processing is busy. Please retry in a few seconds.")
+    return BackgroundJobAccepted(id=job.id, status=job.status)
+
+
 @app.get("/", include_in_schema=False)
 def root():
     return RedirectResponse(get_frontend_url(), status_code=307)
@@ -338,6 +356,19 @@ def favicon():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/jobs/{job_id}", response_model=BackgroundJobRead)
+def get_background_job(job_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    job = db.query(BackgroundJob).filter(BackgroundJob.id == job_id, BackgroundJob.owner_id == current_user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Background job not found")
+    return BackgroundJobRead(
+        id=job.id, status=job.status, operation=job.operation,
+        result=job.result if job.status == "succeeded" else None,
+        error=job.error if job.status == "failed" else None,
+        created_at=job.created_at, updated_at=job.updated_at,
+    )
 
 
 @app.get("/games", response_model=list[GameRead])
@@ -392,8 +423,8 @@ async def preview_psn_import(
     )
 
 
-@app.post("/psn/import/confirm", response_model=PsnImportResult)
-def confirm_psn_import(
+@app.post("/psn/import/confirm", status_code=202, response_model=BackgroundJobAccepted)
+async def confirm_psn_import(
     data: PsnImportConfirmRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -406,41 +437,7 @@ def confirm_psn_import(
     if not unique_games:
         raise HTTPException(status_code=400, detail="Choose at least one valid game to import")
 
-    existing = {
-        game.external_id: game
-        for game in db.query(Game)
-        .filter(Game.owner_id == current_user.id, Game.source == "psn")
-        .all()
-    }
-    now = datetime.now(timezone.utc)
-    created = updated = skipped = 0
-    try:
-        for title in unique_games.values():
-            external_id = psn_external_id(title)
-            imported = existing.get(external_id)
-            if imported is None:
-                db.add(
-                    Game(
-                        owner_id=current_user.id,
-                        source="psn",
-                        external_id=external_id,
-                        title=title,
-                        info="Imported from your PlayStation data export",
-                        synced_at=now,
-                    )
-                )
-                created += 1
-            elif imported.title != title:
-                imported.title = title
-                imported.synced_at = now
-                updated += 1
-            else:
-                skipped += 1
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    return PsnImportResult(created=created, updated=updated, skipped=skipped, total=len(unique_games))
+    return await accepted_background_job(db, current_user.id, "psn_import", {"games": list(unique_games.values())})
 
 
 @app.post("/auth/register", response_model=UserRead)
@@ -745,17 +742,11 @@ def unlink_telegram_account(db: Session = Depends(get_db), current_user: User = 
     return telegram_account_response(current_user)
 
 
-@app.post("/telegram/test-alert")
-def send_telegram_test_alert(current_user: User = Depends(get_current_user)):
+@app.post("/telegram/test-alert", status_code=202, response_model=BackgroundJobAccepted)
+async def send_telegram_test_alert(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not current_user.telegram_chat_id:
         raise HTTPException(status_code=409, detail="Connect Telegram first")
-    ok = send_telegram_message(
-        current_user.telegram_chat_id,
-        "Game Finder alerts are connected. Future favorites can use this chat for price and release updates.",
-    )
-    if not ok:
-        raise HTTPException(status_code=502, detail="Telegram did not accept the message")
-    return {"status": "sent"}
+    return await accepted_background_job(db, current_user.id, "telegram_test_alert", {})
 
 
 @app.post("/telegram/webhook/{secret}", include_in_schema=False)
@@ -849,33 +840,13 @@ async def get_steam_library(current_user: User = Depends(get_current_user)):
     return SteamLibraryRead(steam=steam_account_response(current_user), games=games)
 
 
-@app.post("/steam/library/sync", response_model=SteamLibrarySyncRead)
+@app.post("/steam/library/sync", status_code=202, response_model=BackgroundJobAccepted)
 async def sync_steam_library(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Refresh Steam-only data and remove legacy Steam imports from saved games."""
     if not current_user.steam_id:
         raise HTTPException(status_code=409, detail="Connect Steam first")
 
-    # Fetch first: a private library or Steam outage must never erase the last successful import.
-    steam_games = await fetch_owned_games(current_user.steam_id)
-    legacy_imports = (
-        db.query(Game)
-        .filter(Game.owner_id == current_user.id, Game.source == "steam")
-        .all()
-    )
-    try:
-        for imported_game in legacy_imports:
-            db.delete(imported_game)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-
-    return SteamLibrarySyncRead(
-        steam=steam_account_response(current_user),
-        games=steam_games,
-        removed=len(legacy_imports),
-        synced_at=datetime.now(timezone.utc),
-    )
+    return await accepted_background_job(db, current_user.id, "steam_library_sync", {})
 
 
 def build_steam_social_response(user: User, own_games: list[dict], friends: list[dict], friend_libraries: list[list[dict] | None]):
@@ -979,20 +950,17 @@ async def get_steam_social(current_user: User = Depends(get_current_user), frien
     return build_steam_social_response(current_user, own_games, friends, friend_libraries)
 
 
-@app.post("/steam/recommendations", response_model=RecommendationResponse)
+@app.post("/steam/recommendations", status_code=202, response_model=BackgroundJobAccepted)
 @limiter.limit("5/minute")
 async def steam_recommendations(
     request: Request,
     data: SteamRecommendationRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not current_user.steam_id:
         raise HTTPException(status_code=409, detail="Connect Steam first")
-    games = await fetch_owned_games(current_user.steam_id)
-    prompt = build_steam_recommendation_prompt(games, data.prompt)
-    liked_app_ids = [int(game["appid"]) for game in games[:10] if game.get("appid") is not None]
-    result = await asyncio.to_thread(get_recommendation, prompt, liked_app_ids)
-    return result
+    return await accepted_background_job(db, current_user.id, "steam_recommendations", {"prompt": data.prompt or ""})
 
 
 @app.get("/search/games", response_model=GameSearchResponse, response_model_exclude_unset=True)
@@ -1148,16 +1116,13 @@ async def homepage_deals(country: str = "US", page_size: int = 6):
     return await get_json_cached(key, CACHE_TTL, fetch)
 
 
-@app.post("/recommendations",response_model=RecommendationResponse)
+@app.post("/recommendations",status_code=202,response_model=BackgroundJobAccepted)
 @limiter.limit("5/minute")
-async def recommendations(request: Request, data: RecommendationRequest):
+async def recommendations(request: Request, data: RecommendationRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not data.prompt.strip():
         raise HTTPException(status_code=400,detail="prompt cannot be empty")
-    result = await asyncio.to_thread(
-        get_recommendation,
-        data.prompt,
-        data.liked_game_ids,)
-    return result
+    payload = {"prompt": data.prompt.strip(), "liked_game_ids": data.liked_game_ids}
+    return await accepted_background_job(db, current_user.id, "recommendations", payload)
 
 
 @app.exception_handler(RateLimitExceeded)

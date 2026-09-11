@@ -231,6 +231,7 @@ Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy.
 | app | FastAPI backend |
 | db | PostgreSQL |
 | redis | cache layer |
+| app-worker | ARQ worker for Steam, PSN, AI, and Telegram actions |
 
 ---
 
@@ -240,6 +241,11 @@ Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy.
 |----------|-------------|
 | DATABASE_URL | PostgreSQL connection string |
 | REDIS_URL | Redis connection |
+| UVICORN_WORKERS | FastAPI worker processes; production default is `2` |
+| DB_POOL_SIZE | Persistent PostgreSQL connections per web worker; default `15` |
+| DB_MAX_OVERFLOW | Temporary PostgreSQL connections per web worker; default `5` |
+| DB_POOL_TIMEOUT_SECONDS | Maximum database checkout wait; default `5`, then retryable `503` |
+| BACKGROUND_JOB_CONCURRENCY | Maximum ARQ jobs per worker; default `10` |
 | FRONTEND_PUBLIC_URL | Public frontend URL used after Steam OpenID callback |
 | BACKEND_PUBLIC_URL | Public API URL used to build Steam OpenID callback URLs |
 | GOOGLE_CLIENT_ID | Google OAuth web-client ID |
@@ -262,6 +268,10 @@ Use `npm.cmd` on Windows PowerShell if `npm` is blocked by the execution policy.
 ---
 
 ## Deployment
+
+Run the migration before starting the updated services, then start both `app` and
+`app-worker` from `docker-compose.lightsail.yml`. Heavy actions return `202` and
+the browser polls `/jobs/{id}`; do not omit Redis or the worker service.
 
 The Lightsail backend is available through nginx at:
 

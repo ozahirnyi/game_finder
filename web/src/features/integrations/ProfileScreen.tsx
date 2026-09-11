@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GoogleStatus, TelegramAccount, UserRead } from "@/lib/api";
-import { getCurrentUser, getGoogleStatus, getTelegramAccount, getTelegramLinkUrl, isAuthenticated, sendTelegramTestAlert, unlinkTelegramAccount } from "@/lib/api";
+import { getCurrentUser, getGoogleStatus, getTelegramAccount, getTelegramLinkUrl, isAuthenticated, sendTelegramTestAlert, unlinkTelegramAccount, waitForBackgroundJob } from "@/lib/api";
 import { Button, Panel, Section, StatePanel } from "@/components/ui";
 
 function failureMessage(error: unknown, fallback: string) {
@@ -20,6 +20,9 @@ export function ProfileScreen() {
   const [error, setError] = useState("");
   const [googleError, setGoogleError] = useState("");
   const [telegramError, setTelegramError] = useState("");
+  const pollAbort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => pollAbort.current?.abort(), []);
 
   async function loadGoogle() {
     try { setGoogle(await getGoogleStatus()); }
@@ -48,7 +51,17 @@ export function ProfileScreen() {
   }
   async function telegramAction(action: "test" | "unlink") {
     setBusy(true); setTelegramError("");
-    try { if (action === "test") { await sendTelegramTestAlert(); setMessage("Test alert sent to Telegram."); } else { setTelegram(await unlinkTelegramAccount()); setMessage("Telegram disconnected."); } }
+    try {
+      if (action === "test") {
+        pollAbort.current?.abort();
+        const controller = new AbortController();
+        pollAbort.current = controller;
+        const accepted = await sendTelegramTestAlert();
+        const completed = await waitForBackgroundJob(accepted.id, controller.signal);
+        if (completed.status === "failed") throw new Error(completed.error ?? "Telegram action failed.");
+        setMessage("Test alert sent to Telegram.");
+      } else { setTelegram(await unlinkTelegramAccount()); setMessage("Telegram disconnected."); }
+    }
     catch (reason) { setTelegramError(failureMessage(reason, "Telegram action failed.")); }
     finally { setBusy(false); }
   }
@@ -57,6 +70,6 @@ export function ProfileScreen() {
   if (error) return <StatePanel kind="error" title="Profile is unavailable" detail={error} />;
   return <div className="stack"><header className="section-header"><p className="eyebrow">Profile</p><h1>{user?.display_name ?? "Your account"}</h1></header>{message ? <p className="alert success">{message}</p> : null}
     <Section title="Google" detail={google?.configured ? (user?.google_linked ? "Google is linked." : "Google sign-in is available.") : "Google sign-in is not configured."}>{googleError ? <StatePanel kind="error" title="Google is unavailable" detail={googleError} action={{ label: "Retry Google", onClick: () => { setGoogleError(""); void loadGoogle(); } }} /> : <Panel><p>{user?.google_linked ? "Linked" : "Not linked"}</p></Panel>}</Section>
-    <Section title="Telegram alerts" detail={telegram?.linked ? `Connected${telegram.username ? ` as @${telegram.username}` : ""}.` : "Connect Telegram for alerts."}>{telegramError ? <StatePanel kind="error" title="Telegram alerts are unavailable" detail={telegramError} action={{ label: "Retry Telegram", onClick: () => { setTelegramError(""); void loadTelegram(); } }} /> : <Panel><div className="actions">{telegram?.linked ? <><Button variant="secondary" disabled={busy} onClick={() => telegramAction("test")}>Send test</Button><Button variant="secondary" disabled={busy} onClick={() => telegramAction("unlink")}>Disconnect</Button></> : <Button disabled={busy} onClick={connectTelegram}>Connect Telegram</Button>}</div></Panel>}</Section>
+    <Section title="Telegram alerts" detail={telegram?.linked ? `Connected${telegram.username ? ` as @${telegram.username}` : ""}.` : "Connect Telegram for alerts."}>{telegramError ? <StatePanel kind="error" title="Telegram alerts are unavailable" detail={telegramError} action={{ label: "Retry Telegram", onClick: () => { setTelegramError(""); void loadTelegram(); } }} /> : <Panel><div className="actions">{telegram?.linked ? <><Button variant="secondary" disabled={busy} onClick={() => telegramAction("test")}>{busy ? "Queued - processing..." : "Send test"}</Button><Button variant="secondary" disabled={busy} onClick={() => telegramAction("unlink")}>Disconnect</Button></> : <Button disabled={busy} onClick={connectTelegram}>Connect Telegram</Button>}</div></Panel>}</Section>
   </div>;
 }

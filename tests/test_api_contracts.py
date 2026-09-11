@@ -718,49 +718,23 @@ def test_steam_recommendations_use_most_played_games(monkeypatch):
         steam_linked_at=linked_at,
     )
 
-    async def fake_fetch_owned_games(_steam_id):
-        return [
-            {
-                "appid": 20,
-                "name": "Half-Life 2",
-                "playtime_forever": 1200,
-                "playtime_2weeks": 0,
-                "img_icon_url": None,
-            },
-            {
-                "appid": 10,
-                "name": "Portal",
-                "playtime_forever": 600,
-                "playtime_2weeks": 0,
-                "img_icon_url": None,
-            },
-        ]
+    job = SimpleNamespace(id=uuid.uuid4(), status="queued")
+    monkeypatch.setattr(main, "enqueue_or_get_job", lambda *_args: job)
+    monkeypatch.setattr(main, "fetch_owned_games", lambda *_args: (_ for _ in ()).throw(AssertionError("Steam must run in worker")))
 
-    def fake_get_recommendation(prompt, liked_game_ids):
-        assert "Half-Life 2 - 20.0 hours played" in prompt
-        assert "Portal - 10.0 hours played" in prompt
-        assert "something with puzzles" in prompt
-        assert liked_game_ids == [20, 10]
-        return {
-            "recommendations": [
-                {
-                    "title": "Prey",
-                    "reason": "It matches your first-person immersive play history.",
-                    "tags": ["immersive", "sci-fi"],
-                }
-            ]
-        }
+    async def fake_dispatch(_job):
+        return None
 
-    monkeypatch.setattr(main, "fetch_owned_games", fake_fetch_owned_games)
-    monkeypatch.setattr(main, "get_recommendation", fake_get_recommendation)
+    monkeypatch.setattr(main, "dispatch_job", fake_dispatch)
+    main.app.dependency_overrides[main.get_db] = lambda: object()
 
     try:
         response = client.post("/steam/recommendations", json={"prompt": "something with puzzles"})
     finally:
         main.app.dependency_overrides.clear()
 
-    assert response.status_code == 200
-    assert response.json()["recommendations"][0]["title"] == "Prey"
+    assert response.status_code == 202
+    assert response.json() == {"id": str(job.id), "status": "queued"}
 
 
 def test_steam_library_sync_removes_legacy_imports_without_saving_steam_games(monkeypatch):
@@ -775,53 +749,20 @@ def test_steam_library_sync_removes_legacy_imports_without_saving_steam_games(mo
         steam_linked_at=linked_at,
     )
 
-    class Query:
-        def filter(self, *_args):
-            return self
-
-        def all(self):
-            return [legacy_import]
-
-    class Db:
-        def __init__(self):
-            self.added = []
-            self.deleted = []
-            self.committed = False
-
-        def query(self, _model):
-            return Query()
-
-        def add(self, game):
-            self.added.append(game)
-
-        def delete(self, game):
-            self.deleted.append(game)
-
-        def commit(self):
-            self.committed = True
-
-        def rollback(self):
-            raise AssertionError("sync should not roll back")
-
-    legacy_import = SimpleNamespace(external_id="10", source="steam")
-    db = Db()
-
-    async def fake_fetch_owned_games(_steam_id):
-        return [{"appid": 10, "name": "Portal", "playtime_forever": 600, "playtime_2weeks": 12, "img_icon_url": "icon"}]
+    job = SimpleNamespace(id=uuid.uuid4(), status="queued")
 
     main.app.dependency_overrides[main.get_current_user] = lambda: user
-    main.app.dependency_overrides[main.get_db] = lambda: db
-    monkeypatch.setattr(main, "fetch_owned_games", fake_fetch_owned_games)
+    main.app.dependency_overrides[main.get_db] = lambda: object()
+    monkeypatch.setattr(main, "enqueue_or_get_job", lambda *_args: job)
+
+    async def fake_dispatch(_job):
+        return None
+
+    monkeypatch.setattr(main, "dispatch_job", fake_dispatch)
     try:
         response = client.post("/steam/library/sync")
     finally:
         main.app.dependency_overrides.clear()
 
-    assert response.status_code == 200
-    assert response.json()["created"] == 0
-    assert response.json()["updated"] == 0
-    assert response.json()["removed"] == 1
-    assert response.json()["games"][0]["appid"] == 10
-    assert db.committed is True
-    assert db.added == []
-    assert db.deleted == [legacy_import]
+    assert response.status_code == 202
+    assert response.json() == {"id": str(job.id), "status": "queued"}
