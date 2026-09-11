@@ -1,12 +1,13 @@
 import asyncio
 import uuid
+import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 from fastapi import Request
 
-from app.database import Favorite, FriendRequest, Game, GameInvite, OAuthIdentity, WishlistItem
+from app.database import BackgroundJob, Favorite, FriendRequest, Game, GameInvite, OAuthIdentity, WishlistItem
 from app.recommendation_quota import QuotaDenied, QuotaSnapshot
 
 
@@ -265,3 +266,81 @@ def test_recommendation_quota_returns_authenticated_status(api_client, app_main,
 
     assert response.status_code == 200
     assert response.json()["remaining"] == 3
+
+
+def test_worker_claims_and_completes_a_durable_job(db_session, user_factory, monkeypatch):
+    from sqlalchemy.orm import sessionmaker
+    from app import worker
+
+    owner = user_factory(email="worker-success@example.com")
+    job = BackgroundJob(owner_id=owner.id, operation="recommendations", idempotency_key="success", payload={"prompt": "cozy"})
+    db_session.add(job)
+    db_session.commit()
+    monkeypatch.setattr(worker, "SessionLocal", sessionmaker(bind=db_session.get_bind()))
+
+    async def completed(_db, _job):
+        return {"recommendations": []}
+
+    monkeypatch.setattr(worker, "execute_and_consume_quota", completed)
+    asyncio.run(worker.run_background_job({}, str(job.id)))
+
+    db_session.expire_all()
+    completed_job = db_session.get(BackgroundJob, job.id)
+    assert completed_job.status == "succeeded"
+    assert completed_job.result == {"recommendations": []}
+    assert completed_job.lease_token is None
+
+
+def test_worker_marks_claimed_job_failed_when_execution_raises(db_session, user_factory, monkeypatch):
+    from sqlalchemy.orm import sessionmaker
+    from app import worker
+
+    owner = user_factory(email="worker-failure@example.com")
+    job = BackgroundJob(owner_id=owner.id, operation="recommendations", idempotency_key="failure", payload={"prompt": "cozy"})
+    db_session.add(job)
+    db_session.commit()
+    monkeypatch.setattr(worker, "SessionLocal", sessionmaker(bind=db_session.get_bind()))
+
+    async def failed(_db, _job):
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr(worker, "execute_and_consume_quota", failed)
+    with pytest.raises(RuntimeError, match="provider down"):
+        asyncio.run(worker.run_background_job({}, str(job.id)))
+
+    db_session.expire_all()
+    failed_job = db_session.get(BackgroundJob, job.id)
+    assert failed_job.status == "failed"
+    assert failed_job.lease_expires_at is None
+
+
+def test_worker_recovery_redelivers_queued_and_expired_jobs(db_session, user_factory, monkeypatch):
+    from datetime import timedelta
+    from sqlalchemy.orm import sessionmaker
+    from app import worker
+
+    owner = user_factory(email="worker-recovery@example.com")
+    queued = BackgroundJob(owner_id=owner.id, operation="recommendations", idempotency_key="queued", payload={})
+    expired = BackgroundJob(
+        owner_id=owner.id, operation="recommendations", idempotency_key="expired", payload={},
+        status="running", lease_token="expired", lease_expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+    )
+    active = BackgroundJob(
+        owner_id=owner.id, operation="recommendations", idempotency_key="active", payload={},
+        status="running", lease_token="active", lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=1),
+    )
+    db_session.add_all([queued, expired, active])
+    db_session.commit()
+    monkeypatch.setattr(worker, "SessionLocal", sessionmaker(bind=db_session.get_bind()))
+    dispatched = []
+
+    async def dispatch(job_id):
+        dispatched.append(job_id)
+
+    monkeypatch.setattr(worker, "dispatch_job_id", dispatch)
+    asyncio.run(worker.recover_background_jobs({}))
+
+    db_session.expire_all()
+    assert set(dispatched) == {str(queued.id), str(expired.id)}
+    assert db_session.get(BackgroundJob, expired.id).status == "queued"
+    assert db_session.get(BackgroundJob, active.id).status == "running"
