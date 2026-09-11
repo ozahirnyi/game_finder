@@ -2,6 +2,7 @@
 
 import uuid
 import os
+from datetime import datetime, timezone
 
 from sqlalchemy.exc import IntegrityError
 
@@ -13,6 +14,15 @@ TERMINAL_JOB_STATUSES = frozenset({"succeeded", "failed"})
 
 def is_terminal_status(status: str) -> bool:
     return status in TERMINAL_JOB_STATUSES
+
+
+def requires_redis_dispatch(job, now: datetime) -> bool:
+    """Return whether a durable job needs another broker delivery attempt."""
+    return job.status == "queued" or (
+        job.status == "running"
+        and job.lease_expires_at is not None
+        and job.lease_expires_at < now
+    )
 
 
 def find_active_job(
@@ -62,10 +72,14 @@ def redis_settings():
 
 
 async def dispatch_job(job: BackgroundJob) -> None:
+    await dispatch_job_id(str(job.id))
+
+
+async def dispatch_job_id(job_id: str) -> None:
     from arq import create_pool
 
     redis = await create_pool(redis_settings())
     try:
-        await redis.enqueue_job("run_background_job", str(job.id))
+        await redis.enqueue_job("run_background_job", job_id)
     finally:
         await redis.aclose()

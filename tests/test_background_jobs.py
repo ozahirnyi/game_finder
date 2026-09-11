@@ -59,6 +59,30 @@ def test_worker_executes_recommendation_without_request_handler(monkeypatch):
     assert result == {"recommendations": [{"title": "cozy:570", "game": {"id": 570}}]}
 
 
+def test_worker_consumes_quota_only_after_a_successful_operation(monkeypatch):
+    import asyncio
+    import uuid
+    from types import SimpleNamespace
+
+    from app import worker
+
+    owner_id = uuid.uuid4()
+    job = SimpleNamespace(owner_id=owner_id)
+    calls = []
+
+    async def successful_operation(_db, _job):
+        calls.append("operation")
+        return {"recommendations": []}
+
+    monkeypatch.setattr(worker, "execute_background_operation", successful_operation)
+    monkeypatch.setattr(worker, "consume_quota", lambda _db, user_id: calls.append(user_id))
+
+    result = asyncio.run(worker.execute_and_consume_quota(object(), job))
+
+    assert result == {"recommendations": []}
+    assert calls == ["operation", owner_id]
+
+
 def test_dispatch_enqueues_only_the_durable_job_id(monkeypatch):
     import asyncio
     import sys
@@ -85,6 +109,28 @@ def test_dispatch_enqueues_only_the_durable_job_id(monkeypatch):
     asyncio.run(background_jobs.dispatch_job(job))
 
     assert calls == [("run_background_job", str(job.id)), ("close", None)]
+
+
+def test_recovery_marks_queued_and_expired_leased_jobs_for_redis_dispatch():
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+
+    from app.background_jobs import requires_redis_dispatch
+
+    now = datetime.now(timezone.utc)
+    assert requires_redis_dispatch(SimpleNamespace(status="queued", lease_expires_at=None), now)
+    assert requires_redis_dispatch(
+        SimpleNamespace(status="running", lease_expires_at=now - timedelta(seconds=1)), now
+    )
+    assert not requires_redis_dispatch(
+        SimpleNamespace(status="running", lease_expires_at=now + timedelta(seconds=1)), now
+    )
+
+
+def test_worker_schedules_periodic_recovery_for_durable_jobs():
+    from app.worker import WorkerSettings
+
+    assert WorkerSettings.cron_jobs
 
 
 def test_background_job_read_exposes_only_safe_polling_fields():
@@ -133,3 +179,31 @@ def test_recommendation_submission_enqueues_without_inline_openai(monkeypatch):
 
     assert result.model_dump() == {"id": job.id, "status": "queued", "result": None, "error": None}
     assert dispatched == [job.id]
+
+
+def test_recommendation_submission_returns_durable_job_when_redis_is_temporarily_down(monkeypatch):
+    import asyncio
+    import uuid
+    from types import SimpleNamespace
+
+    from app import main
+    from app.schemas import RecommendationRequest
+
+    job = SimpleNamespace(id=uuid.uuid4(), status="queued", result=None, error=None)
+    monkeypatch.setattr(main, "check_quota_available", lambda *_args: SimpleNamespace())
+    monkeypatch.setattr(main, "enqueue_or_get_job", lambda *_args: job, raising=False)
+
+    async def redis_down(_job):
+        raise OSError("Redis is restarting")
+
+    monkeypatch.setattr(main, "dispatch_job", redis_down, raising=False)
+    result = asyncio.run(
+        main.recommendations.__wrapped__(
+            SimpleNamespace(),
+            RecommendationRequest(prompt="cozy", liked_game_ids=[570]),
+            object(),
+            SimpleNamespace(id=uuid.uuid4()),
+        )
+    )
+
+    assert result.status == "queued"

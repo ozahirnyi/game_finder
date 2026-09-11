@@ -3962,7 +3962,11 @@ async def recommendations(
     ).hexdigest()
     job = enqueue_or_get_job(db, current_user.id, "recommendations", idempotency_key, payload)
     if job.status == "queued":
-        await dispatch_job(job)
+        try:
+            await dispatch_job(job)
+        except Exception:
+            # The worker periodically redelivers durable queued jobs after Redis recovers.
+            pass
     return BackgroundJobRead.model_validate(job)
 
 

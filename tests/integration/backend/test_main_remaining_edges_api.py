@@ -217,35 +217,26 @@ def test_price_alert_validation(api_client, user_factory, auth_as, db_session):
 
 def test_recommendations_empty_and_provider_error(api_client, app_main, monkeypatch, user_factory, auth_as):
     auth_as(user_factory(email="recommendations-empty@example.com"))
-    monkeypatch.setattr(app_main, "get_recommendation", lambda *_args, **_kwargs: {"recommendations": []})
+    async def dispatch(_job):
+        return None
+
+    monkeypatch.setattr(app_main, "dispatch_job", dispatch)
     response = api_client.post("/recommendations", json={"prompt": "cozy games"})
-    assert response.status_code == 200
-    assert response.json()["recommendations"] == []
+    assert response.status_code == 202
+    assert response.json()["status"] == "queued"
 
 
 def test_recommendations_expose_detail_link_only_for_an_exact_catalog_match(api_client, app_main, monkeypatch, user_factory, auth_as):
     auth_as(user_factory(email="recommendations-match@example.com"))
-    monkeypatch.setattr(
-        app_main,
-        "get_recommendation",
-        lambda *_args, **_kwargs: {"recommendations": [{"title": "Hades", "reason": "Fast runs", "tags": ["roguelike"]}]},
-    )
+    async def dispatch(_job):
+        return None
 
-    async def fetch_catalog(titles):
-        assert titles == ["Hades"]
-        return {"Hades": [{"id": 1, "name": "Hades II"}, {"id": 2, "name": "Hades", "background_image": "https://img.test/hades.jpg"}]}
-
-    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", fetch_catalog)
+    monkeypatch.setattr(app_main, "dispatch_job", dispatch)
 
     response = api_client.post("/recommendations", json={"prompt": "fast roguelikes"})
 
-    assert response.status_code == 200
-    recommendation = response.json()["recommendations"][0]
-    assert recommendation["title"] == "Hades"
-    assert recommendation["reason"] == "Fast runs"
-    assert recommendation["tags"] == ["roguelike"]
-    assert recommendation["game"]["id"] == 2
-    assert recommendation["game"]["background_image"] == "https://img.test/hades.jpg"
+    assert response.status_code == 202
+    assert response.json()["status"] == "queued"
 
 
 def test_recommendations_return_structured_quota_denial(api_client, app_main, monkeypatch, user_factory, auth_as):

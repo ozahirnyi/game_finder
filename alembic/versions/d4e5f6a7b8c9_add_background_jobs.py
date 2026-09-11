@@ -19,9 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # A prior queue-release attempt created this table and then reset Alembic
     # to bc72e81f4a10 during rollback.  Preserve that recovery-safe state.
-    if sa.inspect(op.get_bind()).has_table("background_jobs"):
-        return
-    op.create_table(
+    inspector = sa.inspect(op.get_bind())
+    if not inspector.has_table("background_jobs"):
+        op.create_table(
         "background_jobs",
         sa.Column("id", sa.UUID(), primary_key=True),
         sa.Column("owner_id", sa.UUID(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
@@ -31,12 +31,20 @@ def upgrade() -> None:
         sa.Column("payload", sa.JSON(), nullable=False),
         sa.Column("result", sa.JSON(), nullable=True),
         sa.Column("error", sa.String(length=500), nullable=True),
+        sa.Column("lease_token", sa.String(length=36), nullable=True),
+        sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint("status IN ('queued', 'running', 'succeeded', 'failed')", name="ck_background_jobs_status"),
-    )
-    op.create_index("ix_background_jobs_owner_status", "background_jobs", ["owner_id", "status"])
-    op.execute("CREATE UNIQUE INDEX uq_background_jobs_active_idempotency ON background_jobs (owner_id, operation, idempotency_key) WHERE status IN ('queued', 'running')")
+        )
+        op.create_index("ix_background_jobs_owner_status", "background_jobs", ["owner_id", "status"])
+        op.execute("CREATE UNIQUE INDEX uq_background_jobs_active_idempotency ON background_jobs (owner_id, operation, idempotency_key) WHERE status IN ('queued', 'running')")
+        return
+    existing_columns = {column["name"] for column in inspector.get_columns("background_jobs")}
+    if "lease_token" not in existing_columns:
+        op.add_column("background_jobs", sa.Column("lease_token", sa.String(length=36), nullable=True))
+    if "lease_expires_at" not in existing_columns:
+        op.add_column("background_jobs", sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True))
 
 
 def downgrade() -> None:
