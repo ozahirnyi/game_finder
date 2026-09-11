@@ -67,7 +67,7 @@ def check_quota_available(
 
 
 def consume_quota(
-    db: Session, user_id: uuid.UUID, now: datetime | None = None
+    db: Session, user_id: uuid.UUID, now: datetime | None = None, *, commit: bool = True
 ) -> QuotaSnapshot:
     current = _utc(now)
     _lock_user(db, user_id)
@@ -95,14 +95,17 @@ def consume_quota(
         )
     row.attempt_count += 1
     row.last_attempt_at = current
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return _snapshot(row, current, current)
 
 
 def reserve_quota(
-    db: Session, user_id: uuid.UUID, now: datetime | None = None
+    db: Session, user_id: uuid.UUID, now: datetime | None = None, *, commit: bool = True
 ) -> QuotaSnapshot:
-    return consume_quota(db, user_id, now)
+    return consume_quota(db, user_id, now, commit=commit)
 
 
 def _lock_user(db: Session, user_id: uuid.UUID) -> None:

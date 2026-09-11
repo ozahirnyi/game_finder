@@ -17,7 +17,14 @@ echo = os.getenv("DEBUG", "false").lower() == "true"
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set")
-engine = create_engine(DATABASE_URL, echo=echo)
+engine = create_engine(
+    DATABASE_URL,
+    echo=echo,
+    pool_size=15,
+    max_overflow=5,
+    pool_timeout=30,
+    pool_pre_ping=True,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -350,6 +357,35 @@ class OAuthAuthorizationTransaction(Base):
     result_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class BackgroundJob(Base):
+    __tablename__ = "background_jobs"
+    __table_args__ = (
+        Index("ix_background_jobs_owner_status", "owner_id", "status"),
+        Index(
+            "uq_background_jobs_active_idempotency",
+            "owner_id",
+            "operation",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+        ),
+        CheckConstraint("status IN ('queued', 'running', 'succeeded', 'failed')", name="ck_background_jobs_status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    operation: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued", server_default="queued")
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    result: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    lease_token: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    lease_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 

@@ -3,6 +3,8 @@ import os
 import uuid
 import contextlib
 import re
+import hashlib
+import json
 import unicodedata
 from dataclasses import dataclass
 from typing import Literal
@@ -55,7 +57,7 @@ from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_cand
 from app.genre_deals import _apply_catalog_media, build_genre_deal_groups, normalize_genre, select_deal_genres
 from app.price_region import effective_price_country
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
-from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, engine, wait_for_db
+from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, BackgroundJob, engine, wait_for_db
 from app.database import SocialBlock, SteamFriendSuppression
 from app import social_policy
 from app.schemas import ConversationReadUpdate
@@ -65,7 +67,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
-    DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult
+    DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult, BackgroundJobRead
 from app.recommendation_quota import (
     QuotaDenied,
     check_quota_available,
@@ -73,6 +75,7 @@ from app.recommendation_quota import (
     get_quota_status,
     reserve_quota,
 )
+from app.background_jobs import dispatch_job, enqueue_or_get_job
 from app.recommendations import enrich_recommendations
 from app.steam import (
     build_steam_login_url,
@@ -3937,7 +3940,7 @@ async def resolve_recommendation_catalog_matches(result: dict) -> dict:
     return {**result, "recommendations": resolved}
 
 
-@app.post("/recommendations",response_model=RecommendationResponse)
+@app.post("/recommendations", status_code=202, response_model=BackgroundJobRead)
 @limiter.limit("5/minute")
 async def recommendations(
     request: Request,
@@ -3953,19 +3956,42 @@ async def recommendations(
         raise HTTPException(status_code=429, detail=jsonable_encoder({
             "code": exc.code, "message": exc.message, "quota": asdict(exc.snapshot),
         })) from exc
-    generated = await asyncio.to_thread(get_recommendation, data.prompt, data.liked_game_ids)
-
-    enriched = await enrich_recommendations(
-        generated.get("recommendations", []), fetch_igdb_games_batch
-    )
-    if any(item.get("game") is not None for item in enriched):
+    payload = {"prompt": data.prompt, "liked_game_ids": data.liked_game_ids}
+    idempotency_key = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    try:
+        job = enqueue_or_get_job(
+            db,
+            current_user.id,
+            "recommendations",
+            idempotency_key,
+            payload,
+            reserve=lambda: reserve_quota(db, current_user.id, commit=False),
+        )
+    except QuotaDenied as exc:
+        raise HTTPException(status_code=429, detail=jsonable_encoder({
+            "code": exc.code, "message": exc.message, "quota": asdict(exc.snapshot),
+        })) from exc
+    if job.status == "queued":
         try:
-            quota = consume_quota(db, current_user.id)
-        except QuotaDenied as exc:
-            raise HTTPException(status_code=429, detail=jsonable_encoder({
-                "code": exc.code, "message": exc.message, "quota": asdict(exc.snapshot),
-            })) from exc
-    return {"recommendations": enriched, "quota": asdict(quota)}
+            await dispatch_job(job)
+        except Exception:
+            # The worker periodically redelivers durable queued jobs after Redis recovers.
+            pass
+    return BackgroundJobRead.model_validate(job)
+
+
+@app.get("/background-jobs/{job_id}", response_model=BackgroundJobRead)
+def get_background_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    job = db.query(BackgroundJob).filter(BackgroundJob.id == job_id, BackgroundJob.owner_id == current_user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Background job not found")
+    return BackgroundJobRead.model_validate(job)
 
 
 @app.get("/recommendations/quota", response_model=RecommendationQuotaRead)

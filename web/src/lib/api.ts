@@ -300,6 +300,12 @@ export type RecommendationResponse = {
   recommendations: RecommendationItem[];
   quota?: RecommendationQuota | null;
 };
+export type BackgroundJob = {
+  id: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  result?: { recommendations?: RecommendationItem[] } | null;
+  error?: string | null;
+};
 export type DashboardBlock<T> = {
   status: "ready" | "empty" | "error" | "not_connected";
   data: T;
@@ -624,13 +630,29 @@ export function searchGames(options: CatalogSearchOptions) {
   return apiRequest<{ results: CatalogGame[] }>(`/search/games?${params.toString()}`);
 }
 
-export function getRecommendations(prompt: string) {
-  return apiRequest<RecommendationResponse>("/recommendations", {
+const BACKGROUND_JOB_POLL_INTERVAL_MS = 500;
+const BACKGROUND_JOB_MAX_POLLS = 60;
+
+function sleep(milliseconds: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+export async function getRecommendations(prompt: string): Promise<RecommendationResponse> {
+  const job = await apiRequest<BackgroundJob>("/recommendations", {
     method: "POST",
     auth: true,
     body: { prompt, liked_game_ids: [] },
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(5_000),
   });
+  for (let attempt = 0; attempt < BACKGROUND_JOB_MAX_POLLS; attempt += 1) {
+    const current = await apiRequest<BackgroundJob>(`/background-jobs/${job.id}`, { auth: true });
+    if (current.status === "succeeded") return current.result ?? { recommendations: [] };
+    if (current.status === "failed") {
+      throw new ApiError(current.error ?? "AI search could not be completed.", 502);
+    }
+    await sleep(BACKGROUND_JOB_POLL_INTERVAL_MS);
+  }
+  throw new ApiError("AI search is taking longer than expected. Please retry.", 504);
 }
 
 export function getRecommendationQuota() {

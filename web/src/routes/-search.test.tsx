@@ -51,23 +51,28 @@ describe("SearchPage", () => {
       Promise.resolve(
         new Response(
           JSON.stringify(
-            url.includes("/recommendations")
+            url.includes("/background-jobs/")
               ? {
-                  recommendations: [
-                    {
-                      title: "Recommended title",
-                      reason: "Fits your prompt",
-                      tags: ["Co-op"],
-                      game: {
-                        id: 42,
-                        name: "Recommended title",
-                        released: null,
-                        background_image: null,
-                        platforms: [],
+                  status: "succeeded",
+                  result: {
+                    recommendations: [
+                      {
+                        title: "Recommended title",
+                        reason: "Fits your prompt",
+                        tags: ["Co-op"],
+                        game: {
+                          id: 42,
+                          name: "Recommended title",
+                          released: null,
+                          background_image: null,
+                          platforms: [],
+                        },
                       },
-                    },
-                  ],
+                    ],
+                  },
                 }
+              : url.includes("/recommendations")
+                ? { id: "job-1", status: "queued" }
               : { results: [] },
           ),
           { status: 200 },
@@ -174,9 +179,11 @@ describe("SearchPage", () => {
         Promise.resolve(
           new Response(
             JSON.stringify(
-              url.includes("/recommendations")
+              url.includes("/background-jobs/")
                 ? {
-                    recommendations: [
+                    status: "succeeded",
+                    result: {
+                      recommendations: [
                       {
                         title: "Hades",
                         reason: "Match",
@@ -192,7 +199,10 @@ describe("SearchPage", () => {
                       },
                       { title: "Unknown Game", reason: "Match", tags: [] },
                     ],
+                    },
                   }
+                : url.includes("/recommendations")
+                  ? { id: "job-1", status: "queued" }
                 : { results: [] },
             ),
           ),
@@ -221,7 +231,11 @@ describe("SearchPage", () => {
         Promise.resolve(
           new Response(
             JSON.stringify(
-              url.includes("/recommendations") ? { recommendations: [] } : { results: [] },
+              url.includes("/background-jobs/")
+                ? { status: "succeeded", result: { recommendations: [] } }
+                : url.includes("/recommendations")
+                  ? { id: "job-1", status: "queued" }
+                  : { results: [] },
             ),
           ),
         ),

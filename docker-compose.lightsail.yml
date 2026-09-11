@@ -12,6 +12,20 @@ services:
       redis:
         condition: service_started
 
+  app-worker:
+    build: .
+    restart: unless-stopped
+    command: arq app.worker.WorkerSettings
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   web:
     build: ./web
     restart: unless-stopped
@@ -34,6 +48,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   postgres_data:

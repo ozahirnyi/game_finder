@@ -314,6 +314,15 @@ class RecommendationResponse(BaseModel):
     quota: RecommendationQuotaRead | None = None
 
 
+class BackgroundJobRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    status: Literal["queued", "running", "succeeded", "failed"]
+    result: dict | None = None
+    error: str | None = None
+
+
 class GameSearchItem(BaseModel):
     id: int | None = None
     name: str | None = None
