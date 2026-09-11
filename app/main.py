@@ -3024,9 +3024,10 @@ async def google_callback(code: str | None = None, state: str | None = None, err
             user = db.query(User).filter(User.id == linked_user_id).first()
             if not user:
                 raise ValueError("Account no longer exists")
-            if identity and identity.user_id != user.id:
-                return google_frontend_redirect(provider="google", error="account_already_linked")
-            if not identity:
+            if identity:
+                identity.user_id = user.id
+                identity.email = email
+            else:
                 db.add(OAuthIdentity(user_id=user.id, provider="google", provider_subject=subject, email=email))
         elif identity:
             user = db.query(User).filter(User.id == identity.user_id).first()
