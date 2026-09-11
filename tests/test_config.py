@@ -1,8 +1,53 @@
 from app.integrations.rawg import get_float_env
+from app.database import database_engine_options_from_env
 from app.main import get_allowed_origins, get_backend_public_url, get_frontend_url
+from app.main import database_timeout_response
 import app.openai_client as openai_client
 from app.openai_client import fallback_or_raise, fallback_recommendations, get_recommendation
 from fastapi import HTTPException
+from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
+
+
+def test_database_engine_options_use_safe_defaults(monkeypatch):
+    for name in ("DB_POOL_SIZE", "DB_MAX_OVERFLOW", "DB_POOL_TIMEOUT_SECONDS"):
+        monkeypatch.delenv(name, raising=False)
+
+    assert database_engine_options_from_env() == {
+        "pool_size": 15,
+        "max_overflow": 5,
+        "pool_timeout": 5.0,
+    }
+
+
+def test_database_engine_options_accept_valid_overrides(monkeypatch):
+    monkeypatch.setenv("DB_POOL_SIZE", "20")
+    monkeypatch.setenv("DB_MAX_OVERFLOW", "4")
+    monkeypatch.setenv("DB_POOL_TIMEOUT_SECONDS", "2.5")
+
+    assert database_engine_options_from_env() == {
+        "pool_size": 20,
+        "max_overflow": 4,
+        "pool_timeout": 2.5,
+    }
+
+
+def test_database_engine_options_reject_invalid_values(monkeypatch):
+    monkeypatch.setenv("DB_POOL_SIZE", "0")
+    monkeypatch.setenv("DB_MAX_OVERFLOW", "-1")
+    monkeypatch.setenv("DB_POOL_TIMEOUT_SECONDS", "not-a-number")
+
+    assert database_engine_options_from_env() == {
+        "pool_size": 15,
+        "max_overflow": 5,
+        "pool_timeout": 5.0,
+    }
+
+
+def test_database_pool_timeout_returns_retryable_503():
+    response = database_timeout_response(None, SQLAlchemyTimeoutError())
+
+    assert response.status_code == 503
+    assert response.body == b'{"detail":"Database is busy. Please retry in a few seconds."}'
 
 
 def test_get_float_env_uses_default_for_missing_empty_or_invalid_values(monkeypatch):

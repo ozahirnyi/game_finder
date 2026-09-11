@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -106,6 +107,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+def database_timeout_response(_request: Request, _exc: SQLAlchemyTimeoutError) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database is busy. Please retry in a few seconds."},
+    )
+
+
+app.add_exception_handler(SQLAlchemyTimeoutError, database_timeout_response)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_origins(),

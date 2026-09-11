@@ -16,7 +16,36 @@ echo = os.getenv("DEBUG", "false").lower() == "true"
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set")
-engine = create_engine(DATABASE_URL, echo=echo)
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+def _positive_float_env(name: str, default: float) -> float:
+    try:
+        value = float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+def database_engine_options_from_env() -> dict[str, int | float]:
+    return {
+        "pool_size": _positive_int_env("DB_POOL_SIZE", 15),
+        "max_overflow": _positive_int_env("DB_MAX_OVERFLOW", 5),
+        "pool_timeout": _positive_float_env("DB_POOL_TIMEOUT_SECONDS", 5.0),
+    }
+
+
+engine_options = {"echo": echo}
+if not DATABASE_URL.startswith("sqlite"):
+    engine_options.update(database_engine_options_from_env())
+engine = create_engine(DATABASE_URL, **engine_options)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
