@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.database import OAuthAuthorizationTransaction, OAuthIdentity, User
+from app.database import Favorite, OAuthAuthorizationTransaction, OAuthIdentity, User
 
 
 pytestmark = pytest.mark.integration
@@ -68,6 +68,67 @@ def test_google_callback_creates_user_identity_and_exchange_transaction(api_clie
     assert db_session.query(OAuthIdentity).filter_by(provider_subject="google-sub", user_id=user.id).count() == 1
     result = db_session.query(OAuthAuthorizationTransaction).filter_by(exchange_code="result-code").one()
     assert result.result_user_id == user.id
+
+
+def test_google_callback_transfers_verified_identity_to_linking_user(
+    api_client, app_main, db_session, user_factory, monkeypatch
+):
+    primary = user_factory(email="primary@example.com")
+    duplicate = user_factory(email="duplicate@example.com")
+    favorite = Favorite(user_id=duplicate.id, catalog_game_id=42, title="Duplicate-only game")
+    identity = OAuthIdentity(
+        user_id=duplicate.id,
+        provider="google",
+        provider_subject="google-subject",
+        email="google@example.com",
+    )
+    transaction = OAuthAuthorizationTransaction(
+        state="link-google-state",
+        code_verifier="verifier",
+        nonce="nonce",
+        mode="link",
+        user_id=primary.id,
+        expires_at=datetime.now() + timedelta(minutes=5),
+    )
+    db_session.add_all([favorite, identity, transaction])
+    db_session.commit()
+
+    async def exchange(code, verifier):
+        assert (code, verifier) == ("oauth-code", "verifier")
+        return {"id_token": "id-token"}
+
+    async def verify(token, nonce):
+        assert (token, nonce) == ("id-token", "nonce")
+        return {"sub": "google-subject", "email": "google@example.com"}
+
+    monkeypatch.setattr(app_main, "exchange_google_code", exchange)
+    monkeypatch.setattr(app_main, "verify_google_id_token", verify)
+    exchange_code = "r" * 32
+    monkeypatch.setattr(app_main, "random_token", lambda: exchange_code)
+
+    response = api_client.get(
+        "/auth/google/callback?code=oauth-code&state=link-google-state",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert f"exchange_code={exchange_code}" in location(response)
+    db_session.refresh(identity)
+    assert identity.user_id == primary.id
+    assert db_session.get(User, duplicate.id) is not None
+    result = db_session.query(OAuthAuthorizationTransaction).filter_by(exchange_code=exchange_code).one()
+    assert result.result_user_id == primary.id
+    exchange_result = api_client.post("/auth/google/exchange", json={"exchange_code": exchange_code})
+    assert exchange_result.status_code == 200
+    current_user = app_main.get_current_user(
+        token=exchange_result.json()["access_token"],
+        db=db_session,
+    )
+    assert current_user.id == primary.id
+    assert db_session.get(Favorite, favorite.id).user_id == duplicate.id
+    assert db_session.query(OAuthIdentity).filter_by(
+        provider="google", provider_subject="google-subject", user_id=primary.id
+    ).count() == 1
 
 
 def test_google_callback_external_failure_is_redirect_and_consumes_state(api_client, app_main, db_session, monkeypatch):
