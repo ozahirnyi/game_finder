@@ -59,30 +59,6 @@ def test_worker_executes_recommendation_without_request_handler(monkeypatch):
     assert result == {"recommendations": [{"title": "cozy:570", "game": {"id": 570}}]}
 
 
-def test_worker_consumes_quota_only_after_a_successful_operation(monkeypatch):
-    import asyncio
-    import uuid
-    from types import SimpleNamespace
-
-    from app import worker
-
-    owner_id = uuid.uuid4()
-    job = SimpleNamespace(owner_id=owner_id)
-    calls = []
-
-    async def successful_operation(_db, _job):
-        calls.append("operation")
-        return {"recommendations": []}
-
-    monkeypatch.setattr(worker, "execute_background_operation", successful_operation)
-    monkeypatch.setattr(worker, "consume_quota", lambda _db, user_id: calls.append(user_id))
-
-    result = asyncio.run(worker.execute_and_consume_quota(object(), job))
-
-    assert result == {"recommendations": []}
-    assert calls == ["operation", owner_id]
-
-
 def test_dispatch_enqueues_only_the_durable_job_id(monkeypatch):
     import asyncio
     import sys
@@ -161,7 +137,7 @@ def test_recommendation_submission_enqueues_without_inline_openai(monkeypatch):
     job = SimpleNamespace(id=uuid.uuid4(), status="queued", result=None, error=None)
     dispatched = []
     monkeypatch.setattr(main, "check_quota_available", lambda *_args: SimpleNamespace())
-    monkeypatch.setattr(main, "enqueue_or_get_job", lambda *_args: job, raising=False)
+    monkeypatch.setattr(main, "enqueue_or_get_job", lambda *_args, **_kwargs: job, raising=False)
     monkeypatch.setattr(main, "get_recommendation", lambda *_args: (_ for _ in ()).throw(AssertionError("inline OpenAI call")))
 
     async def dispatch(created_job):
@@ -191,7 +167,7 @@ def test_recommendation_submission_returns_durable_job_when_redis_is_temporarily
 
     job = SimpleNamespace(id=uuid.uuid4(), status="queued", result=None, error=None)
     monkeypatch.setattr(main, "check_quota_available", lambda *_args: SimpleNamespace())
-    monkeypatch.setattr(main, "enqueue_or_get_job", lambda *_args: job, raising=False)
+    monkeypatch.setattr(main, "enqueue_or_get_job", lambda *_args, **_kwargs: job, raising=False)
 
     async def redis_down(_job):
         raise OSError("Redis is restarting")

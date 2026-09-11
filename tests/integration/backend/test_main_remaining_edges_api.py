@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import Request
 
-from app.database import BackgroundJob, Favorite, FriendRequest, Game, GameInvite, OAuthIdentity, WishlistItem
+from app.database import AIRecommendationQuota, BackgroundJob, Favorite, FriendRequest, Game, GameInvite, OAuthIdentity, WishlistItem
 from app.recommendation_quota import QuotaDenied, QuotaSnapshot
 
 
@@ -216,8 +216,8 @@ def test_price_alert_validation(api_client, user_factory, auth_as, db_session):
     assert api_client.patch(f"/price-alerts/{created.json()['id']}", json={"target_price": None, "target_discount": None}).status_code == 422
 
 
-def test_recommendations_empty_and_provider_error(api_client, app_main, monkeypatch, user_factory, auth_as):
-    auth_as(user_factory(email="recommendations-empty@example.com"))
+def test_recommendations_empty_and_provider_error(api_client, app_main, monkeypatch, user_factory, auth_as, db_session):
+    user = auth_as(user_factory(email="recommendations-empty@example.com"))
     async def dispatch(_job):
         return None
 
@@ -225,6 +225,8 @@ def test_recommendations_empty_and_provider_error(api_client, app_main, monkeypa
     response = api_client.post("/recommendations", json={"prompt": "cozy games"})
     assert response.status_code == 202
     assert response.json()["status"] == "queued"
+    quota = db_session.get(AIRecommendationQuota, (user.id, datetime.now(timezone.utc).date()))
+    assert quota.attempt_count == 1
 
 
 def test_recommendations_expose_detail_link_only_for_an_exact_catalog_match(api_client, app_main, monkeypatch, user_factory, auth_as):
@@ -281,7 +283,7 @@ def test_worker_claims_and_completes_a_durable_job(db_session, user_factory, mon
     async def completed(_db, _job):
         return {"recommendations": []}
 
-    monkeypatch.setattr(worker, "execute_and_consume_quota", completed)
+    monkeypatch.setattr(worker, "execute_background_operation", completed)
     asyncio.run(worker.run_background_job({}, str(job.id)))
 
     db_session.expire_all()
@@ -304,7 +306,7 @@ def test_worker_marks_claimed_job_failed_when_execution_raises(db_session, user_
     async def failed(_db, _job):
         raise RuntimeError("provider down")
 
-    monkeypatch.setattr(worker, "execute_and_consume_quota", failed)
+    monkeypatch.setattr(worker, "execute_background_operation", failed)
     with pytest.raises(RuntimeError, match="provider down"):
         asyncio.run(worker.run_background_job({}, str(job.id)))
 

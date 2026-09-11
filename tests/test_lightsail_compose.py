@@ -22,3 +22,6 @@ def test_production_lightsail_compose_defines_a_separate_background_worker() -> 
     assert "  app-worker:\n" in config
     assert "command: arq app.worker.WorkerSettings" in config
     assert "REDIS_URL: redis://redis:6379/0" in config
+    assert "restart: unless-stopped" in config
+    assert "condition: service_healthy" in config
+    assert '"redis-cli", "ping"' in config

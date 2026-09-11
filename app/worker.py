@@ -12,7 +12,6 @@ from app.openai_client import get_recommendation
 from app.database import BackgroundJob, SessionLocal
 from app.integrations.igdb import fetch_igdb_games_batch
 from app.recommendations import enrich_recommendations
-from app.recommendation_quota import consume_quota
 from app.background_jobs import dispatch_job_id
 
 LEASE_DURATION = timedelta(minutes=15)
@@ -35,12 +34,6 @@ async def execute_background_operation(_db, job) -> dict:
         )
         return {"recommendations": enriched}
     raise BackgroundJobOperationError("Unsupported background operation")
-
-
-async def execute_and_consume_quota(db, job) -> dict:
-    result = await execute_background_operation(db, job)
-    consume_quota(db, job.owner_id)
-    return result
 
 
 def redis_settings() -> RedisSettings:
@@ -77,7 +70,7 @@ async def run_background_job(_ctx: dict, job_id: str) -> None:
         heartbeat_task = asyncio.create_task(
             _extend_lease_until_complete(parsed_job_id, lease_token, heartbeat_stop)
         )
-        job.result = jsonable_encoder(await execute_and_consume_quota(db, job))
+        job.result = jsonable_encoder(await execute_background_operation(db, job))
         completed = (
             db.query(BackgroundJob)
             .filter(

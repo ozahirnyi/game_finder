@@ -3960,7 +3960,19 @@ async def recommendations(
     idempotency_key = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
-    job = enqueue_or_get_job(db, current_user.id, "recommendations", idempotency_key, payload)
+    try:
+        job = enqueue_or_get_job(
+            db,
+            current_user.id,
+            "recommendations",
+            idempotency_key,
+            payload,
+            reserve=lambda: reserve_quota(db, current_user.id, commit=False),
+        )
+    except QuotaDenied as exc:
+        raise HTTPException(status_code=429, detail=jsonable_encoder({
+            "code": exc.code, "message": exc.message, "quota": asdict(exc.snapshot),
+        })) from exc
     if job.status == "queued":
         try:
             await dispatch_job(job)

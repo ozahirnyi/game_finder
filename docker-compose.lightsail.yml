@@ -14,6 +14,7 @@ services:
 
   app-worker:
     build: .
+    restart: unless-stopped
     command: arq app.worker.WorkerSettings
     env_file: .env
     environment:
@@ -23,7 +24,7 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   web:
     build: ./web
@@ -47,6 +48,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   postgres_data:

@@ -6,11 +6,11 @@ import pytest
 def test_alembic_has_a_single_upgrade_head():
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["d4e5f6a7b8c9"]
-    assert script.get_revision("d4e5f6a7b8c9").down_revision == "bc72e81f4a10"
+    assert script.get_heads() == ["e5f6a7b8c9d0"]
+    assert script.get_revision("e5f6a7b8c9d0").down_revision == "d4e5f6a7b8c9"
 
 
-def test_background_jobs_migration_accepts_the_table_left_by_the_rolled_back_release(monkeypatch):
+def test_background_jobs_lease_migration_accepts_the_table_left_by_the_rolled_back_release(monkeypatch):
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
     from sqlalchemy import Column, MetaData, String, Table, create_engine
@@ -19,10 +19,12 @@ def test_background_jobs_migration_accepts_the_table_left_by_the_rolled_back_rel
     metadata = MetaData()
     Table("background_jobs", metadata, Column("status", String(16), nullable=False))
     metadata.create_all(engine)
-    migration = ScriptDirectory.from_config(Config("alembic.ini")).get_revision("d4e5f6a7b8c9").module
+    migration = ScriptDirectory.from_config(Config("alembic.ini")).get_revision("e5f6a7b8c9d0").module
     with engine.begin() as connection:
         monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
         migration.upgrade()
+        columns = {column["name"] for column in connection.dialect.get_columns(connection, "background_jobs")}
+        assert {"lease_token", "lease_expires_at"} <= columns
     engine.dispose()
 
 

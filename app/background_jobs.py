@@ -41,7 +41,7 @@ def find_active_job(
 
 
 def enqueue_or_get_job(
-    db, owner_id: uuid.UUID, operation: str, idempotency_key: str, payload: dict
+    db, owner_id: uuid.UUID, operation: str, idempotency_key: str, payload: dict, reserve=None
 ) -> BackgroundJob:
     existing = find_active_job(db, owner_id, operation, idempotency_key)
     if existing:
@@ -54,6 +54,8 @@ def enqueue_or_get_job(
     )
     db.add(job)
     try:
+        if reserve is not None:
+            reserve()
         db.commit()
     except IntegrityError:
         db.rollback()
