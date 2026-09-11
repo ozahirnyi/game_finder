@@ -57,9 +57,9 @@ and a concurrency limit of 10 jobs per worker process.
 
 The first migrated operations are Steam library synchronization, Steam and AI
 recommendations, PSN import confirmation, and Telegram delivery. Catalog,
-price, and deal requests stay request/response APIs because their Redis cache
-already coalesces normal repeated reads and the frontend needs their result
-immediately.
+price, and deal requests stay request/response APIs because the frontend needs
+their result immediately; their cache-stampede protection is outside this
+action-queue change.
 
 ### Deployment
 
@@ -106,4 +106,5 @@ success for these lightweight reads.
 ## Non-goals
 
 - Raising PostgreSQL `max_connections` above 100.
-- Changing existing authentication or game-library response contracts.
+- Changing contracts for normal authentication, saved-game, social, catalog,
+  price, or deal routes.
