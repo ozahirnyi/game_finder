@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   createMessage: vi.fn(),
   markConversationRead: vi.fn(),
   getProfile: vi.fn(),
+  getAuthSnapshot: vi.fn(),
 }));
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual("@/lib/api")), ...api }));
 import { MessagesScreen } from "./MessagesScreen";
@@ -36,6 +37,7 @@ beforeEach(() => {
   api.getConversationMessages.mockResolvedValue([first]);
   api.getProfile.mockResolvedValue({ id: "me" });
   api.markConversationRead.mockResolvedValue(undefined);
+  api.getAuthSnapshot.mockReturnValue(true);
 });
 afterEach(() => {
   cleanup();
@@ -104,4 +106,19 @@ it("shows a new-account empty state instead of a conversation picker", async () 
     await screen.findByText("No conversations yet. Open a friend's profile to start a chat."),
   ).toBeInTheDocument();
   expect(screen.queryByText("Choose a conversation")).not.toBeInTheDocument();
+});
+
+it("asks signed-out visitors to sign in without loading conversations", () => {
+  api.getAuthSnapshot.mockReturnValue(false);
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MessagesScreen onSelect={vi.fn()} />
+    </QueryClientProvider>,
+  );
+  expect(screen.getByText("Sign in to view messages.")).toBeInTheDocument();
+  expect(screen.queryByText(/Loading conversations/)).not.toBeInTheDocument();
+  expect(screen.queryByText("Choose a conversation")).not.toBeInTheDocument();
+  expect(api.getConversations).not.toHaveBeenCalled();
 });
