@@ -103,6 +103,10 @@ export function MessagesScreen({
           visible={visible}
           onBack={() => onSelect()}
         />
+      ) : conversations.data?.length === 0 ? (
+        <p className="hidden place-self-center text-muted-foreground md:block">
+          No conversations yet. Add a friend to start chatting.
+        </p>
       ) : (
         <p className="hidden place-self-center text-muted-foreground md:block">
           Choose a conversation

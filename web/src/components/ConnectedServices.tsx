@@ -17,6 +17,7 @@ import {
   type TelegramLink,
   unlinkTelegramAccount,
   unlinkSteamAccount,
+  unlinkGoogleAccount,
 } from "@/lib/api";
 import { Check, Gamepad2, Loader2, RefreshCw, Unlink, Upload } from "lucide-react";
 
@@ -82,21 +83,25 @@ export function ConnectedServices() {
   const steamQuery = useQuery({ queryKey: ["steam-account"], queryFn: getSteamAccount });
   const telegramQuery = useQuery({ queryKey: ["telegram-account"], queryFn: getTelegramAccount });
   const action = useMutation<
-    OAuthLoginUrl | SteamAccount,
+    OAuthLoginUrl | SteamAccount | void,
     Error,
-    "google" | "link" | "sync" | "unlink"
+    "google" | "google-unlink" | "link" | "sync" | "unlink"
   >({
-    mutationFn: (kind: "google" | "link" | "sync" | "unlink") =>
+    mutationFn: (kind: "google" | "google-unlink" | "link" | "sync" | "unlink") =>
       kind === "google"
         ? getGoogleLinkUrl()
-        : kind === "link"
-          ? getSteamLinkUrl()
-          : kind === "sync"
-            ? syncSteamLibrary()
-            : unlinkSteamAccount(),
+        : kind === "google-unlink"
+          ? unlinkGoogleAccount()
+          : kind === "link"
+            ? getSteamLinkUrl()
+            : kind === "sync"
+              ? syncSteamLibrary()
+              : unlinkSteamAccount(),
     onSuccess: (result) => {
-      if ("url" in result) window.location.assign(result.url);
+      if (result && typeof result === "object" && "url" in result)
+        window.location.assign(result.url);
       client.invalidateQueries({ queryKey: ["steam-account"] });
+      client.invalidateQueries({ queryKey: ["profile"] });
       client.invalidateQueries({ queryKey: ["library"] });
       client.invalidateQueries({ queryKey: ["library-overview"] });
     },
@@ -125,13 +130,23 @@ export function ConnectedServices() {
               : "Use Google to sign in faster"
           }
         >
-          <button
-            disabled={action.isPending || profileQuery.data?.google_linked}
-            className={btnPrimary}
-            onClick={() => action.mutate("google")}
-          >
-            Connect
-          </button>
+          {profileQuery.data?.google_linked ? (
+            <button
+              className={btn}
+              disabled={action.isPending}
+              onClick={() => action.mutate("google-unlink")}
+            >
+              Disconnect Google
+            </button>
+          ) : (
+            <button
+              disabled={action.isPending}
+              className={btnPrimary}
+              onClick={() => action.mutate("google")}
+            >
+              Connect
+            </button>
+          )}
         </ServiceRow>
         <ServiceRow
           icon={<Gamepad2 className="size-4" />}

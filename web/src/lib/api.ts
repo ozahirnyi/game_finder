@@ -498,6 +498,10 @@ export function getGoogleLinkUrl() {
   return apiRequest<OAuthLoginUrl>("/auth/google/link-url", { auth: true, method: "POST" });
 }
 
+export function unlinkGoogleAccount() {
+  return apiRequest<void>("/auth/google/link", { auth: true, method: "DELETE" });
+}
+
 export function exchangeGoogleCode(exchange_code: string) {
   return apiRequest<TokenResponse>("/auth/google/exchange", {
     method: "POST",

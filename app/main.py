@@ -2992,6 +2992,15 @@ def google_link_url(db: Session = Depends(get_db), current_user: User = Depends(
     return create_google_transaction(db, "link", current_user.id)
 
 
+@app.delete("/auth/google/link", status_code=204)
+def unlink_google_account(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    db.query(OAuthIdentity).filter(
+        OAuthIdentity.user_id == current_user.id,
+        OAuthIdentity.provider == "google",
+    ).delete()
+    db.commit()
+
+
 @app.get("/auth/google/callback", include_in_schema=False)
 async def google_callback(code: str | None = None, state: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
     if error or not code or not state:
