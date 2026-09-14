@@ -32,13 +32,19 @@ Steam candidate cache and then the global per-game IGDB cache. A miss at any
 lower layer only rebuilds that layer and stores a new value before the outer
 response is saved.
 
-### Parallel enrichment
+### Batched, rate-limited enrichment
 
-IGDB enrichment will run concurrently with a small fixed semaphore limit.
-The existing IGDB client already serializes provider requests to respect its
-minimum request interval; concurrency removes serial orchestration latency
-and lets cache hits complete immediately without making the external provider
-unbounded.
+IGDB enrichment will batch up to 10 title searches into one IGDB `multiquery`
+request, then schedule those batch requests with a small fixed concurrency
+limit. This matches IGDB's documented limits of four requests per second,
+eight open requests, and ten subqueries per multiquery request. At most six
+batch requests are needed for the current 60 Steam candidates, rather than 60
+sequential HTTP requests.
+
+The IGDB request governor will reserve a rate-limit slot before starting a
+network request, then release its lock while that request is in flight. This
+preserves the four-request-per-second limit while allowing several safe batch
+requests to overlap. Cache hits do not consume a provider slot.
 
 If an IGDB lookup times out or fails, the affected deal still appears with
 Steam metadata. A failed provider response is not stored as a successful
@@ -61,11 +67,12 @@ entry. Country remains normalized to its two-letter uppercase code.
 
 ## Testing
 
-Tests will prove that enrichment starts multiple lookups before the first one
-is released, that a cached IGDB match avoids a new lookup, and that two users
-with the same country and genres reuse a shared canonical completed-response
-key. Existing endpoint tests will continue to cover unauthenticated users,
-country selection, timeouts, and Steam fallback.
+Tests will prove that 11 titles become two IGDB multiquery batches, that the
+rate governor releases its lock before HTTP work completes, that a cached
+IGDB match avoids a new lookup, and that two users with the same country and
+genres reuse a shared canonical completed-response key. Existing endpoint
+tests will continue to cover unauthenticated users, country selection,
+timeouts, and Steam fallback.
 
 ## Scope limits
 
