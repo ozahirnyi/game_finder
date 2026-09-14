@@ -87,6 +87,22 @@ afterEach(() => {
 });
 
 describe("PsnImportPage", () => {
+  it("shows instructions for obtaining a PlayStation export before upload", async () => {
+    renderPage();
+
+    expect(await screen.findByText("How to get your PlayStation export")).toBeInTheDocument();
+    expect(screen.getByText("Privacy Settings", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/up to seven days/i)).toBeInTheDocument();
+
+    const link = screen.getByRole("link", { name: "Open PlayStation instructions" });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://www.playstation.com/en-us/support/account/data-request/",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noreferrer");
+  });
+
   it("groups every plausible title as selected games and leaves suggested non-games unselected", async () => {
     previewPsnImport.mockResolvedValueOnce({
       items: previewItems,

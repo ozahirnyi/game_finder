@@ -232,36 +232,69 @@ function PsnImportPage() {
         </div>
         {error && <InlineError>{error}</InlineError>}
         {step === "upload" && (
-          <Panel className="p-6">
-            <SectionHeader title="Upload export" hint="XLSX, CSV or JSON, up to 10 MB" />
-            <button
-              onClick={() => input.current?.click()}
-              className="flex w-full flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-14"
-            >
-              <FileUp className="size-6 text-primary" />
-              <span className="font-bold">Choose an export file</span>
-              <span className="text-xs text-muted-foreground">.xlsx, .csv or .json</span>
-            </button>
-            <input
-              ref={input}
-              type="file"
-              accept=".xlsx,.csv,.json"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  setFileName(file.name);
-                  setUploadedFile(file);
-                  preview.mutate(file);
-                }
-              }}
-            />
-            {preview.isPending && (
-              <p className="mt-4 flex items-center gap-2">
-                <Loader2 className="size-4 animate-spin" /> Reading {fileName}…
-              </p>
-            )}
-          </Panel>
+          <>
+            <details className="mb-4 rounded-xl border border-border bg-surface-2 p-4">
+              <summary className="cursor-pointer font-bold">
+                How to get your PlayStation export
+              </summary>
+              <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+                <ol className="list-decimal space-y-2 pl-5">
+                  <li>Sign in to PlayStation Account Management.</li>
+                  <li>
+                    Open <strong>Privacy Settings</strong>, then choose{" "}
+                    <strong>Data Access Requests → Request Data</strong>.
+                  </li>
+                  <li>
+                    Wait for Sony&apos;s email that says your export is ready, then use its download
+                    link to save the Excel file.
+                  </li>
+                  <li>Return here and choose the downloaded file.</li>
+                </ol>
+                <p>
+                  Sony can take up to seven days to send the email; its download link is valid for
+                  seven days.
+                </p>
+                <a
+                  href="https://www.playstation.com/en-us/support/account/data-request/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex font-semibold text-primary underline underline-offset-4"
+                >
+                  Open PlayStation instructions
+                </a>
+              </div>
+            </details>
+            <Panel className="p-6">
+              <SectionHeader title="Upload export" hint="XLSX, CSV or JSON, up to 10 MB" />
+              <button
+                onClick={() => input.current?.click()}
+                className="flex w-full flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-14"
+              >
+                <FileUp className="size-6 text-primary" />
+                <span className="font-bold">Choose an export file</span>
+                <span className="text-xs text-muted-foreground">.xlsx, .csv or .json</span>
+              </button>
+              <input
+                ref={input}
+                type="file"
+                accept=".xlsx,.csv,.json"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    setFileName(file.name);
+                    setUploadedFile(file);
+                    preview.mutate(file);
+                  }
+                }}
+              />
+              {preview.isPending && (
+                <p className="mt-4 flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" /> Reading {fileName}…
+                </p>
+              )}
+            </Panel>
+          </>
         )}
         {step === "preview" && (
           <Panel className="p-6">
