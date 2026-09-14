@@ -15,6 +15,7 @@ import {
   getLibraryOverview,
   getOnboardingSummary,
   getProfile,
+  getSteamLinkUrl,
   getTrendingGames,
   searchGames,
   subscribeToAuthChanges,
@@ -68,6 +69,10 @@ function Home() {
     profileQuery.isPending || libraryQuery.isPending || friendsQuery.isPending;
   const accountSummaryUnavailable =
     profileQuery.isError || libraryQuery.isError || friendsQuery.isError;
+  const connectSteam = async () => {
+    const { url } = await getSteamLinkUrl();
+    window.location.assign(url);
+  };
 
   return (
     <AppShell>
@@ -152,6 +157,9 @@ function Home() {
           isError={onboardingQuery.isError}
           onRetry={() => {
             void onboardingQuery.refetch();
+          }}
+          onConnectSteam={() => {
+            void connectSteam();
           }}
         />
       )}

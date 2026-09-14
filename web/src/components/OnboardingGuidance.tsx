@@ -3,11 +3,12 @@ import { Panel } from "@/components/ui-bits";
 import type { OnboardingSummary } from "@/lib/api";
 
 type GuidanceTarget = "/account" | "/psn-import" | "/search" | "/wishlist" | "/friends";
+type GuidanceAction = { label: string; to: GuidanceTarget } | { label: string; onClick: () => void };
 
 type GuidanceCardProps = {
   title: string;
   description: string;
-  actions: { label: string; to: GuidanceTarget }[];
+  actions: GuidanceAction[];
 };
 
 function GuidanceCard({ title, description, actions }: GuidanceCardProps) {
@@ -17,13 +18,24 @@ function GuidanceCard({ title, description, actions }: GuidanceCardProps) {
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {actions.map((action) => (
-          <Link
-            key={action.to}
-            to={action.to}
-            className="rounded-lg border border-border px-3 py-2 text-sm font-bold text-primary transition hover:border-primary/50"
-          >
-            {action.label}
-          </Link>
+          "onClick" in action ? (
+            <button
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+              className="rounded-lg border border-border px-3 py-2 text-sm font-bold text-primary transition hover:border-primary/50"
+            >
+              {action.label}
+            </button>
+          ) : (
+            <Link
+              key={action.to}
+              to={action.to}
+              className="rounded-lg border border-border px-3 py-2 text-sm font-bold text-primary transition hover:border-primary/50"
+            >
+              {action.label}
+            </Link>
+          )
         ))}
       </div>
     </div>
@@ -35,12 +47,14 @@ export function OnboardingGuidance({
   isPending,
   isError,
   onRetry,
+  onConnectSteam,
   compact = false,
 }: {
   summary?: OnboardingSummary;
   isPending: boolean;
   isError: boolean;
   onRetry: () => void;
+  onConnectSteam?: () => void;
   compact?: boolean;
 }) {
   const className = compact ? "mb-6 p-4" : "mb-8 p-6";
@@ -79,7 +93,9 @@ export function OnboardingGuidance({
             title: "Connect a library",
             description: "Connect Steam or import your PlayStation library.",
             actions: [
-              { label: "Connect Steam", to: "/account" as const },
+              onConnectSteam
+                ? { label: "Connect Steam", onClick: onConnectSteam }
+                : { label: "Connect Steam", to: "/account" as const },
               { label: "Import PlayStation", to: "/psn-import" as const },
             ],
           },

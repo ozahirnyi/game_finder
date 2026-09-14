@@ -83,6 +83,33 @@ describe("OnboardingGuidance", () => {
     expect(screen.getByRole("link", { name: "Find friends" })).toHaveAttribute("href", "/friends");
   });
 
+  it("uses a direct handler for only the Steam action when one is supplied", async () => {
+    const onConnectSteam = vi.fn();
+    renderGuidance(
+      <OnboardingGuidance
+        summary={{
+          steam_linked: false,
+          psn_library_games: 0,
+          wishlist_games: 0,
+          price_alerts: 0,
+          friends: 0,
+        }}
+        isPending={false}
+        isError={false}
+        onRetry={vi.fn()}
+        onConnectSteam={onConnectSteam}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Connect Steam" }));
+
+    expect(onConnectSteam).toHaveBeenCalledOnce();
+    expect(screen.getByRole("link", { name: "Import PlayStation" })).toHaveAttribute(
+      "href",
+      "/psn-import",
+    );
+  });
+
   it("treats linked Steam or imported PSN games as a completed library", async () => {
     renderGuidance(
       <OnboardingGuidance
