@@ -8,7 +8,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -22,6 +22,7 @@ const api = vi.hoisted(() => ({
   getLibraryOverview: vi.fn(),
   getOnboardingSummary: vi.fn(),
   getProfile: vi.fn(),
+  getSteamLinkUrl: vi.fn(),
   getSteamSocial: vi.fn(),
   searchGames: vi.fn(),
 }));
@@ -69,6 +70,7 @@ beforeEach(() => {
     friends: 0,
   });
   api.getProfile.mockResolvedValue({ display_name: "Player" });
+  api.getSteamLinkUrl.mockResolvedValue({ url: "https://steam.example/connect" });
   api.getSteamSocial.mockResolvedValue({ friends: [] });
   api.getDashboard.mockResolvedValue({ recommendations: { status: "empty", data: [] } });
 });
@@ -115,6 +117,14 @@ describe("home startup", () => {
 
     expect(await screen.findByText("Connect a library")).toBeInTheDocument();
     expect(api.getOnboardingSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts Steam linking from the homepage onboarding action", async () => {
+    renderHome();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Connect Steam" }));
+
+    await waitFor(() => expect(api.getSteamLinkUrl).toHaveBeenCalledOnce());
   });
 
   it("does not request or render setup guidance for a signed-out visitor", async () => {
