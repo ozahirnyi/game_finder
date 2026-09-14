@@ -12,6 +12,28 @@ import app.main as main
 client = TestClient(main.app)
 
 
+def mock_genre_deal_sources(monkeypatch, fetch_candidates, fetch_igdb_games):
+    async def steam_cache(country, _fetch):
+        return await fetch_candidates(country)
+
+    async def igdb_batches(titles):
+        return {
+            title: (await fetch_igdb_games(title, 1)).get("results", [])
+            for title in titles
+        }
+
+    async def igdb_matches(deals, batches):
+        results = await batches([deal["name"] for deal in deals])
+        return {
+            deal["steam_appid"]: {"results": results.get(deal["name"], [])}
+            for deal in deals
+        }
+
+    monkeypatch.setattr(main, "get_cached_steam_deal_candidates", steam_cache)
+    monkeypatch.setattr(main, "get_cached_igdb_deal_matches", igdb_matches)
+    monkeypatch.setattr(main, "fetch_igdb_games_batches", igdb_batches)
+
+
 def test_steam_game_routes_use_app_id(monkeypatch):
     async def fake_detail(appid: int, country: str = "US"):
         assert appid == 1091500
@@ -814,8 +836,7 @@ def test_genre_deals_falls_back_to_steam_when_igdb_is_slow(monkeypatch):
         return {appid: ["Action"] for appid in appids}
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
-    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_candidates)
-    monkeypatch.setattr(main, "fetch_igdb_games", slow_igdb_games)
+    mock_genre_deal_sources(monkeypatch, fake_candidates, slow_igdb_games)
     monkeypatch.setattr(main, "fetch_steam_store_game_genres", fake_steam_genres)
     monkeypatch.setattr(main, "DEAL_IGDB_ENRICHMENT_TIMEOUT_SECONDS", 0.001)
 
@@ -858,8 +879,7 @@ def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch
         favorite_genres=[], steam_country_code=None
     )
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
-    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
-    monkeypatch.setattr(main, "fetch_igdb_games", fake_fetch_igdb_games)
+    mock_genre_deal_sources(monkeypatch, fake_fetch_deal_candidates, fake_fetch_igdb_games)
 
     try:
         response = client.get("/prices/genre-deals")
@@ -885,7 +905,7 @@ def test_genre_deals_are_available_without_an_account(monkeypatch):
 
     main.app.dependency_overrides[main.get_optional_current_user] = lambda: None
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
-    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates)
+    mock_genre_deal_sources(monkeypatch, fake_fetch_deal_candidates, lambda *_: asyncio.sleep(0, result={"results": []}))
     try:
         response = client.get("/prices/genre-deals")
     finally:
@@ -926,8 +946,7 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
     user = SimpleNamespace(favorite_genres=[" Action "], steam_country_code="us")
     main.app.dependency_overrides[main.get_optional_current_user] = lambda: user
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
-    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
-    monkeypatch.setattr(main, "fetch_igdb_games", fake_fetch_igdb_games)
+    mock_genre_deal_sources(monkeypatch, fake_fetch_deal_candidates, fake_fetch_igdb_games)
 
     try:
         first = client.get("/prices/genre-deals")
@@ -939,7 +958,52 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
     assert len(first.json()["sections"][0]["results"]) == 5
     assert second.status_code == 200
     assert cache_keys[0] == cache_keys[1]
-    assert cache_keys[0].startswith("steam_genre_deals_v5:")
+    assert cache_keys[0].startswith("steam_genre_deals_v6:")
+
+
+def test_genre_deals_share_canonical_completed_responses_and_country_sources(monkeypatch):
+    cached = {}
+    cache_keys = []
+    steam_countries = []
+
+    async def fake_cache(key, _ttl, fetch):
+        cache_keys.append(key)
+        if key not in cached:
+            cached[key] = await fetch()
+        return cached[key]
+
+    async def fake_steam_cache(country, _fetch):
+        steam_countries.append(country)
+        return {"popular": [], "candidates": []}
+
+    async def fake_fetch_deal_candidates(country):
+        return await fake_steam_cache(country, None)
+
+    async def fake_build(**_kwargs):
+        return {"popular": [], "sections": []}
+
+    first_user = SimpleNamespace(favorite_genres=["RPG", "Action"], price_country_code="us")
+    second_user = SimpleNamespace(favorite_genres=[" action ", "rpg"], price_country_code="US")
+    ukrainian_user = SimpleNamespace(favorite_genres=["RPG", "Action"], price_country_code="ua")
+    current_user = first_user
+
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: current_user
+    monkeypatch.setattr(main, "get_json_cached", fake_cache)
+    monkeypatch.setattr(main, "get_cached_steam_deal_candidates", fake_steam_cache, raising=False)
+    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
+    monkeypatch.setattr(main, "build_genre_deal_groups", fake_build)
+    try:
+        assert client.get("/prices/genre-deals").status_code == 200
+        current_user = second_user
+        assert client.get("/prices/genre-deals").status_code == 200
+        current_user = ukrainian_user
+        assert client.get("/prices/genre-deals").status_code == 200
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert cache_keys[0] == cache_keys[1]
+    assert cache_keys[0] != cache_keys[2]
+    assert steam_countries == ["US", "UA"]
 
 
 def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
@@ -967,8 +1031,7 @@ def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
         favorite_genres=["Sports"], steam_country_code="US"
     )
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
-    monkeypatch.setattr(main, "fetch_steam_store_deal_candidates", fake_fetch_deal_candidates, raising=False)
-    monkeypatch.setattr(main, "fetch_igdb_games", fake_fetch_igdb_games)
+    mock_genre_deal_sources(monkeypatch, fake_fetch_deal_candidates, fake_fetch_igdb_games)
 
     try:
         response = client.get("/prices/genre-deals")
@@ -977,7 +1040,7 @@ def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
 
     assert response.status_code == 200
     assert [section["genre"] for section in response.json()["sections"]] == [
-        "Sports", "Action", "Adventure", "RPG", "Strategy"
+        "sports", "Action", "Adventure", "RPG", "Strategy"
     ]
 
 

@@ -22,6 +22,7 @@ IGDB_API_KEY: str | None = None
 _token: str | None = None
 _token_expires_at = 0.0
 _request_lock = asyncio.Lock()
+_request_semaphore = asyncio.Semaphore(8)
 _last_request_at = 0.0
 
 
@@ -109,21 +110,22 @@ async def _query(endpoint: str, query: str) -> list[dict[str, Any]]:
             await asyncio.sleep(delay)
         client_id, token = await _access_token()
         _last_request_at = time.monotonic()
-    async with httpx.AsyncClient(timeout=httpx.Timeout(IGDB_TIMEOUT_SECONDS)) as client:
-        try:
-            response = await client.post(f"{IGDB_BASE_URL}/{endpoint}", content=query, headers={
-                "Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json",
-            })
-            if response is None and IGDB_API_KEY:
-                response = await client.get(f"{IGDB_BASE_URL}/{endpoint}")
-            response.raise_for_status()
-        except httpx.TimeoutException as exc:
-            raise IGDBError("IGDB request timeout", 504) from exc
-        except httpx.HTTPStatusError as exc:
-            status = 404 if exc.response.status_code == 404 else 502
-            raise IGDBError(f"IGDB HTTP error: {exc.response.status_code}", status) from exc
-        except httpx.HTTPError as exc:
-            raise IGDBError("IGDB connection error") from exc
+    async with _request_semaphore:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(IGDB_TIMEOUT_SECONDS)) as client:
+            try:
+                response = await client.post(f"{IGDB_BASE_URL}/{endpoint}", content=query, headers={
+                    "Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json",
+                })
+                if response is None and IGDB_API_KEY:
+                    response = await client.get(f"{IGDB_BASE_URL}/{endpoint}")
+                response.raise_for_status()
+            except httpx.TimeoutException as exc:
+                raise IGDBError("IGDB request timeout", 504) from exc
+            except httpx.HTTPStatusError as exc:
+                status = 404 if exc.response.status_code == 404 else 502
+                raise IGDBError(f"IGDB HTTP error: {exc.response.status_code}", status) from exc
+            except httpx.HTTPError as exc:
+                raise IGDBError("IGDB connection error") from exc
     data = response.json()
     if isinstance(data, dict):
         data = data.get("results", [data] if data.get("id") else [])

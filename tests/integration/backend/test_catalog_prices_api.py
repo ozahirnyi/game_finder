@@ -452,16 +452,28 @@ def test_genre_deals_uses_authenticated_favorite_genres(api_client, app_main, mo
     auth_as(user)
     candidate = {"steam_appid": 42, "name": "Hades", "background_image": None, "url": "https://deal.test", "current": None, "history_low_all": None}
     monkeypatch.setattr(app_main, "fetch_steam_store_deal_candidates", AsyncMock(return_value={"candidates": [candidate], "popular": [candidate]}))
-    igdb = AsyncMock(return_value={"results": [{"id": 42, "name": "Hades", "genres": ["RPG"], "hero_image": "https://images.test/hades-wide.jpg"}]})
-    monkeypatch.setattr(app_main, "fetch_igdb_games", igdb)
+    igdb_result = {"id": 42, "name": "Hades", "genres": ["RPG"], "hero_image": "https://images.test/hades-wide.jpg"}
+
+    async def steam_cache(_country, fetch):
+        return await fetch(_country)
+
+    igdb_batches = AsyncMock(return_value={"Hades": [igdb_result]})
+
+    async def igdb_cache(deals, fetch):
+        results = await fetch([deal["name"] for deal in deals])
+        return {deal["steam_appid"]: {"results": results[deal["name"]]} for deal in deals}
+
+    monkeypatch.setattr(app_main, "get_cached_steam_deal_candidates", steam_cache)
+    monkeypatch.setattr(app_main, "get_cached_igdb_deal_matches", igdb_cache)
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batches", igdb_batches)
     cached = AsyncMock(side_effect=run_cached)
     monkeypatch.setattr(app_main, "get_json_cached", cached)
 
     response = api_client.get("/prices/genre-deals")
 
     assert response.status_code == 200
-    assert response.json()["sections"][0]["genre"] == "RPG"
+    assert response.json()["sections"][0]["genre"] == "rpg"
     assert response.json()["sections"][0]["results"][0]["id"] == 42
     assert response.json()["sections"][0]["results"][0]["hero_image"] == "https://images.test/hades-wide.jpg"
-    assert cached.await_args.args[0].startswith("steam_genre_deals_v5:")
-    igdb.assert_awaited_with("Hades", 1)
+    assert cached.await_args.args[0].startswith("steam_genre_deals_v6:")
+    igdb_batches.assert_awaited_once_with(["Hades"])

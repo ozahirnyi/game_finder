@@ -119,3 +119,41 @@ def test_canonical_deal_genres_is_order_independent():
     from app.deal_cache import canonical_deal_genres
 
     assert canonical_deal_genres([" RPG ", "action", "Action"]) == ("action", "rpg")
+
+
+@pytest.mark.anyio
+async def test_build_genre_deal_groups_resolves_all_candidates_in_one_batch():
+    from app.genre_deals import build_genre_deal_groups
+
+    candidates = [
+        {"steam_appid": appid, "name": f"Action {appid}", "background_image": None, "url": None, "current": None}
+        for appid in range(1, 12)
+    ]
+    requested_titles = []
+
+    async def fetch_igdb_matches(deals, fetch_batches):
+        requested_titles.extend(deal["name"] for deal in deals)
+        batches = await fetch_batches(requested_titles)
+        return {
+            deal["steam_appid"]: {"results": batches[deal["name"]]}
+            for deal in deals
+        }
+
+    async def fetch_igdb_batches(titles):
+        assert titles == [deal["name"] for deal in candidates]
+        return {
+            title: [{"id": index, "name": title, "genres": ["Action"]}]
+            for index, title in enumerate(titles, start=1)
+        }
+
+    result = await build_genre_deal_groups(
+        country="US",
+        favorite_genres=["Action"],
+        candidates={"popular": candidates[:2], "candidates": candidates},
+        fetch_igdb_matches=fetch_igdb_matches,
+        fetch_igdb_batches=fetch_igdb_batches,
+    )
+
+    assert requested_titles == [deal["name"] for deal in candidates]
+    assert [item["name"] for item in result["popular"]] == ["Action 1", "Action 2"]
+    assert len(result["sections"][0]["results"]) == 5

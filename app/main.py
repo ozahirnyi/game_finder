@@ -33,6 +33,7 @@ from app.integrations.igdb import (
     fetch_igdb_game_detail,
     fetch_igdb_games,
     fetch_igdb_games_batch,
+    fetch_igdb_games_batches,
     fetch_igdb_related_fallback_games,
     fetch_igdb_similar_games,
     fetch_igdb_trending_games,
@@ -55,6 +56,12 @@ from app.psn_resolution import classify_psn_candidate
 from app.psn_resolution import resolve_psn_catalog_titles
 from app.steam_store import fetch_steam_store_deals, fetch_steam_store_deal_candidates, fetch_steam_store_game_detail, fetch_steam_store_game_price, fetch_steam_store_game_genres, fetch_steam_store_search
 from app.genre_deals import _apply_catalog_media, build_genre_deal_groups, normalize_genre, select_deal_genres
+from app.deal_cache import (
+    GENRE_DEALS_TTL,
+    canonical_deal_genres,
+    get_cached_igdb_deal_matches,
+    get_cached_steam_deal_candidates,
+)
 from app.price_region import effective_price_country
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, BackgroundJob, engine, wait_for_db
@@ -3886,32 +3893,38 @@ async def homepage_deals(
 @app.get("/prices/genre-deals", response_model=GenreDealResponse)
 async def genre_deals(current_user: User | None = Depends(get_optional_current_user)):
     country = effective_price_country(current_user)
-    genres = select_deal_genres(current_user.favorite_genres if current_user else [])
+    canonical_genres = canonical_deal_genres(
+        current_user.favorite_genres if current_user else []
+    )
     key = build_cache_key(
-        "steam_genre_deals_v5",
+        "steam_genre_deals_v6",
         country=country,
-        genres=[normalize_genre(genre) for genre in genres],
+        genres=canonical_genres,
     )
 
     async def fetch():
-        async def fetch_igdb_deal(query: str, page: int):
+        async def fetch_igdb_batches(titles: list[str]):
             try:
                 return await asyncio.wait_for(
-                    fetch_igdb_games(query, page),
+                    fetch_igdb_games_batches(titles),
                     timeout=DEAL_IGDB_ENRICHMENT_TIMEOUT_SECONDS,
                 )
             except asyncio.TimeoutError as exc:
                 raise IGDBError("IGDB deal enrichment timeout", status_code=504) from exc
 
+        candidates = await get_cached_steam_deal_candidates(
+            country, fetch_steam_store_deal_candidates,
+        )
         return await build_genre_deal_groups(
-            country,
-            genres,
-            fetch_steam_store_deal_candidates,
-            fetch_igdb_deal,
-            fetch_steam_store_game_genres,
+            country=country,
+            favorite_genres=list(canonical_genres),
+            candidates=candidates,
+            fetch_igdb_matches=get_cached_igdb_deal_matches,
+            fetch_igdb_batches=fetch_igdb_batches,
+            fetch_steam_genres=fetch_steam_store_game_genres,
         )
 
-    return await get_json_cached(key, CACHE_TTL, fetch)
+    return await get_json_cached(key, GENRE_DEALS_TTL, fetch)
 
 
 async def resolve_recommendation_catalog_matches(result: dict) -> dict:
