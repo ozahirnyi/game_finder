@@ -2,6 +2,43 @@ import pytest
 from datetime import datetime, timedelta, timezone
 
 
+@pytest.mark.anyio
+async def test_igdb_batches_more_than_ten_titles(monkeypatch):
+    import app.integrations.igdb as client
+
+    statements = []
+
+    async def query(endpoint, statement):
+        statements.append((endpoint, statement))
+        return []
+
+    monkeypatch.setattr(client, "_query", query)
+
+    await client.fetch_igdb_games_batches([f"Game {index}" for index in range(11)])
+
+    assert [endpoint for endpoint, _ in statements] == ["multiquery", "multiquery"]
+    assert statements[0][1].count('query games "deal_') == 10
+    assert statements[1][1].count('query games "deal_') == 1
+
+
+@pytest.mark.anyio
+async def test_igdb_batches_ignores_duplicate_titles(monkeypatch):
+    import app.integrations.igdb as client
+
+    statements = []
+
+    async def query(endpoint, statement):
+        statements.append((endpoint, statement))
+        return []
+
+    monkeypatch.setattr(client, "_query", query)
+
+    await client.fetch_igdb_games_batches([" Hades ", "", "Hades", " ", "Bastion"])
+
+    assert len(statements) == 1
+    assert statements[0][1].count('query games "deal_') == 2
+
+
 def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
     from app.integrations.igdb import normalize_igdb_game
 

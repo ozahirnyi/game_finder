@@ -109,21 +109,21 @@ async def _query(endpoint: str, query: str) -> list[dict[str, Any]]:
             await asyncio.sleep(delay)
         client_id, token = await _access_token()
         _last_request_at = time.monotonic()
-        async with httpx.AsyncClient(timeout=httpx.Timeout(IGDB_TIMEOUT_SECONDS)) as client:
-            try:
-                response = await client.post(f"{IGDB_BASE_URL}/{endpoint}", content=query, headers={
-                    "Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json",
-                })
-                if response is None and IGDB_API_KEY:
-                    response = await client.get(f"{IGDB_BASE_URL}/{endpoint}")
-                response.raise_for_status()
-            except httpx.TimeoutException as exc:
-                raise IGDBError("IGDB request timeout", 504) from exc
-            except httpx.HTTPStatusError as exc:
-                status = 404 if exc.response.status_code == 404 else 502
-                raise IGDBError(f"IGDB HTTP error: {exc.response.status_code}", status) from exc
-            except httpx.HTTPError as exc:
-                raise IGDBError("IGDB connection error") from exc
+    async with httpx.AsyncClient(timeout=httpx.Timeout(IGDB_TIMEOUT_SECONDS)) as client:
+        try:
+            response = await client.post(f"{IGDB_BASE_URL}/{endpoint}", content=query, headers={
+                "Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json",
+            })
+            if response is None and IGDB_API_KEY:
+                response = await client.get(f"{IGDB_BASE_URL}/{endpoint}")
+            response.raise_for_status()
+        except httpx.TimeoutException as exc:
+            raise IGDBError("IGDB request timeout", 504) from exc
+        except httpx.HTTPStatusError as exc:
+            status = 404 if exc.response.status_code == 404 else 502
+            raise IGDBError(f"IGDB HTTP error: {exc.response.status_code}", status) from exc
+        except httpx.HTTPError as exc:
+            raise IGDBError("IGDB connection error") from exc
     data = response.json()
     if isinstance(data, dict):
         data = data.get("results", [data] if data.get("id") else [])
@@ -202,7 +202,7 @@ async def fetch_igdb_games_batch(titles: list[str]) -> dict[str, list[dict[str, 
     queries = []
     aliases: dict[str, str] = {}
     for index, title in enumerate(unique_titles):
-        alias = f"psn_{index}"
+        alias = f"deal_{index}"
         aliases[alias] = title
         safe_title = title.replace('"', "").replace("\\", "")
         queries.append(f'query games "{alias}" {{ {_FIELDS} where name ~ "{safe_title}"; limit 20; }};')
@@ -216,6 +216,17 @@ async def fetch_igdb_games_batch(titles: list[str]) -> dict[str, list[dict[str, 
         if title and isinstance(values, list):
             results[title] = [normalize_igdb_game(game) for game in values if isinstance(game, dict)]
     return results
+
+
+async def fetch_igdb_games_batches(titles: list[str]) -> dict[str, list[dict[str, Any]]]:
+    unique_titles = list(dict.fromkeys(title.strip() for title in titles if title and title.strip()))
+    batches = [unique_titles[offset:offset + 10] for offset in range(0, len(unique_titles), 10)]
+    responses = await asyncio.gather(*(fetch_igdb_games_batch(batch) for batch in batches))
+    return {
+        title: results
+        for response in responses
+        for title, results in response.items()
+    }
 
 
 async def fetch_igdb_game_detail(igdb_id: int) -> dict[str, Any]:
