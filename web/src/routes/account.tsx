@@ -4,7 +4,13 @@ import { AppShell } from "@/components/AppShell";
 import { OnboardingGuidance } from "@/components/OnboardingGuidance";
 import { ProfileView } from "@/components/ProfileView";
 import { BlockedUsers } from "@/components/FriendsSync";
-import { getFavorites, getLibraryOverview, getOnboardingSummary, getProfile } from "@/lib/api";
+import {
+  getFavorites,
+  getLibraryOverview,
+  getOnboardingSummary,
+  getProfile,
+  getSteamLinkUrl,
+} from "@/lib/api";
 import { libraryPlaytime } from "@/lib/collectionPresentation";
 
 export const Route = createFileRoute("/account")({
@@ -38,6 +44,10 @@ export function AccountPage() {
   });
   const profile = profileQuery.data;
   const owned = libraryQuery.data?.games ?? [];
+  const connectSteam = async () => {
+    const { url } = await getSteamLinkUrl();
+    window.location.assign(url);
+  };
 
   return (
     <AppShell>
@@ -48,6 +58,9 @@ export function AccountPage() {
         isError={onboardingQuery.isError}
         onRetry={() => {
           void onboardingQuery.refetch();
+        }}
+        onConnectSteam={() => {
+          void connectSteam();
         }}
       />
       <ProfileView

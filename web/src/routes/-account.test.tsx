@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { getProfile, getLibraryOverview, getFavorites, getOnboardingSummary, profileView } =
+const { getProfile, getLibraryOverview, getFavorites, getOnboardingSummary, getSteamLinkUrl, profileView } =
   vi.hoisted(() => ({
     getProfile: vi.fn().mockResolvedValue({ display_name: "test1" }),
     getLibraryOverview: vi.fn().mockResolvedValue({
@@ -41,6 +41,7 @@ const { getProfile, getLibraryOverview, getFavorites, getOnboardingSummary, prof
       },
     ]),
     getOnboardingSummary: vi.fn(() => new Promise(() => {})),
+    getSteamLinkUrl: vi.fn().mockResolvedValue({ url: "https://steam.example/connect" }),
     profileView: vi.fn((_props: unknown) => null),
   }));
 
@@ -49,12 +50,17 @@ vi.mock("@/lib/api", () => ({
   getLibraryOverview,
   getFavorites,
   getOnboardingSummary,
+  getSteamLinkUrl,
 }));
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/components/ProfileView", () => ({
   ProfileView: (props: unknown) => profileView(props),
+}));
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  Link: ({ children, ...props }: { children: ReactNode }) => <a {...props}>{children}</a>,
 }));
 
 import { AccountPage } from "./account";
@@ -104,5 +110,25 @@ describe("AccountPage", () => {
       "Preparing your setup…",
     );
     expect(getOnboardingSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts Steam linking from account onboarding", async () => {
+    getOnboardingSummary.mockResolvedValue({
+      steam_linked: false,
+      psn_library_games: 0,
+      wishlist_games: 0,
+      price_alerts: 0,
+      friends: 0,
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <AccountPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Connect Steam" }));
+
+    await waitFor(() => expect(getSteamLinkUrl).toHaveBeenCalledTimes(1));
   });
 });
