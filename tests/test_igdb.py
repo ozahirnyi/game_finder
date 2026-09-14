@@ -2,6 +2,91 @@ import pytest
 from datetime import datetime, timedelta, timezone
 
 
+@pytest.mark.anyio
+async def test_igdb_batches_more_than_ten_titles(monkeypatch):
+    import app.integrations.igdb as client
+
+    statements = []
+
+    async def query(endpoint, statement):
+        statements.append((endpoint, statement))
+        return []
+
+    monkeypatch.setattr(client, "_query", query)
+
+    await client.fetch_igdb_games_batches([f"Game {index}" for index in range(11)])
+
+    assert [endpoint for endpoint, _ in statements] == ["multiquery", "multiquery"]
+    assert statements[0][1].count('query games "deal_') == 10
+    assert statements[1][1].count('query games "deal_') == 1
+
+
+@pytest.mark.anyio
+async def test_igdb_batches_ignores_duplicate_titles(monkeypatch):
+    import app.integrations.igdb as client
+
+    statements = []
+
+    async def query(endpoint, statement):
+        statements.append((endpoint, statement))
+        return []
+
+    monkeypatch.setattr(client, "_query", query)
+
+    await client.fetch_igdb_games_batches([" Hades ", "", "Hades", " ", "Bastion"])
+
+    assert len(statements) == 1
+    assert statements[0][1].count('query games "deal_') == 2
+
+
+@pytest.mark.anyio
+async def test_igdb_query_limits_open_requests_to_eight(monkeypatch):
+    import asyncio
+    import app.integrations.igdb as client
+
+    active = 0
+    max_active = 0
+    release = asyncio.Event()
+
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return []
+
+    class Http:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            pass
+
+        async def post(self, *_args, **_kwargs):
+            nonlocal active, max_active
+            active += 1
+            max_active = max(max_active, active)
+            await release.wait()
+            active -= 1
+            return Response()
+
+    async def token():
+        return "client", "token"
+
+    monkeypatch.setattr(client, "_request_lock", asyncio.Lock())
+    monkeypatch.setattr(client, "_request_semaphore", asyncio.Semaphore(8), raising=False)
+    monkeypatch.setattr(client, "_access_token", token)
+    monkeypatch.setattr(client, "IGDB_MIN_REQUEST_INTERVAL_SECONDS", 0)
+    monkeypatch.setattr(client.httpx, "AsyncClient", lambda **_: Http())
+
+    tasks = [asyncio.create_task(client._query("games", "fields id;")) for _ in range(9)]
+    await asyncio.sleep(0.05)
+    release.set()
+    await asyncio.gather(*tasks)
+
+    assert max_active == 8
+
+
 def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
     from app.integrations.igdb import normalize_igdb_game
 

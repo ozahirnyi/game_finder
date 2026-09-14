@@ -70,9 +70,9 @@ async def test_igdb_multiquery_keeps_only_valid_returned_aliases(monkeypatch):
     async def fake_query(endpoint, payload):
         captured.append((endpoint, payload))
         return [
-            {"name": "psn_0", "result": [{"id": 1, "name": "One"}]},
-            {"name": "psn_1", "result": []},
-            {"name": "psn_3", "result": {}},
+            {"name": "deal_0", "result": [{"id": 1, "name": "One"}]},
+            {"name": "deal_1", "result": []},
+            {"name": "deal_3", "result": {}},
             {"name": "unexpected", "result": []},
         ]
 
@@ -82,11 +82,11 @@ async def test_igdb_multiquery_keeps_only_valid_returned_aliases(monkeypatch):
 
     assert captured[0][0] == "multiquery"
     assert all(
-        f'query games "psn_{index}"' in captured[0][1]
+        f'query games "deal_{index}"' in captured[0][1]
         and f'where name ~ "{title}"' in captured[0][1]
         for index, title in enumerate(expected_titles)
     )
-    assert "psn_10" not in captured[0][1]
+    assert "deal_10" not in captured[0][1]
     assert result["One"][0]["name"] == "One"
     assert result["Empty"] == []
     assert "Missing" not in result
