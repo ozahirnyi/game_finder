@@ -38,3 +38,17 @@ it("shows linked Google and imported PlayStation data", async () => {
   expect(screen.getByText("Google sign-in connected")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Disconnect Google" })).toBeInTheDocument();
 });
+
+it("shows a Steam linking error returned by the callback", async () => {
+  window.history.replaceState({}, "", "/account?steam_error=This+Steam+account+is+already+linked");
+  api.getProfile.mockResolvedValue({ google_linked: false });
+  api.getOnboardingSummary.mockResolvedValue({ psn_library_games: 0 });
+  api.getSteamAccount.mockResolvedValue({ linked: false });
+  api.getTelegramAccount.mockResolvedValue({ configured: true, linked: false });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ConnectedServices />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText("This Steam account is already linked")).toBeInTheDocument();
+});

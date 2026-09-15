@@ -12,15 +12,14 @@ vi.mock("@/components/GameCard", () => ({
 }));
 import { Route } from "./search";
 
-function renderSearch() {
+function renderSearch(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const SearchPage = Route.options.component!;
   render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
+    <QueryClientProvider client={client}>
       <SearchPage />
     </QueryClientProvider>,
   );
+  return client;
 }
 
 describe("SearchPage", () => {
@@ -73,7 +72,7 @@ describe("SearchPage", () => {
                 }
               : url.includes("/recommendations")
                 ? { id: "job-1", status: "queued" }
-              : { results: [] },
+                : { results: [] },
           ),
           { status: 200 },
         ),
@@ -92,6 +91,50 @@ describe("SearchPage", () => {
       expect.stringContaining("/recommendations"),
       expect.any(Object),
     );
+  });
+
+  it("restores completed AI recommendations after returning from a game page without another request", async () => {
+    const fetchMock = vi.fn((url: string) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.includes("/background-jobs/")
+              ? {
+                  status: "succeeded",
+                  result: {
+                    recommendations: [
+                      {
+                        title: "Hades",
+                        reason: "Matches",
+                        tags: [],
+                        game: { id: 42, name: "Hades", platforms: [] },
+                      },
+                    ],
+                  },
+                }
+              : { id: "job-1", status: "queued" },
+          ),
+          { status: 200 },
+        ),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    window.localStorage.setItem("game_finder_token", "test-token");
+    const client = renderSearch();
+
+    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
+      target: { value: "roguelike" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
+    expect(await screen.findByRole("link", { name: "Hades" })).toBeInTheDocument();
+    const requestsBeforeReturn = fetchMock.mock.calls.length;
+
+    cleanup();
+    renderSearch(client);
+
+    expect(await screen.findByRole("link", { name: "Hades" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(requestsBeforeReturn);
   });
 
   it("uses chips as multi-select discovery filters without changing the text", async () => {
@@ -184,26 +227,26 @@ describe("SearchPage", () => {
                     status: "succeeded",
                     result: {
                       recommendations: [
-                      {
-                        title: "Hades",
-                        reason: "Match",
-                        tags: [],
-                        game: {
-                          id: 30,
-                          name: "Hades",
-                          genres: ["Roguelike"],
-                          platforms: ["PC"],
-                          hero_image: null,
-                          background_image: null,
+                        {
+                          title: "Hades",
+                          reason: "Match",
+                          tags: [],
+                          game: {
+                            id: 30,
+                            name: "Hades",
+                            genres: ["Roguelike"],
+                            platforms: ["PC"],
+                            hero_image: null,
+                            background_image: null,
+                          },
                         },
-                      },
-                      { title: "Unknown Game", reason: "Match", tags: [] },
-                    ],
+                        { title: "Unknown Game", reason: "Match", tags: [] },
+                      ],
                     },
                   }
                 : url.includes("/recommendations")
                   ? { id: "job-1", status: "queued" }
-                : { results: [] },
+                  : { results: [] },
             ),
           ),
         ),

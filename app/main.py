@@ -486,7 +486,7 @@ def notify_saved_game(user: User, game_title: str) -> None:
 
 
 def steam_frontend_redirect(**params: str) -> RedirectResponse:
-    return RedirectResponse(f"{get_frontend_url()}/steam?{urlencode(params)}", status_code=303)
+    return RedirectResponse(f"{get_frontend_url()}/account?{urlencode(params)}", status_code=303)
 
 
 @app.get("/", include_in_schema=False)
@@ -3225,10 +3225,10 @@ async def steam_callback(request: Request, state: str, db: Session = Depends(get
         user.steam_linked_at = datetime.now(timezone.utc)
         db.commit()
     except HTTPException as exc:
-        return steam_frontend_redirect(error=str(exc.detail))
+        return steam_frontend_redirect(steam_error=str(exc.detail))
     except Exception:
         db.rollback()
-        return steam_frontend_redirect(error="Could not link Steam account")
+        return steam_frontend_redirect(steam_error="Could not link Steam account")
     await sync_steam_friends_after_auth(db, user)
     return steam_frontend_redirect(linked="1")
 

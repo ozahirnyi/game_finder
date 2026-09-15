@@ -115,6 +115,10 @@ export function ConnectedServices() {
   });
   const steam = steamQuery.data;
   const telegram = telegramQuery.data;
+  const steamError =
+    typeof window === "undefined"
+      ? ""
+      : (new URLSearchParams(window.location.search).get("steam_error") ?? "");
   return (
     <Panel className="p-6">
       <SectionHeader title="Connected services" hint="Sign-in methods and library sources" />
@@ -148,6 +152,7 @@ export function ConnectedServices() {
             </button>
           )}
         </ServiceRow>
+        {steamError && <InlineError>{steamError}</InlineError>}
         <ServiceRow
           icon={<Gamepad2 className="size-4" />}
           name="Steam"
