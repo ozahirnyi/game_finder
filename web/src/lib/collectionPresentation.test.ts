@@ -14,7 +14,8 @@ describe("collection presentation", () => {
     expect(libraryPlaytime(null)).toBe("—");
   });
 
-  it("keeps the wishlist price card honest when the API has no price", () => {
+  it("formats a current wishlist price and keeps the unavailable state for missing data", () => {
+    expect(wishlistPriceLabel({ amount: 19.99, currency: "USD" })).toBe("19.99 USD");
     expect(wishlistPriceLabel()).toBe("Price unavailable");
   });
 });

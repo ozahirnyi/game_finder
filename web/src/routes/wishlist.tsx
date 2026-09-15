@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
@@ -9,6 +9,9 @@ import {
   createPriceAlert,
   deletePriceAlert,
   getPriceAlerts,
+  getPriceHistory,
+  getProfile,
+  getSteamPriceHistory,
   getWishlist,
   removeWishlist,
   type PriceAlertCreate,
@@ -52,6 +55,7 @@ function WishlistPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
   });
   const alertsQuery = useQuery({ queryKey: ["price-alerts"], queryFn: getPriceAlerts });
+  const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
   const alertMutation = useMutation({
     mutationFn: (data: PriceAlertCreate) => createPriceAlert(data),
     onSuccess: () => {
@@ -64,6 +68,17 @@ function WishlistPage() {
   });
 
   const wl = wishlistQuery.data ?? [];
+  const priceCountry = profileQuery.data?.price_country_code ?? "US";
+  const priceQueries = useQueries({
+    queries: wl.map((game) => ({
+      queryKey: ["wishlist-price", game.source, game.catalog_game_id, priceCountry],
+      queryFn: () =>
+        game.source === "steam"
+          ? getSteamPriceHistory(game.catalog_game_id, priceCountry)
+          : getPriceHistory(game.catalog_game_id, priceCountry),
+      staleTime: 1000 * 60 * 5,
+    })),
+  });
 
   return (
     <AppShell>
@@ -174,7 +189,7 @@ function WishlistPage() {
 
       {wl.length > 0 && (
         <div className="stagger space-y-4">
-          {wl.map((g) => (
+          {wl.map((g, index) => (
             <div
               key={g.id}
               data-testid={`wishlist-card-${g.id}`}
@@ -226,7 +241,7 @@ function WishlistPage() {
                 <p className="mt-1 text-xs text-muted-foreground">Saved game</p>
               </div>
               <p className="text-right text-xs font-bold text-muted-foreground">
-                {wishlistPriceLabel()}
+                {wishlistPriceLabel(priceQueries[index]?.data?.current?.price)}
               </p>
               <div className="flex items-center justify-end gap-2">
                 <Link

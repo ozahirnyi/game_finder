@@ -251,4 +251,21 @@ def test_authenticated_steam_callback_redirects_decode_error(api_client, app_mai
     monkeypatch.setattr(app_main, "decode_steam_state", lambda _state: (_ for _ in ()).throw(HTTPException(status_code=400, detail="Invalid Steam link state")))
     response = api_client.get("/steam/callback?state=bad", follow_redirects=False)
     assert response.status_code == 303
-    assert "error=Invalid+Steam+link+state" in location(response)
+    assert "steam_error=Invalid+Steam+link+state" in location(response)
+
+
+def test_authenticated_steam_callback_redirects_conflicting_account_to_account_page(api_client, app_main, db_session, user_factory, auth_as, monkeypatch):
+    user = auth_as(user_factory(email="steam-conflict@example.com"))
+    owner = user_factory(email="steam-owner@example.com")
+    owner.steam_id = "76561198000000099"
+    db_session.commit()
+    monkeypatch.setattr(app_main, "decode_steam_state", lambda _state: str(user.id))
+
+    async def verify(_params):
+        return "76561198000000099"
+
+    monkeypatch.setattr(app_main, "verify_steam_openid", verify)
+    response = api_client.get("/steam/callback?state=conflict", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert "/account?steam_error=This+Steam+account+is+already+linked" in location(response)

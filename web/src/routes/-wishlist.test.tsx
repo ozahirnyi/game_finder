@@ -15,6 +15,8 @@ const api = vi.hoisted(() => ({
   createPriceAlert: vi.fn(),
   deletePriceAlert: vi.fn(),
   getPriceAlerts: vi.fn(),
+  getPriceHistory: vi.fn(),
+  getProfile: vi.fn(),
   getTelegramAccount: vi.fn(),
   getWishlist: vi.fn(),
   removeWishlist: vi.fn(),
@@ -46,6 +48,13 @@ describe("WishlistPage", () => {
     ]);
     api.removeWishlist.mockResolvedValue(undefined);
     api.getPriceAlerts.mockResolvedValue([]);
+    api.getProfile.mockResolvedValue({ price_country_code: "US" });
+    api.getPriceHistory.mockResolvedValue({
+      current: { price: { amount: 19.99, currency: "USD" } },
+      deals: [],
+      history: [],
+      history_available: true,
+    });
     api.getTelegramAccount.mockResolvedValue({ linked: false, configured: false });
     api.createPriceAlert.mockResolvedValue({ id: "alert-1" });
     api.deletePriceAlert.mockResolvedValue(undefined);
@@ -120,6 +129,29 @@ describe("WishlistPage", () => {
         delivery_channels: ["in_app"],
       }),
     );
+  });
+
+  it("shows the current price for every wishlist card", async () => {
+    const rootRoute = createRootRoute({ component: Outlet });
+    const wishlistRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: Route.options.component,
+    });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([wishlistRoute]),
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    });
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("19.99 USD")).toBeInTheDocument();
+    expect(api.getPriceHistory).toHaveBeenCalledWith(274755, "US");
   });
 
   it("cancels an existing price alert", async () => {

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
@@ -80,14 +80,30 @@ function SearchPage() {
   const [features, setFeatures] = useState<CatalogFeature[]>([]);
   const [genres, setGenres] = useState<CatalogGenre[]>([]);
   const [onSale, setOnSale] = useState(false);
-  const [mode, setMode] = useState<"catalog" | "ai">("catalog");
+  const [mode, setMode] = useState<"catalog" | "ai">(() => {
+    if (typeof window === "undefined") return "catalog";
+    return new URLSearchParams(window.location.search).get("mode") === "ai" ? "ai" : "catalog";
+  });
+  const queryClient = useQueryClient();
   const searchQuery = useQuery({
     queryKey: ["search", query, platforms, features, genres, onSale],
     queryFn: () => searchGames({ query: query.trim(), platforms, features, genres, onSale }),
     enabled: mode === "catalog",
   });
-  const recommendationMutation = useMutation({ mutationFn: getRecommendations });
+  const aiRecommendationQuery = useQuery({
+    queryKey: ["ai-recommendations", query.trim()],
+    enabled: false,
+    staleTime: Infinity,
+    gcTime: 1000 * 60 * 60 * 24,
+  });
+  const recommendationMutation = useMutation({
+    mutationFn: getRecommendations,
+    onSuccess: (data, prompt) => {
+      queryClient.setQueryData(["ai-recommendations", prompt.trim()], data);
+    },
+  });
   const results = searchQuery.data?.results ?? [];
+  const recommendations = aiRecommendationQuery.data;
   const aiSearchError = recommendationMutation.isError
     ? getAiSearchError(recommendationMutation.error)
     : null;
@@ -98,6 +114,7 @@ function SearchPage() {
     nextFeatures = features,
     nextGenres = genres,
     nextOnSale = onSale,
+    nextMode = mode,
   ) {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
@@ -111,12 +128,18 @@ function SearchPage() {
     nextGenres.forEach((value) => url.searchParams.append("genre", value));
     if (nextOnSale) url.searchParams.set("on_sale", "true");
     else url.searchParams.delete("on_sale");
+    if (nextMode === "ai") url.searchParams.set("mode", "ai");
+    else url.searchParams.delete("mode");
     window.history.replaceState({}, "", url);
   }
 
   function updateQuery(nextQuery: string) {
     setQuery(nextQuery);
     syncUrl(nextQuery);
+  }
+  function updateMode(nextMode: "catalog" | "ai") {
+    setMode(nextMode);
+    syncUrl(query, platforms, features, genres, onSale, nextMode);
   }
   function toggleFilter(filter: (typeof filters)[number]) {
     if (!filter.type) {
@@ -162,14 +185,14 @@ function SearchPage() {
       <div className="mb-3 flex gap-2">
         <button
           type="button"
-          onClick={() => setMode("catalog")}
+          onClick={() => updateMode("catalog")}
           className={`rounded-md px-3 py-1.5 text-xs font-bold ${mode === "catalog" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
         >
           Search games
         </button>
         <button
           type="button"
-          onClick={() => setMode("ai")}
+          onClick={() => updateMode("ai")}
           className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${mode === "ai" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
         >
           <Sparkles className="size-3.5" /> AI search
@@ -275,16 +298,16 @@ function SearchPage() {
               description={aiSearchError.description}
             />
           )}
-          {recommendationMutation.data?.recommendations.length === 0 && (
+          {recommendations?.recommendations.length === 0 && (
             <EmptyState
               icon={<Sparkles className="size-5" />}
               title="No AI matches found"
               description="Try describing a different mood, genre, or platform."
             />
           )}
-          {recommendationMutation.data?.recommendations && (
+          {recommendations?.recommendations && (
             <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-5">
-              {recommendationMutation.data.recommendations.flatMap((item) => {
+              {recommendations.recommendations.flatMap((item) => {
                 const game = item.game;
                 if (!game || !Number.isInteger(game.id)) return [];
                 return [
