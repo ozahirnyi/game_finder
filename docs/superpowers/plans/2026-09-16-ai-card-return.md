@@ -23,7 +23,7 @@
 - Test: `web/src/components/GameCard.test.tsx`
 
 **Interfaces:**
-- Produces: optional `description?: string` and `search?: Record<string, string>` card fields for callers.
+- Produces: optional `description?: string` and `returnTo?: string` card fields for callers.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -41,9 +41,9 @@ Expected: the description is absent.
 
 ```tsx
 description?: string;
-search?: Record<string, string>;
+returnTo?: string;
 // render <p className="mt-2 line-clamp-3 ...">{game.description}</p> when present
-// pass game.search to the internal Link search prop
+// include game.returnTo in the internal Link search prop when present
 ```
 
 - [ ] **Step 4: Run the component test and verify it passes**
@@ -58,7 +58,7 @@ Expected: PASS.
 - Modify: `web/src/routes/-search.test.tsx`
 
 **Interfaces:**
-- Consumes: `GameCardData.description` and `GameCardData.search` from Task 1.
+- Consumes: `GameCardData.description` and `GameCardData.returnTo` from Task 1.
 - Produces: `returnTo=/search?mode=ai&q=<prompt>` on every AI recommendation link.
 
 - [ ] **Step 1: Write the failing route assertion**
@@ -79,7 +79,7 @@ Expected: the recommendation link has no return target.
 
 ```tsx
 description: item.reason,
-search: { title: game.name, returnTo: `/search?mode=ai&q=${encodeURIComponent(query.trim())}` },
+returnTo: `/search?mode=ai&q=${encodeURIComponent(query.trim())}`,
 ```
 
 - [ ] **Step 4: Remove the sibling reason paragraph and run the test**

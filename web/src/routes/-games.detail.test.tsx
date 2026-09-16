@@ -58,7 +58,7 @@ const game = {
   isSteamLibrary: false,
 };
 
-function renderDetail() {
+function renderDetail(initialEntry = "/games/274755") {
   const root = createRootRoute({ component: Outlet });
   const route = createRoute({
     getParentRoute: () => root,
@@ -68,7 +68,7 @@ function renderDetail() {
   });
   const router = createRouter({
     routeTree: root.addChildren([route]),
-    history: createMemoryHistory({ initialEntries: ["/games/274755"] }),
+    history: createMemoryHistory({ initialEntries: [initialEntry] }),
   });
   render(
     <QueryClientProvider
@@ -96,6 +96,15 @@ afterEach(() => {
 });
 
 describe("game detail presentation", () => {
+  it("returns an AI result to the original AI search", async () => {
+    renderDetail("/games/274755?returnTo=%2Fsearch%3Fmode%3Dai%26q%3Droguelike");
+
+    expect(await screen.findByRole("link", { name: /back to search/i })).toHaveAttribute(
+      "href",
+      "/search?mode=ai&q=roguelike",
+    );
+  });
+
   it("uses formatted rating and release date consistently in the hero and details", async () => {
     renderDetail();
 

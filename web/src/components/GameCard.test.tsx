@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 
+import { gameDetailSearch } from "@/lib/gameCardPresentation";
 import { GameCard } from "./GameCard";
 
 describe("GameCard", () => {
@@ -80,6 +81,49 @@ describe("GameCard", () => {
       "href",
       "/games/1145360?title=Hades&source=steam",
     );
+  });
+
+  it("keeps an optional description inside the game card", async () => {
+    const rootRoute = createRootRoute({ component: Outlet });
+    const indexRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: () => (
+        <GameCard
+          game={{
+            gameId: "42",
+            title: "Return game",
+            coverFrom: "#111111",
+            coverTo: "#222222",
+            description: "Matches your roguelike request",
+          }}
+        />
+      ),
+    });
+    const gameRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/games/$gameId",
+      component: () => null,
+    });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([indexRoute, gameRoute]),
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    });
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("Matches your roguelike request")).toHaveClass("line-clamp-3");
+  });
+
+  it("adds an optional return target to internal detail search parameters", () => {
+    expect(
+      gameDetailSearch({
+        title: "Return game",
+        coverFrom: "#111111",
+        coverTo: "#222222",
+        returnTo: "/search?mode=ai&q=roguelike",
+      }),
+    ).toEqual({ title: "Return game", returnTo: "/search?mode=ai&q=roguelike" });
   });
 
   it("opens the verified store URL when no internal catalog identity exists", async () => {

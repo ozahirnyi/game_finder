@@ -44,9 +44,14 @@ import { exactCatalogMatch, hasCatalogId } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
 export const Route = createFileRoute("/games/$gameId")({
-  validateSearch: (search: Record<string, unknown>): { title?: string; source?: "steam" } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { title?: string; source?: "steam"; returnTo?: string } => ({
     ...(typeof search.title === "string" ? { title: search.title } : {}),
     ...(search.source === "steam" ? { source: "steam" } : {}),
+    ...(typeof search.returnTo === "string" && search.returnTo.startsWith("/search?")
+      ? { returnTo: search.returnTo }
+      : {}),
   }),
   loaderDeps: ({ search }) => ({ title: search.title, source: search.source }),
   loader: async ({ params, deps }) => {
@@ -183,7 +188,27 @@ export const Route = createFileRoute("/games/$gameId")({
       : [{ title: "Game not found — Playfinder" }, { name: "robots", content: "noindex" }],
   }),
   component: GameDetail,
-  notFoundComponent: () => (
+  notFoundComponent: GameNotFound,
+});
+
+function searchBackParams(returnTo?: string) {
+  if (!returnTo) return {};
+  const params = new URLSearchParams(returnTo.slice("/search?".length));
+  const query = params.get("q")?.trim();
+  return params.get("mode") === "ai" && query ? { mode: "ai", q: query } : {};
+}
+
+function SearchBackLink({ returnTo, className }: { returnTo?: string; className: string }) {
+  return (
+    <Link to="/search" search={searchBackParams(returnTo)} className={className}>
+      <ArrowLeft className="size-3.5" /> Back to search
+    </Link>
+  );
+}
+
+function GameNotFound() {
+  const { returnTo } = Route.useSearch();
+  return (
     <AppShell>
       <div className="mx-auto max-w-md py-24 text-center">
         <p className="font-mono text-xs uppercase tracking-widest text-primary">404</p>
@@ -191,16 +216,14 @@ export const Route = createFileRoute("/games/$gameId")({
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn't find that title. It may have been delisted.
         </p>
-        <Link
-          to="/search"
+        <SearchBackLink
+          returnTo={returnTo}
           className="mt-6 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-        >
-          Back to search
-        </Link>
+        />
       </div>
     </AppShell>
-  ),
-});
+  );
+}
 
 export function mergeGamePrice<
   T extends {
@@ -234,6 +257,7 @@ export function mergeGamePrice<
 
 function GameDetail() {
   const { game: catalogGame } = Route.useLoaderData();
+  const { returnTo } = Route.useSearch();
   const priceQuery = useQuery({
     queryKey: ["price-history", catalogGame.isSteamLibrary ? "steam" : "catalog", catalogGame.id],
     queryFn: () =>
@@ -364,12 +388,10 @@ function GameDetail() {
 
   return (
     <AppShell>
-      <Link
-        to="/search"
+      <SearchBackLink
+        returnTo={returnTo}
         className="mb-6 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" /> Back to search
-      </Link>
+      />
 
       {/* Hero cover */}
       <section className="relative mb-10 overflow-hidden rounded-3xl border border-border">
