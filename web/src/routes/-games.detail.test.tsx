@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   getFavorites: vi.fn(),
   getFriends: vi.fn(),
   getPriceHistory: vi.fn(),
+  getRecentGamePlayers: vi.fn(),
   getSimilarCatalogGames: vi.fn(),
   getSteamPriceHistory: vi.fn(),
   getWishlist: vi.fn(),
@@ -86,6 +87,7 @@ beforeEach(() => {
     current: { price: { amount: 19.99, currency: "USD" } },
     history: [],
   });
+  api.getRecentGamePlayers.mockResolvedValue([]);
   api.getSimilarCatalogGames.mockResolvedValue({ results: [] });
   api.getWishlist.mockResolvedValue([]);
 });
@@ -190,5 +192,19 @@ describe("game detail presentation", () => {
     const retry = await screen.findByRole("button", { name: "Retry similar games" });
     fireEvent.click(retry);
     await screen.findByText("No similar games are available yet.");
+  });
+
+  it("shows recently active Steam players with profile links and two-week hours", async () => {
+    api.getRecentGamePlayers.mockResolvedValue([
+      { id: "player-1", public_id: "sam-public", display_name: "Sam", playtime_2weeks: 125 },
+    ]);
+    renderDetail();
+
+    expect(
+      await screen.findByRole("heading", { name: "Recently active players" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sam" })).toHaveAttribute("href", "/users/sam-public");
+    expect(screen.getByText("2.1 hours in the last two weeks")).toBeInTheDocument();
+    expect(api.getRecentGamePlayers).toHaveBeenCalledWith("274755");
   });
 });

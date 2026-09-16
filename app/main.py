@@ -72,7 +72,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
-    PublicUserRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
+    PublicUserRead, PublicUserDirectoryRead, RecentGamePlayerRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult, BackgroundJobRead
 from app.recommendation_quota import (
@@ -1498,6 +1498,64 @@ def search_users_before_public_profile(
     current_user: User = Depends(get_current_user),
 ):
     return search_users(q=q, limit=limit, db=db, current_user=current_user)
+
+
+@app.get("/users", response_model=PublicUserDirectoryRead)
+def list_public_users(
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    page_size = 10
+    filters = (
+        User.id != current_user.id,
+        User.public_nickname.is_not(None),
+        User.e2e_fixture_hidden.is_(False),
+        social_policy.visible_user_filter(current_user.id),
+    )
+    total = db.query(User).filter(*filters).count()
+    users = (
+        db.query(User)
+        .filter(*filters)
+        .order_by(User.created_at.desc(), User.id.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return PublicUserDirectoryRead(
+        items=[public_user_response(user) for user in users], page=page, page_size=page_size, total=total
+    )
+
+
+@app.get("/catalog/games/{catalog_game_id}/active-players", response_model=list[RecentGamePlayerRead])
+def recent_game_players(
+    catalog_game_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    rows = (
+        db.query(Game, User)
+        .join(User, Game.owner_id == User.id)
+        .filter(
+            Game.catalog_game_id == catalog_game_id,
+            Game.source == "steam",
+            Game.playtime_2weeks > 0,
+            User.id != current_user.id,
+            User.public_nickname.is_not(None),
+            User.e2e_fixture_hidden.is_(False),
+            social_policy.visible_user_filter(current_user.id),
+        )
+        .order_by(Game.playtime_2weeks.desc(), User.id.asc())
+        .all()
+    )
+    seen, players = set(), []
+    for game, user in rows:
+        if user.id not in seen:
+            seen.add(user.id)
+            players.append(RecentGamePlayerRead(**public_user_response(user).model_dump(), playtime_2weeks=game.playtime_2weeks))
+        if len(players) == 10:
+            break
+    return players
 
 
 @app.get("/users/{public_id}", response_model=PublicProfileRead)

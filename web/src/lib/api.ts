@@ -880,6 +880,25 @@ export function searchUsers(query: string) {
   });
 }
 
+export type PublicUserDirectory = {
+  items: Friend["user"][];
+  page: number;
+  page_size: number;
+  total: number;
+};
+export type RecentGamePlayer = Friend["user"] & { playtime_2weeks: number };
+
+export function getPublicUsers(page = 1) {
+  return apiRequest<PublicUserDirectory>(`/users?page=${encodeURIComponent(page)}`, { auth: true });
+}
+
+export function getRecentGamePlayers(catalogGameId: string | number) {
+  return apiRequest<RecentGamePlayer[]>(
+    `/catalog/games/${encodeURIComponent(catalogGameId)}/active-players`,
+    { auth: true },
+  );
+}
+
 export function getIncomingFriendRequests() {
   return apiRequest<FriendRequest[]>("/friends/requests/incoming", { auth: true });
 }

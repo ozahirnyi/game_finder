@@ -6,6 +6,7 @@ import { Avatar, GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { PriceAlertForm } from "@/components/PriceAlertForm";
+import { UserProfileLink } from "@/components/UserProfileLink";
 import {
   formatCatalogRating,
   formatCatalogReleaseDate,
@@ -30,6 +31,7 @@ import {
   getFavorites,
   getFriends,
   getPriceHistory,
+  getRecentGamePlayers,
   getSimilarCatalogGames,
   getSteamGame,
   getSteamPriceHistory,
@@ -270,6 +272,11 @@ function GameDetail() {
     queryFn: () => getSimilarCatalogGames(catalogGame.id),
     enabled: !catalogGame.isSteamLibrary,
   });
+  const activePlayersQuery = useQuery({
+    queryKey: ["recent-game-players", catalogGame.id],
+    queryFn: () => getRecentGamePlayers(catalogGame.id),
+    enabled: !catalogGame.isSteamLibrary,
+  });
   const queryClient = useQueryClient();
   const [showAlertForm, setShowAlertForm] = useState(false);
   const [showAllPlatforms, setShowAllPlatforms] = useState(false);
@@ -385,6 +392,7 @@ function GameDetail() {
   const similar = (similarQuery.data?.results ?? [])
     .filter((candidate) => candidate.id != null && String(candidate.id) !== catalogGame.id)
     .slice(0, 4);
+  const activePlayers = activePlayersQuery.data ?? [];
 
   return (
     <AppShell>
@@ -508,6 +516,33 @@ function GameDetail() {
                   </div>
                 ))}
               </div>
+            </section>
+          )}
+
+          {activePlayers.length > 0 && (
+            <section>
+              <SectionHeader
+                title="Recently active players"
+                hint="Played on Steam in the last two weeks"
+              />
+              <Panel className="divide-y divide-border">
+                {activePlayers.map((player) => (
+                  <div
+                    key={player.id}
+                    className="flex items-center justify-between gap-4 px-5 py-4"
+                  >
+                    <UserProfileLink
+                      publicId={player.public_id}
+                      className="min-w-0 truncate text-sm font-bold hover:text-primary"
+                    >
+                      {player.display_name}
+                    </UserProfileLink>
+                    <p className="shrink-0 text-xs text-muted-foreground">
+                      {(player.playtime_2weeks / 60).toFixed(1)} hours in the last two weeks
+                    </p>
+                  </div>
+                ))}
+              </Panel>
             </section>
           )}
 

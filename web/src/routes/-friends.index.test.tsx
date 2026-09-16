@@ -139,6 +139,18 @@ describe("FriendsPage", () => {
     expect(await screen.findByText("Request sent")).toBeInTheDocument();
   });
 
+  it("keeps one player-name lookup and links to the full player directory", async () => {
+    renderFriends();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Add friend" }))[0]);
+
+    expect(screen.getAllByLabelText("Player name")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Browse all players" })).toHaveAttribute(
+      "href",
+      "/users",
+    );
+  });
+
   it("links a search result to that player's canonical public profile", async () => {
     api.searchUsers.mockResolvedValue([
       { id: "player-1", public_id: "sam-public", display_name: "Sam" },
