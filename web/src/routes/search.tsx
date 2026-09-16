@@ -6,6 +6,7 @@ import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   ApiError,
+  getRecommendationQuota,
   getRecommendations,
   searchGames,
   type CatalogFeature,
@@ -58,6 +59,12 @@ function getAiSearchError(error: unknown) {
       description: "AI searches are limited to one request per minute.",
     };
   }
+  if (error instanceof ApiError && error.status === 429) {
+    return {
+      title: "AI search limit reached",
+      description: "Check your remaining AI searches and try again when they are available.",
+    };
+  }
   if (
     code === "ai_recommendations_unavailable" ||
     (error instanceof ApiError && error.status >= 500)
@@ -96,16 +103,33 @@ function SearchPage() {
     staleTime: Infinity,
     gcTime: 1000 * 60 * 60 * 24,
   });
+  const quotaQuery = useQuery({
+    queryKey: ["recommendation-quota"],
+    queryFn: getRecommendationQuota,
+    enabled: mode === "ai",
+    staleTime: 10_000,
+  });
   const recommendationMutation = useMutation({
     mutationFn: getRecommendations,
     onSuccess: (data, prompt) => {
       queryClient.setQueryData(["ai-recommendations", prompt.trim()], data);
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["recommendation-quota"] }),
   });
   const results = searchQuery.data?.results ?? [];
   const recommendations = aiRecommendationQuery.data;
   const aiSearchError = recommendationMutation.isError
     ? getAiSearchError(recommendationMutation.error)
+    : null;
+  const quota = quotaQuery.data;
+  const cooldownActive = Boolean(
+    quota?.cooldown_until && new Date(quota.cooldown_until).getTime() > Date.now(),
+  );
+  const quotaExhausted = quota?.remaining === 0;
+  const aiSearchBlocked = cooldownActive || quotaExhausted;
+  const quotaTime = quotaExhausted ? quota?.reset_at : quota?.cooldown_until;
+  const quotaAvailability = quotaTime
+    ? new Date(quotaTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : null;
 
   function syncUrl(
@@ -203,7 +227,9 @@ function SearchPage() {
         className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 focus-within:border-primary/60"
         onSubmit={(event) => {
           event.preventDefault();
-          if (mode === "ai" && query.trim()) recommendationMutation.mutate(query.trim());
+          if (mode === "ai" && query.trim() && !aiSearchBlocked) {
+            recommendationMutation.mutate(query.trim());
+          }
         }}
       >
         <Search className="size-4 text-muted-foreground" />
@@ -217,11 +243,19 @@ function SearchPage() {
         />
         <button
           type="submit"
+          disabled={mode === "ai" && (aiSearchBlocked || recommendationMutation.isPending)}
           className="rounded-md border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground"
         >
           {mode === "ai" ? "Ask AI" : "Search"}
         </button>
       </form>
+      {mode === "ai" && quota && (
+        <p className="-mt-4 mb-6 text-xs text-muted-foreground" role="status">
+          {quota.remaining} of {quota.limit} AI searches remaining today
+          {quotaExhausted && quotaAvailability && ` · Resets at ${quotaAvailability}`}
+          {cooldownActive && quotaAvailability && ` · Available again at ${quotaAvailability}`}
+        </p>
+      )}
       {mode === "catalog" && (
         <>
           <div className="mb-8 flex flex-wrap gap-2">
