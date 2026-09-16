@@ -83,7 +83,7 @@ describe("GameCard", () => {
     );
   });
 
-  it("keeps an optional description inside the game card", async () => {
+  it("shows an optional description in full inside the game card", async () => {
     const rootRoute = createRootRoute({ component: Outlet });
     const indexRoute = createRoute({
       getParentRoute: () => rootRoute,
@@ -112,7 +112,9 @@ describe("GameCard", () => {
 
     render(<RouterProvider router={router} />);
 
-    expect(await screen.findByText("Matches your roguelike request")).toHaveClass("line-clamp-3");
+    expect(await screen.findByText("Matches your roguelike request")).not.toHaveClass(
+      "line-clamp-3",
+    );
   });
 
   it("adds an optional return target to internal detail search parameters", () => {
