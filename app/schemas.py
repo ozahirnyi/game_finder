@@ -606,6 +606,17 @@ class PublicUserRead(BaseModel):
     avatar: str | None = None
 
 
+class PublicUserDirectoryRead(BaseModel):
+    items: list[PublicUserRead] = Field(default_factory=list)
+    page: int
+    page_size: int
+    total: int
+
+
+class RecentGamePlayerRead(PublicUserRead):
+    playtime_2weeks: int
+
+
 class FriendRequestCreate(BaseModel):
     recipient_id: uuid.UUID
     message: str | None = Field(default=None, max_length=280)

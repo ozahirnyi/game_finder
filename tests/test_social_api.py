@@ -66,6 +66,43 @@ def create_users(db):
     return alice, bob, charlie, hidden
 
 
+def test_public_user_directory_paginates_ten_visible_players(social_db):
+    viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
+    players = [
+        User(email=f"player-{index}@example.com", public_id=f"player-{index}", public_nickname=f"Player {index:02d}")
+        for index in range(11)
+    ]
+    social_db.add_all([viewer, *players])
+    social_db.commit()
+
+    response = use_social_api(viewer, social_db).get("/users?page=1")
+
+    assert response.status_code == 200
+    assert response.json()["page_size"] == 10
+    assert response.json()["total"] == 11
+    assert len(response.json()["items"]) == 10
+    assert str(viewer.id) not in {player["id"] for player in response.json()["items"]}
+
+
+def test_recent_game_players_returns_distinct_active_users(social_db):
+    viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
+    active = User(email="active@example.com", public_id="active-id", public_nickname="Active")
+    inactive = User(email="inactive@example.com", public_id="inactive-id", public_nickname="Inactive")
+    social_db.add_all([viewer, active, inactive])
+    social_db.commit()
+    social_db.add_all([
+        Game(owner_id=active.id, title="Portal", source="steam", catalog_game_id=72, playtime_2weeks=120),
+        Game(owner_id=inactive.id, title="Portal", source="steam", catalog_game_id=72, playtime_2weeks=0),
+    ])
+    social_db.commit()
+
+    response = use_social_api(viewer, social_db).get("/catalog/games/72/active-players")
+
+    assert response.status_code == 200
+    assert response.json()[0]["public_id"] == "active-id"
+    assert response.json()[0]["playtime_2weeks"] == 120
+
+
 def test_profile_visibility_defaults_to_public_for_existing_user(social_db):
     user = User(email="existing@example.com", public_id="existing-id")
     social_db.add(user)
