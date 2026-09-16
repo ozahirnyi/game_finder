@@ -84,6 +84,38 @@ describe("SearchPage", () => {
     expect(await screen.findByText("2 of 3 AI searches remaining today")).toBeInTheDocument();
   });
 
+  it("shows only the daily reset time when the AI search quota is exhausted", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(
+              url.includes("/recommendations/quota")
+                ? {
+                    limit: 3,
+                    remaining: 0,
+                    cooldown_until: "2099-09-17T00:00:00Z",
+                    reset_at: "2099-09-18T00:00:00Z",
+                  }
+                : { results: [] },
+            ),
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+    window.localStorage.setItem("game_finder_token", "test-token");
+    renderSearch();
+
+    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+
+    const quotaStatus = await screen.findByRole("status");
+    expect(quotaStatus).toHaveTextContent("0 of 3 AI searches remaining today");
+    expect(quotaStatus).toHaveTextContent("Resets at");
+    expect(quotaStatus).not.toHaveTextContent("Available again at");
+  });
+
   it("submits an AI prompt and displays returned recommendations", async () => {
     const fetchMock = vi.fn((url: string) =>
       Promise.resolve(

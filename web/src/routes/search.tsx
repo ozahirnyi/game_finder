@@ -253,7 +253,10 @@ function SearchPage() {
         <p className="-mt-4 mb-6 text-xs text-muted-foreground" role="status">
           {quota.remaining} of {quota.limit} AI searches remaining today
           {quotaExhausted && quotaAvailability && ` · Resets at ${quotaAvailability}`}
-          {cooldownActive && quotaAvailability && ` · Available again at ${quotaAvailability}`}
+          {cooldownActive &&
+            !quotaExhausted &&
+            quotaAvailability &&
+            ` · Available again at ${quotaAvailability}`}
         </p>
       )}
       {mode === "catalog" && (
