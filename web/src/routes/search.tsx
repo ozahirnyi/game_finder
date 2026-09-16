@@ -311,21 +311,21 @@ function SearchPage() {
                 const game = item.game;
                 if (!game || !Number.isInteger(game.id)) return [];
                 return [
-                  <div key={game.id} className="space-y-2">
-                    <GameCard
-                      aspect="aspect-[3/4]"
-                      showPrice={false}
-                      game={{
-                        gameId: String(game.id),
-                        title: game.name,
-                        coverFrom: "#312e81",
-                        coverTo: "#111827",
-                        coverUrl: game.background_image ?? undefined,
-                        platforms: game.platforms,
-                      }}
-                    />
-                    <p className="text-sm text-muted-foreground">{item.reason}</p>
-                  </div>,
+                  <GameCard
+                    key={game.id}
+                    aspect="aspect-[3/4]"
+                    showPrice={false}
+                    game={{
+                      gameId: String(game.id),
+                      title: game.name,
+                      description: item.reason,
+                      returnTo: `/search?mode=ai&q=${encodeURIComponent(query.trim())}`,
+                      coverFrom: "#312e81",
+                      coverTo: "#111827",
+                      coverUrl: game.background_image ?? undefined,
+                      platforms: game.platforms,
+                    }}
+                  />,
                 ];
               })}
             </div>

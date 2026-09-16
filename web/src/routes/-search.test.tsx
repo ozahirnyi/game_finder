@@ -6,8 +6,18 @@ vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/components/GameCard", () => ({
-  GameCard: ({ game }: { game: { gameId?: string; title: string } }) => (
-    <a href={`/games/${game.gameId}`}>{game.title}</a>
+  GameCard: ({
+    game,
+  }: {
+    game: { gameId?: string; title: string; description?: string; returnTo?: string };
+  }) => (
+    <a
+      aria-label={game.title}
+      href={`/games/${game.gameId}${game.returnTo ? `?returnTo=${encodeURIComponent(game.returnTo)}` : ""}`}
+    >
+      {game.title}
+      {game.description && <span>{game.description}</span>}
+    </a>
   ),
 }));
 import { Route } from "./search";
@@ -86,7 +96,12 @@ describe("SearchPage", () => {
     fireEvent.change(prompt, { target: { value: "co-op games for two" } });
     fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
     expect(await screen.findByText("Recommended title")).toBeInTheDocument();
-    expect(screen.getByText("Fits your prompt")).toBeInTheDocument();
+    const recommendation = screen.getByRole("link", { name: "Recommended title" });
+    expect(recommendation).toContainElement(screen.getByText("Fits your prompt"));
+    expect(recommendation).toHaveAttribute(
+      "href",
+      "/games/42?returnTo=%2Fsearch%3Fmode%3Dai%26q%3Dco-op%2520games%2520for%2520two",
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/recommendations"),
       expect.any(Object),

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { GameCover } from "@/components/GameCover";
 import { Chip, PriceBlock } from "@/components/ui-bits";
+import { gameDetailSearch } from "@/lib/gameCardPresentation";
 import { summarizePlatforms } from "@/lib/platformPresentation";
 
 export type GameCardData = {
@@ -11,6 +12,8 @@ export type GameCardData = {
   /** Verified storefront URL for a deal without an internal catalog identity. */
   externalUrl?: string;
   title: string;
+  description?: string;
+  returnTo?: string;
   coverUrl?: string;
   coverFrom: string;
   coverTo: string;
@@ -54,6 +57,9 @@ export function GameCard({
         <h4 className="truncate font-display text-sm font-bold transition-colors group-hover:text-primary">
           {game.title}
         </h4>
+        {game.description && (
+          <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{game.description}</p>
+        )}
         {game.genres && game.genres.length > 0 && (
           <p className="mt-1 truncate text-xs text-muted-foreground">{game.genres.join(" · ")}</p>
         )}
@@ -102,7 +108,7 @@ export function GameCard({
     <Link
       to="/games/$gameId"
       params={{ gameId: game.gameId }}
-      search={{ title: game.title, ...(game.source ? { source: game.source } : {}) }}
+      search={gameDetailSearch(game)}
       className={className}
     >
       {inner}
