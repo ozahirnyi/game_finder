@@ -58,7 +58,7 @@ export function GameCard({
           {game.title}
         </h4>
         {game.description && (
-          <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{game.description}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{game.description}</p>
         )}
         {game.genres && game.genres.length > 0 && (
           <p className="mt-1 truncate text-xs text-muted-foreground">{game.genres.join(" · ")}</p>
