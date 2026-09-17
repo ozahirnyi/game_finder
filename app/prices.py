@@ -72,11 +72,13 @@ def price_history_since(now: datetime | None = None) -> str:
     if month < 1:
         month += 12
         year -= 1
-    return current.replace(
+    since = current.replace(
         year=year,
         month=month,
         day=min(current.day, monthrange(year, month)[1]),
-    ).isoformat()
+        microsecond=0,
+    )
+    return since.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _itad_history_points(payload: Any) -> list[dict[str, Any]]:
