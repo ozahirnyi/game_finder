@@ -123,9 +123,10 @@ async def fetch_steam_store_game_price(title: str, country: str = "US") -> dict[
         raise HTTPException(status_code=502, detail="Steam Store request failed") from exc
 
     data = (detail.json().get(str(appid)) or {}).get("data") or {}
+    is_free = bool(data.get("is_free"))
     overview = data.get("price_overview") or {}
     price = _money_from_steam_cents(overview.get("final"), overview.get("currency"))
-    if price is None:
+    if price is None and not is_free:
         raise HTTPException(status_code=404, detail="Steam price data not found for this game")
     regular = _money_from_steam_cents(overview.get("initial"), overview.get("currency"))
     url = f"https://store.steampowered.com/app/{appid}/"
@@ -146,7 +147,7 @@ async def fetch_steam_store_game_price(title: str, country: str = "US") -> dict[
             "url": url, "timestamp": None,
         },
         "history_low_all": None, "history_low_1y": None,
-        "history_low_3m": None, "deals": [],
+        "history_low_3m": None, "deals": [], "is_free": is_free,
     }
 
 
@@ -162,6 +163,7 @@ async def fetch_steam_store_game_detail(appid: int, country: str = "US") -> dict
         raise HTTPException(status_code=502, detail="Steam Store request failed") from exc
 
     data = (response.json().get(str(appid)) or {}).get("data") or {}
+    is_free = bool(data.get("is_free"))
     if not data:
         raise HTTPException(status_code=404, detail="Steam game not found")
 
@@ -188,7 +190,7 @@ async def fetch_steam_store_game_detail(appid: int, country: str = "US") -> dict
             "url": url, "timestamp": None,
         } if price else None,
         "history_low_all": None, "history_low_1y": None,
-        "history_low_3m": None, "deals": [], "history": [],
+        "history_low_3m": None, "deals": [], "history": [], "is_free": is_free,
     }
 
 

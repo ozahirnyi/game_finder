@@ -86,6 +86,7 @@ export const Route = createFileRoute("/games/$gameId")({
                 storeUrl: steamGame.current?.url ?? steamGame.url ?? undefined,
                 coop: false,
                 isSteamLibrary: false,
+                steamAppId: Number(params.gameId),
               },
             };
           }
@@ -114,6 +115,7 @@ export const Route = createFileRoute("/games/$gameId")({
               `https://store.steampowered.com/app/${params.gameId}/`,
             coop: false,
             isSteamLibrary: true,
+            steamAppId: Number(params.gameId),
           },
         };
       }
@@ -158,6 +160,7 @@ export const Route = createFileRoute("/games/$gameId")({
           storeUrl: undefined,
           coop: false,
           isSteamLibrary: false,
+          steamAppId: null,
         },
       };
     } catch {
@@ -262,10 +265,10 @@ function GameDetail() {
   const { game: catalogGame } = Route.useLoaderData();
   const { returnTo } = Route.useSearch();
   const priceQuery = useQuery({
-    queryKey: ["price-history", catalogGame.isSteamLibrary ? "steam" : "catalog", catalogGame.id],
+    queryKey: ["price-history", catalogGame.steamAppId ? "steam" : "catalog", catalogGame.id],
     queryFn: () =>
-      catalogGame.isSteamLibrary
-        ? getSteamPriceHistory(catalogGame.id)
+      catalogGame.steamAppId
+        ? getSteamPriceHistory(catalogGame.steamAppId)
         : getPriceHistory(catalogGame.id),
   });
   const similarQuery = useQuery({
@@ -276,12 +279,12 @@ function GameDetail() {
   const activePlayersQuery = useQuery({
     queryKey: [
       "recent-game-players",
-      catalogGame.isSteamLibrary ? "steam" : "catalog",
-      catalogGame.id,
+      catalogGame.steamAppId ? "steam" : "catalog",
+      catalogGame.steamAppId ?? catalogGame.id,
     ],
     queryFn: () =>
-      catalogGame.isSteamLibrary
-        ? getRecentSteamGamePlayers(catalogGame.id)
+      catalogGame.steamAppId
+        ? getRecentSteamGamePlayers(catalogGame.steamAppId)
         : getRecentGamePlayers(catalogGame.id),
   });
   const queryClient = useQueryClient();
@@ -386,7 +389,7 @@ function GameDetail() {
     online: boolean;
     activity?: string;
   }> = [];
-  const priceUnavailable = game.price == null;
+  const priceUnavailable = game.price == null && !priceQuery.data?.is_free;
   const platformSummary = summarizePlatforms(game.platforms);
   const rating = formatCatalogRating(game.rating);
   const releaseDate = formatCatalogReleaseDate(game.releaseDate);
@@ -588,7 +591,9 @@ function GameDetail() {
                 </div>
               ) : (
                 <>
-                  {priceUnavailable ? (
+                  {priceQuery.data?.is_free ? (
+                    <p className="mb-4 text-2xl font-bold">Free</p>
+                  ) : priceUnavailable ? (
                     <div className="mb-4">
                       <EmptyState
                         title="Price unavailable"
@@ -608,12 +613,15 @@ function GameDetail() {
                       />
                     </div>
                   )}
-                  <PriceHistoryChart
+                  {(priceQuery.data?.history?.length ?? 0) > 0 && <PriceHistoryChart
                     points={priceHistory.points}
                     currency={game.currency}
                     currentPrice={game.price}
                     historyAvailable={priceQuery.data?.history_available}
-                  />
+                  />}
+                  {!priceQuery.data?.history_available && priceQuery.data?.provider_message && (
+                    <p className="text-sm text-muted-foreground">{priceQuery.data.provider_message}</p>
+                  )}
                 </>
               )}
             </div>

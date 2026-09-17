@@ -6,6 +6,7 @@ import re
 import hashlib
 import json
 import unicodedata
+import time
 from dataclasses import dataclass
 from typing import Literal
 from contextlib import asynccontextmanager
@@ -72,7 +73,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
-    PublicUserRead, PublicUserDirectoryRead, RecentGamePlayerRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
+    PublicUserRead, PublicUserDirectoryRead, PublicUserDirectoryItemRead, RecentGamePlayerRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, PublicLibrarySummaryRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult, BackgroundJobRead
 from app.recommendation_quota import (
@@ -178,6 +179,19 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 CACHE_TTL = 3600
 DEAL_IGDB_ENRICHMENT_TIMEOUT_SECONDS = 1.5
+PUBLIC_LIBRARY_PAGE_SIZE = 12
+PUBLIC_LIBRARY_SNAPSHOT_TTL_SECONDS = 60
+
+
+@dataclass(frozen=True)
+class PublicLibrarySnapshot:
+    items: list[dict]
+    summary: PublicLibrarySummaryRead
+    status: Literal["ready", "empty", "partial", "error"]
+    message: str | None = None
+
+
+_public_library_snapshots: dict[tuple[uuid.UUID, uuid.UUID, str], tuple[float, PublicLibrarySnapshot]] = {}
 
 
 def get_optional_current_user(request: Request, db: Session = Depends(get_db)) -> User | None:
@@ -239,6 +253,10 @@ def public_user_response(user: User) -> PublicUserRead:
         bio=getattr(user, "bio", None),
         avatar=getattr(user, "steam_avatar", None),
     )
+
+
+def public_user_directory_response(user: User, relationship: str) -> PublicUserDirectoryItemRead:
+    return PublicUserDirectoryItemRead(**public_user_response(user).model_dump(), relationship=relationship)
 
 
 def notification_actor_name(user: User) -> str:
@@ -414,6 +432,89 @@ def public_library_game_response(game: Game) -> PublicLibraryGameRead:
         playtime_forever=game.playtime_forever,
         detail_game_id=(game.external_id if game.source == "steam" else str(game.catalog_game_id) if getattr(game, "link_state", None) == "linked" and game.catalog_game_id else None),
         detail_source="steam" if game.source == "steam" else None,
+    )
+
+
+async def build_visible_library_snapshot(
+    db: Session, viewer: User, owner: User
+) -> PublicLibrarySnapshot | None:
+    if not can_view_section(owner, viewer, owner.library_visibility, db):
+        return None
+
+    cache_key = (viewer.id, owner.id, owner.steam_visibility)
+    cached = _public_library_snapshots.get(cache_key)
+    if cached is not None and cached[0] > time.monotonic():
+        return cached[1]
+
+    games = (
+        db.query(Game)
+        .filter(
+            Game.owner_id == owner.id,
+            Game.source != "steam",
+            or_(Game.link_state.is_(None), Game.link_state != "quarantined"),
+        )
+        .order_by(func.lower(Game.title))
+        .all()
+    )
+    library_items = [public_library_game_response(game).model_dump(mode="json") for game in games]
+    steam_error = None
+    if owner.steam_id and can_view_section(owner, viewer, owner.steam_visibility, db):
+        try:
+            steam_games = await fetch_owned_games(owner.steam_id)
+        except HTTPException:
+            steam_games = []
+            steam_error = "Steam library is unavailable. Please retry later."
+        library_items.extend(
+            PublicLibraryGameRead(
+                id=uuid.uuid5(uuid.NAMESPACE_URL, f"steam:{game['appid']}"),
+                title=game["name"],
+                source="steam",
+                cover_url=steam_library_cover_url(game["appid"], game.get("img_icon_url")),
+                playtime_forever=game.get("playtime_forever"),
+                detail_game_id=str(game["appid"]),
+                detail_source="steam",
+            ).model_dump(mode="json")
+            for game in steam_games
+        )
+    summary = PublicLibrarySummaryRead(
+        total_games=len(library_items),
+        total_playtime=sum(int(item.get("playtime_forever") or 0) for item in library_items),
+        platform_counts={
+            source: sum(item["source"] == source for item in library_items)
+            for source in sorted({item["source"] for item in library_items})
+        },
+    )
+    snapshot = PublicLibrarySnapshot(
+        items=library_items,
+        summary=summary,
+        status=("partial" if library_items else "error") if steam_error else ("ready" if library_items else "empty"),
+        message=steam_error or (None if library_items else "No library games have been saved yet."),
+    )
+    if steam_error is None:
+        _public_library_snapshots[cache_key] = (time.monotonic() + PUBLIC_LIBRARY_SNAPSHOT_TTL_SECONDS, snapshot)
+    return snapshot
+
+
+def page_visible_library(
+    snapshot: PublicLibrarySnapshot | None, page: int, q: str | None
+) -> PublicLibraryPageRead:
+    if snapshot is None:
+        return PublicLibraryPageRead(**hidden_public_block().model_dump())
+    normalized_query = (q or "").strip().casefold()
+    items = (
+        [item for item in snapshot.items if normalized_query in item["title"].casefold()]
+        if normalized_query
+        else snapshot.items
+    )
+    start = (page - 1) * PUBLIC_LIBRARY_PAGE_SIZE
+    return PublicLibraryPageRead(
+        status=snapshot.status,
+        data=items[start : start + PUBLIC_LIBRARY_PAGE_SIZE],
+        message=snapshot.message,
+        page=page,
+        page_size=PUBLIC_LIBRARY_PAGE_SIZE,
+        total=len(items),
+        summary=snapshot.summary,
     )
 
 
@@ -1522,8 +1623,39 @@ def list_public_users(
         .limit(page_size)
         .all()
     )
+    user_ids = {user.id for user in users}
+    relationship_by_user_id = {user_id: "none" for user_id in user_ids}
+    if user_ids:
+        friendships = db.query(Friendship).filter(
+            or_(
+                and_(Friendship.user_low_id == current_user.id, Friendship.user_high_id.in_(user_ids)),
+                and_(Friendship.user_high_id == current_user.id, Friendship.user_low_id.in_(user_ids)),
+            )
+        ).all()
+        for friendship in friendships:
+            other_id = friendship.user_high_id if friendship.user_low_id == current_user.id else friendship.user_low_id
+            relationship_by_user_id[other_id] = "friends"
+        requests = db.query(FriendRequest).filter(
+            FriendRequest.status == "pending",
+            or_(
+                and_(FriendRequest.sender_id == current_user.id, FriendRequest.recipient_id.in_(user_ids)),
+                and_(FriendRequest.recipient_id == current_user.id, FriendRequest.sender_id.in_(user_ids)),
+            ),
+        ).all()
+        for request in requests:
+            other_id = request.recipient_id if request.sender_id == current_user.id else request.sender_id
+            if relationship_by_user_id[other_id] != "friends":
+                relationship_by_user_id[other_id] = (
+                    "outgoing_pending" if request.sender_id == current_user.id else "incoming_pending"
+                )
     return PublicUserDirectoryRead(
-        items=[public_user_response(user) for user in users], page=page, page_size=page_size, total=total
+        items=[
+            public_user_directory_response(user, relationship_by_user_id[user.id])
+            for user in users
+        ],
+        page=page,
+        page_size=page_size,
+        total=total,
     )
 
 
@@ -2267,45 +2399,9 @@ def get_friend_activity(
 async def friend_profile_response(
     db: Session, current_user: User, friend: User, page: int = 1, q: str | None = None
 ) -> FriendProfileRead:
-    if can_view_section(friend, current_user, friend.library_visibility, db):
-        games = db.query(Game).filter(Game.owner_id == friend.id, Game.source != "steam", or_(Game.link_state.is_(None), Game.link_state != "quarantined")).order_by(func.lower(Game.title)).all()
-        library_items = [public_library_game_response(game).model_dump(mode="json") for game in games]
-        steam_error = None
-        if friend.steam_id and can_view_section(friend, current_user, friend.steam_visibility, db):
-            try:
-                steam_games = await fetch_owned_games(friend.steam_id)
-            except HTTPException as exc:
-                steam_games = []
-                steam_error = "Steam library is unavailable. Please retry later."
-            library_items.extend(
-                PublicLibraryGameRead(
-                    id=uuid.uuid5(uuid.NAMESPACE_URL, f"steam:{game['appid']}"),
-                    title=game["name"],
-                    source="steam",
-                    cover_url=steam_library_cover_url(game["appid"], game.get("img_icon_url")),
-                    playtime_forever=game.get("playtime_forever"),
-                    detail_game_id=str(game["appid"]),
-                    detail_source="steam",
-                ).model_dump(mode="json")
-                for game in steam_games
-            )
-        if q:
-            normalized_query = q.strip().casefold()
-            library_items = [
-                item for item in library_items if normalized_query in item["title"].casefold()
-            ]
-        total = len(library_items)
-        page_size = 10
-        library = PublicLibraryPageRead(
-            status=("partial" if library_items else "error") if steam_error else ("ready" if library_items else "empty"),
-            data=library_items[(page - 1) * page_size : page * page_size],
-            message=steam_error or (None if library_items else "No library games have been saved yet."),
-            page=page,
-            page_size=page_size,
-            total=total,
-        )
-    else:
-        library = PublicLibraryPageRead(**hidden_public_block().model_dump())
+    library = page_visible_library(
+        await build_visible_library_snapshot(db, current_user, friend), page, q
+    )
     return FriendProfileRead(user=public_user_response(friend), library=library)
 
 
@@ -3881,7 +3977,7 @@ async def game_price_history(
             if exc.status_code not in {404, 502, 503}:
                 raise
             price = await fetch_steam_store_game_price(title, country=normalized_country)
-            return {**price, "history_available": False}
+            return {**price, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
 
     price_key = build_cache_key("price_history_v2", steam_appid=steam_appid, country=normalized_country)
 
@@ -3895,7 +3991,7 @@ async def game_price_history(
         if exc.status_code not in {404, 502, 503}:
             raise
         price = await fetch_steam_store_game_price(title or str(steam_appid), country=normalized_country)
-        return {**price, "history_available": False}
+        return {**price, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
 
 
 @app.get("/prices/steam-games/{appid}", response_model=GamePriceHistory)
@@ -3915,7 +4011,7 @@ async def steam_game_price_history(
     except HTTPException as exc:
         if exc.status_code not in {404, 502, 503}:
             raise
-        return {**steam_detail, "history_available": False}
+        return {**steam_detail, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
 
 
 

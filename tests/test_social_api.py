@@ -84,6 +84,32 @@ def test_public_user_directory_paginates_ten_visible_players(social_db):
     assert str(viewer.id) not in {player["id"] for player in response.json()["items"]}
 
 
+def test_public_user_directory_returns_viewer_relationships(social_db):
+    viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
+    friend = User(email="friend@example.com", public_id="friend-id", public_nickname="Friend")
+    outgoing = User(email="outgoing@example.com", public_id="outgoing-id", public_nickname="Outgoing")
+    incoming = User(email="incoming@example.com", public_id="incoming-id", public_nickname="Incoming")
+    stranger = User(email="stranger@example.com", public_id="stranger-id", public_nickname="Stranger")
+    social_db.add_all([viewer, friend, outgoing, incoming, stranger])
+    social_db.commit()
+    social_db.add_all([
+        Friendship(user_low_id=viewer.id, user_high_id=friend.id),
+        FriendRequest(sender_id=viewer.id, recipient_id=outgoing.id, status="pending"),
+        FriendRequest(sender_id=incoming.id, recipient_id=viewer.id, status="pending"),
+    ])
+    social_db.commit()
+
+    directory = use_social_api(viewer, social_db).get("/users?page=1").json()["items"]
+    relationships = {item["public_id"]: item["relationship"] for item in directory}
+
+    assert relationships == {
+        "friend-id": "friends",
+        "outgoing-id": "outgoing_pending",
+        "incoming-id": "incoming_pending",
+        "stranger-id": "none",
+    }
+
+
 def test_recent_game_players_returns_distinct_active_users(social_db):
     viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
     active = User(email="active@example.com", public_id="active-id", public_nickname="Active")
@@ -306,7 +332,7 @@ def test_friend_profile_library_paginates_and_searches(social_db):
     alice, bob, _, _ = create_users(social_db)
     social_db.add(Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)))
     social_db.add_all(
-        [Game(owner_id=bob.id, title=f"Game {index:02d}", source="manual") for index in range(11)]
+        [Game(owner_id=bob.id, title=f"Game {index:02d}", source="manual") for index in range(13)]
     )
     social_db.commit()
 
@@ -317,9 +343,43 @@ def test_friend_profile_library_paginates_and_searches(social_db):
     assert response.status_code == 200
     library = response.json()["library"]
     assert library["page"] == 2
-    assert library["page_size"] == 10
-    assert library["total"] == 11
-    assert [game["title"] for game in library["data"]] == ["Game 10"]
+    assert library["page_size"] == 12
+    assert library["total"] == 13
+    assert [game["title"] for game in library["data"]] == ["Game 12"]
+
+
+def test_friend_profile_library_page_uses_complete_library_summary(social_db):
+    alice, bob, _, _ = create_users(social_db)
+    social_db.add(Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)))
+    social_db.add_all(
+        [
+            Game(
+                owner_id=bob.id,
+                title="Dota 2" if index == 0 else f"Game {index:02d}",
+                source="manual",
+                playtime_forever=60,
+            )
+            for index in range(13)
+        ]
+    )
+    social_db.commit()
+
+    response = use_social_api(alice, social_db).get(f"/friends/{bob.id}/profile", params={"page": 1})
+
+    assert response.status_code == 200
+    library = response.json()["library"]
+    assert library["page_size"] == 12
+    assert len(library["data"]) == 12
+    assert library["total"] == 13
+    assert library["summary"]["total_games"] == 13
+    assert library["summary"]["total_playtime"] == 780
+
+    filtered = use_social_api(alice, social_db).get(
+        f"/friends/{bob.id}/profile", params={"page": 1, "q": "dota"}
+    )
+
+    assert [item["title"] for item in filtered.json()["library"]["data"]] == ["Dota 2"]
+    assert filtered.json()["library"]["summary"]["total_games"] == 13
 
 
 def test_friend_shared_games_match_saved_source_and_external_id_only(social_db):

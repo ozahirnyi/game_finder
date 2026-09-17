@@ -232,6 +232,11 @@ export type FriendProfile = {
     page: number;
     page_size: number;
     total: number;
+    summary?: {
+      total_games: number;
+      total_playtime: number;
+      platform_counts: Record<string, number>;
+    } | null;
   };
 };
 
@@ -891,7 +896,9 @@ export function searchUsers(query: string) {
 }
 
 export type PublicUserDirectory = {
-  items: Friend["user"][];
+  items: (Friend["user"] & {
+    relationship: "none" | "friends" | "outgoing_pending" | "incoming_pending";
+  })[];
   page: number;
   page_size: number;
   total: number;

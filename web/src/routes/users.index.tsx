@@ -13,6 +13,16 @@ export const Route = createFileRoute("/users/")({
   component: UsersPage,
 });
 
+export function directoryAction(
+  relationship: "none" | "friends" | "outgoing_pending" | "incoming_pending",
+  locallyRequested: boolean,
+) {
+  if (relationship === "friends") return { label: "Friends", enabled: false };
+  if (relationship === "incoming_pending") return { label: "Respond to request", enabled: false };
+  if (relationship === "outgoing_pending" || locallyRequested) return { label: "Request sent", enabled: false };
+  return { label: "Add friend", enabled: true };
+}
+
 function UsersPage() {
   const { page } = Route.useSearch();
   const queryClient = useQueryClient();
@@ -66,6 +76,7 @@ function UsersPage() {
               {users.data?.items.map((user) => {
                 const wasRequested = requestedUserIds.has(user.id);
                 const isRequesting = request.isPending && request.variables === user.id;
+                const action = directoryAction(user.relationship, wasRequested);
                 return (
                   <article
                     key={user.id}
@@ -97,11 +108,11 @@ function UsersPage() {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => request.mutate(user.id)}
-                      disabled={isRequesting || wasRequested}
+                      onClick={() => action.enabled && request.mutate(user.id)}
+                      disabled={isRequesting || !action.enabled}
                       className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {isRequesting ? "Sending…" : wasRequested ? "Request sent" : "Add friend"}
+                      {isRequesting ? "Sending…" : action.label}
                     </button>
                   </article>
                 );

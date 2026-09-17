@@ -194,6 +194,22 @@ async def test_steam_store_game_detail_uses_app_id_without_title_search(monkeypa
 
 
 @pytest.mark.anyio
+async def test_steam_store_game_detail_marks_free_games_without_price_overview(monkeypatch):
+    response = FakeResponse({
+        "570": {
+            "success": True,
+            "data": {"name": "Dota 2", "is_free": True, "platforms": {"windows": True}},
+        },
+    })
+    monkeypatch.setattr(steam_store.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(responses=[response]))
+
+    result = await steam_store.fetch_steam_store_game_detail(570)
+
+    assert result["is_free"] is True
+    assert result["current"] is None
+
+
+@pytest.mark.anyio
 async def test_igdb_game_stores_returns_urls_and_maps_provider_errors(monkeypatch):
     monkeypatch.setattr(igdb, "IGDB_API_KEY", "key")
     monkeypatch.setattr(igdb.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(response=FakeResponse({"results": [{"url": "https://store.steampowered.com/app/1091500/"}]})))

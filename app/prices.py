@@ -212,8 +212,8 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
         async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
             game_id, game_title, game_url = await _resolve_itad_game(client, title, steam_appid)
             prices = await client.post(
-                f"{ITAD_BASE_URL}/games/prices/v3",
-                params={"country": country, "capacity": 5, "vouchers": "true"},
+                f"{ITAD_BASE_URL}/games/overview/v2",
+                params={"country": country, "vouchers": "true"},
                 json=[game_id],
             )
             prices.raise_for_status()
@@ -266,4 +266,5 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
         "history_low_3m": _money(history_low.get("m3")),
         "deals": [deal for deal in deals if deal is not None],
         "history": normalized_history,
+        "history_available": True,
     }
