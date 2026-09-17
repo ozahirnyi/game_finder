@@ -76,3 +76,7 @@ export function presentPriceHistory(
       points.length === 0 && typeof current?.amount === "number" && Number.isFinite(current.amount),
   };
 }
+
+export function hasRenderablePriceHistory(history: PriceHistoryApiPoint[]): boolean {
+  return presentPriceHistory(history).points.length > 0;
+}

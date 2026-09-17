@@ -10,6 +10,7 @@ import { UserProfileLink } from "@/components/UserProfileLink";
 import {
   formatCatalogRating,
   formatCatalogReleaseDate,
+  hasRenderablePriceHistory,
   presentPriceHistory,
 } from "@/lib/gamePresentation";
 import { summarizePlatforms } from "@/lib/platformPresentation";
@@ -160,7 +161,10 @@ export const Route = createFileRoute("/games/$gameId")({
           storeUrl: undefined,
           coop: false,
           isSteamLibrary: false,
-          steamAppId: null,
+          steamAppId:
+            typeof catalog.steam_appid === "number" && catalog.steam_appid > 0
+              ? catalog.steam_appid
+              : null,
         },
       };
     } catch {
@@ -399,6 +403,7 @@ function GameDetail() {
     ...(rating === "Not rated yet" ? [] : [`${rating} critic score`]),
   ];
   const priceHistory = presentPriceHistory(priceQuery.data?.history ?? [], current?.price);
+  const showPriceHistory = hasRenderablePriceHistory(priceQuery.data?.history ?? []);
   const similar = (similarQuery.data?.results ?? [])
     .filter((candidate) => candidate.id != null && String(candidate.id) !== catalogGame.id)
     .slice(0, 4);
@@ -573,59 +578,58 @@ function GameDetail() {
             </Panel>
           </section>
 
-          <section>
-            <SectionHeader title="Price history" hint="Trend across storefronts" />
-            <div className="rounded-2xl border border-border bg-surface p-6">
-              {priceQuery.isPending ? (
-                <p className="text-sm text-muted-foreground">Loading price history…</p>
-              ) : priceQuery.isError ? (
-                <div className="text-sm text-muted-foreground">
-                  <p>Price history is unavailable.</p>
-                  <button
-                    type="button"
-                    onClick={() => void priceQuery.refetch()}
-                    className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
-                  >
-                    Retry price history
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {priceQuery.data?.is_free ? (
-                    <p className="mb-4 text-2xl font-bold">Free</p>
-                  ) : priceUnavailable ? (
-                    <div className="mb-4">
-                      <EmptyState
-                        title="Price unavailable"
-                        description="We have no current price for this title in your region."
-                      />
-                    </div>
-                  ) : (
-                    <div className="mb-4">
-                      <PriceBlock
-                        price={game.price}
-                        originalPrice={game.originalPrice}
-                        discount={game.discount}
+          {(priceQuery.isPending || priceQuery.isError || showPriceHistory) && (
+            <section>
+              <SectionHeader title="Price history" hint="Trend across storefronts" />
+              <div className="rounded-2xl border border-border bg-surface p-6">
+                {priceQuery.isPending ? (
+                  <p className="text-sm text-muted-foreground">Loading price history…</p>
+                ) : priceQuery.isError ? (
+                  <div className="text-sm text-muted-foreground">
+                    <p>Price history is unavailable.</p>
+                    <button
+                      type="button"
+                      onClick={() => void priceQuery.refetch()}
+                      className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+                    >
+                      Retry price history
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {priceUnavailable ? (
+                      <div className="mb-4">
+                        <EmptyState
+                          title="Price unavailable"
+                          description="We have no current price for this title in your region."
+                        />
+                      </div>
+                    ) : (
+                      <div className="mb-4">
+                        <PriceBlock
+                          price={game.price}
+                          originalPrice={game.originalPrice}
+                          discount={game.discount}
+                          currency={game.currency}
+                          store={game.store}
+                          size="lg"
+                          align="left"
+                        />
+                      </div>
+                    )}
+                    {showPriceHistory && (
+                      <PriceHistoryChart
+                        points={priceHistory.points}
                         currency={game.currency}
-                        store={game.store}
-                        size="lg"
-                        align="left"
+                        currentPrice={game.price}
+                        historyAvailable={priceQuery.data?.history_available}
                       />
-                    </div>
-                  )}
-                  {(priceQuery.data?.history?.length ?? 0) > 0 && <PriceHistoryChart
-                    points={priceHistory.points}
-                    currency={game.currency}
-                    currentPrice={game.price}
-                    historyAvailable={priceQuery.data?.history_available}
-                  />}
-                  {!priceQuery.data?.history_available && priceQuery.data?.provider_message && (
-                    <p className="text-sm text-muted-foreground">{priceQuery.data.provider_message}</p>
-                  )}
-                </>
-              )}
-            </div>
-          </section>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+          )}
 
           <section>
             <SectionHeader title="You might also like" />
@@ -675,16 +679,25 @@ function GameDetail() {
         <div className="space-y-6 lg:col-span-4">
           <div className="rounded-2xl border border-border bg-surface p-6">
             <p className="label-mono mb-3 text-muted-foreground">Best price</p>
-            <PriceBlock
-              price={game.price}
-              originalPrice={game.originalPrice}
-              discount={game.discount}
-              currency={game.currency}
-              store={game.store}
-              size="lg"
-              align="left"
-              unavailable={priceUnavailable}
-            />
+            {priceQuery.data?.is_free ? (
+              <p className="text-3xl font-extrabold">Free</p>
+            ) : (
+              <PriceBlock
+                price={game.price}
+                originalPrice={game.originalPrice}
+                discount={game.discount}
+                currency={game.currency}
+                store={game.store}
+                size="lg"
+                align="left"
+                unavailable={priceUnavailable}
+              />
+            )}
+            {!priceQuery.data?.history_available && priceQuery.data?.provider_message && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                {priceQuery.data.provider_message}
+              </p>
+            )}
 
             <button
               onClick={() => wishlistMutation.mutate()}

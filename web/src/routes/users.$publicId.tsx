@@ -12,7 +12,7 @@ import {
   getPublicProfile,
   getSharedGames,
 } from "@/lib/api";
-import { profileLibraryGames, profileLibraryHours } from "@/lib/profileLibrary";
+import { formatPlaytime, profileLibraryGames, profileLibraryHours } from "@/lib/profileLibrary";
 import { friendDisplayName } from "@/lib/friendIdentity";
 
 export const Route = createFileRoute("/users/$publicId")({
@@ -96,33 +96,37 @@ function PublicProfilePage() {
     avatarUrl: friend?.avatar ?? publicProfile.avatar ?? undefined,
     bio: friend?.bio ?? undefined,
     region: "Global",
-    hours: friendQuery.data?.library.summary?.total_playtime ?? profileLibraryHours(library.data),
+    hours: friendQuery.data?.library.summary
+      ? formatPlaytime(friendQuery.data.library.summary.total_playtime)
+      : profileLibraryHours(library.data),
     libraryMessage: friendQuery.isError
       ? "Could not load this library. Please retry."
-      : library.message ?? undefined,
-    libraryPagination: friendQuery.data || publicProfile.relationship === "friends"
-      ? {
-          page: friendQuery.data?.library.page ?? libraryPage,
-          pageSize: friendQuery.data?.library.page_size ?? 12,
-          total: friendQuery.data?.library.total ?? library.data.length,
-          summary: friendQuery.data?.library.summary
-            ? {
-                totalGames: friendQuery.data.library.summary.total_games,
-                totalPlaytime: friendQuery.data.library.summary.total_playtime,
-                platformCounts: friendQuery.data.library.summary.platform_counts,
-              }
-            : undefined,
-          query: librarySearch,
-          onQueryChange: (query) => {
-            setLibrarySearch(query);
-          },
-          onPageChange: setLibraryPage,
-          onRetry: () => void friendQuery.refetch(),
-          isFetching: friendQuery.isFetching,
-        }
-      : undefined,
+      : (library.message ?? undefined),
+    libraryPagination:
+      friendQuery.data || publicProfile.relationship === "friends"
+        ? {
+            page: friendQuery.data?.library.page ?? libraryPage,
+            pageSize: friendQuery.data?.library.page_size ?? 12,
+            total: friendQuery.data?.library.total ?? library.data.length,
+            summary: friendQuery.data?.library.summary
+              ? {
+                  totalGames: friendQuery.data.library.summary.total_games,
+                  totalPlaytime: friendQuery.data.library.summary.total_playtime,
+                  platformCounts: friendQuery.data.library.summary.platform_counts,
+                }
+              : undefined,
+            query: librarySearch,
+            onQueryChange: (query) => {
+              setLibrarySearch(query);
+            },
+            onPageChange: setLibraryPage,
+            onRetry: () => void friendQuery.refetch(),
+            isFetching: friendQuery.isFetching,
+          }
+        : undefined,
     games,
-    friendId: friend?.id ?? (publicProfile.relationship === "friends" ? publicProfile.user_id : undefined),
+    friendId:
+      friend?.id ?? (publicProfile.relationship === "friends" ? publicProfile.user_id : undefined),
     userId: friend?.id ?? publicProfile.user_id,
     sharedLibrary: sharedQuery.data,
     steamProfileUrl:
@@ -133,14 +137,17 @@ function PublicProfilePage() {
     stores: [
       {
         name: "Steam",
-        count: friendQuery.data?.library.summary?.platform_counts.steam ?? games.filter((game) => game.source?.toLowerCase() === "steam").length,
+        count:
+          friendQuery.data?.library.summary?.platform_counts.steam ??
+          games.filter((game) => game.source?.toLowerCase() === "steam").length,
         note: "Synced games",
       },
       {
         name: "PlayStation",
-        count: friendQuery.data?.library.summary?.platform_counts.psn ?? games.filter((game) =>
-          ["psn", "playstation"].includes(game.source?.toLowerCase() ?? ""),
-        ).length,
+        count:
+          friendQuery.data?.library.summary?.platform_counts.psn ??
+          games.filter((game) => ["psn", "playstation"].includes(game.source?.toLowerCase() ?? ""))
+            .length,
         note: "Synced games",
       },
     ],

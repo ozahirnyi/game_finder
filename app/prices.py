@@ -159,24 +159,23 @@ def _itad_game_url(game: Any) -> str | None:
 async def _resolve_itad_game(
     client: httpx.AsyncClient, title: str, steam_appid: int | None
 ) -> tuple[str, str, str | None]:
-    async def lookup(params: dict[str, str | int]) -> tuple[str, str, str | None] | None:
-        response = await client.get(f"{ITAD_BASE_URL}/games/lookup/v1", params=params)
+    if steam_appid is not None:
+        response = await client.post(
+            f"{ITAD_BASE_URL}/lookup/id/shop/61/v1",
+            json=[f"app/{steam_appid}"],
+        )
         response.raise_for_status()
         data = response.json()
-        if not isinstance(data, dict) or not data.get("found"):
-            return None
-        game = data.get("game")
-        identity = _itad_game_identity(game, title)
-        return (*identity, _itad_game_url(game)) if identity else None
+        game_id = data.get(f"app/{steam_appid}") if isinstance(data, dict) else None
+        if isinstance(game_id, str) and game_id.strip():
+            return game_id, title, None
 
-    if steam_appid is not None:
-        game = await lookup({"appid": steam_appid})
-        if game:
-            return game
-
-    game = await lookup({"title": title})
-    if game:
-        return game
+    response = await client.post(f"{ITAD_BASE_URL}/lookup/id/title/v1", json=[title])
+    response.raise_for_status()
+    data = response.json()
+    game_id = data.get(title) if isinstance(data, dict) else None
+    if isinstance(game_id, str) and game_id.strip():
+        return game_id, title, None
 
     response = await client.get(f"{ITAD_BASE_URL}/games/search/v1", params={"title": title})
     response.raise_for_status()

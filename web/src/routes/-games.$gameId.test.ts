@@ -41,6 +41,26 @@ describe("Steam library game loader", () => {
     expect(result.game.coverUrl).toBe("https://images.example.test/portal-hero.jpg");
   });
 
+  it("keeps the linked Steam app ID for a catalog game detail", async () => {
+    api.getCatalogGame.mockResolvedValue({
+      id: 570,
+      name: "Dota 2",
+      steam_appid: 570,
+      genres: ["MOBA"],
+      platforms: ["PC"],
+    });
+
+    const loader = Route.options.loader;
+    if (typeof loader !== "function") throw new Error("Expected a route loader");
+
+    const result = await loader({
+      params: { gameId: "570" },
+      deps: {},
+    } as never);
+
+    expect(result.game.steamAppId).toBe(570);
+  });
+
   it("promotes a linked Steam game to its canonical catalog detail", async () => {
     api.getSteamGame.mockResolvedValue({
       appid: 620,

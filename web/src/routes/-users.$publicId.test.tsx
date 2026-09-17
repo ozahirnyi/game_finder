@@ -32,6 +32,7 @@ vi.mock("@/components/ProfileView", () => ({
   }: {
     profile: {
       name: string;
+      hours: string | number;
       games: { title: string }[];
       libraryPagination?: { query: string; onQueryChange: (query: string) => void };
     };
@@ -41,6 +42,7 @@ vi.mock("@/components/ProfileView", () => ({
   }) => (
     <div>
       <h1>{profile.name}</h1>
+      <p>Hours: {profile.hours}</p>
       {profile.libraryPagination && (
         <input
           aria-label="Search library"
@@ -48,7 +50,9 @@ vi.mock("@/components/ProfileView", () => ({
           onChange={(event) => profile.libraryPagination?.onQueryChange(event.target.value)}
         />
       )}
-      {profile.games.map((game) => <p key={game.title}>{game.title}</p>)}
+      {profile.games.map((game) => (
+        <p key={game.title}>{game.title}</p>
+      ))}
       <p>{initialComposer ?? "none"}</p>
       {isSelf && <button>Settings</button>}
       {viewer?.canMessage && <button>Message</button>}
@@ -114,7 +118,10 @@ describe("PublicProfilePage", () => {
       favorite_genres: [],
     });
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.resetAllMocks();
+  });
 
   it("loads a friend through the canonical route and opens the requested composer", async () => {
     api.getPublicProfile.mockResolvedValue(publicProfile("friends"));
@@ -148,6 +155,25 @@ describe("PublicProfilePage", () => {
 
     expect(screen.getByRole("heading", { name: "Owner" })).toBeVisible();
     expect(screen.getByText("Game from first page")).toBeVisible();
+  });
+
+  it("formats complete-library playtime from minutes", async () => {
+    api.getPublicProfile.mockResolvedValue(publicProfile("friends"));
+    api.getFriendProfileByPublicId.mockResolvedValue({
+      user: { id: "friend-id", public_id: "owner", display_name: "Owner" },
+      library: {
+        status: "ready",
+        data: [],
+        page: 1,
+        page_size: 12,
+        total: 1,
+        summary: { total_games: 1, total_playtime: 715000, platform_counts: { steam: 1 } },
+      },
+    });
+
+    renderProfile();
+
+    expect(await screen.findByText("Hours: 11916h 40m")).toBeInTheDocument();
   });
 
   it("keeps anonymous strangers on ProfileView without friend actions", async () => {
