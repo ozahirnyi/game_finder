@@ -191,7 +191,7 @@ class PublicLibrarySnapshot:
     message: str | None = None
 
 
-_public_library_snapshots: dict[tuple[uuid.UUID, uuid.UUID], tuple[float, PublicLibrarySnapshot]] = {}
+_public_library_snapshots: dict[tuple[uuid.UUID, uuid.UUID, str], tuple[float, PublicLibrarySnapshot]] = {}
 
 
 def get_optional_current_user(request: Request, db: Session = Depends(get_db)) -> User | None:
@@ -441,7 +441,7 @@ async def build_visible_library_snapshot(
     if not can_view_section(owner, viewer, owner.library_visibility, db):
         return None
 
-    cache_key = (viewer.id, owner.id)
+    cache_key = (viewer.id, owner.id, owner.steam_visibility)
     cached = _public_library_snapshots.get(cache_key)
     if cached is not None and cached[0] > time.monotonic():
         return cached[1]
@@ -1626,7 +1626,6 @@ def list_public_users(
     user_ids = {user.id for user in users}
     relationship_by_user_id = {user_id: "none" for user_id in user_ids}
     if user_ids:
-        low_id, high_id = user_pair(current_user.id, current_user.id)
         friendships = db.query(Friendship).filter(
             or_(
                 and_(Friendship.user_low_id == current_user.id, Friendship.user_high_id.in_(user_ids)),
