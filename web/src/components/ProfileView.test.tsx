@@ -291,7 +291,7 @@ describe("ProfileView library visibility", () => {
     renderProfile(false);
     expect(screen.getByText("2h 5m")).toBeInTheDocument();
   });
-  it("opens the dedicated chat from the profile", () => {
+  it("keeps the dedicated message action without a redundant chat panel", () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <ProfileView profile={{ ...profile, friendId: "friend-1" }} isSelf={false} />
@@ -302,10 +302,32 @@ describe("ProfileView library visibility", () => {
       "/messages?friend=friend-1",
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open chat" })).toHaveAttribute(
-      "href",
-      "/messages?friend=friend-1",
+    expect(screen.queryByRole("link", { name: "Open chat" })).not.toBeInTheDocument();
+  });
+
+  it("uses complete library totals and the responsive four-column grid", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{
+            ...profile,
+            libraryPagination: {
+              page: 1,
+              pageSize: 12,
+              total: 13,
+              summary: { totalGames: 13, totalPlaytime: 780, platformCounts: { manual: 13 } },
+              query: "",
+              onQueryChange: vi.fn(),
+              onPageChange: vi.fn(),
+            },
+          }}
+          isSelf={false}
+        />
+      </QueryClientProvider>,
     );
+
+    expect(screen.getByText("13 games")).toBeInTheDocument();
+    expect(screen.getByTestId("profile-library-grid")).toHaveClass("lg:grid-cols-4");
   });
 
   it("shows the explicit shared library state for a private library", () => {

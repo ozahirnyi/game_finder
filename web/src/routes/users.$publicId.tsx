@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView, type ProfileData } from "@/components/ProfileView";
 import { ErrorState, Skeleton } from "@/components/ui-bits";
@@ -29,15 +29,24 @@ function PublicProfilePage() {
   const { compose } = Route.useSearch();
   const [libraryPage, setLibraryPage] = useState(1);
   const [librarySearch, setLibrarySearch] = useState("");
+  const [debouncedLibrarySearch, setDebouncedLibrarySearch] = useState("");
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedLibrarySearch(librarySearch);
+      setLibraryPage(1);
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [librarySearch]);
   const publicQuery = useQuery({
     queryKey: ["public-profile", publicId],
     queryFn: () => getPublicProfile(publicId),
   });
   const publicProfile = publicQuery.data;
   const friendQuery = useQuery({
-    queryKey: ["friend-profile", publicId, libraryPage, librarySearch],
-    queryFn: () => getFriendProfileByPublicId(publicId, libraryPage, librarySearch),
+    queryKey: ["friend-profile", publicId, libraryPage, debouncedLibrarySearch],
+    queryFn: () => getFriendProfileByPublicId(publicId, libraryPage, debouncedLibrarySearch),
     enabled: publicProfile?.relationship === "friends",
+    placeholderData: keepPreviousData,
   });
   const sharedQuery = useQuery({
     queryKey: ["shared-games", friendQuery.data?.user.id],
@@ -65,14 +74,7 @@ function PublicProfilePage() {
         />
       </AppShell>
     );
-  if (publicProfile.relationship === "friends" && friendQuery.isError)
-    return (
-      <AppShell>
-        <ErrorState title="Friend profile unavailable" description="Could not load this profile." />
-        <button onClick={() => void friendQuery.refetch()}>Retry profile</button>
-      </AppShell>
-    );
-  if (publicProfile.relationship === "friends" && (friendQuery.isLoading || !friendQuery.data))
+  if (publicProfile.relationship === "friends" && friendQuery.isLoading && !friendQuery.data)
     return (
       <AppShell>
         <Skeleton className="h-80 w-full" />
@@ -94,23 +96,33 @@ function PublicProfilePage() {
     avatarUrl: friend?.avatar ?? publicProfile.avatar ?? undefined,
     bio: friend?.bio ?? undefined,
     region: "Global",
-    hours: profileLibraryHours(library.data),
-    libraryMessage: library.message ?? undefined,
-    libraryPagination: friendQuery.data
+    hours: friendQuery.data?.library.summary?.total_playtime ?? profileLibraryHours(library.data),
+    libraryMessage: friendQuery.isError
+      ? "Could not load this library. Please retry."
+      : library.message ?? undefined,
+    libraryPagination: friendQuery.data || publicProfile.relationship === "friends"
       ? {
-          page: friendQuery.data.library.page,
-          pageSize: friendQuery.data.library.page_size,
-          total: friendQuery.data.library.total,
+          page: friendQuery.data?.library.page ?? libraryPage,
+          pageSize: friendQuery.data?.library.page_size ?? 12,
+          total: friendQuery.data?.library.total ?? library.data.length,
+          summary: friendQuery.data?.library.summary
+            ? {
+                totalGames: friendQuery.data.library.summary.total_games,
+                totalPlaytime: friendQuery.data.library.summary.total_playtime,
+                platformCounts: friendQuery.data.library.summary.platform_counts,
+              }
+            : undefined,
           query: librarySearch,
           onQueryChange: (query) => {
             setLibrarySearch(query);
-            setLibraryPage(1);
           },
           onPageChange: setLibraryPage,
+          onRetry: () => void friendQuery.refetch(),
+          isFetching: friendQuery.isFetching,
         }
       : undefined,
     games,
-    friendId: friend?.id,
+    friendId: friend?.id ?? (publicProfile.relationship === "friends" ? publicProfile.user_id : undefined),
     userId: friend?.id ?? publicProfile.user_id,
     sharedLibrary: sharedQuery.data,
     steamProfileUrl:
@@ -121,12 +133,12 @@ function PublicProfilePage() {
     stores: [
       {
         name: "Steam",
-        count: games.filter((game) => game.source?.toLowerCase() === "steam").length,
+        count: friendQuery.data?.library.summary?.platform_counts.steam ?? games.filter((game) => game.source?.toLowerCase() === "steam").length,
         note: "Synced games",
       },
       {
         name: "PlayStation",
-        count: games.filter((game) =>
+        count: friendQuery.data?.library.summary?.platform_counts.psn ?? games.filter((game) =>
           ["psn", "playstation"].includes(game.source?.toLowerCase() ?? ""),
         ).length,
         note: "Synced games",

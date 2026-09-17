@@ -8,7 +8,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -25,16 +25,30 @@ vi.mock("@/components/AppShell", () => ({
 }));
 vi.mock("@/components/ProfileView", () => ({
   ProfileView: ({
+    profile,
     isSelf,
     initialComposer,
     viewer,
   }: {
+    profile: {
+      name: string;
+      games: { title: string }[];
+      libraryPagination?: { query: string; onQueryChange: (query: string) => void };
+    };
     isSelf: boolean;
     initialComposer?: string;
     viewer?: { canMessage: boolean; canInvite: boolean; canAddFriend: boolean };
   }) => (
     <div>
-      <h1>ProfileView</h1>
+      <h1>{profile.name}</h1>
+      {profile.libraryPagination && (
+        <input
+          aria-label="Search library"
+          value={profile.libraryPagination.query}
+          onChange={(event) => profile.libraryPagination?.onQueryChange(event.target.value)}
+        />
+      )}
+      {profile.games.map((game) => <p key={game.title}>{game.title}</p>)}
       <p>{initialComposer ?? "none"}</p>
       {isSelf && <button>Settings</button>}
       {viewer?.canMessage && <button>Message</button>}
@@ -109,9 +123,36 @@ describe("PublicProfilePage", () => {
     expect(api.getFriendProfileByPublicId).toHaveBeenCalledWith("owner", 1, "");
   });
 
+  it("keeps the friend profile mounted while a library search request is pending", async () => {
+    api.getPublicProfile.mockResolvedValue(publicProfile("friends"));
+    api.getFriendProfileByPublicId
+      .mockResolvedValueOnce({
+        user: { id: "friend-id", public_id: "owner", display_name: "Owner" },
+        library: {
+          status: "ready",
+          data: [{ id: "game-id", title: "Game from first page", source: "manual" }],
+          page: 1,
+          page_size: 12,
+          total: 13,
+          summary: { total_games: 13, total_playtime: 780, platform_counts: { manual: 13 } },
+        },
+      })
+      .mockImplementationOnce(() => new Promise(() => {}));
+
+    renderProfile();
+
+    expect(await screen.findByRole("heading", { name: "Owner" })).toBeVisible();
+    fireEvent.change(screen.getByRole("textbox", { name: "Search library" }), {
+      target: { value: "dota" },
+    });
+
+    expect(screen.getByRole("heading", { name: "Owner" })).toBeVisible();
+    expect(screen.getByText("Game from first page")).toBeVisible();
+  });
+
   it("keeps anonymous strangers on ProfileView without friend actions", async () => {
     renderProfile();
-    expect(await screen.findByRole("heading", { name: "ProfileView" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Owner" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Message" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Invite" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add friend" })).not.toBeInTheDocument();
@@ -123,7 +164,7 @@ describe("PublicProfilePage", () => {
 
     renderProfile();
 
-    expect(await screen.findByRole("heading", { name: "ProfileView" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Owner" })).toBeInTheDocument();
   });
 
   it("keeps settings available on the owner profile", async () => {

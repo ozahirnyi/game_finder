@@ -68,9 +68,16 @@ export type ProfileData = {
     page: number;
     pageSize: number;
     total: number;
+    summary?: {
+      totalGames: number;
+      totalPlaytime: number;
+      platformCounts: Record<string, number>;
+    };
     query: string;
     onQueryChange: (query: string) => void;
     onPageChange: (page: number) => void;
+    onRetry?: () => void;
+    isFetching?: boolean;
   };
   steamProfileUrl?: string;
   settings?: {
@@ -205,7 +212,7 @@ export function ProfileView({
           <p className="truncate text-sm text-muted-foreground">@{profile.handle}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Chip tone="primary">Region · {profile.region}</Chip>
-            {!isSelf && <Chip tone="outline">{profile.games.length} games synced</Chip>}
+          {!isSelf && <Chip tone="outline">{profile.libraryPagination?.summary?.totalGames ?? profile.games.length} games synced</Chip>}
             {!isSelf && profile.compatibility != null && (
               <Chip tone="primary">{profile.compatibility}% compatible</Chip>
             )}
@@ -501,7 +508,7 @@ export function ProfileView({
       )}
       <div className="mb-8 flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl border border-border bg-surface-2 px-5 py-4">
         {[
-          ...(!isSelf ? [{ l: "Games", v: profile.games.length }] : []),
+          ...(!isSelf ? [{ l: "Games", v: profile.libraryPagination?.summary?.totalGames ?? profile.games.length }] : []),
           { l: "Steam", v: steam },
           { l: "PlayStation", v: psn },
           { l: "Hours", v: profile.hours },
@@ -575,18 +582,6 @@ export function ProfileView({
           </Panel>
         )}
 
-        {!isSelf && profile.friendId && (
-          <Panel className="p-6 lg:col-span-12">
-            <Link
-              to="/messages"
-              search={{ friend: profile.friendId }}
-              className="font-bold text-primary"
-            >
-              Open chat
-            </Link>
-          </Panel>
-        )}
-
         {!isSelf && (
           <Panel className="p-6 lg:col-span-12">
             <SectionHeader
@@ -638,7 +633,7 @@ export function ProfileView({
           <Panel className="p-6 lg:col-span-12">
             <SectionHeader
               title={isSelf ? "Your library" : "Their library"}
-              hint={`${profile.libraryPagination?.total ?? profile.games.length} games`}
+              hint={`${profile.libraryPagination?.summary?.totalGames ?? profile.libraryPagination?.total ?? profile.games.length} games`}
             />
             {profile.libraryPagination && (
               <label className="mb-4 block">
@@ -656,6 +651,11 @@ export function ProfileView({
               <p role="status" className="mb-3 text-muted-foreground">
                 {profile.libraryMessage}
               </p>
+            )}
+            {profile.libraryPagination?.onRetry && profile.libraryMessage?.startsWith("Could not load") && (
+              <button type="button" onClick={profile.libraryPagination.onRetry} className="mb-3 text-sm font-bold text-primary">
+                Retry library
+              </button>
             )}
             {profile.games.length === 0 ? (
               <EmptyState
@@ -678,7 +678,7 @@ export function ProfileView({
                 }
               />
             ) : (
-              <div className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              <div data-testid="profile-library-grid" aria-busy={profile.libraryPagination?.isFetching} className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {profile.games.map((g) => {
                   const content = (
                     <>

@@ -130,7 +130,7 @@ git commit -m "feat: paginate visible profile libraries"
 - Produces `getFriendProfileByPublicId(publicId, page, query)` returning the expanded library contract.
 - Produces `libraryPagination.isFetching?: boolean` and `summary?: PublicLibrarySummary` for `ProfileView`.
 
-- [ ] **Step 1: Add a failing route test for retained profile content during a second library request**
+- [x] **Step 1: Add a failing route test for retained profile content during a second library request**
 
 ```tsx
 api.getFriendProfileByPublicId.mockResolvedValueOnce(firstPage);
@@ -143,21 +143,21 @@ expect(screen.getByRole("heading", { name: "Owner" })).toBeVisible();
 expect(screen.getByText("Game from first page")).toBeVisible();
 ```
 
-- [ ] **Step 2: Run the route test and confirm it fails due to the full-page skeleton condition**
+- [x] **Step 2: Run the route test and confirm it fails due to the full-page skeleton condition**
 
 Run: `rtk npm test -- --run web/src/routes/users.$publicId.test.tsx`
 
 Expected: FAIL because the route replaces `AppShell` with a skeleton while `friendQuery.isLoading`.
 
-- [ ] **Step 3: Implement stable query behavior and debounced search**
+- [x] **Step 3: Implement stable query behavior and debounced search**
 
 Keep the profile metadata query independent from the paginated friend-library query.  Use `placeholderData: keepPreviousData` (or the installed TanStack Query equivalent), debounce the typed query before changing its query key, and reset `libraryPage` to `1` only after the debounce value changes.  Remove the full-page loading branch after initial profile identity has resolved; query failures must leave the shell visible and render retry/error inside the library section.
 
-- [ ] **Step 4: Render complete totals and responsive pagination in ProfileView**
+- [x] **Step 4: Render complete totals and responsive pagination in ProfileView**
 
 Use `library.summary.total_games` and `library.summary.total_playtime` for header/store metrics, not `profile.games.length` or the current page’s games.  Keep `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4`, pass page size 12, mark only the library region busy with `aria-busy`, and keep Previous/Next buttons keyboard-operable.  Delete the `Open chat` panel guarded by `!isSelf && profile.friendId`.
 
-- [ ] **Step 5: Add UI regression tests and run them**
+- [x] **Step 5: Add UI regression tests and run them**
 
 ```tsx
 expect(screen.queryByRole("link", { name: "Open chat" })).not.toBeInTheDocument();
@@ -169,7 +169,7 @@ Run: `rtk npm test -- --run web/src/routes/users.$publicId.test.tsx web/src/comp
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the profile UX change**
+- [x] **Step 6: Commit the profile UX change**
 
 ```text
 git add web/src/lib/api.ts web/src/routes/users.$publicId.tsx web/src/components/ProfileView.tsx web/src/routes/users.$publicId.test.tsx web/src/components/ProfileView.test.tsx

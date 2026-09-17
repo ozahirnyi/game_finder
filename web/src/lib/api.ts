@@ -232,6 +232,11 @@ export type FriendProfile = {
     page: number;
     page_size: number;
     total: number;
+    summary?: {
+      total_games: number;
+      total_playtime: number;
+      platform_counts: Record<string, number>;
+    } | null;
   };
 };
 
