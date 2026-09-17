@@ -80,3 +80,7 @@ export function presentPriceHistory(
 export function hasRenderablePriceHistory(history: PriceHistoryApiPoint[]): boolean {
   return presentPriceHistory(history).points.length > 0;
 }
+
+export function shouldRenderPriceHistory(isFree: boolean): boolean {
+  return !isFree;
+}

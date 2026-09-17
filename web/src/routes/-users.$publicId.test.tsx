@@ -173,7 +173,7 @@ describe("PublicProfilePage", () => {
 
     renderProfile();
 
-    expect(await screen.findByText("Hours: 11916h 40m")).toBeInTheDocument();
+    expect(await screen.findByText("Hours: 11916h")).toBeInTheDocument();
   });
 
   it("keeps anonymous strangers on ProfileView without friend actions", async () => {

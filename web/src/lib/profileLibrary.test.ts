@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { profileLibraryGames, profileLibraryHours } from "./profileLibrary";
+import { formatWholeHours, profileLibraryGames, profileLibraryHours } from "./profileLibrary";
 
 describe("friend library presentation", () => {
+  it("formats aggregate playtime as whole hours", () => {
+    expect(formatWholeHours(715000)).toBe("11916h");
+  });
+
   it("uses the detail identity rather than the owner's library UUID", () => {
     const [steam, catalog, unknown] = profileLibraryGames([
       {
@@ -21,7 +25,7 @@ describe("friend library presentation", () => {
   it("sums known minutes, distinguishes unknown from zero and labels partial totals", () => {
     expect(profileLibraryHours([{ playtime_forever: 90 }, { playtime_forever: 30 }])).toBe("2h");
     expect(profileLibraryHours([{ playtime_forever: null }])).toBe("—");
-    expect(profileLibraryHours([{ playtime_forever: 0 }])).toBe("0m");
-    expect(profileLibraryHours([{ playtime_forever: 90 }, {}])).toBe("1h 30m (known)");
+    expect(profileLibraryHours([{ playtime_forever: 0 }])).toBe("0h");
+    expect(profileLibraryHours([{ playtime_forever: 90 }, {}])).toBe("1h (known)");
   });
 });

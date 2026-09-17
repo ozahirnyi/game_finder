@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 import pytest
 from fastapi import HTTPException
@@ -150,6 +152,24 @@ async def test_itad_price_history_status_errors(monkeypatch, status, expected):
     with pytest.raises(HTTPException) as exc:
         await prices.fetch_game_price_history("Game")
     assert exc.value.status_code == expected
+
+
+@pytest.mark.anyio
+async def test_itad_price_history_logs_safe_provider_failure_details(monkeypatch, caplog):
+    monkeypatch.setenv("ITAD_API_KEY", "sensitive-itad-key")
+    monkeypatch.setattr(
+        prices.httpx,
+        "AsyncClient",
+        lambda *a, **k: AsyncClient(post_result=Response({"detail": "raw provider body"}, 500)),
+    )
+    caplog.set_level(logging.WARNING, logger=prices.__name__)
+
+    with pytest.raises(HTTPException):
+        await prices.fetch_game_price_history("Game")
+
+    assert "operation=itad_price_history status=500 error_class=HTTPStatusError" in caplog.text
+    assert "sensitive-itad-key" not in caplog.text
+    assert "raw provider body" not in caplog.text
 
 
 @pytest.mark.anyio

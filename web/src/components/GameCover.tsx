@@ -99,12 +99,14 @@ export function Avatar({
   to,
   name,
   image,
+  imageAlt = "",
   className = "",
 }: {
   from: string;
   to: string;
   name: string;
   image?: string;
+  imageAlt?: string;
   className?: string;
 }) {
   const [broken, setBroken] = useState(false);
@@ -122,7 +124,7 @@ export function Avatar({
       {image && !broken ? (
         <img
           src={image}
-          alt=""
+          alt={imageAlt}
           loading="lazy"
           onError={() => setBroken(true)}
           className="absolute inset-0 size-full object-cover"
