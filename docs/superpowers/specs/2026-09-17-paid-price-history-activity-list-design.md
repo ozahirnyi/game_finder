@@ -11,6 +11,8 @@ Restore useful price-history feedback for paid Steam games without showing an em
 - If the provider returns history points, render the existing chart.
 - If the provider reports history unavailable or returns no usable points, render an unavailable message and a Retry action in that section.
 - Current price and provider status remain in the sidebar price card. A free title continues to show `Free` there.
+- Resolve Steam titles through ITAD's documented `GET /games/lookup/v1?appid=…` path first. Keep the newer ID lookup endpoints only as fallbacks for unmatched titles.
+- Log the safe provider failure class and status on the server before falling back to Steam's current price; do not expose keys or raw provider payloads to users.
 
 ## Recently active players
 
