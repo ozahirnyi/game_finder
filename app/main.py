@@ -3942,6 +3942,29 @@ async def trending_games(request: Request, page: int = 1, page_size: int = 8):
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
+def _merge_platform_price_history(platform_price: dict, history: dict) -> dict:
+    """Enrich canonical platform pricing with ITAD history only."""
+    return {
+        **platform_price,
+        "history_low_all": history.get("history_low_all"),
+        "history_low_1y": history.get("history_low_1y"),
+        "history_low_3m": history.get("history_low_3m"),
+        "history": history.get("history") or [],
+    }
+
+
+def _strip_itad_reseller_urls(history: dict) -> dict:
+    """Keep title-based ITAD history from becoming a catalog purchase action."""
+    current = history.get("current")
+    deals = history.get("deals") or []
+    return {
+        **history,
+        "url": None,
+        "current": {**current, "url": None} if isinstance(current, dict) else current,
+        "deals": [{**deal, "url": None} if isinstance(deal, dict) else deal for deal in deals],
+    }
+
+
 @app.get("/prices/games/{igdb_id}", response_model=GamePriceHistory)
 async def game_price_history(
     igdb_id: int,
@@ -3969,7 +3992,7 @@ async def game_price_history(
 
         async def fetch_title_price():
             history = await fetch_game_price_history(title, country=normalized_country)
-            return {**history, "history_available": True}
+            return {**_strip_itad_reseller_urls(history), "history_available": True}
 
         try:
             return await get_json_cached(title_key, CACHE_TTL, fetch_title_price)
@@ -3980,18 +4003,19 @@ async def game_price_history(
             return {**price, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
 
     price_key = build_cache_key("price_history_v2", steam_appid=steam_appid, country=normalized_country)
+    steam_detail = await fetch_steam_store_game_detail(steam_appid, country=normalized_country)
+    steam_title = str(steam_detail.get("title") or steam_detail.get("name") or title or steam_appid).strip()
 
     async def fetch_price():
-        history = await fetch_game_price_history(title or str(steam_appid), country=normalized_country, steam_appid=steam_appid)
-        return {**history, "history_available": True}
+        history = await fetch_game_price_history(steam_title, country=normalized_country, steam_appid=steam_appid)
+        return {**_merge_platform_price_history(steam_detail, history), "history_available": True}
 
     try:
         return await get_json_cached(price_key, CACHE_TTL, fetch_price)
     except HTTPException as exc:
         if exc.status_code not in {404, 502, 503}:
             raise
-        price = await fetch_steam_store_game_price(title or str(steam_appid), country=normalized_country)
-        return {**price, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
+        return {**steam_detail, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
 
 
 @app.get("/prices/steam-games/{appid}", response_model=GamePriceHistory)
@@ -4007,7 +4031,7 @@ async def steam_game_price_history(
     title = str(steam_detail.get("title") or steam_detail.get("name") or appid).strip()
     try:
         history = await fetch_game_price_history(title, country=normalized_country, steam_appid=appid)
-        return {**history, "history_available": True}
+        return {**_merge_platform_price_history(steam_detail, history), "history_available": True}
     except HTTPException as exc:
         if exc.status_code not in {404, 502, 503}:
             raise

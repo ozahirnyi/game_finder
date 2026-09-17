@@ -35,7 +35,7 @@ vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-import { Route } from "./games.$gameId";
+import { mergeGamePrice, Route } from "./games.$gameId";
 
 const game = {
   id: "274755",
@@ -98,6 +98,21 @@ afterEach(() => {
 });
 
 describe("game detail presentation", () => {
+  it("keeps an established platform label and URL when price enrichment names a reseller", () => {
+    const merged = mergeGamePrice(
+      { ...game, price: null, originalPrice: null, discount: null, store: "Steam", storeUrl: "https://store.steampowered.com/app/1145350/" },
+      {
+        shop: "Arbitrary reseller",
+        url: "https://reseller.example/hades",
+        price: { amount: 9.99, currency: "USD" },
+      },
+    );
+
+    expect(merged.price).toBe(9.99);
+    expect(merged.store).toBe("Steam");
+    expect(merged.storeUrl).toBe("https://store.steampowered.com/app/1145350/");
+  });
+
   it("returns an AI result to the original AI search", async () => {
     renderDetail("/games/274755?returnTo=%2Fsearch%3Fmode%3Dai%26q%3Droguelike");
 
@@ -151,6 +166,18 @@ describe("game detail presentation", () => {
     await waitFor(() =>
       expect(screen.queryByRole("heading", { name: "Price history" })).not.toBeInTheDocument(),
     );
+  });
+
+  it("shows Free instead of a zero-price enrichment and hides price history for free games", async () => {
+    api.getPriceHistory.mockResolvedValue({
+      is_free: true,
+      current: { price: { amount: 0, currency: "USD" } },
+      history: [],
+    });
+    renderDetail();
+
+    expect(await screen.findByText("Free")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Price history" })).not.toBeInTheDocument();
   });
 
   it("shows unavailable price history with retry for paid games without points", async () => {
