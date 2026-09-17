@@ -67,5 +67,5 @@ def test_price_history_skips_malformed_provider_entries():
     assert history == []
 
 
-def test_price_history_requests_a_six_month_window():
-    assert prices.price_history_since(datetime(2026, 9, 3, 12, tzinfo=timezone.utc)) == "2026-03-03T12:00:00+00:00"
+def test_price_history_requests_a_six_month_window_in_itad_utc_format():
+    assert prices.price_history_since(datetime(2026, 9, 3, 12, 34, 56, 789012, tzinfo=timezone.utc)) == "2026-03-03T12:34:56Z"
