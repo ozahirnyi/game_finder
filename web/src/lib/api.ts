@@ -896,7 +896,9 @@ export function searchUsers(query: string) {
 }
 
 export type PublicUserDirectory = {
-  items: Friend["user"][];
+  items: (Friend["user"] & {
+    relationship: "none" | "friends" | "outgoing_pending" | "incoming_pending";
+  })[];
   page: number;
   page_size: number;
   total: number;

@@ -192,7 +192,7 @@ git commit -m "fix: retain friend profile during library paging"
 - `fetch_steam_store_game_detail(appid, country)` returns `is_free` from Steam’s `data["is_free"]` even when no `price_overview` exists.
 - `fetch_game_price_history(title, country, steam_appid)` returns an ITAD-normalized result or raises a provider-specific HTTP error; it never labels a Steam fallback as history data.
 
-- [ ] **Step 1: Write provider tests using current ITAD overview and history fixture shapes**
+- [x] **Step 1: Write provider tests using current ITAD overview and history fixture shapes**
 
 ```python
 result = await prices.fetch_game_price_history("Cyberpunk 2077", steam_appid=1091500)
@@ -207,21 +207,21 @@ assert free["current"] is None
 
 Fixtures must represent the documented `games/overview/v2`/`games/history/v2` response fields actually consumed by the adapter.  Assert request method, URL, JSON body, headers, country, and game ID so a legacy `prices/v3` payload cannot pass by accident.
 
-- [ ] **Step 2: Run focused tests and confirm the legacy ITAD request fails the new contract**
+- [x] **Step 2: Run focused tests and confirm the legacy ITAD request fails the new contract**
 
 Run: `rtk pytest -q tests/test_provider_clients.py tests/test_api_contracts.py -k "itad or steam_game"`
 
 Expected: FAIL on the old `/games/prices/v3` request or missing `is_free`.
 
-- [ ] **Step 3: Implement the current ITAD adapter and explicit failure result**
+- [x] **Step 3: Implement the current ITAD adapter and explicit failure result**
 
 Resolve the ITAD game ID as today, request the documented overview endpoint, request `history/v2`, then pass their deal/history arrays through `normalize_price_history`.  Preserve 401/403 as a safe 502 message without including the key.  In the API endpoints, keep Steam current-price data if ITAD is unavailable but return `history_available=False`, `provider_message="Price history is temporarily unavailable."`, and `history=[]`; do not claim a successful history lookup.
 
-- [ ] **Step 4: Implement Steam `is_free` end-to-end and cache-safe response shaping**
+- [x] **Step 4: Implement Steam `is_free` end-to-end and cache-safe response shaping**
 
 Set `is_free=bool(data.get("is_free"))` in both Steam detail and title-price paths.  Add it to Pydantic/API response types.  Ensure cache keys distinguish response versions if existing cached price payloads omit the new field.
 
-- [ ] **Step 5: Replace fallback-success tests and run backend price suites**
+- [x] **Step 5: Replace fallback-success tests and run backend price suites**
 
 ```python
 response = api_client.get("/prices/steam-games/570")
@@ -237,7 +237,7 @@ Run: `rtk pytest -q tests/test_provider_clients.py tests/test_api_contracts.py t
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the pricing backend change**
+- [x] **Step 6: Commit the pricing backend change**
 
 ```text
 git add app/schemas.py app/steam_store.py app/prices.py app/main.py tests/test_provider_clients.py tests/test_api_contracts.py tests/integration/backend/test_catalog_prices_api.py
@@ -258,7 +258,7 @@ git commit -m "fix: return reliable price history and free games"
 - Route loader produces `steamAppId: number | null` even when the visible game is a catalog record.
 - `GET /catalog/games/{catalog_game_id}/active-players` obtains a canonical Steam app ID from the resolved catalog snapshot; the Steam endpoint remains the direct path where one is known.
 
-- [ ] **Step 1: Write failing UI tests for Free, hidden empty history, preserved Steam activity ID, and visible historical chart**
+- [x] **Step 1: Write failing UI tests for Free, hidden empty history, preserved Steam activity ID, and visible historical chart**
 
 ```tsx
 expect(screen.getByText("Free")).toBeVisible();
@@ -269,21 +269,21 @@ renderWithPrice({ is_free: true, history: [point], history_available: true });
 expect(screen.getByRole("heading", { name: "Price History" })).toBeVisible();
 ```
 
-- [ ] **Step 2: Run the UI test and confirm it fails**
+- [x] **Step 2: Run the UI test and confirm it fails**
 
 Run: `rtk npm test -- --run web/src/routes/games.$gameId.test.ts`
 
 Expected: FAIL because `game.price == null` renders “Price unavailable” and the catalog path calls `/catalog/...` without its Steam ID.
 
-- [ ] **Step 3: Implement price presentation rules**
+- [x] **Step 3: Implement price presentation rules**
 
 Derive displayed price in this priority: `is_free` -> `Free`; valid `current.price` -> formatted money; otherwise `Price unavailable`.  Render Price History only when `history.length > 0`.  When a paid game has no history and `provider_message` exists, display that message in the price panel rather than an empty chart.  Do not hide a now-free game that has history points.
 
-- [ ] **Step 4: Implement canonical Steam activity identity**
+- [x] **Step 4: Implement canonical Steam activity identity**
 
 Keep the Steam app ID returned by Steam lookup when a loader substitutes catalog metadata.  Query `getRecentSteamGamePlayers(steamAppId)` whenever it is non-null, irrespective of whether the rendered page is catalog-backed.  On the backend, when catalog cache lacks an app ID, use local `Game.catalog_game_id` activity as fallback; when an ID is known, merge persisted activity with each visible user’s current `fetch_owned_games` result and filter to `playtime_2weeks > 0`.
 
-- [ ] **Step 5: Add backend activity regression coverage and run focused tests**
+- [x] **Step 5: Add backend activity regression coverage and run focused tests**
 
 ```python
 monkeypatch.setattr(main, "fetch_owned_games", AsyncMock(return_value=[{"appid": 570, "playtime_2weeks": 120}]))
@@ -295,7 +295,7 @@ Run: `rtk pytest -q tests/test_social_api.py -k active; rtk npm test -- --run we
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit game-page behavior**
+- [x] **Step 6: Commit game-page behavior**
 
 ```text
 git add app/main.py web/src/lib/api.ts web/src/routes/games.$gameId.tsx tests/test_social_api.py web/src/routes/games.$gameId.test.ts
@@ -314,7 +314,7 @@ git commit -m "fix: show free prices and recent Steam players"
 - Consumes directory `relationship` from Task 1.
 - Produces a row link for profile navigation plus a separate non-navigating relationship control.
 
-- [ ] **Step 1: Write failing directory tests for relationship labels and row navigation**
+- [x] **Step 1: Write failing directory tests for relationship labels and row navigation**
 
 ```tsx
 expect(screen.getByRole("button", { name: "Friends" })).toBeDisabled();
@@ -323,21 +323,21 @@ expect(screen.getByRole("button", { name: "Respond to request" })).toBeDisabled(
 expect(screen.getByRole("link", { name: "Open Ada profile" })).toHaveAttribute("href", "/users/ada");
 ```
 
-- [ ] **Step 2: Run the directory test and confirm it fails because all records offer Add friend**
+- [x] **Step 2: Run the directory test and confirm it fails because all records offer Add friend**
 
 Run: `rtk npm test -- --run web/src/routes/users.index.test.tsx`
 
 Expected: FAIL on the relationship-specific accessible names.
 
-- [ ] **Step 3: Implement the one-row directory control matrix**
+- [x] **Step 3: Implement the one-row directory control matrix**
 
 Define a pure `directoryAction(relationship, locallyRequested)` mapping: `none` => enabled `Add friend`; `outgoing_pending` or locally requested => disabled `Request sent`; `incoming_pending` => disabled `Respond to request`; `friends` => disabled `Friends`.  Keep the avatar/name region as the profile link and style the article’s hover/focus state so the full non-button row reads as a profile card.  Never invoke the request mutation unless the mapped action is `Add friend`.
 
-- [ ] **Step 4: Add the duplicate friend-search regression test**
+- [x] **Step 4: Add the duplicate friend-search regression test**
 
 Render the Friends page search affordance, type once, and assert exactly one searchbox and one request for the normalized query.  If the test exposes duplicate controls, retain the route-level search field and remove the second rendering path; do not create a second query state inside a child component.
 
-- [ ] **Step 5: Run all social UI tests and commit**
+- [x] **Step 5: Run all social UI tests and commit**
 
 Run: `rtk npm test -- --run web/src/routes/users.index.test.tsx web/src/routes/friends.index.test.tsx`
 

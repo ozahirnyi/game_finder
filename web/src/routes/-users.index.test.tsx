@@ -86,4 +86,26 @@ describe("All users directory", () => {
     );
     expect(screen.getByRole("button", { name: "Request sent" })).toBeDisabled();
   });
+
+  it("renders relationship-aware controls without duplicate requests", async () => {
+    api.getPublicUsers.mockResolvedValue({
+      items: [
+        { id: "friend", public_id: "ada", display_name: "Ada", relationship: "friends" },
+        { id: "outgoing", public_id: "bea", display_name: "Bea", relationship: "outgoing_pending" },
+        { id: "incoming", public_id: "cyd", display_name: "Cyd", relationship: "incoming_pending" },
+        { id: "stranger", public_id: "dan", display_name: "Dan", relationship: "none" },
+      ],
+      page: 1,
+      page_size: 10,
+      total: 4,
+    });
+    renderUsers("/users?page=1");
+
+    expect(await screen.findByRole("button", { name: "Friends" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Request sent" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Respond to request" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Open Ada profile" })).toHaveAttribute("href", "/users/ada");
+    fireEvent.click(screen.getByRole("button", { name: "Add friend" }));
+    await waitFor(() => expect(api.createFriendRequest).toHaveBeenCalledWith({ recipient_id: "stranger" }));
+  });
 });
