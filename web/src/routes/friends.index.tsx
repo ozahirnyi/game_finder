@@ -55,11 +55,11 @@ function FriendsPage() {
   const navigate = useNavigate();
   const notificationSearch = Route.useSearch();
   const queryClient = useQueryClient();
-  const [showAddFriend, setShowAddFriend] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("");
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
   const markedNotificationIds = useRef(new Set<string>());
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const friendsQuery = useQuery(friendsQueryOptions());
   const incomingQuery = useQuery(incomingFriendRequestsQueryOptions());
   const gameInvitesQuery = useQuery({
@@ -69,7 +69,7 @@ function FriendsPage() {
   const searchQuery = useQuery({
     queryKey: ["user-search", searchTerm],
     queryFn: () => searchUsers(searchTerm),
-    enabled: showAddFriend && searchTerm.trim().length >= 2,
+    enabled: searchTerm.trim().length >= 2,
   });
   const requestMutation = useMutation({
     mutationFn: (data: { recipient_id: string; message?: string }) => createFriendRequest(data),
@@ -195,7 +195,7 @@ function FriendsPage() {
               action={
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowAddFriend(true)}
+                    onClick={() => searchInputRef.current?.focus()}
                     className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
                   >
                     <UserPlus className="size-3.5" /> Add friend
@@ -209,59 +209,6 @@ function FriendsPage() {
                 </div>
               }
             />
-            {showAddFriend && (
-              <section
-                aria-label="Add friend"
-                className="mb-6 rounded-2xl border border-border bg-surface p-4"
-              >
-                <label className="grid gap-2 text-sm font-bold">
-                  Player name
-                  <input
-                    aria-label="Player name"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search by display name"
-                    className="rounded-lg border border-border bg-background px-3 py-2 font-normal"
-                  />
-                </label>
-                {searchTerm.trim().length >= 2 &&
-                  !searchQuery.isLoading &&
-                  searchQuery.data?.length === 0 && (
-                    <p className="mt-3 text-sm text-muted-foreground">No players found.</p>
-                  )}
-                <div className="mt-3 space-y-2">
-                  {searchQuery.data?.map((player) => (
-                    <div
-                      key={player.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
-                    >
-                      <UserProfileLink publicId={player.public_id} className="font-semibold">
-                        {friendDisplayName(player)}
-                      </UserProfileLink>
-                      <button
-                        onClick={() => requestMutation.mutate({ recipient_id: player.id })}
-                        disabled={requestMutation.isPending}
-                        className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
-                      >
-                        Add {friendDisplayName(player)}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {requestMutation.isError && (
-                  <p role="alert" className="mt-3 text-sm text-destructive">
-                    Could not send this request.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowAddFriend(false)}
-                  className="mt-4 text-xs font-bold text-muted-foreground"
-                >
-                  Close
-                </button>
-              </section>
-            )}
             {incomingQuery.data?.length ? (
               <section
                 aria-label="Friend requests"
@@ -343,17 +290,46 @@ function FriendsPage() {
             <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 focus-within:border-primary/60">
               <Search className="size-4 text-muted-foreground" />
               <input
+                ref={searchInputRef}
                 aria-label="Find players"
                 value={searchTerm}
-                onFocus={() => setShowAddFriend(true)}
-                onChange={(event) => {
-                  setSearchTerm(event.target.value);
-                  setShowAddFriend(true);
-                }}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Find players by name"
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
             </div>
+            {searchTerm.trim().length >= 2 && (
+              <section aria-label="Player search results" className="mb-6 space-y-2">
+                {searchQuery.isLoading ? (
+                  <p className="text-sm text-muted-foreground">Searching players…</p>
+                ) : searchQuery.data?.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No players found.</p>
+                ) : (
+                  searchQuery.data?.map((player) => (
+                    <div
+                      key={player.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3"
+                    >
+                      <UserProfileLink publicId={player.public_id} className="font-semibold">
+                        {friendDisplayName(player)}
+                      </UserProfileLink>
+                      <button
+                        onClick={() => requestMutation.mutate({ recipient_id: player.id })}
+                        disabled={requestMutation.isPending}
+                        className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
+                      >
+                        Add {friendDisplayName(player)}
+                      </button>
+                    </div>
+                  ))
+                )}
+                {requestMutation.isError && (
+                  <p role="alert" className="text-sm text-destructive">
+                    Could not send this request.
+                  </p>
+                )}
+              </section>
+            )}
 
             {friends.length === 0 ? (
               <EmptyState
@@ -362,7 +338,7 @@ function FriendsPage() {
                 description="Add friends to compare libraries and find games you can play together."
                 action={
                   <button
-                    onClick={() => setShowAddFriend(true)}
+                    onClick={() => searchInputRef.current?.focus()}
                     className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
                   >
                     Add friend

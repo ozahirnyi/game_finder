@@ -203,8 +203,24 @@ describe("game detail presentation", () => {
     expect(
       await screen.findByRole("heading", { name: "Recently active players" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sam" })).toHaveAttribute("href", "/users/sam-public");
+    expect(await screen.findByRole("link", { name: "Sam" })).toHaveAttribute(
+      "href",
+      "/users/sam-public",
+    );
     expect(screen.getByText("2.1 hours in the last two weeks")).toBeInTheDocument();
     expect(api.getRecentGamePlayers).toHaveBeenCalledWith("274755");
+  });
+
+  it("keeps the recent-player section visible when nobody played recently", async () => {
+    renderDetail();
+
+    expect(
+      await screen.findByRole("heading", { name: "Recently active players" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "No public players have logged time in this game during the last two weeks.",
+      ),
+    ).toBeInTheDocument();
   });
 });

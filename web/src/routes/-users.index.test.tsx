@@ -64,11 +64,12 @@ afterEach(() => {
 });
 
 describe("All users directory", () => {
-  it("shows ten public player cards with numbered profile links", async () => {
+  it("shows ten full-width player rows with avatars and numbered profile links", async () => {
     renderUsers();
 
     expect((await screen.findAllByRole("article")).length).toBe(10);
-    expect(screen.getByRole("link", { name: "Player 1" })).toHaveAttribute(
+    expect(screen.getByLabelText("Player 1")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Player 1 profile" })).toHaveAttribute(
       "href",
       "/users/player-1",
     );

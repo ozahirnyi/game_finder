@@ -229,6 +229,9 @@ export type FriendProfile = {
     status: "ready" | "empty" | "hidden" | "partial" | "error";
     data: PublicLibraryGame[];
     message?: string | null;
+    page: number;
+    page_size: number;
+    total: number;
   };
 };
 
@@ -810,14 +813,21 @@ export function getFriends() {
   return apiRequest<Friend[]>("/friends", { auth: true });
 }
 
-export function getFriendProfile(id: string) {
-  return apiRequest<FriendProfile>(`/friends/${id}/profile`, { auth: true });
+export function getFriendProfile(id: string, page = 1, query = "") {
+  const search = new URLSearchParams({ page: String(page) });
+  if (query.trim()) search.set("q", query.trim());
+  return apiRequest<FriendProfile>(`/friends/${id}/profile?${search}`, { auth: true });
 }
 
-export function getFriendProfileByPublicId(publicId: string) {
-  return apiRequest<FriendProfile>(`/users/${encodeURIComponent(publicId)}/friend-profile`, {
-    auth: true,
-  });
+export function getFriendProfileByPublicId(publicId: string, page = 1, query = "") {
+  const search = new URLSearchParams({ page: String(page) });
+  if (query.trim()) search.set("q", query.trim());
+  return apiRequest<FriendProfile>(
+    `/users/${encodeURIComponent(publicId)}/friend-profile?${search}`,
+    {
+      auth: true,
+    },
+  );
 }
 
 export function getSharedGames(friendId: string) {
@@ -895,6 +905,13 @@ export function getPublicUsers(page = 1) {
 export function getRecentGamePlayers(catalogGameId: string | number) {
   return apiRequest<RecentGamePlayer[]>(
     `/catalog/games/${encodeURIComponent(catalogGameId)}/active-players`,
+    { auth: true },
+  );
+}
+
+export function getRecentSteamGamePlayers(steamAppId: string | number) {
+  return apiRequest<RecentGamePlayer[]>(
+    `/steam/games/${encodeURIComponent(steamAppId)}/active-players`,
     { auth: true },
   );
 }

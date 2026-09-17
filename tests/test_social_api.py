@@ -103,6 +103,74 @@ def test_recent_game_players_returns_distinct_active_users(social_db):
     assert response.json()[0]["playtime_2weeks"] == 120
 
 
+def test_recent_steam_game_players_match_the_steam_app_id(social_db):
+    viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
+    active = User(email="active@example.com", public_id="active-id", public_nickname="Active")
+    social_db.add_all([viewer, active])
+    social_db.commit()
+    social_db.add(
+        Game(
+            owner_id=active.id,
+            title="Steam-only game",
+            source="steam",
+            external_id="12345",
+            playtime_2weeks=90,
+        )
+    )
+    social_db.commit()
+
+    response = use_social_api(viewer, social_db).get("/steam/games/12345/active-players")
+
+    assert response.status_code == 200
+    assert response.json()[0]["public_id"] == "active-id"
+    assert response.json()[0]["playtime_2weeks"] == 90
+
+
+def test_recent_steam_game_players_reads_current_steam_library(monkeypatch, social_db):
+    viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
+    active = User(
+        email="active@example.com",
+        public_id="active-id",
+        public_nickname="Active",
+        steam_id="active-steam",
+    )
+    social_db.add_all([viewer, active])
+    social_db.commit()
+
+    async def fake_owned_games(steam_id):
+        assert steam_id == "active-steam"
+        return [{"appid": 12345, "name": "Steam-only game", "playtime_2weeks": 90}]
+
+    monkeypatch.setattr(main, "fetch_owned_games", fake_owned_games)
+
+    response = use_social_api(viewer, social_db).get("/steam/games/12345/active-players")
+
+    assert response.status_code == 200
+    assert response.json()[0]["public_id"] == "active-id"
+    assert response.json()[0]["playtime_2weeks"] == 90
+
+
+def test_recent_game_players_hide_private_libraries(social_db):
+    viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
+    private = User(
+        email="private@example.com",
+        public_id="private-id",
+        public_nickname="Private",
+        library_visibility="private",
+    )
+    social_db.add_all([viewer, private])
+    social_db.commit()
+    social_db.add(
+        Game(owner_id=private.id, title="Private game", source="steam", catalog_game_id=72, playtime_2weeks=90)
+    )
+    social_db.commit()
+
+    response = use_social_api(viewer, social_db).get("/catalog/games/72/active-players")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_profile_visibility_defaults_to_public_for_existing_user(social_db):
     user = User(email="existing@example.com", public_id="existing-id")
     social_db.add(user)
@@ -232,6 +300,26 @@ def test_friend_profile_returns_friend_bio_avatar_and_library(monkeypatch, socia
     assert payload["library"]["status"] == "ready"
     assert payload["library"]["data"][0]["title"] == "Portal 2"
     assert use_social_api(charlie, social_db).get(f"/friends/{bob.id}/profile").status_code == 404
+
+
+def test_friend_profile_library_paginates_and_searches(social_db):
+    alice, bob, _, _ = create_users(social_db)
+    social_db.add(Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)))
+    social_db.add_all(
+        [Game(owner_id=bob.id, title=f"Game {index:02d}", source="manual") for index in range(11)]
+    )
+    social_db.commit()
+
+    response = use_social_api(alice, social_db).get(
+        f"/friends/{bob.id}/profile?page=2&q=Game"
+    )
+
+    assert response.status_code == 200
+    library = response.json()["library"]
+    assert library["page"] == 2
+    assert library["page_size"] == 10
+    assert library["total"] == 11
+    assert [game["title"] for game in library["data"]] == ["Game 10"]
 
 
 def test_friend_shared_games_match_saved_source_and_external_id_only(social_db):

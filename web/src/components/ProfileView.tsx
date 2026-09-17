@@ -64,6 +64,14 @@ export type ProfileData = {
   friendId?: string;
   userId?: string;
   libraryMessage?: string;
+  libraryPagination?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    query: string;
+    onQueryChange: (query: string) => void;
+    onPageChange: (page: number) => void;
+  };
   steamProfileUrl?: string;
   settings?: {
     displayName: string;
@@ -630,8 +638,20 @@ export function ProfileView({
           <Panel className="p-6 lg:col-span-12">
             <SectionHeader
               title={isSelf ? "Your library" : "Their library"}
-              hint={`${profile.games.length} games`}
+              hint={`${profile.libraryPagination?.total ?? profile.games.length} games`}
             />
+            {profile.libraryPagination && (
+              <label className="mb-4 block">
+                <span className="sr-only">Search their library</span>
+                <input
+                  aria-label="Search their library"
+                  value={profile.libraryPagination.query}
+                  onChange={(event) => profile.libraryPagination?.onQueryChange(event.target.value)}
+                  placeholder="Search this library"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                />
+              </label>
+            )}
             {profile.libraryMessage && (
               <p role="status" className="mb-3 text-muted-foreground">
                 {profile.libraryMessage}
@@ -707,6 +727,42 @@ export function ProfileView({
                 })}
               </div>
             )}
+            {profile.libraryPagination &&
+              profile.libraryPagination.total > profile.libraryPagination.pageSize && (
+                <nav aria-label="Library pages" className="mt-5 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={profile.libraryPagination.page <= 1}
+                    onClick={() =>
+                      profile.libraryPagination?.onPageChange(profile.libraryPagination.page - 1)
+                    }
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {profile.libraryPagination.page} of{" "}
+                    {Math.ceil(
+                      profile.libraryPagination.total / profile.libraryPagination.pageSize,
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={
+                      profile.libraryPagination.page >=
+                      Math.ceil(
+                        profile.libraryPagination.total / profile.libraryPagination.pageSize,
+                      )
+                    }
+                    onClick={() =>
+                      profile.libraryPagination?.onPageChange(profile.libraryPagination.page + 1)
+                    }
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </nav>
+              )}
           </Panel>
         )}
       </div>

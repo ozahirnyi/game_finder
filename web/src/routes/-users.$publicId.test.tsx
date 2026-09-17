@@ -106,8 +106,7 @@ describe("PublicProfilePage", () => {
     api.getPublicProfile.mockResolvedValue(publicProfile("friends"));
     renderProfile("/users/owner?compose=message");
     expect(await screen.findByText("Dedicated chat")).toBeInTheDocument();
-    expect(api.getFriendProfileByPublicId).toHaveBeenCalledWith("owner");
-    expect(api.getFriendProfileByPublicId).toHaveBeenCalledWith("owner");
+    expect(api.getFriendProfileByPublicId).toHaveBeenCalledWith("owner", 1, "");
   });
 
   it("keeps anonymous strangers on ProfileView without friend actions", async () => {
