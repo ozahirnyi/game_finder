@@ -476,7 +476,6 @@ async def build_visible_library_snapshot(
             ).model_dump(mode="json")
             for game in steam_games
         )
-    library_items.sort(key=lambda item: item["title"].casefold())
     summary = PublicLibrarySummaryRead(
         total_games=len(library_items),
         total_playtime=sum(int(item.get("playtime_forever") or 0) for item in library_items),
@@ -3979,7 +3978,7 @@ async def game_price_history(
             if exc.status_code not in {404, 502, 503}:
                 raise
             price = await fetch_steam_store_game_price(title, country=normalized_country)
-            return {**price, "history_available": False}
+            return {**price, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
 
     price_key = build_cache_key("price_history_v2", steam_appid=steam_appid, country=normalized_country)
 
@@ -3993,7 +3992,7 @@ async def game_price_history(
         if exc.status_code not in {404, 502, 503}:
             raise
         price = await fetch_steam_store_game_price(title or str(steam_appid), country=normalized_country)
-        return {**price, "history_available": False}
+        return {**price, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
 
 
 @app.get("/prices/steam-games/{appid}", response_model=GamePriceHistory)
@@ -4013,7 +4012,7 @@ async def steam_game_price_history(
     except HTTPException as exc:
         if exc.status_code not in {404, 502, 503}:
             raise
-        return {**steam_detail, "history_available": False}
+        return {**steam_detail, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
 
 
 

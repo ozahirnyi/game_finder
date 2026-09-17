@@ -560,6 +560,8 @@ class GamePriceHistory(BaseModel):
     itad_id: str
     title: str
     history_available: bool
+    is_free: bool = False
+    provider_message: str | None = None
     url: str | None = None
     current: PriceDeal | None = None
     history_low_all: PriceMoney | None = None
