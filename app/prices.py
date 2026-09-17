@@ -160,6 +160,17 @@ async def _resolve_itad_game(
     client: httpx.AsyncClient, title: str, steam_appid: int | None
 ) -> tuple[str, str, str | None]:
     if steam_appid is not None:
+        response = await client.get(
+            f"{ITAD_BASE_URL}/games/lookup/v1",
+            params={"appid": steam_appid},
+        )
+        response.raise_for_status()
+        data = response.json()
+        game = data.get("game") if isinstance(data, dict) and data.get("found") else None
+        identity = _itad_game_identity(game, title)
+        if identity:
+            return *identity, _itad_game_url(game)
+
         response = await client.post(
             f"{ITAD_BASE_URL}/lookup/id/shop/61/v1",
             json=[f"app/{steam_appid}"],
@@ -224,6 +235,11 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
     except HTTPException:
         raise
     except httpx.HTTPStatusError as exc:
+        logger.warning(
+            "ITAD provider failure operation=itad_price_history status=%d error_class=%s",
+            exc.response.status_code,
+            type(exc).__name__,
+        )
         if exc.response.status_code in {401, 403}:
             reason = _itad_error_message(exc.response)
             raise HTTPException(status_code=502, detail=f"IsThereAnyDeal rejected the API key: {reason}")
@@ -231,7 +247,11 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
             raise HTTPException(status_code=429, detail="IsThereAnyDeal rate limit reached")
         reason = _itad_error_message(exc.response)
         raise HTTPException(status_code=502, detail=f"Price history request failed: {reason}")
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
+        logger.warning(
+            "ITAD provider failure operation=itad_price_history status=none error_class=%s",
+            type(exc).__name__,
+        )
         raise HTTPException(status_code=502, detail="Price history request failed")
 
     price_items = prices.json()

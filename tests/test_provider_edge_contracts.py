@@ -30,19 +30,19 @@ class _ItadClient:
 
 
 @pytest.mark.anyio
-async def test_itad_game_id_resolution_prefers_steam_app_mapping():
+async def test_itad_game_id_resolution_prefers_documented_steam_lookup():
     from app.prices import ITAD_BASE_URL, resolve_itad_game_id
 
-    client = _ItadClient([
-        {"app/3240220": "itad-id"},
-    ])
+    client = _ItadClient(
+        [{"found": True, "game": {"id": "itad-id", "title": "Grand Theft Auto V"}}]
+    )
 
     assert await resolve_itad_game_id(client, "Grand Theft Auto V", 3240220) == (
         "itad-id",
         "Grand Theft Auto V",
     )
     assert client.calls == [
-        ("POST", f"{ITAD_BASE_URL}/lookup/id/shop/61/v1", {"json": ["app/3240220"]}),
+        ("GET", f"{ITAD_BASE_URL}/games/lookup/v1", {"appid": 3240220}),
     ]
 
 
@@ -68,6 +68,7 @@ async def test_itad_game_id_resolution_falls_back_to_casefold_exact_search():
     from app.prices import ITAD_BASE_URL, resolve_itad_game_id
 
     client = _ItadClient([
+        {"found": False},
         {},
         {},
         [
@@ -82,6 +83,7 @@ async def test_itad_game_id_resolution_falls_back_to_casefold_exact_search():
         "Grand Theft Auto V",
     )
     assert client.calls == [
+        ("GET", f"{ITAD_BASE_URL}/games/lookup/v1", {"appid": 3240220}),
         ("POST", f"{ITAD_BASE_URL}/lookup/id/shop/61/v1", {"json": ["app/3240220"]}),
         ("POST", f"{ITAD_BASE_URL}/lookup/id/title/v1", {"json": ["Grand Theft Auto V"]}),
         ("GET", f"{ITAD_BASE_URL}/games/search/v1", {"title": "Grand Theft Auto V"}),
@@ -93,6 +95,7 @@ async def test_itad_game_id_resolution_rejects_fuzzy_search_results():
     from app.prices import resolve_itad_game_id
 
     client = _ItadClient([
+        {"found": False},
         {},
         {},
         [{"id": "wrong-id", "title": "Grand Theft Auto V Enhanced", "type": "game"}],
