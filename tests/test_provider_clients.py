@@ -133,6 +133,37 @@ async def test_itad_price_history_normalizes_deals(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_itad_price_history_accepts_documented_overview_response(monkeypatch):
+    monkeypatch.setenv("ITAD_API_KEY", "key")
+    responses = [
+        FakeResponse({"Game": "g1"}),
+        FakeResponse({
+            "prices": [{
+                "id": "g1",
+                "current": {
+                    "shop": {"name": "Steam"},
+                    "price": {"amount": 6, "currency": "USD"},
+                    "regular": {"amount": 10, "currency": "USD"},
+                    "cut": 40,
+                    "url": "https://store.steampowered.com/app/1/",
+                    "timestamp": "2026-08-01T00:00:00+00:00",
+                },
+                "lowest": {"price": {"amount": 5, "currency": "USD"}},
+            }],
+            "bundles": [],
+        }),
+        FakeResponse([{"timestamp": "2026-08-01T00:00:00+00:00", "shop": {"name": "Steam"}, "deal": {"price": {"amount": 6, "currency": "USD"}}}]),
+    ]
+    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: FakeAsyncClient(responses=responses))
+
+    result = await prices.fetch_game_price_history("Game")
+
+    assert result["current"]["shop"] == "Steam"
+    assert result["history_low_all"] == {"amount": 5, "currency": "USD"}
+    assert len(result["history"]) == 1
+
+
+@pytest.mark.anyio
 async def test_itad_resolves_a_steam_app_with_the_documented_shop_lookup(monkeypatch):
     monkeypatch.setenv("ITAD_API_KEY", "key")
     calls = []
