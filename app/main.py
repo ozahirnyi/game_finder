@@ -13,7 +13,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from sqlalchemy import and_, func, or_
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from fastapi.encoders import jsonable_encoder
@@ -64,7 +64,7 @@ from app.deal_cache import (
 )
 from app.price_region import effective_price_country
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
-from app.database import get_db, User, Game, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, BackgroundJob, engine, wait_for_db
+from app.database import get_db, User, Game, CatalogGameCache, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, BackgroundJob, engine, wait_for_db
 from app.database import SocialBlock, SteamFriendSuppression
 from app import social_policy
 from app.schemas import ConversationReadUpdate
@@ -72,7 +72,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
-    PublicUserRead, PublicUserDirectoryRead, RecentGamePlayerRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
+    PublicUserRead, PublicUserDirectoryRead, RecentGamePlayerRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult, BackgroundJobRead
 from app.recommendation_quota import (
@@ -1527,35 +1527,97 @@ def list_public_users(
     )
 
 
+async def recent_steam_players_for_app(
+    steam_appid: int | None,
+    db: Session,
+    current_user: User,
+    catalog_game_id: int | None = None,
+) -> list[RecentGamePlayerRead]:
+    visible_filters = (
+        User.id != current_user.id,
+        User.public_nickname.is_not(None),
+        User.e2e_fixture_hidden.is_(False),
+        social_policy.visible_user_filter(current_user.id),
+    )
+    game_filters = [Game.source == "steam", Game.playtime_2weeks > 0]
+    if catalog_game_id is not None:
+        game_filters.append(Game.catalog_game_id == catalog_game_id)
+    elif steam_appid is not None:
+        game_filters.append(Game.external_id == str(steam_appid))
+    else:
+        return []
+    rows = (
+        db.query(Game, User)
+        .join(User, Game.owner_id == User.id)
+        .filter(*game_filters, *visible_filters)
+        .all()
+    )
+    playtime_by_user: dict[uuid.UUID, int] = {}
+    users_by_id: dict[uuid.UUID, User] = {}
+    for game, user in rows:
+        if not can_view_section(user, current_user, user.library_visibility, db):
+            continue
+        users_by_id[user.id] = user
+        playtime_by_user[user.id] = max(playtime_by_user.get(user.id, 0), game.playtime_2weeks or 0)
+
+    if steam_appid is not None:
+        steam_users = db.query(User).filter(*visible_filters, User.steam_id.is_not(None)).all()
+        for user in steam_users:
+            if not can_view_section(user, current_user, user.library_visibility, db):
+                continue
+            try:
+                steam_games = await fetch_owned_games(user.steam_id)
+            except HTTPException:
+                continue
+            recent_minutes = next(
+                (
+                    int(game.get("playtime_2weeks") or 0)
+                    for game in steam_games
+                    if int(game.get("appid") or 0) == steam_appid
+                ),
+                0,
+            )
+            if recent_minutes > 0:
+                users_by_id[user.id] = user
+                playtime_by_user[user.id] = max(playtime_by_user.get(user.id, 0), recent_minutes)
+
+    ordered_users = sorted(
+        users_by_id.values(), key=lambda user: (-playtime_by_user[user.id], str(user.id))
+    )[:10]
+    return [
+        RecentGamePlayerRead(
+            **public_user_response(user).model_dump(), playtime_2weeks=playtime_by_user[user.id]
+        )
+        for user in ordered_users
+    ]
+
+
 @app.get("/catalog/games/{catalog_game_id}/active-players", response_model=list[RecentGamePlayerRead])
-def recent_game_players(
+async def recent_game_players(
     catalog_game_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    rows = (
-        db.query(Game, User)
-        .join(User, Game.owner_id == User.id)
-        .filter(
-            Game.catalog_game_id == catalog_game_id,
-            Game.source == "steam",
-            Game.playtime_2weeks > 0,
-            User.id != current_user.id,
-            User.public_nickname.is_not(None),
-            User.e2e_fixture_hidden.is_(False),
-            social_policy.visible_user_filter(current_user.id),
-        )
-        .order_by(Game.playtime_2weeks.desc(), User.id.asc())
-        .all()
+    try:
+        cached = db.get(CatalogGameCache, catalog_game_id)
+    except OperationalError:
+        db.rollback()
+        cached = None
+    return await recent_steam_players_for_app(
+        cached.steam_appid if cached else None,
+        db,
+        current_user,
+        catalog_game_id=catalog_game_id,
     )
-    seen, players = set(), []
-    for game, user in rows:
-        if user.id not in seen:
-            seen.add(user.id)
-            players.append(RecentGamePlayerRead(**public_user_response(user).model_dump(), playtime_2weeks=game.playtime_2weeks))
-        if len(players) == 10:
-            break
-    return players
+
+
+@app.get("/steam/games/{steam_appid}/active-players", response_model=list[RecentGamePlayerRead])
+async def recent_steam_game_players(
+    steam_appid: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await recent_steam_players_for_app(steam_appid, db, current_user)
 
 
 @app.get("/users/{public_id}", response_model=PublicProfileRead)
@@ -2203,7 +2265,7 @@ def get_friend_activity(
 
 
 async def friend_profile_response(
-    db: Session, current_user: User, friend: User
+    db: Session, current_user: User, friend: User, page: int = 1, q: str | None = None
 ) -> FriendProfileRead:
     if can_view_section(friend, current_user, friend.library_visibility, db):
         games = db.query(Game).filter(Game.owner_id == friend.id, Game.source != "steam", or_(Game.link_state.is_(None), Game.link_state != "quarantined")).order_by(func.lower(Game.title)).all()
@@ -2227,19 +2289,31 @@ async def friend_profile_response(
                 ).model_dump(mode="json")
                 for game in steam_games
             )
-        library = PublicDataBlock(
+        if q:
+            normalized_query = q.strip().casefold()
+            library_items = [
+                item for item in library_items if normalized_query in item["title"].casefold()
+            ]
+        total = len(library_items)
+        page_size = 10
+        library = PublicLibraryPageRead(
             status=("partial" if library_items else "error") if steam_error else ("ready" if library_items else "empty"),
-            data=library_items,
+            data=library_items[(page - 1) * page_size : page * page_size],
             message=steam_error or (None if library_items else "No library games have been saved yet."),
+            page=page,
+            page_size=page_size,
+            total=total,
         )
     else:
-        library = hidden_public_block()
+        library = PublicLibraryPageRead(**hidden_public_block().model_dump())
     return FriendProfileRead(user=public_user_response(friend), library=library)
 
 
 @app.get("/users/{public_id}/friend-profile", response_model=FriendProfileRead)
 async def get_friend_profile_by_public_id(
     public_id: str,
+    page: int = Query(default=1, ge=1),
+    q: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
@@ -2252,19 +2326,21 @@ async def get_friend_profile_by_public_id(
         or not are_friends(db, current_user.id, friend.id)
     ):
         raise HTTPException(status_code=404, detail="Friend not found")
-    return await friend_profile_response(db, current_user, friend)
+    return await friend_profile_response(db, current_user, friend, page=page, q=q)
 
 
 @app.get("/friends/{user_id}/profile", response_model=FriendProfileRead)
 async def get_friend_profile(
     user_id: uuid.UUID,
+    page: int = Query(default=1, ge=1),
+    q: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     friend = db.query(User).filter(User.id == user_id).first()
     if friend is None or not social_target_visible(db, current_user, friend) or not are_friends(db, current_user.id, friend.id):
         raise HTTPException(status_code=404, detail="Friend not found")
-    return await friend_profile_response(db, current_user, friend)
+    return await friend_profile_response(db, current_user, friend, page=page, q=q)
 
 
 @app.delete("/friends/{user_id}", status_code=204)

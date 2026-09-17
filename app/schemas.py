@@ -130,6 +130,12 @@ class PublicLibraryGameRead(BaseModel):
     detail_source: Literal["steam"] | None = None
 
 
+class PublicLibraryPageRead(PublicDataBlock):
+    page: int = 1
+    page_size: int = 10
+    total: int = 0
+
+
 class PublicSteamAccountRead(BaseModel):
     linked: bool
     persona_name: str | None = None
@@ -662,7 +668,7 @@ class FriendActivityRead(BaseModel):
 
 class FriendProfileRead(BaseModel):
     user: PublicUserRead
-    library: PublicDataBlock
+    library: PublicLibraryPageRead
 
 
 class ConversationCreate(BaseModel):

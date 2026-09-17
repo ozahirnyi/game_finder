@@ -129,7 +129,7 @@ describe("FriendsPage", () => {
     renderFriends();
 
     fireEvent.click((await screen.findAllByRole("button", { name: "Add friend" }))[0]);
-    fireEvent.change(screen.getByLabelText("Player name"), { target: { value: "Sam" } });
+    fireEvent.change(screen.getByLabelText("Find players"), { target: { value: "Sam" } });
 
     await waitFor(() => expect(api.searchUsers).toHaveBeenCalledWith("Sam"));
     fireEvent.click(await screen.findByRole("button", { name: "Add Sam" }));
@@ -139,12 +139,13 @@ describe("FriendsPage", () => {
     expect(await screen.findByText("Request sent")).toBeInTheDocument();
   });
 
-  it("keeps one player-name lookup and links to the full player directory", async () => {
+  it("keeps one inline player lookup and links to the full player directory", async () => {
     renderFriends();
 
     fireEvent.click((await screen.findAllByRole("button", { name: "Add friend" }))[0]);
 
-    expect(screen.getAllByLabelText("Player name")).toHaveLength(1);
+    expect(screen.getAllByLabelText("Find players")).toHaveLength(1);
+    expect(screen.queryByLabelText("Player name")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Browse all players" })).toHaveAttribute(
       "href",
       "/users",
@@ -158,7 +159,7 @@ describe("FriendsPage", () => {
     renderFriends();
 
     fireEvent.click((await screen.findAllByRole("button", { name: "Add friend" }))[0]);
-    fireEvent.change(screen.getByLabelText("Player name"), { target: { value: "Sam" } });
+    fireEvent.change(screen.getByLabelText("Find players"), { target: { value: "Sam" } });
 
     expect(await screen.findByRole("link", { name: "Sam" })).toHaveAttribute(
       "href",

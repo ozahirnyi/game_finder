@@ -32,6 +32,7 @@ import {
   getFriends,
   getPriceHistory,
   getRecentGamePlayers,
+  getRecentSteamGamePlayers,
   getSimilarCatalogGames,
   getSteamGame,
   getSteamPriceHistory,
@@ -273,9 +274,15 @@ function GameDetail() {
     enabled: !catalogGame.isSteamLibrary,
   });
   const activePlayersQuery = useQuery({
-    queryKey: ["recent-game-players", catalogGame.id],
-    queryFn: () => getRecentGamePlayers(catalogGame.id),
-    enabled: !catalogGame.isSteamLibrary,
+    queryKey: [
+      "recent-game-players",
+      catalogGame.isSteamLibrary ? "steam" : "catalog",
+      catalogGame.id,
+    ],
+    queryFn: () =>
+      catalogGame.isSteamLibrary
+        ? getRecentSteamGamePlayers(catalogGame.id)
+        : getRecentGamePlayers(catalogGame.id),
   });
   const queryClient = useQueryClient();
   const [showAlertForm, setShowAlertForm] = useState(false);
@@ -519,14 +526,31 @@ function GameDetail() {
             </section>
           )}
 
-          {activePlayers.length > 0 && (
-            <section>
-              <SectionHeader
-                title="Recently active players"
-                hint="Played on Steam in the last two weeks"
-              />
-              <Panel className="divide-y divide-border">
-                {activePlayers.map((player) => (
+          <section>
+            <SectionHeader
+              title="Recently active players"
+              hint="Played on Steam in the last two weeks"
+            />
+            <Panel className="divide-y divide-border">
+              {activePlayersQuery.isPending ? (
+                <p className="px-5 py-4 text-sm text-muted-foreground">Loading recent players…</p>
+              ) : activePlayersQuery.isError ? (
+                <div className="px-5 py-4 text-sm text-muted-foreground">
+                  <p>Recent player activity is unavailable.</p>
+                  <button
+                    type="button"
+                    onClick={() => void activePlayersQuery.refetch()}
+                    className="mt-3 rounded-lg border border-border px-3 py-1.5 text-xs font-bold"
+                  >
+                    Retry activity
+                  </button>
+                </div>
+              ) : activePlayers.length === 0 ? (
+                <p className="px-5 py-4 text-sm text-muted-foreground">
+                  No public players have logged time in this game during the last two weeks.
+                </p>
+              ) : (
+                activePlayers.map((player) => (
                   <div
                     key={player.id}
                     className="flex items-center justify-between gap-4 px-5 py-4"
@@ -541,10 +565,10 @@ function GameDetail() {
                       {(player.playtime_2weeks / 60).toFixed(1)} hours in the last two weeks
                     </p>
                   </div>
-                ))}
-              </Panel>
-            </section>
-          )}
+                ))
+              )}
+            </Panel>
+          </section>
 
           <section>
             <SectionHeader title="Price history" hint="Trend across storefronts" />

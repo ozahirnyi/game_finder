@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { UserProfileLink } from "@/components/UserProfileLink";
+import { Avatar } from "@/components/GameCover";
 import { EmptyState, Panel, SectionHeader } from "@/components/ui-bits";
 import { createFriendRequest, getPublicUsers } from "@/lib/api";
 
@@ -62,7 +62,7 @@ function UsersPage() {
           />
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-3">
               {users.data?.items.map((user) => {
                 const wasRequested = requestedUserIds.has(user.id);
                 const isRequesting = request.isPending && request.variables === user.id;
@@ -71,12 +71,30 @@ function UsersPage() {
                     key={user.id}
                     className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4"
                   >
-                    <UserProfileLink
-                      publicId={user.public_id}
-                      className="min-w-0 truncate font-bold hover:text-primary"
+                    <Link
+                      to="/users/$publicId"
+                      params={{ publicId: user.public_id }}
+                      aria-label={`Open ${user.display_name} profile`}
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/60"
                     >
-                      {user.display_name}
-                    </UserProfileLink>
+                      <span aria-label={user.display_name} className="shrink-0">
+                        <Avatar
+                          from="#7c3aed"
+                          to="#111827"
+                          name={user.display_name}
+                          image={user.avatar ?? undefined}
+                          className="size-11 rounded-full"
+                        />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-bold">{user.display_name}</span>
+                        {user.steam_persona_name && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {user.steam_persona_name}
+                          </span>
+                        )}
+                      </span>
+                    </Link>
                     <button
                       type="button"
                       onClick={() => request.mutate(user.id)}

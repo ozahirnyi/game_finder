@@ -1,5 +1,6 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView, type ProfileData } from "@/components/ProfileView";
 import { ErrorState, Skeleton } from "@/components/ui-bits";
@@ -26,14 +27,16 @@ export const Route = createFileRoute("/users/$publicId")({
 function PublicProfilePage() {
   const { publicId } = Route.useParams();
   const { compose } = Route.useSearch();
+  const [libraryPage, setLibraryPage] = useState(1);
+  const [librarySearch, setLibrarySearch] = useState("");
   const publicQuery = useQuery({
     queryKey: ["public-profile", publicId],
     queryFn: () => getPublicProfile(publicId),
   });
   const publicProfile = publicQuery.data;
   const friendQuery = useQuery({
-    queryKey: ["friend-profile", publicId],
-    queryFn: () => getFriendProfileByPublicId(publicId),
+    queryKey: ["friend-profile", publicId, libraryPage, librarySearch],
+    queryFn: () => getFriendProfileByPublicId(publicId, libraryPage, librarySearch),
     enabled: publicProfile?.relationship === "friends",
   });
   const sharedQuery = useQuery({
@@ -93,6 +96,19 @@ function PublicProfilePage() {
     region: "Global",
     hours: profileLibraryHours(library.data),
     libraryMessage: library.message ?? undefined,
+    libraryPagination: friendQuery.data
+      ? {
+          page: friendQuery.data.library.page,
+          pageSize: friendQuery.data.library.page_size,
+          total: friendQuery.data.library.total,
+          query: librarySearch,
+          onQueryChange: (query) => {
+            setLibrarySearch(query);
+            setLibraryPage(1);
+          },
+          onPageChange: setLibraryPage,
+        }
+      : undefined,
     games,
     friendId: friend?.id,
     userId: friend?.id ?? publicProfile.user_id,
