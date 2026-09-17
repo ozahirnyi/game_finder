@@ -353,7 +353,7 @@ git commit -m "fix: reflect friendship state in user directory"
 **Files:**
 - Verify: all files changed above
 
-- [ ] **Step 1: Run backend and frontend quality gates**
+- [x] **Step 1: Run backend and frontend quality gates**
 
 Run: `rtk pytest -q`
 
@@ -367,7 +367,7 @@ Run: `rtk npm run build`
 
 Expected: successful production build.
 
-- [ ] **Step 2: Inspect only task-owned changes and request code review**
+- [x] **Step 2: Inspect only task-owned changes and request code review**
 
 Run: `rtk diff --stat origin/main...HEAD`
 
@@ -375,7 +375,7 @@ Expected: only profile, price, activity, directory, and their tests/docs.
 
 Review edge cases: hidden libraries never leak totals; free-with-history renders history; an existing friend cannot send a request; profile paging does not remount the shell; all API errors are user-safe.
 
-- [ ] **Step 3: Push branch and create PR**
+- [x] **Step 3: Push branch and create PR**
 
 ```text
 git push -u origin codex/profile-price-reliability
