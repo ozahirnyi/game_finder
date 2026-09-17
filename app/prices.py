@@ -256,16 +256,33 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
         )
         raise HTTPException(status_code=502, detail="Price history request failed")
 
-    price_items = prices.json()
-    if not isinstance(price_items, list) or not price_items or not isinstance(price_items[0], dict):
+    price_payload = prices.json()
+    if isinstance(price_payload, list):
+        price_items = price_payload
+        item = price_items[0] if price_items and isinstance(price_items[0], dict) else None
+        history_low = item.get("historyLow") if isinstance(item, dict) else None
+        deal_values = item.get("deals") if isinstance(item, dict) and isinstance(item.get("deals"), list) else []
+    elif isinstance(price_payload, dict):
+        price_items = price_payload.get("prices")
+        item = next(
+            (value for value in price_items if isinstance(value, dict) and value.get("id") == game_id),
+            None,
+        ) if isinstance(price_items, list) else None
+        history_low = item.get("lowest") if isinstance(item, dict) else None
+        current_deal = item.get("current") if isinstance(item, dict) else None
+        deal_values = [current_deal] if isinstance(current_deal, dict) else []
+    else:
+        item = None
+        history_low = None
+        deal_values = []
+
+    if item is None:
         raise HTTPException(status_code=404, detail="Price data not found for this game")
 
-    item = price_items[0]
-    history_low = item.get("historyLow") or {}
+    history_low = history_low if isinstance(history_low, dict) else {}
     history_data = history.json()
     raw_history_count = len(history_data) if isinstance(history_data, list) else len(history_data.get("history", [])) if isinstance(history_data, dict) and isinstance(history_data.get("history"), list) else 0
     history_points = _itad_history_points(history_data)
-    deal_values = item.get("deals") if isinstance(item.get("deals"), list) else []
     current, normalized_history = normalize_price_history(deal_values, history_points)
     logger.info(
         "ITAD price history normalized game_id=%s country=%s since=%s raw_count=%d normalized_count=%d",
@@ -282,7 +299,7 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
         "title": game_title,
         "url": game_url or f"https://isthereanydeal.com/game/id:{game_id}/",
         "current": current,
-        "history_low_all": _money(history_low.get("all")),
+        "history_low_all": _money(history_low.get("all")) or _money(history_low.get("price")),
         "history_low_1y": _money(history_low.get("y1")),
         "history_low_3m": _money(history_low.get("m3")),
         "deals": [deal for deal in deals if deal is not None],
