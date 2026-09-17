@@ -120,7 +120,7 @@ async def test_igdb_detail_upcoming_and_trending_happy_paths(monkeypatch):
 async def test_itad_price_history_normalizes_deals(monkeypatch):
     monkeypatch.setenv("ITAD_API_KEY", "key")
     responses = [
-        FakeResponse({"found": True, "game": {"id": "g1", "title": "Game", "urls": {"game": "url"}}}),
+        FakeResponse({"Game": "g1"}),
         FakeResponse([{"historyLow": {"all": {"amount": 5, "currency": "USD"}}, "deals": [{"shop": {"name": "Store"}, "price": {"amount": 6, "currency": "USD"}}]}]),
         FakeResponse([{"timestamp": "2026-08-01T00:00:00+00:00", "shop": {"name": "Store"}, "deal": {"price": {"amount": 6, "currency": "USD"}}}]),
     ]
@@ -133,10 +133,40 @@ async def test_itad_price_history_normalizes_deals(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_itad_resolves_a_steam_app_with_the_documented_shop_lookup(monkeypatch):
+    monkeypatch.setenv("ITAD_API_KEY", "key")
+    calls = []
+
+    class RecordingClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, **kwargs):
+            calls.append(("POST", url, kwargs))
+            if "lookup/id/shop" in url:
+                return FakeResponse({"app/570": "itad-dota"})
+            return FakeResponse([{"historyLow": {}, "deals": []}])
+
+        async def get(self, url, **kwargs):
+            calls.append(("GET", url, kwargs))
+            return FakeResponse([])
+
+    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: RecordingClient())
+
+    result = await prices.fetch_game_price_history("Dota 2", steam_appid=570)
+
+    assert result["itad_id"] == "itad-dota"
+    assert ("POST", f"{prices.ITAD_BASE_URL}/lookup/id/shop/61/v1", {"json": ["app/570"]}) in calls
+
+
+@pytest.mark.anyio
 async def test_itad_price_history_retains_documented_history_wrapper(monkeypatch):
     monkeypatch.setenv("ITAD_API_KEY", "key")
     responses = [
-        FakeResponse({"found": True, "game": {"id": "g1", "title": "Game", "urls": {"game": "url"}}}),
+        FakeResponse({"Game": "g1"}),
         FakeResponse([{"historyLow": {}, "deals": []}]),
         FakeResponse({"history": [{"timestamp": "2026-06-25T12:00:00+00:00", "shop": {"name": "Store"}, "deal": {"price": {"amount": 6, "currency": "USD"}}}]}),
     ]
@@ -151,7 +181,7 @@ async def test_itad_price_history_retains_documented_history_wrapper(monkeypatch
 async def test_itad_price_history_logs_raw_source_count_before_retention(monkeypatch, caplog):
     monkeypatch.setenv("ITAD_API_KEY", "key")
     responses = [
-        FakeResponse({"found": True, "game": {"id": "g1", "title": "Game", "urls": {"game": "url"}}}),
+        FakeResponse({"Game": "g1"}),
         FakeResponse([{"historyLow": {}, "deals": []}]),
         FakeResponse([
             {"timestamp": "2026-08-01T00:00:00+00:00", "shop": {"name": "Store"}, "deal": {"price": {"amount": 6, "currency": "USD"}}},

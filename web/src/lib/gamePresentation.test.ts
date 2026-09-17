@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatCatalogRating,
   formatCatalogReleaseDate,
+  hasRenderablePriceHistory,
   presentPriceHistory,
 } from "./gamePresentation";
 import { hasCatalogId } from "./catalogMatch";
@@ -37,6 +38,15 @@ describe("catalog metadata presentation", () => {
 });
 
 describe("price history presentation", () => {
+  it("shows the price-history section only when there are historical points", () => {
+    expect(hasRenderablePriceHistory([])).toBe(false);
+    expect(
+      hasRenderablePriceHistory([
+        { timestamp: "2025-09-25T00:00:00+00:00", price: { amount: 0, currency: "USD" } },
+      ]),
+    ).toBe(true);
+  });
+
   it("keeps valid chronological points and supplies concise endpoint labels", () => {
     expect(
       presentPriceHistory([

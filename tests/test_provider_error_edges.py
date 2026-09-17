@@ -146,7 +146,7 @@ def test_itad_error_message_variations(payload, expected):
 @pytest.mark.parametrize("status,expected", [(401, 502), (429, 429), (500, 502)])
 async def test_itad_price_history_status_errors(monkeypatch, status, expected):
     monkeypatch.setenv("ITAD_API_KEY", "key")
-    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: AsyncClient(get_result=Response({"detail": "bad"}, status)))
+    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: AsyncClient(post_result=Response({"detail": "bad"}, status)))
     with pytest.raises(HTTPException) as exc:
         await prices.fetch_game_price_history("Game")
     assert exc.value.status_code == expected
@@ -155,12 +155,19 @@ async def test_itad_price_history_status_errors(monkeypatch, status, expected):
 @pytest.mark.anyio
 async def test_itad_empty_lookup_prices_and_transport_error(monkeypatch):
     monkeypatch.setenv("ITAD_API_KEY", "key")
-    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: AsyncClient(get_result=Response({"found": False})))
+    monkeypatch.setattr(
+        prices.httpx,
+        "AsyncClient",
+        lambda *a, **k: AsyncClient(get_result=Response([]), post_result=Response({})),
+    )
     with pytest.raises(HTTPException) as exc:
         await prices.fetch_game_price_history("Game")
     assert exc.value.status_code == 404
-    responses = [Response({"found": True, "game": {"id": "g"}}), Response([])]
-    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *a, **k: AsyncClient(get_result=responses[0], post_result=responses[1]))
+    monkeypatch.setattr(
+        prices.httpx,
+        "AsyncClient",
+        lambda *a, **k: AsyncClient(get_result=Response([]), post_result=Response({"Game": "g"})),
+    )
     with pytest.raises(HTTPException) as exc:
         await prices.fetch_game_price_history("Game")
     assert exc.value.status_code == 404

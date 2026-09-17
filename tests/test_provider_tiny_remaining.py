@@ -84,10 +84,12 @@ async def test_itad_success_uses_title_and_url_fallback_and_country(monkeypatch)
     class Client(FakeAsyncClient):
         async def get(self, url, **kwargs):
             calls.append(("get", url, kwargs))
-            return FakeResponse({"found": True, "game": {"id": "g1"}})
+            return FakeResponse([])
 
         async def post(self, url, **kwargs):
             calls.append(("post", url, kwargs))
+            if "lookup/id/title" in url:
+                return FakeResponse({"Fallback title": "g1"})
             return FakeResponse([{"deals": [], "historyLow": {}}])
 
     monkeypatch.setattr(prices.httpx, "AsyncClient", Client)
