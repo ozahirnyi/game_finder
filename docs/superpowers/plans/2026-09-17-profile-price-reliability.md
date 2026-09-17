@@ -48,7 +48,7 @@
 - Produces `PublicUserRead(..., relationship: Literal["none", "friends", "outgoing_pending", "incoming_pending"])` for directory rows only.
 - Produces `build_visible_library_snapshot(db, viewer, owner) -> PublicLibrarySnapshot` and `page_visible_library(snapshot, page, q) -> PublicLibraryPageRead`.
 
-- [ ] **Step 1: Write failing backend contracts for a 13-game friend library, a filtered page, and complete summary**
+- [x] **Step 1: Write failing backend contracts for a 13-game friend library, a filtered page, and complete summary**
 
 ```python
 response = client.get(f"/users/{friend.public_id}/friend-profile", params={"page": 1})
@@ -64,13 +64,13 @@ assert [item["title"] for item in filtered.json()["library"]["data"]] == ["Dota 
 assert filtered.json()["library"]["summary"]["total_games"] == 13
 ```
 
-- [ ] **Step 2: Run the focused contract test and confirm it fails because the page size/summary are absent**
+- [x] **Step 2: Run the focused contract test and confirm it fails because the page size/summary are absent**
 
 Run: `rtk pytest -q tests/test_social_api.py -k library`
 
 Expected: FAIL on `page_size == 12` or missing `summary`.
 
-- [ ] **Step 3: Add Pydantic response types and snapshot helpers**
+- [x] **Step 3: Add Pydantic response types and snapshot helpers**
 
 ```python
 class PublicLibrarySummaryRead(BaseModel):
@@ -87,11 +87,11 @@ class PublicLibraryPageRead(PublicDataBlock):
 
 Build the snapshot once per `(viewer.id, owner.id)` cache key with the same `can_view_section` checks already used by `friend_profile_response`.  It must contain normalized non-Steam and Steam game rows plus aggregates calculated before search/slicing.  `page_visible_library` casefolds `q`, slices with `PAGE_SIZE = 12`, and returns a hidden block unchanged when the library is not visible.
 
-- [ ] **Step 4: Route both friend-profile endpoints through the shared paged library builder**
+- [x] **Step 4: Route both friend-profile endpoints through the shared paged library builder**
 
 Replace the in-function list construction in `friend_profile_response` with `page_visible_library`.  Cache only successful Steam data for a short bounded TTL; retain the existing partial/error message if Steam fails.  Do not call `fetch_owned_games` again for each page or query within that TTL.
 
-- [ ] **Step 5: Add directory relationship tests, then implement the relationship field**
+- [x] **Step 5: Add directory relationship tests, then implement the relationship field**
 
 ```python
 directory = client.get("/users?page=1").json()["items"]
@@ -103,13 +103,13 @@ assert by_id[stranger_id]["relationship"] == "none"
 
 Use the existing friendship/request queries or social-policy helpers, in a bounded batch lookup for the page of users, rather than one relationship query per row.  Do not change the `PublicUserRead` representation used in old endpoints unless all responses can safely populate the new default; alternatively introduce `PublicUserDirectoryItemRead` and use it only for `/users`.
 
-- [ ] **Step 6: Run focused backend tests**
+- [x] **Step 6: Run focused backend tests**
 
 Run: `rtk pytest -q tests/test_social_api.py tests/integration/backend/test_legacy_social_api.py`
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the independently testable contract change**
+- [x] **Step 7: Commit the independently testable contract change**
 
 ```text
 git add app/schemas.py app/main.py tests/test_social_api.py tests/integration/backend/test_legacy_social_api.py

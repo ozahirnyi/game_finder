@@ -130,10 +130,17 @@ class PublicLibraryGameRead(BaseModel):
     detail_source: Literal["steam"] | None = None
 
 
+class PublicLibrarySummaryRead(BaseModel):
+    total_games: int = 0
+    total_playtime: int = 0
+    platform_counts: dict[str, int] = Field(default_factory=dict)
+
+
 class PublicLibraryPageRead(PublicDataBlock):
     page: int = 1
-    page_size: int = 10
+    page_size: int = 12
     total: int = 0
+    summary: PublicLibrarySummaryRead | None = None
 
 
 class PublicSteamAccountRead(BaseModel):
@@ -612,8 +619,12 @@ class PublicUserRead(BaseModel):
     avatar: str | None = None
 
 
+class PublicUserDirectoryItemRead(PublicUserRead):
+    relationship: Literal["none", "friends", "outgoing_pending", "incoming_pending"] = "none"
+
+
 class PublicUserDirectoryRead(BaseModel):
-    items: list[PublicUserRead] = Field(default_factory=list)
+    items: list[PublicUserDirectoryItemRead] = Field(default_factory=list)
     page: int
     page_size: int
     total: int
