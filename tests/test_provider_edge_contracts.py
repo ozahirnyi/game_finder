@@ -21,7 +21,11 @@ class _ItadClient:
         self.calls = []
 
     async def get(self, url, *, params):
-        self.calls.append((url, params))
+        self.calls.append(("GET", url, params))
+        return _ItadResponse(next(self.responses))
+
+    async def post(self, url, **kwargs):
+        self.calls.append(("POST", url, kwargs))
         return _ItadResponse(next(self.responses))
 
 
@@ -30,15 +34,15 @@ async def test_itad_game_id_resolution_prefers_steam_app_mapping():
     from app.prices import ITAD_BASE_URL, resolve_itad_game_id
 
     client = _ItadClient([
-        {"found": True, "game": {"id": "itad-id", "title": "Grand Theft Auto V Enhanced"}},
+        {"app/3240220": "itad-id"},
     ])
 
     assert await resolve_itad_game_id(client, "Grand Theft Auto V", 3240220) == (
         "itad-id",
-        "Grand Theft Auto V Enhanced",
+        "Grand Theft Auto V",
     )
     assert client.calls == [
-        (f"{ITAD_BASE_URL}/games/lookup/v1", {"appid": 3240220}),
+        ("POST", f"{ITAD_BASE_URL}/lookup/id/shop/61/v1", {"json": ["app/3240220"]}),
     ]
 
 
@@ -47,7 +51,7 @@ async def test_itad_game_id_resolution_uses_title_lookup_first_without_steam_app
     from app.prices import ITAD_BASE_URL, resolve_itad_game_id
 
     client = _ItadClient([
-        {"found": True, "game": {"id": "itad-id", "title": "Grand Theft Auto V"}},
+        {"Grand Theft Auto V": "itad-id"},
     ])
 
     assert await resolve_itad_game_id(client, "Grand Theft Auto V", None) == (
@@ -55,7 +59,7 @@ async def test_itad_game_id_resolution_uses_title_lookup_first_without_steam_app
         "Grand Theft Auto V",
     )
     assert client.calls == [
-        (f"{ITAD_BASE_URL}/games/lookup/v1", {"title": "Grand Theft Auto V"}),
+        ("POST", f"{ITAD_BASE_URL}/lookup/id/title/v1", {"json": ["Grand Theft Auto V"]}),
     ]
 
 
@@ -64,8 +68,8 @@ async def test_itad_game_id_resolution_falls_back_to_casefold_exact_search():
     from app.prices import ITAD_BASE_URL, resolve_itad_game_id
 
     client = _ItadClient([
-        {"found": False},
-        {"found": False},
+        {},
+        {},
         [
             {"id": "wrong-id", "title": "Grand Theft Auto V Enhanced", "type": "game"},
             {"id": "wrong-type", "title": "Grand Theft Auto V", "type": "dlc"},
@@ -78,9 +82,9 @@ async def test_itad_game_id_resolution_falls_back_to_casefold_exact_search():
         "Grand Theft Auto V",
     )
     assert client.calls == [
-        (f"{ITAD_BASE_URL}/games/lookup/v1", {"appid": 3240220}),
-        (f"{ITAD_BASE_URL}/games/lookup/v1", {"title": "Grand Theft Auto V"}),
-        (f"{ITAD_BASE_URL}/games/search/v1", {"title": "Grand Theft Auto V"}),
+        ("POST", f"{ITAD_BASE_URL}/lookup/id/shop/61/v1", {"json": ["app/3240220"]}),
+        ("POST", f"{ITAD_BASE_URL}/lookup/id/title/v1", {"json": ["Grand Theft Auto V"]}),
+        ("GET", f"{ITAD_BASE_URL}/games/search/v1", {"title": "Grand Theft Auto V"}),
     ]
 
 
@@ -89,8 +93,8 @@ async def test_itad_game_id_resolution_rejects_fuzzy_search_results():
     from app.prices import resolve_itad_game_id
 
     client = _ItadClient([
-        {"found": False},
-        {"found": False},
+        {},
+        {},
         [{"id": "wrong-id", "title": "Grand Theft Auto V Enhanced", "type": "game"}],
     ])
 
@@ -101,7 +105,7 @@ async def test_itad_game_id_resolution_rejects_fuzzy_search_results():
 
 
 @pytest.mark.anyio
-async def test_itad_price_history_preserves_provider_game_url(monkeypatch):
+async def test_itad_price_history_uses_a_stable_itad_game_url(monkeypatch):
     from app import prices
 
     class Client:
@@ -112,18 +116,11 @@ async def test_itad_price_history_preserves_provider_game_url(monkeypatch):
             return None
 
         async def get(self, _url, *, params):
-            if "appid" in params:
-                return _ItadResponse({
-                    "found": True,
-                    "game": {
-                        "id": "itad-id",
-                        "title": "Grand Theft Auto V Enhanced",
-                        "urls": {"game": "https://itad.example/gta-v-enhanced"},
-                    },
-                })
             return _ItadResponse([])
 
-        async def post(self, _url, **_kwargs):
+        async def post(self, url, **_kwargs):
+            if "lookup/id/shop" in url:
+                return _ItadResponse({"app/3240220": "itad-id"})
             return _ItadResponse([{"deals": [], "historyLow": {}}])
 
     monkeypatch.setenv("ITAD_API_KEY", "key")
@@ -133,7 +130,7 @@ async def test_itad_price_history_preserves_provider_game_url(monkeypatch):
         "Grand Theft Auto V", steam_appid=3240220
     )
 
-    assert result["url"] == "https://itad.example/gta-v-enhanced"
+    assert result["url"] == "https://isthereanydeal.com/game/id:itad-id/"
 
 
 def test_price_helpers_keep_invalid_amounts_and_provider_errors_safe(monkeypatch):
