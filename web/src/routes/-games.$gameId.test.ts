@@ -74,6 +74,7 @@ describe("Steam library game loader", () => {
       releaseDate: "2011-04-18",
       rating: 91.2,
       price: 9.99,
+      steamAppId: 620,
     });
   });
 
@@ -86,6 +87,7 @@ describe("Steam library game loader", () => {
       platforms: ["PC"],
       released: "17 Sep, 2020",
       rating: 93,
+      steamAppId: 1145360,
       current: {
         shop: "Steam",
         price: { amount: 25, currency: "USD" },
