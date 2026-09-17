@@ -144,6 +144,23 @@ describe("game detail presentation", () => {
     await waitFor(() => expect(api.getPriceHistory).toHaveBeenCalledTimes(callsBeforeRetry + 1));
   });
 
+  it("hides price history for free games", async () => {
+    api.getPriceHistory.mockResolvedValue({ is_free: true, current: undefined, history: [] });
+    renderDetail();
+
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Price history" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("shows unavailable price history with retry for paid games without points", async () => {
+    api.getPriceHistory.mockResolvedValue({ is_free: false, current: undefined, history: [] });
+    renderDetail();
+
+    expect(await screen.findByText("Price history is temporarily unavailable.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry price history" })).toBeInTheDocument();
+  });
+
   it("keeps the historical chart visible when the current price is unavailable", async () => {
     api.getPriceHistory.mockResolvedValue({
       current: undefined,

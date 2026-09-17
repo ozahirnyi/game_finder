@@ -12,6 +12,7 @@ import {
   formatCatalogReleaseDate,
   hasRenderablePriceHistory,
   presentPriceHistory,
+  shouldRenderPriceHistory,
 } from "@/lib/gamePresentation";
 import { summarizePlatforms } from "@/lib/platformPresentation";
 import {
@@ -403,7 +404,8 @@ function GameDetail() {
     ...(rating === "Not rated yet" ? [] : [`${rating} critic score`]),
   ];
   const priceHistory = presentPriceHistory(priceQuery.data?.history ?? [], current?.price);
-  const showPriceHistory = hasRenderablePriceHistory(priceQuery.data?.history ?? []);
+  const showPriceHistory = shouldRenderPriceHistory(priceQuery.data?.is_free === true);
+  const hasPriceHistoryPoints = hasRenderablePriceHistory(priceQuery.data?.history ?? []);
   const similar = (similarQuery.data?.results ?? [])
     .filter((candidate) => candidate.id != null && String(candidate.id) !== catalogGame.id)
     .slice(0, 4);
@@ -578,7 +580,7 @@ function GameDetail() {
             </Panel>
           </section>
 
-          {(priceQuery.isPending || priceQuery.isError || showPriceHistory) && (
+          {showPriceHistory && (
             <section>
               <SectionHeader title="Price history" hint="Trend across storefronts" />
               <div className="rounded-2xl border border-border bg-surface p-6">
@@ -595,37 +597,24 @@ function GameDetail() {
                       Retry price history
                     </button>
                   </div>
-                ) : (
-                  <>
-                    {priceUnavailable ? (
-                      <div className="mb-4">
-                        <EmptyState
-                          title="Price unavailable"
-                          description="We have no current price for this title in your region."
-                        />
-                      </div>
-                    ) : (
-                      <div className="mb-4">
-                        <PriceBlock
-                          price={game.price}
-                          originalPrice={game.originalPrice}
-                          discount={game.discount}
-                          currency={game.currency}
-                          store={game.store}
-                          size="lg"
-                          align="left"
-                        />
-                      </div>
-                    )}
-                    {showPriceHistory && (
+                ) : hasPriceHistoryPoints ? (
                       <PriceHistoryChart
                         points={priceHistory.points}
                         currency={game.currency}
                         currentPrice={game.price}
                         historyAvailable={priceQuery.data?.history_available}
                       />
-                    )}
-                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    <p>Price history is temporarily unavailable.</p>
+                    <button
+                      type="button"
+                      onClick={() => void priceQuery.refetch()}
+                      className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
+                    >
+                      Retry price history
+                    </button>
+                  </div>
                 )}
               </div>
             </section>

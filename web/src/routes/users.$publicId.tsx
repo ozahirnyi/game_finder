@@ -12,7 +12,7 @@ import {
   getPublicProfile,
   getSharedGames,
 } from "@/lib/api";
-import { formatPlaytime, profileLibraryGames, profileLibraryHours } from "@/lib/profileLibrary";
+import { formatWholeHours, profileLibraryGames, profileLibraryHours } from "@/lib/profileLibrary";
 import { friendDisplayName } from "@/lib/friendIdentity";
 
 export const Route = createFileRoute("/users/$publicId")({
@@ -97,7 +97,7 @@ function PublicProfilePage() {
     bio: friend?.bio ?? undefined,
     region: "Global",
     hours: friendQuery.data?.library.summary
-      ? formatPlaytime(friendQuery.data.library.summary.total_playtime)
+      ? formatWholeHours(friendQuery.data.library.summary.total_playtime)
       : profileLibraryHours(library.data),
     libraryMessage: friendQuery.isError
       ? "Could not load this library. Please retry."

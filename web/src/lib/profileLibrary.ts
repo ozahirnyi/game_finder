@@ -7,13 +7,17 @@ export function formatPlaytime(minutes: number) {
   return hours ? `${hours}h${total % 60 ? ` ${total % 60}m` : ""}` : `${total}m`;
 }
 
+export function formatWholeHours(minutes: number) {
+  return `${Math.floor(Math.max(0, minutes) / 60)}h`;
+}
+
 export function profileLibraryHours(games: { playtime_forever?: number | null }[]) {
   const known = games.filter(
     (game) => game.playtime_forever != null && Number.isFinite(game.playtime_forever),
   );
   if (!known.length) return "—";
   return (
-    formatPlaytime(known.reduce((total, game) => total + Math.max(0, game.playtime_forever!), 0)) +
+    formatWholeHours(known.reduce((total, game) => total + Math.max(0, game.playtime_forever!), 0)) +
     (known.length < games.length ? " (known)" : "")
   );
 }

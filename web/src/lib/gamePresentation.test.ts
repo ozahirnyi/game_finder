@@ -5,6 +5,7 @@ import {
   formatCatalogReleaseDate,
   hasRenderablePriceHistory,
   presentPriceHistory,
+  shouldRenderPriceHistory,
 } from "./gamePresentation";
 import { hasCatalogId } from "./catalogMatch";
 
@@ -38,6 +39,11 @@ describe("catalog metadata presentation", () => {
 });
 
 describe("price history presentation", () => {
+  it("hides price history only for free games", () => {
+    expect(shouldRenderPriceHistory(true)).toBe(false);
+    expect(shouldRenderPriceHistory(false)).toBe(true);
+  });
+
   it("shows the price-history section only when there are historical points", () => {
     expect(hasRenderablePriceHistory([])).toBe(false);
     expect(
