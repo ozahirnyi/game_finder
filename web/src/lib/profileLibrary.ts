@@ -17,8 +17,9 @@ export function profileLibraryHours(games: { playtime_forever?: number | null }[
   );
   if (!known.length) return "—";
   return (
-    formatWholeHours(known.reduce((total, game) => total + Math.max(0, game.playtime_forever!), 0)) +
-    (known.length < games.length ? " (known)" : "")
+    formatWholeHours(
+      known.reduce((total, game) => total + Math.max(0, game.playtime_forever!), 0),
+    ) + (known.length < games.length ? " (known)" : "")
   );
 }
 

@@ -157,7 +157,9 @@ describe("game detail presentation", () => {
     api.getPriceHistory.mockResolvedValue({ is_free: false, current: undefined, history: [] });
     renderDetail();
 
-    expect(await screen.findByText("Price history is temporarily unavailable.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Price history is temporarily unavailable."),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry price history" })).toBeInTheDocument();
   });
 
@@ -224,7 +226,7 @@ describe("game detail presentation", () => {
       "href",
       "/users/sam-public",
     );
-    expect(screen.getByText("2.1 hours in the last two weeks")).toBeInTheDocument();
+    expect(screen.getByText("2.1 h")).toBeInTheDocument();
     expect(api.getRecentGamePlayers).toHaveBeenCalledWith("274755");
   });
 
@@ -235,9 +237,7 @@ describe("game detail presentation", () => {
       await screen.findByRole("heading", { name: "Recently active players" }),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText(
-        "No public players have logged time in this game during the last two weeks.",
-      ),
+      await screen.findByText("No public players logged time in the last two weeks."),
     ).toBeInTheDocument();
   });
 });
