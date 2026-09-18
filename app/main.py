@@ -3942,14 +3942,27 @@ async def trending_games(request: Request, page: int = 1, page_size: int = 8):
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
+def _steam_only_price_history(history: dict) -> list[dict]:
+    points = history.get("history") if isinstance(history, dict) else []
+    if not isinstance(points, list):
+        return []
+    return [
+        point
+        for point in points
+        if isinstance(point, dict)
+        and str(point.get("shop") or "").strip().casefold() == "steam"
+    ]
+
+
 def _merge_platform_price_history(platform_price: dict, history: dict) -> dict:
-    """Enrich canonical platform pricing with ITAD history only."""
+    """Keep Steam pricing authoritative and use ITAD only for Steam history."""
     return {
         **platform_price,
-        "history_low_all": history.get("history_low_all"),
-        "history_low_1y": history.get("history_low_1y"),
-        "history_low_3m": history.get("history_low_3m"),
-        "history": history.get("history") or [],
+        "history_low_all": None,
+        "history_low_1y": None,
+        "history_low_3m": None,
+        "deals": [],
+        "history": _steam_only_price_history(history),
     }
 
 
@@ -3997,7 +4010,20 @@ async def game_price_history(
                 )
             except HTTPException:
                 history = await fetch_game_price_history(title, country=normalized_country)
-                return {**_strip_itad_reseller_urls(history), "history_available": True}
+                return {
+                    "itad_id": str(history.get("itad_id") or f"catalog:{igdb_id}"),
+                    "title": title,
+                    "history_available": True,
+                    "is_free": False,
+                    "provider_message": "Steam price is temporarily unavailable.",
+                    "url": None,
+                    "current": None,
+                    "history_low_all": None,
+                    "history_low_1y": None,
+                    "history_low_3m": None,
+                    "deals": [],
+                    "history": _steam_only_price_history(history),
+                }
 
             try:
                 history = await fetch_game_price_history(title, country=normalized_country)
