@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.database import Game, PriceAlert, SessionLocal, User, WishlistItem
 from app.notifications import create_notification, price_alert_payload
-from app.prices import fetch_game_price_history
+from app.price_region import normalize_price_country
+from app.steam_store import fetch_steam_store_game_detail, fetch_steam_store_game_price
 from app.telegram import send_telegram_message
 
 
@@ -50,6 +51,28 @@ def build_price_alert_key(deal: dict[str, Any]) -> str | None:
     return f"{shop}|{amount}|{currency}|{cut}|{url}"
 
 
+def price_alert_country(user: User) -> str:
+    return normalize_price_country(getattr(user, "price_country_code", None))
+
+
+def wishlist_steam_appid(item: WishlistItem) -> int | None:
+    if getattr(item, "source", None) != "steam":
+        return None
+    try:
+        appid = int(getattr(item, "external_id", ""))
+    except (TypeError, ValueError):
+        return None
+    return appid if appid > 0 else None
+
+
+async def fetch_steam_alert_price(
+    title: str, country: str, steam_appid: int | None = None
+) -> dict[str, Any]:
+    if steam_appid is not None:
+        return await fetch_steam_store_game_detail(steam_appid, country=country)
+    return await fetch_steam_store_game_price(title, country=country, exact_title_only=True)
+
+
 def format_price_alert_message(game_title: str, price_data: dict[str, Any]) -> str | None:
     deal = price_data.get("current")
     if not deal:
@@ -66,18 +89,12 @@ def format_price_alert_message(game_title: str, price_data: dict[str, Any]) -> s
     regular_amount = regular.get("amount")
     shop = deal.get("shop") or "a store"
     deal_url = deal.get("url") or price_data.get("url")
-    history_low = price_data.get("history_low_all") or {}
-    history_amount = history_low.get("amount")
-    history_currency = history_low.get("currency")
-
     lines = [
         f"{game_title} is on sale.",
         f"Now: {amount} {currency} at {shop} ({cut}% off).",
     ]
     if regular_amount is not None:
         lines.append(f"Regular: {regular_amount} {currency}.")
-    if history_amount is not None and history_currency:
-        lines.append(f"Historical low: {history_amount} {history_currency}.")
     if deal_url:
         lines.append(deal_url)
     return "\n".join(lines)
@@ -106,11 +123,11 @@ async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult)
         user = db.query(User).filter(User.id == alert.user_id).first()
         if not item or not user:
             continue
-        country = (user.steam_country_code or "US").strip().upper()
-        if len(country) != 2:
-            country = "US"
+        country = price_alert_country(user)
         try:
-            price_data = await fetch_game_price_history(item.title, country=country)
+            price_data = await fetch_steam_alert_price(
+                item.title, country=country, steam_appid=wishlist_steam_appid(item)
+            )
             deal = price_data.get("current")
             alert_key = build_price_alert_key(deal) if deal else None
             if not deal or not alert_key or not alert_matches(alert, deal) or alert.last_notification_key == alert_key:
@@ -139,16 +156,14 @@ async def check_price_alerts(db: Session) -> PriceAlertRunResult:
     result.users_checked = len(users)
 
     for user in users:
-        country = (user.steam_country_code or "US").strip().upper()
-        if len(country) != 2:
-            country = "US"
+        country = price_alert_country(user)
 
         games = db.query(Game).filter(Game.owner_id == user.id, Game.source == "manual").all()
         for game in games:
             result.games_checked += 1
             game.price_alert_checked_at = datetime.now(timezone.utc)
             try:
-                price_data = await fetch_game_price_history(game.title, country=country)
+                price_data = await fetch_steam_alert_price(game.title, country=country)
                 deal = price_data.get("current")
                 message = format_price_alert_message(game.title, price_data)
                 alert_key = build_price_alert_key(deal) if deal else None
