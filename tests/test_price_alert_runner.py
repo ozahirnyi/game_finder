@@ -102,14 +102,14 @@ def test_format_message_supports_fallbacks_and_optional_lines(monkeypatch):
     assert message == "Game is on sale.\nNow: 9.99 USD at a store (60% off).\nhttps://fallback"
 
 
-def test_format_message_includes_regular_and_history_low(monkeypatch):
+def test_format_message_includes_regular_without_itad_history_low(monkeypatch):
     monkeypatch.setenv("PRICE_ALERT_MIN_CUT", "1")
     message = runner.format_price_alert_message(
         "Game",
         {"current": deal(), "history_low_all": {"amount": 5, "currency": "EUR"}},
     )
     assert "Regular: 24.99 USD." in message
-    assert "Historical low: 5 EUR." in message
+    assert "Historical low" not in message
 
 
 def test_check_price_alerts_no_users_and_no_games(monkeypatch):
@@ -126,7 +126,7 @@ def test_check_price_alerts_sends_updates_and_suppresses_duplicate(monkeypatch):
     db.query = Mock(side_effect=[FakeQuery([user]), FakeQuery([game]), FakeQuery([user]), FakeQuery([game])])
     fetch = AsyncMock(return_value={"current": deal()})
     send = Mock(return_value=True)
-    monkeypatch.setattr(runner, "fetch_game_price_history", fetch)
+    monkeypatch.setattr(runner, "fetch_steam_store_game_price", fetch)
     monkeypatch.setattr(runner, "send_telegram_message", send)
     monkeypatch.setattr(runner, "check_persisted_price_alerts", AsyncMock())
 
@@ -141,6 +141,35 @@ def test_check_price_alerts_sends_updates_and_suppresses_duplicate(monkeypatch):
     assert db.commits == 2
 
 
+def test_check_price_alerts_uses_profile_price_region_and_steam_price(monkeypatch):
+    game = SimpleNamespace(title="Hades", owner_id="u1", price_alert_last_key=None)
+    user = SimpleNamespace(
+        id="u1",
+        telegram_chat_id="chat",
+        price_country_code="PL",
+        steam_country_code="US",
+    )
+    db = FakeDb([user])
+    db.query = Mock(side_effect=[FakeQuery([user]), FakeQuery([game])])
+    steam_price = AsyncMock(return_value={
+        "current": deal(
+            price={"amount": 79.99, "currency": "PLN"},
+            regular={"amount": 159.99, "currency": "PLN"},
+            url="https://store.steampowered.com/app/1145360/",
+        )
+    })
+    send = Mock(return_value=True)
+    monkeypatch.setattr(runner, "fetch_steam_store_game_price", steam_price)
+    monkeypatch.setattr(runner, "send_telegram_message", send)
+    monkeypatch.setattr(runner, "check_persisted_price_alerts", AsyncMock())
+
+    result = asyncio.run(runner.check_price_alerts(db))
+
+    assert result.alerts_sent == 1
+    steam_price.assert_awaited_once_with("Hades", country="PL", exact_title_only=True)
+    assert "79.99 PLN at Steam" in send.call_args.args[1]
+
+
 def test_check_price_alerts_handles_no_deal_failed_delivery_and_provider_error(monkeypatch):
     games = [SimpleNamespace(title="No deal", owner_id="u1", price_alert_last_key=None),
              SimpleNamespace(title="Failed send", owner_id="u1", price_alert_last_key=None),
@@ -148,7 +177,7 @@ def test_check_price_alerts_handles_no_deal_failed_delivery_and_provider_error(m
     user = SimpleNamespace(id="u1", telegram_chat_id="chat", steam_country_code="USA")
     db = FakeDb([user])
     db.query = Mock(side_effect=[FakeQuery([user]), FakeQuery(games)])
-    monkeypatch.setattr(runner, "fetch_game_price_history", AsyncMock(side_effect=[{}, {"current": deal()}, RuntimeError("down")]))
+    monkeypatch.setattr(runner, "fetch_steam_store_game_price", AsyncMock(side_effect=[{}, {"current": deal()}, RuntimeError("down")]))
     monkeypatch.setattr(runner, "send_telegram_message", Mock(return_value=False))
     monkeypatch.setattr(runner, "check_persisted_price_alerts", AsyncMock())
 
@@ -166,7 +195,7 @@ def test_check_price_alerts_handles_http_exception(monkeypatch):
     db.query = Mock(side_effect=[FakeQuery([user]), FakeQuery([game])])
     monkeypatch.setattr(
         runner,
-        "fetch_game_price_history",
+        "fetch_steam_store_game_price",
         AsyncMock(side_effect=HTTPException(status_code=503, detail="provider unavailable")),
     )
     monkeypatch.setattr(runner, "check_persisted_price_alerts", AsyncMock())

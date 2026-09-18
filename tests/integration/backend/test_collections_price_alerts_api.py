@@ -164,9 +164,15 @@ def test_price_alert_accepts_one_percent_for_the_any_discount_preset(
 def test_in_app_price_alert_notification_is_owner_scoped_and_deduplicated(
     db_session, user_factory, monkeypatch
 ):
-    owner = user_factory(email="notification-alert-owner@example.com")
+    owner = user_factory(email="notification-alert-owner@example.com", price_country_code="UA")
     other = user_factory(email="notification-alert-other@example.com")
-    owner_item = WishlistItem(user_id=owner.id, catalog_game_id=707, title="Hades")
+    owner_item = WishlistItem(
+        user_id=owner.id,
+        catalog_game_id=707,
+        title="Hades",
+        source="steam",
+        external_id="1145350",
+    )
     other_item = WishlistItem(user_id=other.id, catalog_game_id=808, title="Celeste")
     db_session.add_all([owner_item, other_item])
     db_session.commit()
@@ -176,11 +182,8 @@ def test_in_app_price_alert_notification_is_owner_scoped_and_deduplicated(
     ])
     db_session.commit()
 
-    monkeypatch.setattr(
-        runner,
-        "fetch_game_price_history",
-        AsyncMock(return_value={"current": {"shop": "Steam", "price": {"amount": 9.99, "currency": "USD"}, "cut": 60, "url": "https://store.example/hades"}}),
-    )
+    steam_detail = AsyncMock(return_value={"current": {"shop": "Steam", "price": {"amount": 9.99, "currency": "UAH"}, "cut": 60, "url": "https://store.example/hades"}})
+    monkeypatch.setattr(runner, "fetch_steam_store_game_detail", steam_detail)
 
     first = asyncio.run(runner.check_price_alerts(db_session))
     second = asyncio.run(runner.check_price_alerts(db_session))
@@ -190,6 +193,10 @@ def test_in_app_price_alert_notification_is_owner_scoped_and_deduplicated(
     assert second.in_app_notifications_created == 0
     assert [(notice.user_id, notice.type, notice.payload) for notice in notices] == [
         (owner.id, "price_alert", {"catalog_game_id": 707}),
+    ]
+    assert [call.kwargs for call in steam_detail.await_args_list] == [
+        {"country": "UA"},
+        {"country": "UA"},
     ]
 
 
