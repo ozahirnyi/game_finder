@@ -329,7 +329,7 @@ def test_catalog_steam_price_history_keeps_steam_current_and_url_while_enriching
     platform_detail.assert_awaited_once_with(1145350, country="UA")
 
 
-def test_catalog_price_history_rejects_steam_history_in_a_different_currency(
+def test_catalog_price_history_keeps_steam_history_in_its_source_currency(
     api_client, app_main, monkeypatch, user_factory, auth_as
 ):
     auth_as(user_factory(email="polish-price@example.com", price_country_code="PL"))
@@ -370,10 +370,16 @@ def test_catalog_price_history_rejects_steam_history_in_a_different_currency(
     assert response.json()["current"]["shop"] == "Steam"
     assert response.json()["current"]["price"] == {"amount": 79.99, "currency": "PLN"}
     assert response.json()["url"] == steam["url"]
-    assert response.json()["history"] == []
+    assert [
+        (point["shop"].strip(), point["price"])
+        for point in response.json()["history"]
+    ] == [
+        ("Steam", {"amount": 9.99, "currency": "USD"}),
+        ("steam", {"amount": 8.99, "currency": "EUR"}),
+    ]
     assert response.json()["history_low_all"] is None
-    assert response.json()["history_available"] is False
-    assert "regional currency" in response.json()["provider_message"]
+    assert response.json()["history_available"] is True
+    assert response.json()["provider_message"] is None
     steam_detail.assert_awaited_once_with(1145350, country="PL")
     fetch_history.assert_awaited_once_with("Hades", country="PL", steam_appid=1145350)
 
@@ -487,7 +493,7 @@ def test_steam_price_history_uses_steam_title_and_falls_back_on_itad_404(api_cli
     detail.assert_awaited_once_with(1145350, country="US")
 
 
-def test_steam_price_history_uses_country_specific_steam_data_and_rejects_usd_history(api_client, app_main, monkeypatch):
+def test_steam_price_history_keeps_country_specific_current_price_and_usd_history(api_client, app_main, monkeypatch):
     async def steam_detail(_appid, country):
         currency, amount = {"UA": ("UAH", 399), "TR": ("TRY", 199)}[country]
         return {
@@ -513,10 +519,10 @@ def test_steam_price_history_uses_country_specific_steam_data_and_rejects_usd_hi
     assert ukraine.json()["current"]["price"] == {"amount": 399, "currency": "UAH"}
     assert turkey.json()["current"]["price"] == {"amount": 199, "currency": "TRY"}
     assert ukraine.json()["url"] == "https://store.steampowered.com/app/1145350/"
-    assert ukraine.json()["history"] == []
-    assert turkey.json()["history"] == []
-    assert ukraine.json()["history_available"] is False
-    assert turkey.json()["history_available"] is False
+    assert ukraine.json()["history"][0]["price"] == {"amount": 4.99, "currency": "USD"}
+    assert turkey.json()["history"][0]["price"] == {"amount": 4.99, "currency": "USD"}
+    assert ukraine.json()["history_available"] is True
+    assert turkey.json()["history_available"] is True
     assert history.await_args_list[0].kwargs["country"] == "UA"
     assert history.await_args_list[1].kwargs["country"] == "TR"
 
