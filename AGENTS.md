@@ -2,6 +2,18 @@
 
 Use `main` / `origin/main` as the source of truth. If the local checkout is on an older phase branch or has unrelated untracked files, base analysis on `origin/main` unless the user explicitly asks otherwise. For analysis, prefer `git show origin/main:<path>` and `git ls-tree origin/main` over reading dirty working-tree files.
 
+## Mandatory task baseline
+
+Before any exploration, planning, test, or edit for an implementation task, establish a fresh, isolated task branch in this order:
+
+```powershell
+rtk git fetch origin
+rtk git status --short
+rtk git switch -c codex/<task-name> origin/main
+```
+
+Choose a unique, lowercase-hyphenated `<task-name>`. Work only in the resulting branch. If `git status --short` is non-empty, the branch name already exists, or any command fails, stop and report the exact condition. Do not stash, reset, checkout over, delete, or otherwise overwrite user changes to proceed.
+
 ## Project Shape
 
 PlayFinder is a full-stack app:
