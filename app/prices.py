@@ -241,7 +241,7 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
             prices.raise_for_status()
             history = await client.get(
                 f"{ITAD_BASE_URL}/games/history/v2",
-                params={"id": game_id, "country": country, "since": since},
+                params={"id": game_id, "country": country, "since": since, "shops": 61},
             )
             history.raise_for_status()
     except HTTPException:

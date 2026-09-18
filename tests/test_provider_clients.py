@@ -133,6 +133,51 @@ async def test_itad_price_history_normalizes_deals(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_itad_history_requests_steam_points_before_weekly_compaction(monkeypatch):
+    monkeypatch.setenv("ITAD_API_KEY", "key")
+
+    class RecordingClient(FakeAsyncClient):
+        def __init__(self):
+            self.steam_point = {
+                "timestamp": "2026-09-01T00:00:00Z",
+                "shop": {"name": "Steam"},
+                "deal": {"price": {"amount": 19.99, "currency": "USD"}},
+            }
+            super().__init__(responses=[
+                FakeResponse({"Game": "g1"}),
+                FakeResponse([{"historyLow": {}, "deals": []}]),
+                FakeResponse([
+                    self.steam_point,
+                    {
+                        "timestamp": "2026-09-02T00:00:00Z",
+                        "shop": {"name": "GOG"},
+                        "deal": {"price": {"amount": 4.99, "currency": "USD"}},
+                    },
+                ]),
+            ])
+            self.calls = []
+
+        async def get(self, *args, **kwargs):
+            self.calls.append(("GET", *args, kwargs))
+            if args[0].endswith("/games/history/v2") and kwargs["params"].get("shops") == 61:
+                return FakeResponse([self.steam_point])
+            return await super().get(*args, **kwargs)
+
+        async def post(self, *args, **kwargs):
+            self.calls.append(("POST", *args, kwargs))
+            return await super().post(*args, **kwargs)
+
+    client = RecordingClient()
+    monkeypatch.setattr(prices.httpx, "AsyncClient", lambda *args, **kwargs: client)
+
+    result = await prices.fetch_game_price_history("Game")
+
+    history_call = next(call for call in client.calls if call[1].endswith("/games/history/v2"))
+    assert history_call[2]["params"]["shops"] == 61
+    assert [point["shop"] for point in result["history"]] == ["Steam"]
+
+
+@pytest.mark.anyio
 async def test_itad_price_history_accepts_documented_overview_response(monkeypatch):
     monkeypatch.setenv("ITAD_API_KEY", "key")
     responses = [
