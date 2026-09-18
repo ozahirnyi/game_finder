@@ -19,8 +19,9 @@ normal empty-history response rather than substituting another storefront.
 Normalize consecutive observations with the same price state before rendering. A state
 contains the sale price, regular price, discount, and currency. Position remaining
 observations by their timestamps, not their array index. The pointer may move anywhere
-inside the plot; it selects the active stepped-price interval and opens a tooltip with
-the interval date, sale price, regular price, and discount. Keyboard focus retains the
+inside the plot (rather than only over a point); it selects the active stepped-price
+interval and opens a tooltip with the interval date, sale price, regular price, and
+discount. The rest of the game card is not a hover target. Keyboard focus retains the
 same tooltip content.
 
 The tooltip remains within the chart: at the left and right edges it opens inward.
