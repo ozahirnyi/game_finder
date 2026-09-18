@@ -4018,7 +4018,7 @@ async def game_price_history(
     if not isinstance(steam_appid, int) or steam_appid < 1:
         if not title:
             raise HTTPException(status_code=404, detail="No price lookup title is available for this catalog game")
-        title_key = build_cache_key("price_history_title_v4", title=title, country=normalized_country, period=period)
+        title_key = build_cache_key("price_history_title_v5", title=title, country=normalized_country, period=period)
 
         async def fetch_title_price():
             try:

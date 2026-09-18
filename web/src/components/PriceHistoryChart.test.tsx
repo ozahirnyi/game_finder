@@ -148,6 +148,25 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByLabelText("Selected price date")).toBeInTheDocument();
   });
 
+  it("uses the full card width and ignores pointer movement over the price scale", () => {
+    render(
+      <PriceHistoryChart
+        currency="USD"
+        points={[
+          { date: "2026-08-01T00:00:00Z", price: 9.99 },
+          { date: "2026-09-01T00:00:00Z", price: 19.99 },
+        ]}
+      />,
+    );
+
+    const chart = screen.getByLabelText("Price history chart");
+    vi.spyOn(chart, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 320, 88));
+    fireEvent.pointerMove(chart, { clientX: 5, clientY: 40 });
+
+    expect(chart).toHaveAttribute("preserveAspectRatio", "none");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
   it("keeps an edge tooltip inside the plot", () => {
     render(
       <PriceHistoryChart

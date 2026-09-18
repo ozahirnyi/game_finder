@@ -86,10 +86,13 @@ export function PriceHistoryChart({
     "",
   );
   const activeCoordinate = activeIndex == null ? undefined : coordinates[Math.min(activeIndex, coordinates.length - 1)];
-  const activeIndexForX = (x: number) => coordinates.reduce(
-    (active, point, index) => point.x <= x ? index : active,
-    0,
-  );
+  const activeIndexForX = (x: number) => {
+    if (x < plotLeft || x > width - plotRight) return null;
+    return coordinates.reduce(
+      (active, point, index) => point.x <= x ? index : active,
+      0,
+    );
+  };
   const tooltipStyle = !activeCoordinate
     ? undefined
     : activeCoordinate.x <= width * 0.15
@@ -108,6 +111,7 @@ export function PriceHistoryChart({
         aria-label="Price history chart"
         role="img"
         viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
         className="h-24 w-full text-primary"
         onPointerMove={(event) => {
           const bounds = event.currentTarget.getBoundingClientRect();
