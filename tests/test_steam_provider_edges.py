@@ -267,6 +267,34 @@ async def test_store_game_price_prefers_a_priced_title_match_over_an_unpriced_re
 
 
 @pytest.mark.anyio
+async def test_store_game_price_resolves_a_purchasable_normalized_or_edition_title(monkeypatch):
+    search = {
+        "items": [
+            {"id": 5006530, "type": "app", "name": "The Witcher 3: Wild Hunt — Songs of the Past"},
+            {"id": 292030, "type": "app", "name": "The Witcher 3: Wild Hunt - Complete Edition", "price": {"currency": "UAH"}},
+            {"id": 7670, "type": "app", "name": "BioShock™", "price": {"currency": "UAH"}},
+            {"id": 1547000, "type": "app", "name": "Grand Theft Auto: San Andreas – The Definitive Edition", "price": {"currency": "UAH"}},
+        ]
+    }
+    details = {
+        "292030": {"data": {"name": "The Witcher 3: Wild Hunt - Complete Edition", "price_overview": {"final": 79900, "initial": 99900, "currency": "UAH", "discount_percent": 20}}},
+        "7670": {"data": {"name": "BioShock™", "price_overview": {"final": 22500, "initial": 44900, "currency": "UAH", "discount_percent": 50}}},
+        "1547000": {"data": {"name": "Grand Theft Auto: San Andreas – The Definitive Edition", "price_overview": {"final": 59900, "initial": 99900, "currency": "UAH", "discount_percent": 40}}},
+    }
+
+    for title, appid in [
+        ("The Witcher 3: Wild Hunt", 292030),
+        ("BioShock", 7670),
+        ("Grand Theft Auto: San Andreas", 1547000),
+    ]:
+        client = client_factory(monkeypatch, steam_store, [FakeResponse(search), FakeResponse({str(appid): details[str(appid)]})])
+        result = await steam_store.fetch_steam_store_game_price(title, country="UA", exact_title_only=True)
+        assert result["appid"] == appid
+        assert result["current"]["price"]["currency"] == "UAH"
+        assert client.calls[1][2]["params"]["appids"] == appid
+
+
+@pytest.mark.anyio
 async def test_store_candidates_error(monkeypatch):
     client_factory(monkeypatch, steam_store, [FakeResponse(status_code=503)])
     with pytest.raises(HTTPException, match="503"):

@@ -10,7 +10,6 @@ import { PriceAlertForm } from "@/components/PriceAlertForm";
 import {
   formatCatalogRating,
   formatCatalogReleaseDate,
-  hasRenderablePriceHistory,
   presentPriceHistory,
   shouldRenderPriceHistory,
 } from "@/lib/gamePresentation";
@@ -44,6 +43,7 @@ import {
   searchGames,
   type CatalogGame,
   type PriceAlertCreate,
+  type PriceHistoryPeriod,
 } from "@/lib/api";
 import { exactCatalogMatch, hasCatalogId } from "@/lib/catalogMatch";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
@@ -269,12 +269,13 @@ export function mergeGamePrice<
 function GameDetail() {
   const { game: catalogGame } = Route.useLoaderData();
   const { returnTo } = Route.useSearch();
+  const [historyPeriod, setHistoryPeriod] = useState<PriceHistoryPeriod>("6m");
   const priceQuery = useQuery({
-    queryKey: ["price-history", catalogGame.steamAppId ? "steam" : "catalog", catalogGame.id],
+    queryKey: ["price-history", catalogGame.steamAppId ? "steam" : "catalog", catalogGame.id, historyPeriod],
     queryFn: () =>
       catalogGame.steamAppId
-        ? getSteamPriceHistory(catalogGame.steamAppId)
-        : getPriceHistory(catalogGame.id),
+        ? getSteamPriceHistory(catalogGame.steamAppId, "US", historyPeriod)
+        : getPriceHistory(catalogGame.id, "US", historyPeriod),
   });
   const similarQuery = useQuery({
     queryKey: ["catalog-similar-games", catalogGame.id],
@@ -405,7 +406,11 @@ function GameDetail() {
   ];
   const priceHistory = presentPriceHistory(priceQuery.data?.history ?? [], current?.price);
   const showPriceHistory = shouldRenderPriceHistory(priceQuery.data?.is_free === true);
-  const hasPriceHistoryPoints = hasRenderablePriceHistory(priceQuery.data?.history ?? []);
+  const historyPeriodLabels: Record<PriceHistoryPeriod, string> = {
+    "1m": "1 month",
+    "6m": "6 months",
+    "1y": "1 year",
+  };
   const similar = (similarQuery.data?.results ?? [])
     .filter((candidate) => candidate.id != null && String(candidate.id) !== catalogGame.id)
     .slice(0, 4);
@@ -538,9 +543,22 @@ function GameDetail() {
             <section>
               <SectionHeader
                 title="Steam price history"
-                hint="Steam historical prices; currency is shown as supplied by Steam history."
+                hint="Steam price events in your selected regional currency."
               />
               <div className="rounded-2xl border border-border bg-surface p-6">
+                <div className="mb-5 flex gap-2" aria-label="Price history period">
+                  {(Object.entries(historyPeriodLabels) as Array<[PriceHistoryPeriod, string]>).map(([period, label]) => (
+                    <button
+                      key={period}
+                      type="button"
+                      aria-pressed={historyPeriod === period}
+                      onClick={() => setHistoryPeriod(period)}
+                      className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 {priceQuery.isPending ? (
                   <p className="text-sm text-muted-foreground">Loading price history…</p>
                 ) : priceQuery.isError ? (
@@ -554,24 +572,16 @@ function GameDetail() {
                       Retry price history
                     </button>
                   </div>
-                ) : hasPriceHistoryPoints ? (
+                ) : (
                   <PriceHistoryChart
                     points={priceHistory.points}
                     currency={game.currency}
                     currentPrice={game.price}
-                    historyAvailable={priceQuery.data?.history_available}
+                    historyAvailable={priceQuery.data?.history_available ?? false}
+                    unavailableMessage={priceQuery.data?.provider_message}
+                    periodLabel={historyPeriodLabels[historyPeriod]}
+                    onRetry={() => void priceQuery.refetch()}
                   />
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    <p>Price history is temporarily unavailable.</p>
-                    <button
-                      type="button"
-                      onClick={() => void priceQuery.refetch()}
-                      className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold"
-                    >
-                      Retry price history
-                    </button>
-                  </div>
                 )}
               </div>
             </section>

@@ -105,10 +105,10 @@ describe("apiRequest", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await getPriceHistory(123, "US");
+    await getPriceHistory(123, "US", "1m");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/prices/games/123?country=US",
+      "/api/prices/games/123?country=US&period=1m",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
       }),

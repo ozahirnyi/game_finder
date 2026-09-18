@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { PriceHistoryChart } from "./PriceHistoryChart";
 
 describe("PriceHistoryChart", () => {
+  afterEach(cleanup);
   it("explains an empty normalized history", () => {
     render(<PriceHistoryChart points={[]} currency="USD" />);
 
@@ -40,7 +41,7 @@ describe("PriceHistoryChart", () => {
       />,
     );
 
-    expect(screen.getByText("Recorded 25 Sep at $19.99.")).toBeInTheDocument();
+    expect(screen.getByText(/25 Sep\. Sale price: \$19\.99/)).toBeInTheDocument();
   });
 
   it("renders an accessible graph with endpoint labels and the historical low", () => {
@@ -61,7 +62,7 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByText("$19.99")).toBeInTheDocument();
   });
 
-  it("formats the historical low in the source history currency", () => {
+  it("formats the historical low in the point currency", () => {
     render(
       <PriceHistoryChart
         currency="UAH"
@@ -73,7 +74,26 @@ describe("PriceHistoryChart", () => {
     );
 
     expect(screen.getByText("$13.00")).toBeInTheDocument();
-    expect(screen.getByText("History currency: USD")).toBeInTheDocument();
     expect(screen.queryByText(/₴13/)).not.toBeInTheDocument();
+  });
+
+  it("uses stepped sale and regular-price lines and exposes each point by hover and keyboard", () => {
+    render(
+      <PriceHistoryChart
+        currency="USD"
+        points={[
+          { date: "2025-08-01T00:00:00+00:00", price: 19.99, regular: 29.99 },
+          { date: "2025-09-25T00:00:00+00:00", price: 24.99, regular: 29.99 },
+        ]}
+      />,
+    );
+
+    expect(screen.getByLabelText("Sale price history")).toHaveAttribute("d", expect.stringContaining("H"));
+    expect(screen.getByLabelText("Regular price history")).toBeInTheDocument();
+    const firstPoint = screen.getByRole("button", { name: /1 Aug.*sale/i });
+    fireEvent.mouseEnter(firstPoint);
+    expect(screen.getByText(/Regular price: \$29\.99/i)).toBeInTheDocument();
+    fireEvent.focus(screen.getByRole("button", { name: /25 Sep.*sale/i }));
+    expect(screen.getByText(/25 Sep.*Sale price: \$24\.99/i)).toBeInTheDocument();
   });
 });

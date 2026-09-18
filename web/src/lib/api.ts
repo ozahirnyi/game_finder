@@ -57,6 +57,7 @@ export type Deal = {
 export type GenreDealResponse = { popular: Deal[]; sections: { genre: string; results: Deal[] }[] };
 
 export type Money = { amount: number; currency: string };
+export type PriceHistoryPeriod = "1m" | "6m" | "1y";
 
 export type LibraryGame = {
   id: string;
@@ -714,7 +715,7 @@ export function getGenreDeals() {
   return apiRequest<GenreDealResponse>("/prices/genre-deals", { includeToken: true });
 }
 
-export function getPriceHistory(id: string | number, country = "US") {
+export function getPriceHistory(id: string | number, country = "US", period: PriceHistoryPeriod = "6m") {
   return apiRequest<{
     current?: Deal["current"];
     deals: Deal["current"][];
@@ -725,11 +726,12 @@ export function getPriceHistory(id: string | number, country = "US") {
       shop?: string | null;
       price?: Money | null;
       regular?: Money | null;
+      cut?: number | null;
     }>;
-  }>(`/prices/games/${id}?country=${encodeURIComponent(country)}`, { includeToken: true });
+  }>(`/prices/games/${id}?country=${encodeURIComponent(country)}&period=${period}`, { includeToken: true });
 }
 
-export function getSteamPriceHistory(appid: string | number, country = "US") {
+export function getSteamPriceHistory(appid: string | number, country = "US", period: PriceHistoryPeriod = "6m") {
   return apiRequest<{
     current?: Deal["current"];
     deals: Deal["current"][];
@@ -740,8 +742,9 @@ export function getSteamPriceHistory(appid: string | number, country = "US") {
       shop?: string | null;
       price?: Money | null;
       regular?: Money | null;
+      cut?: number | null;
     }>;
-  }>(`/prices/steam-games/${appid}?country=${encodeURIComponent(country)}`, {
+  }>(`/prices/steam-games/${appid}?country=${encodeURIComponent(country)}&period=${period}`, {
     includeToken: true,
   });
 }
