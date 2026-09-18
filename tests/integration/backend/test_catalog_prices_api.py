@@ -290,27 +290,43 @@ def test_catalog_lists_reject_invalid_pagination(api_client, params):
     assert api_client.get("/catalog/upcoming-games", params=params).status_code == 400
 
 
-def test_price_history_uses_itad_success(api_client, app_main, monkeypatch):
+def test_catalog_steam_price_history_keeps_steam_current_and_url_while_enriching_itad_history(api_client, app_main, monkeypatch):
     detail = AsyncMock(return_value={"name": "Hades", "steam_appid": 1145350})
-    history = {"itad_id": "itad-1", "title": "Hades", "deals": []}
+    steam_detail = {
+        "itad_id": "steam:1145350", "title": "Hades", "url": "https://store.steampowered.com/app/1145350/",
+        "current": {"shop": "Steam", "price": {"amount": 399, "currency": "UAH"}},
+        "is_free": False, "deals": [], "history": [],
+    }
+    history = {
+        "itad_id": "itad-1", "title": "ITAD listing", "url": "https://reseller.example/hades",
+        "current": {"shop": "Reseller", "price": {"amount": 9.99, "currency": "USD"}},
+        "is_free": True, "deals": [{"shop": "Reseller", "url": "https://reseller.example/hades"}],
+        "history": [{"timestamp": "2025-01-01T00:00:00Z", "price": {"amount": 299, "currency": "UAH"}}],
+        "history_low_all": {"amount": 199, "currency": "UAH"},
+    }
     fetch_history = AsyncMock(return_value=history)
-    fallback = AsyncMock()
+    platform_detail = AsyncMock(return_value=steam_detail)
     cached = AsyncMock(side_effect=run_cached)
     monkeypatch.setattr(app_main, "fetch_igdb_game_detail", detail)
     monkeypatch.setattr(app_main, "fetch_game_price_history", fetch_history)
-    monkeypatch.setattr(app_main, "fetch_steam_store_game_price", fallback)
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_detail", platform_detail)
     monkeypatch.setattr(app_main, "get_json_cached", cached)
 
     response = api_client.get("/prices/games/42", params={"country": " ua "})
 
     assert response.status_code == 200
-    assert response.json()["itad_id"] == history["itad_id"]
-    assert response.json()["title"] == history["title"]
-    assert response.json()["deals"] == []
+    assert response.json()["itad_id"] == steam_detail["itad_id"]
+    assert response.json()["title"] == steam_detail["title"]
+    assert response.json()["url"] == steam_detail["url"]
+    assert response.json()["current"]["shop"] == "Steam"
+    assert response.json()["current"]["price"] == steam_detail["current"]["price"]
+    assert response.json()["is_free"] is False
+    assert response.json()["history"][0]["price"] == history["history"][0]["price"]
+    assert response.json()["history_low_all"] == history["history_low_all"]
     assert cached.await_args.args[0].startswith("price_history_v2:")
     assert response.json()["history_available"] is True
     fetch_history.assert_awaited_once_with("Hades", country="UA", steam_appid=1145350)
-    fallback.assert_not_awaited()
+    platform_detail.assert_awaited_once_with(1145350, country="UA")
 
 
 def test_price_history_uses_catalog_title_when_app_id_resolution_needs_a_title(api_client, app_main, monkeypatch):
@@ -319,6 +335,10 @@ def test_price_history_uses_catalog_title_when_app_id_resolution_needs_a_title(a
         "fetch_igdb_game_detail",
         AsyncMock(return_value={"name": "Hades", "steam_appid": 1145350}),
     )
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_detail", AsyncMock(return_value={
+        "itad_id": "steam:1145350", "title": "Hades", "url": "https://store.steampowered.com/app/1145350/",
+        "current": None, "is_free": False, "deals": [], "history": [],
+    }))
     history = AsyncMock(return_value={"itad_id": "itad-1", "title": "Hades", "deals": []})
     monkeypatch.setattr(app_main, "fetch_game_price_history", history)
     monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
@@ -332,9 +352,9 @@ def test_price_history_uses_catalog_title_when_app_id_resolution_needs_a_title(a
 def test_price_history_falls_back_to_steam_on_itad_502(api_client, app_main, monkeypatch):
     monkeypatch.setattr(app_main, "fetch_igdb_game_detail", AsyncMock(return_value={"name": "Hades", "steam_appid": 1145350}))
     monkeypatch.setattr(app_main, "fetch_game_price_history", AsyncMock(side_effect=HTTPException(502, "ITAD down")))
-    steam = {"itad_id": "steam:42", "title": "Hades", "deals": []}
-    fallback = AsyncMock(return_value=steam)
-    monkeypatch.setattr(app_main, "fetch_steam_store_game_price", fallback)
+    steam = {"itad_id": "steam:1145350", "title": "Hades", "url": "https://store.steampowered.com/app/1145350/", "current": None, "is_free": False, "deals": [], "history": []}
+    platform_detail = AsyncMock(return_value=steam)
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_detail", platform_detail)
     monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
 
     response = api_client.get("/prices/games/42")
@@ -344,14 +364,14 @@ def test_price_history_falls_back_to_steam_on_itad_502(api_client, app_main, mon
     assert response.json()["title"] == steam["title"]
     assert response.json()["deals"] == []
     assert response.json()["history_available"] is False
-    fallback.assert_awaited_once_with("Hades", country="US")
+    platform_detail.assert_awaited_once_with(1145350, country="US")
 
 
 def test_price_history_falls_back_to_steam_on_itad_404(api_client, app_main, monkeypatch):
     monkeypatch.setattr(app_main, "fetch_igdb_game_detail", AsyncMock(return_value={"name": "Hades", "steam_appid": 1145350}))
     monkeypatch.setattr(app_main, "fetch_game_price_history", AsyncMock(side_effect=HTTPException(404, "ITAD game missing")))
-    steam = {"itad_id": "steam:42", "title": "Hades", "deals": []}
-    monkeypatch.setattr(app_main, "fetch_steam_store_game_price", AsyncMock(return_value=steam))
+    steam = {"itad_id": "steam:1145350", "title": "Hades", "url": "https://store.steampowered.com/app/1145350/", "current": None, "is_free": False, "deals": [], "history": []}
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_detail", AsyncMock(return_value=steam))
     monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
 
     response = api_client.get("/prices/games/42")
@@ -361,7 +381,11 @@ def test_price_history_falls_back_to_steam_on_itad_404(api_client, app_main, mon
 
 
 def test_steam_price_history_uses_steam_title_and_falls_back_on_itad_404(api_client, app_main, monkeypatch):
-    detail = AsyncMock(return_value={"itad_id": "steam:1145350", "title": "Hades", "deals": []})
+    detail = AsyncMock(return_value={
+        "itad_id": "steam:1145350", "title": "Hades", "url": "https://store.steampowered.com/app/1145350/",
+        "current": {"shop": "Steam", "price": {"amount": 19.99, "currency": "USD"}},
+        "is_free": False, "deals": [], "history": [],
+    })
     history = AsyncMock(side_effect=HTTPException(404, "ITAD game missing"))
     monkeypatch.setattr(app_main, "fetch_steam_store_game_detail", detail)
     monkeypatch.setattr(app_main, "fetch_game_price_history", history)
@@ -372,6 +396,56 @@ def test_steam_price_history_uses_steam_title_and_falls_back_on_itad_404(api_cli
     assert response.json()["history_available"] is False
     history.assert_awaited_once_with("Hades", country="US", steam_appid=1145350)
     detail.assert_awaited_once_with(1145350, country="US")
+
+
+def test_steam_price_history_uses_country_specific_steam_data_and_keeps_itad_history(api_client, app_main, monkeypatch):
+    async def steam_detail(_appid, country):
+        currency, amount = {"UA": ("UAH", 399), "TR": ("TRY", 199)}[country]
+        return {
+            "itad_id": "steam:1145350", "title": "Hades", "url": "https://store.steampowered.com/app/1145350/",
+            "current": {"shop": "Steam", "price": {"amount": amount, "currency": currency}},
+            "is_free": False, "deals": [], "history": [],
+        }
+
+    history = AsyncMock(return_value={
+        "itad_id": "itad-hades", "title": "ITAD Hades", "url": "https://reseller.example/hades",
+        "current": {"shop": "Reseller", "price": {"amount": 9.99, "currency": "USD"}},
+        "is_free": True, "history": [{"timestamp": "2025-01-01T00:00:00Z", "price": {"amount": 4.99, "currency": "USD"}}],
+        "deals": [],
+    })
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_detail", steam_detail)
+    monkeypatch.setattr(app_main, "fetch_game_price_history", history)
+
+    ukraine = api_client.get("/prices/steam-games/1145350", params={"country": "ua"})
+    turkey = api_client.get("/prices/steam-games/1145350", params={"country": "tr"})
+
+    assert ukraine.status_code == 200
+    assert turkey.status_code == 200
+    assert ukraine.json()["current"]["price"] == {"amount": 399, "currency": "UAH"}
+    assert turkey.json()["current"]["price"] == {"amount": 199, "currency": "TRY"}
+    assert ukraine.json()["url"] == "https://store.steampowered.com/app/1145350/"
+    assert turkey.json()["history"][0]["price"] == history.return_value["history"][0]["price"]
+    assert history.await_args_list[0].kwargs["country"] == "UA"
+    assert history.await_args_list[1].kwargs["country"] == "TR"
+
+
+def test_steam_price_history_keeps_free_status_when_itad_reports_zero_price(api_client, app_main, monkeypatch):
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_detail", AsyncMock(return_value={
+        "itad_id": "steam:620", "title": "Portal 2", "url": "https://store.steampowered.com/app/620/",
+        "current": None, "is_free": True, "deals": [], "history": [],
+    }))
+    monkeypatch.setattr(app_main, "fetch_game_price_history", AsyncMock(return_value={
+        "itad_id": "itad-portal-2", "title": "Portal 2", "url": "https://reseller.example/portal-2",
+        "current": {"shop": "Reseller", "price": {"amount": 0, "currency": "USD"}},
+        "is_free": False, "deals": [], "history": [],
+    }))
+
+    response = api_client.get("/prices/steam-games/620")
+
+    assert response.status_code == 200
+    assert response.json()["is_free"] is True
+    assert response.json()["current"] is None
+    assert response.json()["url"] == "https://store.steampowered.com/app/620/"
 
 
 def test_price_history_uses_itad_title_lookup_when_igdb_has_no_steam_appid(api_client, app_main, monkeypatch):
@@ -393,6 +467,27 @@ def test_price_history_uses_itad_title_lookup_when_igdb_has_no_steam_appid(api_c
     assert response.json()["history_available"] is True
     history.assert_awaited_once_with("Black Myth: Wukong", country="UA")
     fallback.assert_not_awaited()
+
+
+def test_non_steam_catalog_history_does_not_expose_itad_reseller_urls(api_client, app_main, monkeypatch):
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_game_detail",
+        AsyncMock(return_value={"name": "Black Myth: Wukong", "steam_appid": None}),
+    )
+    monkeypatch.setattr(app_main, "fetch_game_price_history", AsyncMock(return_value={
+        "itad_id": "itad-2358720", "title": "Black Myth: Wukong", "url": "https://reseller.example/game",
+        "current": {"shop": "Reseller", "price": {"amount": 59.99, "currency": "USD"}, "url": "https://reseller.example/game"},
+        "deals": [{"shop": "Reseller", "url": "https://reseller.example/game"}], "history": [],
+    }))
+    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+
+    response = api_client.get("/prices/games/136879")
+
+    assert response.status_code == 200
+    assert response.json()["url"] is None
+    assert response.json()["current"]["url"] is None
+    assert response.json()["deals"][0]["url"] is None
 
 
 def test_price_history_falls_back_to_steam_when_itad_title_lookup_is_unavailable(api_client, app_main, monkeypatch):

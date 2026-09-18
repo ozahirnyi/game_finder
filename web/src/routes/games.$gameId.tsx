@@ -261,8 +261,8 @@ export function mergeGamePrice<
     originalPrice: current?.regular?.amount ?? game.originalPrice,
     discount: current?.cut ?? game.discount,
     currency: current?.price?.currency ?? game.currency,
-    store: current?.shop ?? game.store,
-    storeUrl: current?.url ?? game.storeUrl,
+    store: game.store ?? current?.shop ?? undefined,
+    storeUrl: game.storeUrl ?? current?.url ?? undefined,
   };
 }
 

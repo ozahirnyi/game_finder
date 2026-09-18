@@ -45,6 +45,11 @@ def test_steam_game_routes_use_app_id(monkeypatch):
             "platforms": ["PC"],
             "released": "10 Dec, 2020",
             "rating": 86,
+            "itad_id": "steam:1091500",
+            "title": "Cyberpunk 2077",
+            "url": "https://store.steampowered.com/app/1091500/",
+            "current": None,
+            "is_free": False,
             "deals": [],
             "history": [],
         }
@@ -65,7 +70,7 @@ def test_steam_game_routes_use_app_id(monkeypatch):
     assert detail.status_code == 200
     assert detail.json()["rating"] == 86
     assert history.status_code == 200
-    assert history.json()["itad_id"] == "itad-1091500"
+    assert history.json()["itad_id"] == "steam:1091500"
     assert client.get("/steam/games/0").status_code == 400
     assert client.get("/prices/steam-games/0").status_code == 400
 
@@ -650,14 +655,23 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
             "deals": [],
         }
 
+    async def fake_steam_detail(appid: int, country: str):
+        assert (appid, country) == (1145350, "US")
+        return {
+            "itad_id": "steam:1145350", "title": "Hades", "url": "https://store.steampowered.com/app/1145350/",
+            "current": {"shop": "Steam", "price": {"amount": 19.99, "currency": "USD"}},
+            "is_free": False, "deals": [], "history": [],
+        }
+
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch_igdb_game_detail)
     monkeypatch.setattr(main, "fetch_game_price_history", fake_fetch_game_price_history)
+    monkeypatch.setattr(main, "fetch_steam_store_game_detail", fake_steam_detail)
 
     response = client.get("/prices/games/274755")
 
     assert response.status_code == 200
-    assert response.json()["current"]["price"] == {"amount": 9.99, "currency": "USD"}
+    assert response.json()["current"]["price"] == {"amount": 19.99, "currency": "USD"}
     assert response.json()["history_low_all"] == {"amount": 8.99, "currency": "USD"}
 
 
@@ -673,8 +687,8 @@ def test_game_price_history_uses_steam_when_itad_is_unavailable(monkeypatch):
         from fastapi import HTTPException
         raise HTTPException(status_code=502, detail="IsThereAnyDeal rejected the API key")
 
-    async def steam_price(title: str, country: str):
-        assert (title, country) == ("Hades II", "US")
+    async def steam_detail(appid: int, country: str):
+        assert (appid, country) == (1145350, "US")
         return {
             "itad_id": "steam:1145350",
             "title": "Hades II",
@@ -683,13 +697,13 @@ def test_game_price_history_uses_steam_when_itad_is_unavailable(monkeypatch):
             "history_low_all": None,
             "history_low_1y": None,
             "history_low_3m": None,
-            "deals": [],
+            "deals": [], "history": [], "is_free": False,
         }
 
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_igdb_game_detail", fake_fetch_igdb_game_detail)
     monkeypatch.setattr(main, "fetch_game_price_history", unavailable_itad)
-    monkeypatch.setattr(main, "fetch_steam_store_game_price", steam_price)
+    monkeypatch.setattr(main, "fetch_steam_store_game_detail", steam_detail)
 
     response = client.get("/prices/games/274755")
 
