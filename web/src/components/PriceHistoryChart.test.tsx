@@ -61,7 +61,7 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByText("1 Aug")).toBeInTheDocument();
     expect(screen.getByText("25 Sep")).toBeInTheDocument();
     expect(screen.getByText("Historical low")).toBeInTheDocument();
-    expect(screen.getByText("$19.99")).toBeInTheDocument();
+    expect(screen.getByText("Historical low").parentElement).toHaveTextContent("$19.99");
   });
 
   it("formats the historical low in the point currency", () => {
@@ -115,6 +115,37 @@ describe("PriceHistoryChart", () => {
     fireEvent.pointerMove(chart, { clientX: 120, clientY: 40 });
 
     expect(screen.getByRole("tooltip")).toHaveTextContent(/1 Aug.*Sale price: \$19\.99/i);
+  });
+
+  it("shows labelled price grid lines", () => {
+    render(
+      <PriceHistoryChart
+        currency="USD"
+        points={[
+          { date: "2026-08-01T00:00:00Z", price: 9.99 },
+          { date: "2026-09-01T00:00:00Z", price: 19.99 },
+        ]}
+      />,
+    );
+
+    expect(screen.getByLabelText("Price scale")).toHaveTextContent("$9.99");
+    expect(screen.getByLabelText("Price scale")).toHaveTextContent("$19.99");
+  });
+
+  it("draws a vertical guide for the active observation", () => {
+    render(
+      <PriceHistoryChart
+        currency="USD"
+        points={[
+          { date: "2026-08-01T00:00:00Z", price: 9.99 },
+          { date: "2026-09-01T00:00:00Z", price: 19.99 },
+        ]}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("button", { name: /1 Aug.*sale/i }));
+
+    expect(screen.getByLabelText("Selected price date")).toBeInTheDocument();
   });
 
   it("keeps an edge tooltip inside the plot", () => {
