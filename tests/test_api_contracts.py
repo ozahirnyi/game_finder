@@ -672,7 +672,8 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["current"]["price"] == {"amount": 19.99, "currency": "USD"}
-    assert response.json()["history_low_all"] == {"amount": 8.99, "currency": "USD"}
+    # Current Steam prices must not be combined with ITAD's cross-store low.
+    assert response.json()["history_low_all"] is None
 
 
 def test_game_price_history_uses_steam_when_itad_is_unavailable(monkeypatch):

@@ -23,7 +23,7 @@ def test_price_alert_message_includes_current_discount(monkeypatch):
     assert "Hades is on sale." in message
     assert "9.99 USD" in message
     assert "60% off" in message
-    assert "Historical low: 8.99 USD" in message
+    assert "Historical low:" not in message
 
 
 def test_price_alert_message_skips_small_discounts(monkeypatch):
