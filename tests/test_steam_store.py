@@ -48,6 +48,26 @@ async def test_price_lookup_accepts_store_search_app_results(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_exact_title_price_lookup_rejects_a_similar_store_search_result(monkeypatch):
+    async def fake_get(self, _url, *, params):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"items": [{"id": 3240220, "name": "Grand Theft Auto V Enhanced", "type": "app"}]}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    with pytest.raises(HTTPException, match="Steam price data not found") as exc:
+        await steam_store.fetch_steam_store_game_price("Grand Theft Auto V", exact_title_only=True)
+
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.anyio
 async def test_popular_deals_fill_from_specials_after_discounted_top_sellers(monkeypatch):
     async def fake_get(self, *_args, **_kwargs):
         class Response:

@@ -3988,19 +3988,31 @@ async def game_price_history(
     if not isinstance(steam_appid, int) or steam_appid < 1:
         if not title:
             raise HTTPException(status_code=404, detail="No price lookup title is available for this catalog game")
-        title_key = build_cache_key("price_history_title_v2", title=title, country=normalized_country)
+        title_key = build_cache_key("price_history_title_v3", title=title, country=normalized_country)
 
         async def fetch_title_price():
-            history = await fetch_game_price_history(title, country=normalized_country)
-            return {**_strip_itad_reseller_urls(history), "history_available": True}
+            try:
+                steam_price = await fetch_steam_store_game_price(
+                    title, country=normalized_country, exact_title_only=True
+                )
+            except HTTPException:
+                history = await fetch_game_price_history(title, country=normalized_country)
+                return {**_strip_itad_reseller_urls(history), "history_available": True}
 
-        try:
-            return await get_json_cached(title_key, CACHE_TTL, fetch_title_price)
-        except HTTPException as exc:
-            if exc.status_code not in {404, 502, 503}:
-                raise
-            price = await fetch_steam_store_game_price(title, country=normalized_country)
-            return {**price, "history_available": False, "history": [], "provider_message": "Price history is temporarily unavailable."}
+            try:
+                history = await fetch_game_price_history(title, country=normalized_country)
+            except HTTPException as exc:
+                if exc.status_code not in {404, 502, 503}:
+                    raise
+                return {
+                    **steam_price,
+                    "history_available": False,
+                    "history": [],
+                    "provider_message": "Price history is temporarily unavailable.",
+                }
+            return {**_merge_platform_price_history(steam_price, history), "history_available": True}
+
+        return await get_json_cached(title_key, CACHE_TTL, fetch_title_price)
 
     price_key = build_cache_key("price_history_v2", steam_appid=steam_appid, country=normalized_country)
     steam_detail = await fetch_steam_store_game_detail(steam_appid, country=normalized_country)
