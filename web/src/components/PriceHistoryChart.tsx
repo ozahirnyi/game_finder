@@ -54,15 +54,19 @@ export function PriceHistoryChart({
   }
   const width = 320;
   const height = 88;
+  const plotLeft = 42;
+  const plotRight = 8;
+  const plotWidth = width - plotLeft - plotRight;
   const values = points.flatMap((point) => [point.price, point.regular].filter((value): value is number => typeof value === "number"));
   const min = Math.min(...values);
   const max = Math.max(...values);
+  const scaleValues = max === min ? [max] : [max, (min + max) / 2, min];
   const timestamps = points.map((point) => Date.parse(point.date));
   const firstTimestamp = timestamps[0];
   const timestampSpan = Math.max(timestamps[timestamps.length - 1] - firstTimestamp, 1);
   const xFor = (index: number) => points.length === 1
-    ? width / 2
-    : ((timestamps[index] - firstTimestamp) / timestampSpan) * width;
+    ? plotLeft + plotWidth / 2
+    : plotLeft + ((timestamps[index] - firstTimestamp) / timestampSpan) * plotWidth;
   const yFor = (value: number) => height - ((value - min) / (max - min || 1)) * (height - 16) - 8;
   const coordinates = points.map((point, index) => {
     return { x: xFor(index), y: yFor(point.price) };
@@ -112,6 +116,28 @@ export function PriceHistoryChart({
         }}
         onPointerLeave={() => setActiveIndex(null)}
       >
+        <g aria-label="Price scale" className="text-muted-foreground">
+          {scaleValues.map((value) => {
+            const y = yFor(value);
+            return (
+              <g key={value}>
+                <line
+                  x1={plotLeft}
+                  x2={width - plotRight}
+                  y1={y}
+                  y2={y}
+                  stroke="currentColor"
+                  strokeOpacity={0.16}
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+                <text x={plotLeft - 5} y={y + 3} textAnchor="end" fontSize={8} fill="currentColor">
+                  {formatPrice(value, currency)}
+                </text>
+              </g>
+            );
+          })}
+        </g>
         <path
           aria-label="Sale price history"
           d={steppedPath(coordinates)}
@@ -120,6 +146,20 @@ export function PriceHistoryChart({
           strokeWidth={2}
           vectorEffect="non-scaling-stroke"
         />
+        {activeCoordinate && (
+          <line
+            aria-label="Selected price date"
+            x1={activeCoordinate.x}
+            x2={activeCoordinate.x}
+            y1={8}
+            y2={height - 8}
+            stroke="currentColor"
+            strokeOpacity={0.45}
+            strokeWidth={1}
+            strokeDasharray="2 2"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
         {regularCoordinates.length > 0 && (
           <path
             aria-label="Regular price history"
