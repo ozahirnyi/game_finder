@@ -36,7 +36,8 @@ def test_catalog_title_fallback_uses_resolved_steam_edition_for_history(
         "price": {"amount": 14.99, "currency": "USD"},
     }]})
     monkeypatch.setattr(app_main, "fetch_game_price_history", history)
-    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+    cached = AsyncMock(side_effect=run_cached)
+    monkeypatch.setattr(app_main, "get_json_cached", cached)
 
     response = api_client.get("/prices/games/1942", params={"country": "UA"})
 
@@ -48,6 +49,7 @@ def test_catalog_title_fallback_uses_resolved_steam_edition_for_history(
         country="UA",
         steam_appid=292030,
     )
+    assert cached.await_args.args[0].startswith("price_history_title_v5:")
 
 
 def test_search_games_accepts_structured_discovery_filters(api_client, app_main, monkeypatch):
