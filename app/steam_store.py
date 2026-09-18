@@ -1,4 +1,6 @@
 import asyncio
+import re
+import unicodedata
 from typing import Any
 
 import httpx
@@ -7,6 +9,54 @@ from fastapi import HTTPException
 
 STEAM_STORE_BASE_URL = "https://store.steampowered.com"
 EXPECTED_CURRENCY_BY_COUNTRY = {"UA": "UAH"}
+_STORE_TITLE_NOISE = re.compile(r"[™®©]")
+_STORE_TITLE_WORDS = re.compile(r"[^a-z0-9]+")
+_STORE_ACCESSORY_WORDS = {"dlc", "soundtrack", "artbook", "ost"}
+
+
+def _normalized_store_title(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", _STORE_TITLE_NOISE.sub("", value)).casefold()
+    normalized = _STORE_TITLE_WORDS.sub(" ", normalized).strip()
+    roman_numerals = {"i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10"}
+    return " ".join(roman_numerals.get(word, word) for word in normalized.split())
+
+
+def _steam_store_candidate_score(title: str, candidate: dict[str, Any]) -> int | None:
+    """Rank only conservative, purchasable title matches from Steam search."""
+    candidate_title = str(candidate.get("name") or "").strip()
+    if not candidate_title:
+        return None
+    requested = _normalized_store_title(title)
+    offered = _normalized_store_title(candidate_title)
+    if not requested or not offered:
+        return None
+    if candidate_title.casefold() == title.casefold():
+        score = 100
+    elif offered == requested:
+        score = 90
+    elif offered.startswith(f"{requested} "):
+        score = 80
+    else:
+        return None
+    words = set(offered.split())
+    if words & _STORE_ACCESSORY_WORDS:
+        score -= 30
+    return score
+
+
+def _rank_steam_store_candidates(title: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    scored = [
+        (score, index, candidate)
+        for index, candidate in enumerate(candidates)
+        if (score := _steam_store_candidate_score(title, candidate)) is not None
+    ]
+    return [
+        candidate
+        for _score, _has_search_price, _index, candidate in sorted(
+            ((score, bool(candidate.get("price")), index, candidate) for score, index, candidate in scored),
+            key=lambda item: (-item[0], -item[1], item[2]),
+        )
+    ]
 
 
 async def fetch_steam_store_search(query: str, page_size: int = 20) -> list[dict[str, Any]]:
@@ -98,28 +148,27 @@ async def fetch_steam_store_game_price(
                 for candidate in items
                 if candidate.get("id") and candidate.get("type") in {"game", "app"}
             ]
-            normalized_title = title.casefold()
-            exact_match = next(
-                (candidate for candidate in candidates if (candidate.get("name") or "").casefold() == normalized_title),
-                None,
-            )
-            item = exact_match if exact_title_only else exact_match or next(
-                (
-                    candidate
-                    for candidate in candidates
-                    if candidate.get("price")
-                    and (candidate.get("name") or "").casefold().startswith(normalized_title)
-                ),
-                next((candidate for candidate in candidates if candidate.get("price")), candidates[0] if candidates else None),
-            )
-            if not item or not item.get("id"):
+            ranked_candidates = _rank_steam_store_candidates(title, candidates)
+            if not ranked_candidates:
                 raise HTTPException(status_code=404, detail="Steam price data not found for this game")
-            appid = int(item["id"])
-            detail = await client.get(
-                f"{STEAM_STORE_BASE_URL}/api/appdetails",
-                params={"appids": appid, "cc": country, "l": "english"},
-            )
-            detail.raise_for_status()
+            item = None
+            detail = None
+            appid = 0
+            for candidate in ranked_candidates:
+                candidate_appid = int(candidate["id"])
+                candidate_detail = await client.get(
+                    f"{STEAM_STORE_BASE_URL}/api/appdetails",
+                    params={"appids": candidate_appid, "cc": country, "l": "english"},
+                )
+                candidate_detail.raise_for_status()
+                candidate_data = (candidate_detail.json().get(str(candidate_appid)) or {}).get("data") or {}
+                overview = candidate_data.get("price_overview") or {}
+                if not candidate_data.get("is_free") and _money_from_steam_cents(overview.get("final"), overview.get("currency")) is None:
+                    continue
+                item, detail, appid = candidate, candidate_detail, candidate_appid
+                break
+            if item is None or detail is None:
+                raise HTTPException(status_code=404, detail="Steam price data not found for this game")
     except HTTPException:
         raise
     except httpx.HTTPError as exc:

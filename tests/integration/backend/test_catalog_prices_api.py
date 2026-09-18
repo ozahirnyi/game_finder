@@ -323,13 +323,13 @@ def test_catalog_steam_price_history_keeps_steam_current_and_url_while_enriching
     assert response.json()["is_free"] is False
     assert response.json()["history"][0]["price"] == history["history"][0]["price"]
     assert response.json()["history_low_all"] is None
-    assert cached.await_args.args[0].startswith("price_history_v2:")
+    assert cached.await_args.args[0].startswith("price_history_v3:")
     assert response.json()["history_available"] is True
     fetch_history.assert_awaited_once_with("Hades", country="UA", steam_appid=1145350)
     platform_detail.assert_awaited_once_with(1145350, country="UA")
 
 
-def test_catalog_price_history_uses_profile_region_and_only_keeps_steam_history(
+def test_catalog_price_history_rejects_steam_history_in_a_different_currency(
     api_client, app_main, monkeypatch, user_factory, auth_as
 ):
     auth_as(user_factory(email="polish-price@example.com", price_country_code="PL"))
@@ -370,14 +370,10 @@ def test_catalog_price_history_uses_profile_region_and_only_keeps_steam_history(
     assert response.json()["current"]["shop"] == "Steam"
     assert response.json()["current"]["price"] == {"amount": 79.99, "currency": "PLN"}
     assert response.json()["url"] == steam["url"]
-    assert [
-        (point["shop"], point["price"])
-        for point in response.json()["history"]
-    ] == [
-        ("Steam", {"amount": 9.99, "currency": "USD"}),
-        (" steam ", {"amount": 8.99, "currency": "EUR"}),
-    ]
+    assert response.json()["history"] == []
     assert response.json()["history_low_all"] is None
+    assert response.json()["history_available"] is False
+    assert "regional currency" in response.json()["provider_message"]
     steam_detail.assert_awaited_once_with(1145350, country="PL")
     fetch_history.assert_awaited_once_with("Hades", country="PL", steam_appid=1145350)
 
@@ -491,7 +487,7 @@ def test_steam_price_history_uses_steam_title_and_falls_back_on_itad_404(api_cli
     detail.assert_awaited_once_with(1145350, country="US")
 
 
-def test_steam_price_history_uses_country_specific_steam_data_and_keeps_itad_history(api_client, app_main, monkeypatch):
+def test_steam_price_history_uses_country_specific_steam_data_and_rejects_usd_history(api_client, app_main, monkeypatch):
     async def steam_detail(_appid, country):
         currency, amount = {"UA": ("UAH", 399), "TR": ("TRY", 199)}[country]
         return {
@@ -517,7 +513,10 @@ def test_steam_price_history_uses_country_specific_steam_data_and_keeps_itad_his
     assert ukraine.json()["current"]["price"] == {"amount": 399, "currency": "UAH"}
     assert turkey.json()["current"]["price"] == {"amount": 199, "currency": "TRY"}
     assert ukraine.json()["url"] == "https://store.steampowered.com/app/1145350/"
-    assert turkey.json()["history"][0]["price"] == history.return_value["history"][0]["price"]
+    assert ukraine.json()["history"] == []
+    assert turkey.json()["history"] == []
+    assert ukraine.json()["history_available"] is False
+    assert turkey.json()["history_available"] is False
     assert history.await_args_list[0].kwargs["country"] == "UA"
     assert history.await_args_list[1].kwargs["country"] == "TR"
 
@@ -559,7 +558,7 @@ def test_price_history_uses_itad_title_lookup_when_igdb_has_no_steam_appid(api_c
     assert response.json()["title"] == "Black Myth: Wukong"
     assert response.json()["history_available"] is True
     history.assert_awaited_once_with("Black Myth: Wukong", country="UA")
-    fallback.assert_awaited_once_with("Black Myth: Wukong", country="UA", exact_title_only=True)
+    fallback.assert_awaited_once_with("Black Myth: Wukong", country="UA")
 
 
 def test_catalog_title_price_uses_exact_steam_price_and_keeps_itad_history(api_client, app_main, monkeypatch):
@@ -596,7 +595,7 @@ def test_catalog_title_price_uses_exact_steam_price_and_keeps_itad_history(api_c
     assert response.json()["history"][0]["price"] == history["history"][0]["price"]
     assert response.json()["history_low_all"] is None
     assert response.json()["history_available"] is True
-    steam_price.assert_awaited_once_with("Portal 2", country="UA", exact_title_only=True)
+    steam_price.assert_awaited_once_with("Portal 2", country="UA")
     fetch_history.assert_awaited_once_with("Portal 2", country="UA")
 
 
@@ -623,7 +622,7 @@ def test_catalog_title_price_preserves_exact_free_steam_result_when_itad_fails(a
     assert response.json()["url"] == steam["url"]
     assert response.json()["history"] == []
     assert response.json()["history_available"] is False
-    steam_price.assert_awaited_once_with("Dota 2", country="US", exact_title_only=True)
+    steam_price.assert_awaited_once_with("Dota 2", country="US")
 
 
 def test_catalog_title_price_preserves_steam_current_and_action_when_itad_fails(api_client, app_main, monkeypatch):
@@ -688,7 +687,7 @@ def test_price_history_falls_back_to_steam_when_itad_title_lookup_is_unavailable
 
     assert response.status_code == 200
     assert response.json()["history_available"] is False
-    fallback.assert_awaited_once_with("Black Myth: Wukong", country="US", exact_title_only=True)
+    fallback.assert_awaited_once_with("Black Myth: Wukong", country="US")
 
 
 def test_homepage_deals_enriches_and_normalizes_payload(api_client, app_main, monkeypatch):

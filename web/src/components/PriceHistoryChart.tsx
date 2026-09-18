@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatHistoryDate, type PriceHistoryPoint } from "@/lib/gamePresentation";
 
 function formatPrice(amount: number, currency?: string) {
@@ -17,53 +18,65 @@ export function PriceHistoryChart({
   currency,
   currentPrice,
   historyAvailable,
+  unavailableMessage,
+  periodLabel = "6 months",
+  onRetry,
 }: {
   points: PriceHistoryPoint[];
   currency?: string;
   currentPrice?: number | null;
   historyAvailable?: boolean;
+  unavailableMessage?: string | null;
+  periodLabel?: string;
+  onRetry?: () => void;
 }) {
+  const [activeIndex, setActiveIndex] = useState(0);
   if (points.length === 0) {
     if (historyAvailable === false) {
       const currentPriceSuffix =
         typeof currentPrice === "number" && Number.isFinite(currentPrice)
           ? ` Current price: ${formatPrice(currentPrice, currency)}.`
           : "";
-      return (
-        <p className="text-sm text-muted-foreground">
-          Price history is temporarily unavailable.{currentPriceSuffix}
-        </p>
-      );
+      return <div className="text-sm text-muted-foreground">
+        <p>{unavailableMessage ?? "Price history is temporarily unavailable."}{currentPriceSuffix}</p>
+        {onRetry && <button type="button" onClick={onRetry} className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-bold">Retry price history</button>}
+      </div>;
     }
     if (typeof currentPrice === "number" && Number.isFinite(currentPrice)) {
       return (
         <p className="text-sm text-muted-foreground">
-          No price changes in the last 6 months. Current price:{" "}
+          No price changes in the last {periodLabel}. Current price:{" "}
           {formatPrice(currentPrice, currency)}.
         </p>
       );
     }
     return <p className="text-sm text-muted-foreground">No price history is available yet.</p>;
   }
-  if (points.length === 1) {
-    const point = points[0];
-    return (
-      <p className="text-sm text-muted-foreground">
-        Recorded {formatHistoryDate(point.date)} at {formatPrice(point.price, point.currency ?? currency)}.
-      </p>
-    );
-  }
-
   const width = 320;
   const height = 88;
-  const min = Math.min(...points.map((point) => point.price));
-  const max = Math.max(...points.map((point) => point.price));
+  const values = points.flatMap((point) => [point.price, point.regular].filter((value): value is number => typeof value === "number"));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const xFor = (index: number) => points.length === 1 ? width / 2 : (index / (points.length - 1)) * width;
+  const yFor = (value: number) => height - ((value - min) / (max - min || 1)) * (height - 16) - 8;
   const coordinates = points.map((point, index) => {
-    const x = (index / (points.length - 1)) * width;
-    const y = height - ((point.price - min) / (max - min || 1)) * (height - 16) - 8;
-    return { x, y };
+    return { x: xFor(index), y: yFor(point.price) };
   });
+  const regularCoordinates = points.flatMap((point, index) =>
+    typeof point.regular === "number" ? [{ x: xFor(index), y: yFor(point.regular) }] : [],
+  );
   const lowPoint = points.reduce((lowest, point) => (point.price < lowest.price ? point : lowest));
+  const activePoint = points[Math.min(activeIndex, points.length - 1)];
+  const discount = activePoint.cut ?? (
+    typeof activePoint.regular === "number" && activePoint.regular > activePoint.price
+      ? Math.round((1 - activePoint.price / activePoint.regular) * 100)
+      : 0
+  );
+  const steppedPath = (values: Array<{ x: number; y: number }>) => values.reduce(
+    (path, point, index) => index === 0 ? `M ${point.x} ${point.y}` : `${path} H ${point.x} V ${point.y}`,
+    "",
+  );
+  const pointLabel = `${formatHistoryDate(activePoint.date)}. Sale price: ${formatPrice(activePoint.price, activePoint.currency ?? currency)}. Regular price: ${typeof activePoint.regular === "number" ? formatPrice(activePoint.regular, activePoint.currency ?? currency) : "not recorded"}. Discount: ${discount}%.`;
 
   return (
     <div>
@@ -73,27 +86,50 @@ export function PriceHistoryChart({
         viewBox={`0 0 ${width} ${height}`}
         className="h-24 w-full text-primary"
       >
-        <polyline
-          points={coordinates.map(({ x, y }) => `${x},${y}`).join(" ")}
+        <path
+          aria-label="Sale price history"
+          d={steppedPath(coordinates)}
           fill="none"
           stroke="currentColor"
           strokeWidth={2}
           vectorEffect="non-scaling-stroke"
         />
+        {regularCoordinates.length > 0 && (
+          <path
+            aria-label="Regular price history"
+            d={steppedPath(regularCoordinates)}
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity={0.35}
+            strokeWidth={1.5}
+            strokeDasharray="3 3"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
         {coordinates.map(({ x, y }, index) => (
-          <circle key={points[index].date} cx={x} cy={y} r={2.5} fill="currentColor" />
+          <g
+            key={points[index].date}
+            role="button"
+            tabIndex={0}
+            aria-label={`${formatHistoryDate(points[index].date)} sale price ${formatPrice(points[index].price, points[index].currency ?? currency)}`}
+            onFocus={() => setActiveIndex(index)}
+            onMouseEnter={() => setActiveIndex(index)}
+          >
+            <circle cx={x} cy={y} r={7} fill="transparent" />
+            <circle cx={x} cy={y} r={2.5} fill="currentColor" />
+          </g>
         ))}
       </svg>
       <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
         <span>{formatHistoryDate(points[0].date)}</span>
-        <span>{formatHistoryDate(points[points.length - 1].date)}</span>
+        {points.length > 1 && <span>{formatHistoryDate(points[points.length - 1].date)}</span>}
       </div>
+      <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">{pointLabel}</p>
       <p className="mt-3 text-xs text-muted-foreground">
         Historical low{" "}
         <span className="font-bold text-foreground">
           {formatPrice(lowPoint.price, lowPoint.currency ?? currency)}
         </span>
-        {lowPoint.currency && <span> History currency: {lowPoint.currency}</span>}
       </p>
     </div>
   );

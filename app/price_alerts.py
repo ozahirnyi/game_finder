@@ -70,7 +70,7 @@ async def fetch_steam_alert_price(
 ) -> dict[str, Any]:
     if steam_appid is not None:
         return await fetch_steam_store_game_detail(steam_appid, country=country)
-    return await fetch_steam_store_game_price(title, country=country, exact_title_only=True)
+    return await fetch_steam_store_game_price(title, country=country)
 
 
 def format_price_alert_message(game_title: str, price_data: dict[str, Any]) -> str | None:

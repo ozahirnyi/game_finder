@@ -3,7 +3,7 @@ import os
 from calendar import monthrange
 from datetime import datetime, timezone
 from math import isfinite
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from fastapi import HTTPException
@@ -11,6 +11,8 @@ from fastapi import HTTPException
 
 ITAD_BASE_URL = "https://api.isthereanydeal.com"
 logger = logging.getLogger(__name__)
+HistoryPeriod = Literal["1m", "6m", "1y"]
+HISTORY_PERIOD_MONTHS: dict[HistoryPeriod, int] = {"1m": 1, "6m": 6, "1y": 12}
 
 
 def get_itad_api_key() -> str:
@@ -47,7 +49,14 @@ def _history_point(value: Any) -> dict[str, Any]:
         return {"timestamp": None, "shop": None, "price": None, "regular": None}
     deal = value.get("deal") if isinstance(value.get("deal"), dict) else {}
     shop = value.get("shop") if isinstance(value.get("shop"), dict) else {}
-    return {"timestamp": value.get("timestamp"), "shop": shop.get("name"), "price": _money(deal.get("price")), "regular": _money(deal.get("regular"))}
+    cut = deal.get("cut")
+    result = {
+        "timestamp": value.get("timestamp"), "shop": shop.get("name"),
+        "price": _money(deal.get("price")), "regular": _money(deal.get("regular")),
+    }
+    if isinstance(cut, int) and not isinstance(cut, bool):
+        result["cut"] = cut
+    return result
 
 
 def _timestamp(value: Any) -> datetime | None:
@@ -62,14 +71,15 @@ def _timestamp(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def price_history_since(now: datetime | None = None) -> str:
+def price_history_since(period: HistoryPeriod = "6m", now: datetime | None = None) -> str:
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
     current = current.astimezone(timezone.utc)
-    month = current.month - 6
+    months = HISTORY_PERIOD_MONTHS[period]
+    month = current.month - months
     year = current.year
-    if month < 1:
+    while month < 1:
         month += 12
         year -= 1
     since = current.replace(
@@ -87,7 +97,7 @@ def _itad_history_points(payload: Any) -> list[dict[str, Any]]:
     return [point for point in values if isinstance(point, dict)] if isinstance(values, list) else []
 
 
-def normalize_price_history(deals: list[dict[str, Any]], history_points: list[dict[str, Any]], *, now: datetime | None = None) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+def normalize_price_history(deals: list[dict[str, Any]], history_points: list[dict[str, Any]], *, period: HistoryPeriod = "6m", now: datetime | None = None) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     """Keep valid provider data compact, chronological, and safe for charting."""
     valid_deals = [deal for deal in (_deal(value) for value in deals) if deal and deal.get("price")]
     current = min(
@@ -99,9 +109,9 @@ def normalize_price_history(deals: list[dict[str, Any]], history_points: list[di
     if current_time.tzinfo is None:
         current_time = current_time.replace(tzinfo=timezone.utc)
     current_time = current_time.astimezone(timezone.utc)
-    cutoff_month = current_time.month - 6
+    cutoff_month = current_time.month - HISTORY_PERIOD_MONTHS[period]
     cutoff_year = current_time.year
-    if cutoff_month < 1:
+    while cutoff_month < 1:
         cutoff_month += 12
         cutoff_year -= 1
     cutoff = current_time.replace(
@@ -213,13 +223,13 @@ async def resolve_itad_game_id(
     return game_id, game_title
 
 
-async def fetch_game_price_history(title: str, country: str = "US", steam_appid: int | None = None) -> dict[str, Any]:
+async def fetch_game_price_history(title: str, country: str = "US", steam_appid: int | None = None, period: HistoryPeriod = "6m") -> dict[str, Any]:
     api_key = get_itad_api_key()
     if not api_key:
         raise HTTPException(status_code=503, detail="ITAD_API_KEY is not configured")
 
     headers = {"ITAD-API-Key": api_key}
-    since = price_history_since()
+    since = price_history_since(period)
     try:
         async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
             game_id, game_title, game_url = await _resolve_itad_game(client, title, steam_appid)
@@ -283,7 +293,7 @@ async def fetch_game_price_history(title: str, country: str = "US", steam_appid:
     history_data = history.json()
     raw_history_count = len(history_data) if isinstance(history_data, list) else len(history_data.get("history", [])) if isinstance(history_data, dict) and isinstance(history_data.get("history"), list) else 0
     history_points = _itad_history_points(history_data)
-    current, normalized_history = normalize_price_history(deal_values, history_points)
+    current, normalized_history = normalize_price_history(deal_values, history_points, period=period)
     logger.info(
         "ITAD price history normalized game_id=%s country=%s since=%s raw_count=%d normalized_count=%d",
         game_id,

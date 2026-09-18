@@ -166,7 +166,7 @@ def test_check_price_alerts_uses_profile_price_region_and_steam_price(monkeypatc
     result = asyncio.run(runner.check_price_alerts(db))
 
     assert result.alerts_sent == 1
-    steam_price.assert_awaited_once_with("Hades", country="PL", exact_title_only=True)
+    steam_price.assert_awaited_once_with("Hades", country="PL")
     assert "79.99 PLN at Steam" in send.call_args.args[1]
 
 

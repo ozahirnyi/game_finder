@@ -554,6 +554,7 @@ class PriceHistoryPoint(BaseModel):
     shop: str | None = None
     price: PriceMoney | None = None
     regular: PriceMoney | None = None
+    cut: int | None = None
 
 
 class GamePriceHistory(BaseModel):

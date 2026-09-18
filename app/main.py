@@ -3956,13 +3956,34 @@ def _steam_only_price_history(history: dict) -> list[dict]:
 
 def _merge_platform_price_history(platform_price: dict, history: dict) -> dict:
     """Keep Steam pricing authoritative and use ITAD only for Steam history."""
+    steam_history = _steam_only_price_history(history)
+    current = platform_price.get("current") if isinstance(platform_price, dict) else None
+    current_price = current.get("price") if isinstance(current, dict) else None
+    current_currency = current_price.get("currency") if isinstance(current_price, dict) else None
+    matching_history = [
+        point
+        for point in steam_history
+        if isinstance(point.get("price"), dict)
+        and point["price"].get("currency") == current_currency
+        and (
+            not isinstance(point.get("regular"), dict)
+            or point["regular"].get("currency") == current_currency
+        )
+    ]
+    currency_mismatch = bool(steam_history) and not matching_history
     return {
         **platform_price,
         "history_low_all": None,
         "history_low_1y": None,
         "history_low_3m": None,
         "deals": [],
-        "history": _steam_only_price_history(history),
+        "history": matching_history,
+        "history_available": not currency_mismatch,
+        **(
+            {"provider_message": "Steam price history is unavailable for the selected regional currency."}
+            if currency_mismatch
+            else {}
+        ),
     }
 
 
@@ -3978,10 +3999,25 @@ def _strip_itad_reseller_urls(history: dict) -> dict:
     }
 
 
+async def _fetch_price_history_for_period(
+    title: str,
+    country: str,
+    period: Literal["1m", "6m", "1y"],
+    steam_appid: int | None = None,
+) -> dict:
+    kwargs: dict[str, str | int] = {"country": country}
+    if steam_appid is not None:
+        kwargs["steam_appid"] = steam_appid
+    if period != "6m":
+        kwargs["period"] = period
+    return await fetch_game_price_history(title, **kwargs)
+
+
 @app.get("/prices/games/{igdb_id}", response_model=GamePriceHistory)
 async def game_price_history(
     igdb_id: int,
     country: str = "US",
+    period: Literal["1m", "6m", "1y"] = Query(default="6m"),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
@@ -4001,15 +4037,15 @@ async def game_price_history(
     if not isinstance(steam_appid, int) or steam_appid < 1:
         if not title:
             raise HTTPException(status_code=404, detail="No price lookup title is available for this catalog game")
-        title_key = build_cache_key("price_history_title_v3", title=title, country=normalized_country)
+        title_key = build_cache_key("price_history_title_v4", title=title, country=normalized_country, period=period)
 
         async def fetch_title_price():
             try:
                 steam_price = await fetch_steam_store_game_price(
-                    title, country=normalized_country, exact_title_only=True
+                    title, country=normalized_country
                 )
             except HTTPException:
-                history = await fetch_game_price_history(title, country=normalized_country)
+                history = await _fetch_price_history_for_period(title, normalized_country, period)
                 return {
                     "itad_id": str(history.get("itad_id") or f"catalog:{igdb_id}"),
                     "title": title,
@@ -4026,7 +4062,7 @@ async def game_price_history(
                 }
 
             try:
-                history = await fetch_game_price_history(title, country=normalized_country)
+                history = await _fetch_price_history_for_period(title, normalized_country, period)
             except HTTPException as exc:
                 if exc.status_code not in {404, 502, 503}:
                     raise
@@ -4036,17 +4072,17 @@ async def game_price_history(
                     "history": [],
                     "provider_message": "Price history is temporarily unavailable.",
                 }
-            return {**_merge_platform_price_history(steam_price, history), "history_available": True}
+            return _merge_platform_price_history(steam_price, history)
 
         return await get_json_cached(title_key, CACHE_TTL, fetch_title_price)
 
-    price_key = build_cache_key("price_history_v2", steam_appid=steam_appid, country=normalized_country)
+    price_key = build_cache_key("price_history_v3", steam_appid=steam_appid, country=normalized_country, period=period)
     steam_detail = await fetch_steam_store_game_detail(steam_appid, country=normalized_country)
     steam_title = str(steam_detail.get("title") or steam_detail.get("name") or title or steam_appid).strip()
 
     async def fetch_price():
-        history = await fetch_game_price_history(steam_title, country=normalized_country, steam_appid=steam_appid)
-        return {**_merge_platform_price_history(steam_detail, history), "history_available": True}
+        history = await _fetch_price_history_for_period(steam_title, normalized_country, period, steam_appid)
+        return _merge_platform_price_history(steam_detail, history)
 
     try:
         return await get_json_cached(price_key, CACHE_TTL, fetch_price)
@@ -4060,6 +4096,7 @@ async def game_price_history(
 async def steam_game_price_history(
     appid: int,
     country: str = "US",
+    period: Literal["1m", "6m", "1y"] = Query(default="6m"),
     current_user: User | None = Depends(get_optional_current_user),
 ):
     normalized_country = effective_price_country(current_user, country)
@@ -4068,8 +4105,8 @@ async def steam_game_price_history(
     steam_detail = await fetch_steam_store_game_detail(appid, country=normalized_country)
     title = str(steam_detail.get("title") or steam_detail.get("name") or appid).strip()
     try:
-        history = await fetch_game_price_history(title, country=normalized_country, steam_appid=appid)
-        return {**_merge_platform_price_history(steam_detail, history), "history_available": True}
+        history = await _fetch_price_history_for_period(title, normalized_country, period, appid)
+        return _merge_platform_price_history(steam_detail, history)
     except HTTPException as exc:
         if exc.status_code not in {404, 502, 503}:
             raise

@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 import uuid
 
 from fastapi.testclient import TestClient
@@ -674,6 +675,45 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
     assert response.json()["current"]["price"] == {"amount": 19.99, "currency": "USD"}
     # Current Steam prices must not be combined with ITAD's cross-store low.
     assert response.json()["history_low_all"] is None
+
+
+def test_steam_history_refuses_foreign_currency_points_but_preserves_current_price():
+    steam_price = {
+        "itad_id": "steam:1086940",
+        "title": "Baldur's Gate 3",
+        "url": "https://store.steampowered.com/app/1086940/",
+        "current": {"shop": "Steam", "price": {"amount": 999, "currency": "UAH"}},
+        "is_free": False,
+    }
+    itad_history = {
+        "history": [
+            {"timestamp": "2026-09-01T00:00:00Z", "shop": "Steam", "price": {"amount": 41.99, "currency": "USD"}},
+        ]
+    }
+
+    result = main._merge_platform_price_history(steam_price, itad_history)
+
+    assert result["current"] == steam_price["current"]
+    assert result["url"] == steam_price["url"]
+    assert result["history"] == []
+    assert result["history_available"] is False
+    assert "regional currency" in result["provider_message"]
+
+
+def test_price_history_forwards_a_nondefault_period_to_itad(monkeypatch):
+    history = {"itad_id": "steam:1", "history": []}
+    fetch = AsyncMock(return_value=history)
+    monkeypatch.setattr(main, "fetch_game_price_history", fetch)
+
+    assert asyncio.run(main._fetch_price_history_for_period("Hades", "UA", "1m", 1145360)) == history
+    fetch.assert_awaited_once_with("Hades", country="UA", steam_appid=1145360, period="1m")
+
+
+def test_price_history_cache_key_changes_with_the_selected_period():
+    one_month = main.build_cache_key("price_history_v3", steam_appid=1145360, country="UA", period="1m")
+    one_year = main.build_cache_key("price_history_v3", steam_appid=1145360, country="UA", period="1y")
+
+    assert one_month != one_year
 
 
 def test_game_price_history_uses_steam_when_itad_is_unavailable(monkeypatch):
