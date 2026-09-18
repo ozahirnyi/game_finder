@@ -53,7 +53,7 @@ describe("price history presentation", () => {
     ).toBe(true);
   });
 
-  it("keeps valid chronological points and supplies concise endpoint labels", () => {
+  it("keeps valid chronological points with source currencies and concise endpoint labels", () => {
     expect(
       presentPriceHistory([
         { timestamp: "2025-09-25T00:00:00+00:00", price: { amount: 24.99, currency: "USD" } },
@@ -62,8 +62,8 @@ describe("price history presentation", () => {
       ]),
     ).toEqual({
       points: [
-        { date: "2025-08-01T00:00:00+00:00", price: 19.99 },
-        { date: "2025-09-25T00:00:00+00:00", price: 24.99 },
+        { date: "2025-08-01T00:00:00+00:00", price: 19.99, currency: "USD" },
+        { date: "2025-09-25T00:00:00+00:00", price: 24.99, currency: "USD" },
       ],
       labels: ["1 Aug", "25 Sep"],
       historicalLow: 19.99,

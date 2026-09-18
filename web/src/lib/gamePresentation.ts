@@ -3,7 +3,7 @@ export type PriceHistoryApiPoint = {
   price?: { amount?: number | null; currency?: string | null } | null;
 };
 
-export type PriceHistoryPoint = { date: string; price: number };
+export type PriceHistoryPoint = { date: string; price: number; currency?: string };
 
 const shortMonth = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -58,7 +58,7 @@ export function presentPriceHistory(
         Number.isFinite(price) &&
         price >= 0 &&
         item.timestamp
-        ? [{ date: item.timestamp, price }]
+        ? [{ date: item.timestamp, price, currency: item.price?.currency ?? undefined }]
         : [];
     })
     .sort((a, b) => a.date.localeCompare(b.date));

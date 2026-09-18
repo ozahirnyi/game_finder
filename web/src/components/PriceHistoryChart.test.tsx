@@ -60,4 +60,20 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByText("Historical low")).toBeInTheDocument();
     expect(screen.getByText("$19.99")).toBeInTheDocument();
   });
+
+  it("formats the historical low in the source history currency", () => {
+    render(
+      <PriceHistoryChart
+        currency="UAH"
+        points={[
+          { date: "2025-08-01T00:00:00+00:00", price: 13, currency: "USD" },
+          { date: "2025-09-25T00:00:00+00:00", price: 20, currency: "USD" },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("$13.00")).toBeInTheDocument();
+    expect(screen.getByText("History currency: USD")).toBeInTheDocument();
+    expect(screen.queryByText(/₴13/)).not.toBeInTheDocument();
+  });
 });
