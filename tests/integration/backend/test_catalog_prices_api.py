@@ -10,6 +10,46 @@ async def run_cached(_key, _ttl, fetch):
     return await fetch()
 
 
+def test_catalog_title_fallback_uses_resolved_steam_edition_for_history(
+    api_client, app_main, monkeypatch
+):
+    monkeypatch.setattr(
+        app_main,
+        "fetch_igdb_game_detail",
+        AsyncMock(return_value={"name": "The Witcher 3: Wild Hunt", "steam_appid": None}),
+    )
+    monkeypatch.setattr(
+        app_main,
+        "fetch_steam_store_game_price",
+        AsyncMock(return_value={
+            "appid": 292030,
+            "itad_id": "steam:292030",
+            "title": "The Witcher 3: Wild Hunt - Complete Edition",
+            "current": {"shop": "Steam", "price": {"amount": 1349, "currency": "UAH"}},
+            "is_free": False,
+            "url": "https://store.steampowered.com/app/292030/",
+        }),
+    )
+    history = AsyncMock(return_value={"history": [{
+        "timestamp": "2026-09-01T00:00:00Z",
+        "shop": "Steam",
+        "price": {"amount": 14.99, "currency": "USD"},
+    }]})
+    monkeypatch.setattr(app_main, "fetch_game_price_history", history)
+    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+
+    response = api_client.get("/prices/games/1942", params={"country": "UA"})
+
+    assert response.status_code == 200
+    assert response.json()["current"]["price"] == {"amount": 1349.0, "currency": "UAH"}
+    assert response.json()["history"][0]["price"] == {"amount": 14.99, "currency": "USD"}
+    history.assert_awaited_once_with(
+        "The Witcher 3: Wild Hunt - Complete Edition",
+        country="UA",
+        steam_appid=292030,
+    )
+
+
 def test_search_games_accepts_structured_discovery_filters(api_client, app_main, monkeypatch):
     captured = {}
 

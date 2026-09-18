@@ -57,7 +57,12 @@ export function PriceHistoryChart({
   const values = points.flatMap((point) => [point.price, point.regular].filter((value): value is number => typeof value === "number"));
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const xFor = (index: number) => points.length === 1 ? width / 2 : (index / (points.length - 1)) * width;
+  const timestamps = points.map((point) => Date.parse(point.date));
+  const firstTimestamp = timestamps[0];
+  const timestampSpan = Math.max(timestamps[timestamps.length - 1] - firstTimestamp, 1);
+  const xFor = (index: number) => points.length === 1
+    ? width / 2
+    : ((timestamps[index] - firstTimestamp) / timestampSpan) * width;
   const yFor = (value: number) => height - ((value - min) / (max - min || 1)) * (height - 16) - 8;
   const coordinates = points.map((point, index) => {
     return { x: xFor(index), y: yFor(point.price) };
@@ -77,6 +82,20 @@ export function PriceHistoryChart({
     "",
   );
   const activeCoordinate = activeIndex == null ? undefined : coordinates[Math.min(activeIndex, coordinates.length - 1)];
+  const activeIndexForX = (x: number) => coordinates.reduce(
+    (active, point, index) => point.x <= x ? index : active,
+    0,
+  );
+  const tooltipStyle = !activeCoordinate
+    ? undefined
+    : activeCoordinate.x <= width * 0.15
+      ? { left: "0%", transform: "translate(0, -115%)" }
+      : activeCoordinate.x >= width * 0.85
+        ? { left: "100%", transform: "translate(-100%, -115%)" }
+        : {
+            left: `${(activeCoordinate.x / width) * 100}%`,
+            transform: "translate(-50%, -115%)",
+          };
 
   return (
     <div>
@@ -86,6 +105,12 @@ export function PriceHistoryChart({
         role="img"
         viewBox={`0 0 ${width} ${height}`}
         className="h-24 w-full text-primary"
+        onPointerMove={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          const x = ((event.clientX - bounds.left) / Math.max(bounds.width, 1)) * width;
+          setActiveIndex(activeIndexForX(Math.min(width, Math.max(0, x))));
+        }}
+        onPointerLeave={() => setActiveIndex(null)}
       >
         <path
           aria-label="Sale price history"
@@ -115,10 +140,9 @@ export function PriceHistoryChart({
             aria-label={`${formatHistoryDate(points[index].date)} sale price ${formatPrice(points[index].price, points[index].currency ?? currency)}`}
             onFocus={() => setActiveIndex(index)}
             onMouseEnter={() => setActiveIndex(index)}
-            onMouseLeave={() => setActiveIndex(null)}
           >
             <circle cx={x} cy={y} r={7} fill="transparent" />
-            <circle cx={x} cy={y} r={2.5} fill="currentColor" />
+            {activeIndex === index && <circle cx={x} cy={y} r={2.5} fill="currentColor" />}
           </g>
         ))}
       </svg>
@@ -127,9 +151,8 @@ export function PriceHistoryChart({
           role="tooltip"
           className="pointer-events-none absolute z-10 rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-lg"
           style={{
-            left: `${(activeCoordinate.x / width) * 100}%`,
+            ...tooltipStyle,
             top: `${(activeCoordinate.y / height) * 100}%`,
-            transform: "translate(-50%, -115%)",
           }}
         >
           <p className="font-semibold">{formatHistoryDate(activePoint.date)}</p>

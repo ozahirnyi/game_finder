@@ -78,18 +78,23 @@ export function presentPriceHistory(
         : [];
     })
     .sort((a, b) => a.date.localeCompare(b.date));
+  const compactPoints = points.filter((point, index) => {
+    const previous = points[index - 1];
+    return !previous || point.price !== previous.price || point.regular !== previous.regular ||
+      point.cut !== previous.cut || point.currency !== previous.currency;
+  });
   const labels =
-    points.length > 1
-      ? [formatHistoryDate(points[0].date), formatHistoryDate(points[points.length - 1].date)]
-      : points.length === 1
-        ? [formatHistoryDate(points[0].date)]
+    compactPoints.length > 1
+      ? [formatHistoryDate(compactPoints[0].date), formatHistoryDate(compactPoints[compactPoints.length - 1].date)]
+      : compactPoints.length === 1
+        ? [formatHistoryDate(compactPoints[0].date)]
         : [];
   return {
-    points,
+    points: compactPoints,
     labels,
-    historicalLow: points.length ? Math.min(...points.map((point) => point.price)) : undefined,
+    historicalLow: compactPoints.length ? Math.min(...compactPoints.map((point) => point.price)) : undefined,
     isCurrentOnly:
-      points.length === 0 && typeof current?.amount === "number" && Number.isFinite(current.amount),
+      compactPoints.length === 0 && typeof current?.amount === "number" && Number.isFinite(current.amount),
   };
 }
 

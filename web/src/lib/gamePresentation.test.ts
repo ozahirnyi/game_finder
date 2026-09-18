@@ -71,6 +71,17 @@ describe("price history presentation", () => {
     });
   });
 
+  it("collapses consecutive identical price states while keeping a later change", () => {
+    expect(presentPriceHistory([
+        { timestamp: "2026-01-01T00:00:00Z", price: { amount: 29.99, currency: "USD" }, regular: { amount: 29.99, currency: "USD" }, cut: 0 },
+        { timestamp: "2026-01-08T00:00:00Z", price: { amount: 29.99, currency: "USD" }, regular: { amount: 29.99, currency: "USD" }, cut: 0 },
+        { timestamp: "2026-01-15T00:00:00Z", price: { amount: 14.99, currency: "USD" }, regular: { amount: 29.99, currency: "USD" }, cut: 50 },
+      ]).points).toMatchObject([
+      { date: "2026-01-01T00:00:00Z", price: 29.99 },
+      { date: "2026-01-15T00:00:00Z", price: 14.99, cut: 50 },
+    ]);
+  });
+
   it("marks a current price without source changes as a current-only state", () => {
     expect(presentPriceHistory([], { amount: 9.99, currency: "USD" })).toMatchObject({
       points: [],

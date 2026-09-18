@@ -4043,7 +4043,16 @@ async def game_price_history(
                 }
 
             try:
-                history = await _fetch_price_history_for_period(title, normalized_country, period)
+                resolved_steam_appid = steam_price.get("appid")
+                resolved_steam_title = str(steam_price.get("title") or title).strip()
+                history = await _fetch_price_history_for_period(
+                    resolved_steam_title,
+                    normalized_country,
+                    period,
+                    resolved_steam_appid
+                    if isinstance(resolved_steam_appid, int) and resolved_steam_appid > 0
+                    else None,
+                )
             except HTTPException as exc:
                 if exc.status_code not in {404, 502, 503}:
                     raise

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PriceHistoryChart } from "./PriceHistoryChart";
 
@@ -97,5 +97,42 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByRole("tooltip")).toHaveTextContent(/Regular price: \$29\.99/i);
     fireEvent.focus(screen.getByRole("button", { name: /25 Sep.*sale/i }));
     expect(screen.getByRole("tooltip")).toHaveTextContent(/25 Sep.*Sale price: \$24\.99/i);
+  });
+
+  it("selects the active stepped price when the pointer moves between observations", () => {
+    render(
+      <PriceHistoryChart
+        currency="USD"
+        points={[
+          { date: "2025-08-01T00:00:00Z", price: 19.99 },
+          { date: "2025-09-25T00:00:00Z", price: 24.99 },
+        ]}
+      />,
+    );
+    const chart = screen.getByLabelText("Price history chart");
+    vi.spyOn(chart, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 320, 88));
+
+    fireEvent.pointerMove(chart, { clientX: 120, clientY: 40 });
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/1 Aug.*Sale price: \$19\.99/i);
+  });
+
+  it("keeps an edge tooltip inside the plot", () => {
+    render(
+      <PriceHistoryChart
+        currency="USD"
+        points={[
+          { date: "2025-08-01T00:00:00Z", price: 19.99 },
+          { date: "2025-09-25T00:00:00Z", price: 24.99 },
+        ]}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("button", { name: /1 Aug.*sale/i }));
+
+    expect(screen.getByRole("tooltip")).toHaveStyle({
+      left: "0%",
+      transform: "translate(0, -115%)",
+    });
   });
 });
