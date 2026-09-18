@@ -405,11 +405,12 @@ function GameDetail() {
     ...(rating === "Not rated yet" ? [] : [`${rating} critic score`]),
   ];
   const priceHistory = presentPriceHistory(priceQuery.data?.history ?? [], current?.price);
+  const historyCurrency = priceHistory.points.find((point) => point.currency)?.currency;
   const showPriceHistory = shouldRenderPriceHistory(priceQuery.data?.is_free === true);
   const historyPeriodLabels: Record<PriceHistoryPeriod, string> = {
-    "1m": "1 month",
     "6m": "6 months",
     "1y": "1 year",
+    "2y": "2 years",
   };
   const similar = (similarQuery.data?.results ?? [])
     .filter((candidate) => candidate.id != null && String(candidate.id) !== catalogGame.id)
@@ -543,7 +544,9 @@ function GameDetail() {
             <section>
               <SectionHeader
                 title="Steam price history"
-                hint="Steam price events in your selected regional currency."
+                hint={historyCurrency
+                  ? `Steam history source currency: ${historyCurrency}.`
+                  : "Steam price events."}
               />
               <div className="rounded-2xl border border-border bg-surface p-6">
                 <div className="mb-5 flex gap-2" aria-label="Price history period">
@@ -575,8 +578,8 @@ function GameDetail() {
                 ) : (
                   <PriceHistoryChart
                     points={priceHistory.points}
-                    currency={game.currency}
-                    currentPrice={game.price}
+                    currency={historyCurrency ?? game.currency}
+                    currentPrice={historyCurrency === game.currency ? game.price : undefined}
                     historyAvailable={priceQuery.data?.history_available ?? false}
                     unavailableMessage={priceQuery.data?.provider_message}
                     periodLabel={historyPeriodLabels[historyPeriod]}

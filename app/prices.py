@@ -11,8 +11,8 @@ from fastapi import HTTPException
 
 ITAD_BASE_URL = "https://api.isthereanydeal.com"
 logger = logging.getLogger(__name__)
-HistoryPeriod = Literal["1m", "6m", "1y"]
-HISTORY_PERIOD_MONTHS: dict[HistoryPeriod, int] = {"1m": 1, "6m": 6, "1y": 12}
+HistoryPeriod = Literal["1m", "6m", "1y", "2y"]
+HISTORY_PERIOD_MONTHS: dict[HistoryPeriod, int] = {"1m": 1, "6m": 6, "1y": 12, "2y": 24}
 
 
 def get_itad_api_key() -> str:

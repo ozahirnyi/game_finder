@@ -30,7 +30,7 @@ export function PriceHistoryChart({
   periodLabel?: string;
   onRetry?: () => void;
 }) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   if (points.length === 0) {
     if (historyAvailable === false) {
       const currentPriceSuffix =
@@ -66,9 +66,9 @@ export function PriceHistoryChart({
     typeof point.regular === "number" ? [{ x: xFor(index), y: yFor(point.regular) }] : [],
   );
   const lowPoint = points.reduce((lowest, point) => (point.price < lowest.price ? point : lowest));
-  const activePoint = points[Math.min(activeIndex, points.length - 1)];
-  const discount = activePoint.cut ?? (
-    typeof activePoint.regular === "number" && activePoint.regular > activePoint.price
+  const activePoint = activeIndex == null ? undefined : points[Math.min(activeIndex, points.length - 1)];
+  const discount = activePoint?.cut ?? (
+    typeof activePoint?.regular === "number" && activePoint.regular > activePoint.price
       ? Math.round((1 - activePoint.price / activePoint.regular) * 100)
       : 0
   );
@@ -76,10 +76,11 @@ export function PriceHistoryChart({
     (path, point, index) => index === 0 ? `M ${point.x} ${point.y}` : `${path} H ${point.x} V ${point.y}`,
     "",
   );
-  const pointLabel = `${formatHistoryDate(activePoint.date)}. Sale price: ${formatPrice(activePoint.price, activePoint.currency ?? currency)}. Regular price: ${typeof activePoint.regular === "number" ? formatPrice(activePoint.regular, activePoint.currency ?? currency) : "not recorded"}. Discount: ${discount}%.`;
+  const activeCoordinate = activeIndex == null ? undefined : coordinates[Math.min(activeIndex, coordinates.length - 1)];
 
   return (
     <div>
+      <div className="relative h-24">
       <svg
         aria-label="Price history chart"
         role="img"
@@ -114,17 +115,34 @@ export function PriceHistoryChart({
             aria-label={`${formatHistoryDate(points[index].date)} sale price ${formatPrice(points[index].price, points[index].currency ?? currency)}`}
             onFocus={() => setActiveIndex(index)}
             onMouseEnter={() => setActiveIndex(index)}
+            onMouseLeave={() => setActiveIndex(null)}
           >
             <circle cx={x} cy={y} r={7} fill="transparent" />
             <circle cx={x} cy={y} r={2.5} fill="currentColor" />
           </g>
         ))}
       </svg>
+      {activePoint && activeCoordinate && (
+        <div
+          role="tooltip"
+          className="pointer-events-none absolute z-10 rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-lg"
+          style={{
+            left: `${(activeCoordinate.x / width) * 100}%`,
+            top: `${(activeCoordinate.y / height) * 100}%`,
+            transform: "translate(-50%, -115%)",
+          }}
+        >
+          <p className="font-semibold">{formatHistoryDate(activePoint.date)}</p>
+          <p>Sale price: {formatPrice(activePoint.price, activePoint.currency ?? currency)}</p>
+          <p>Regular price: {typeof activePoint.regular === "number" ? formatPrice(activePoint.regular, activePoint.currency ?? currency) : "Not recorded"}</p>
+          <p>Discount: {discount}%</p>
+        </div>
+      )}
+      </div>
       <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
         <span>{formatHistoryDate(points[0].date)}</span>
         {points.length > 1 && <span>{formatHistoryDate(points[points.length - 1].date)}</span>}
       </div>
-      <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">{pointLabel}</p>
       <p className="mt-3 text-xs text-muted-foreground">
         Historical low{" "}
         <span className="font-bold text-foreground">

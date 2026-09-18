@@ -73,3 +73,4 @@ def test_price_history_requests_the_selected_window_in_itad_utc_format():
     assert prices.price_history_since("1m", now) == "2026-08-03T12:34:56Z"
     assert prices.price_history_since("6m", now) == "2026-03-03T12:34:56Z"
     assert prices.price_history_since("1y", now) == "2025-09-03T12:34:56Z"
+    assert prices.price_history_since("2y", now) == "2024-09-03T12:34:56Z"

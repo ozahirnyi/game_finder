@@ -3957,33 +3957,14 @@ def _steam_only_price_history(history: dict) -> list[dict]:
 def _merge_platform_price_history(platform_price: dict, history: dict) -> dict:
     """Keep Steam pricing authoritative and use ITAD only for Steam history."""
     steam_history = _steam_only_price_history(history)
-    current = platform_price.get("current") if isinstance(platform_price, dict) else None
-    current_price = current.get("price") if isinstance(current, dict) else None
-    current_currency = current_price.get("currency") if isinstance(current_price, dict) else None
-    matching_history = [
-        point
-        for point in steam_history
-        if isinstance(point.get("price"), dict)
-        and point["price"].get("currency") == current_currency
-        and (
-            not isinstance(point.get("regular"), dict)
-            or point["regular"].get("currency") == current_currency
-        )
-    ]
-    currency_mismatch = bool(steam_history) and not matching_history
     return {
         **platform_price,
         "history_low_all": None,
         "history_low_1y": None,
         "history_low_3m": None,
         "deals": [],
-        "history": matching_history,
-        "history_available": not currency_mismatch,
-        **(
-            {"provider_message": "Steam price history is unavailable for the selected regional currency."}
-            if currency_mismatch
-            else {}
-        ),
+        "history": steam_history,
+        "history_available": True,
     }
 
 
@@ -4002,7 +3983,7 @@ def _strip_itad_reseller_urls(history: dict) -> dict:
 async def _fetch_price_history_for_period(
     title: str,
     country: str,
-    period: Literal["1m", "6m", "1y"],
+    period: Literal["1m", "6m", "1y", "2y"],
     steam_appid: int | None = None,
 ) -> dict:
     kwargs: dict[str, str | int] = {"country": country}
@@ -4017,7 +3998,7 @@ async def _fetch_price_history_for_period(
 async def game_price_history(
     igdb_id: int,
     country: str = "US",
-    period: Literal["1m", "6m", "1y"] = Query(default="6m"),
+    period: Literal["1m", "6m", "1y", "2y"] = Query(default="6m"),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
@@ -4096,7 +4077,7 @@ async def game_price_history(
 async def steam_game_price_history(
     appid: int,
     country: str = "US",
-    period: Literal["1m", "6m", "1y"] = Query(default="6m"),
+    period: Literal["1m", "6m", "1y", "2y"] = Query(default="6m"),
     current_user: User | None = Depends(get_optional_current_user),
 ):
     normalized_country = effective_price_country(current_user, country)

@@ -677,7 +677,7 @@ def test_game_price_history_returns_normalized_prices(monkeypatch):
     assert response.json()["history_low_all"] is None
 
 
-def test_steam_history_refuses_foreign_currency_points_but_preserves_current_price():
+def test_steam_history_keeps_source_currency_points_but_preserves_current_price():
     steam_price = {
         "itad_id": "steam:1086940",
         "title": "Baldur's Gate 3",
@@ -695,9 +695,9 @@ def test_steam_history_refuses_foreign_currency_points_but_preserves_current_pri
 
     assert result["current"] == steam_price["current"]
     assert result["url"] == steam_price["url"]
-    assert result["history"] == []
-    assert result["history_available"] is False
-    assert "regional currency" in result["provider_message"]
+    assert result["history"] == itad_history["history"]
+    assert result["history_available"] is True
+    assert "provider_message" not in result
 
 
 def test_price_history_forwards_a_nondefault_period_to_itad(monkeypatch):
@@ -707,6 +707,15 @@ def test_price_history_forwards_a_nondefault_period_to_itad(monkeypatch):
 
     assert asyncio.run(main._fetch_price_history_for_period("Hades", "UA", "1m", 1145360)) == history
     fetch.assert_awaited_once_with("Hades", country="UA", steam_appid=1145360, period="1m")
+
+
+def test_price_history_forwards_two_year_period_to_itad(monkeypatch):
+    history = {"itad_id": "steam:1", "history": []}
+    fetch = AsyncMock(return_value=history)
+    monkeypatch.setattr(main, "fetch_game_price_history", fetch)
+
+    assert asyncio.run(main._fetch_price_history_for_period("Hades", "PL", "2y", 1145360)) == history
+    fetch.assert_awaited_once_with("Hades", country="PL", steam_appid=1145360, period="2y")
 
 
 def test_price_history_cache_key_changes_with_the_selected_period():

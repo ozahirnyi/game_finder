@@ -41,7 +41,9 @@ describe("PriceHistoryChart", () => {
       />,
     );
 
-    expect(screen.getByText(/25 Sep\. Sale price: \$19\.99/)).toBeInTheDocument();
+    fireEvent.focus(screen.getByRole("button", { name: /25 Sep.*sale/i }));
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/25 Sep.*Sale price: \$19\.99/i);
   });
 
   it("renders an accessible graph with endpoint labels and the historical low", () => {
@@ -92,8 +94,8 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByLabelText("Regular price history")).toBeInTheDocument();
     const firstPoint = screen.getByRole("button", { name: /1 Aug.*sale/i });
     fireEvent.mouseEnter(firstPoint);
-    expect(screen.getByText(/Regular price: \$29\.99/i)).toBeInTheDocument();
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/Regular price: \$29\.99/i);
     fireEvent.focus(screen.getByRole("button", { name: /25 Sep.*sale/i }));
-    expect(screen.getByText(/25 Sep.*Sale price: \$24\.99/i)).toBeInTheDocument();
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/25 Sep.*Sale price: \$24\.99/i);
   });
 });

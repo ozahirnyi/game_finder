@@ -98,12 +98,11 @@ afterEach(() => {
 });
 
 describe("game detail presentation", () => {
-  it("explains that foreign-currency history is unavailable without hiding the Steam price", async () => {
+  it("labels foreign-currency Steam history without changing the current Steam price", async () => {
     api.getPriceHistory.mockResolvedValue({
       current: { price: { amount: 399, currency: "UAH" } },
-      history: [],
-      history_available: false,
-      provider_message: "Steam price history is unavailable for the selected regional currency.",
+      history: [{ timestamp: "2026-09-01T00:00:00Z", shop: "Steam", price: { amount: 41.99, currency: "USD" } }],
+      history_available: true,
     });
 
     renderDetail();
@@ -111,9 +110,7 @@ describe("game detail presentation", () => {
     expect(
       await screen.findByRole("heading", { name: "Steam price history" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/selected regional currency/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/source currency: USD/i)).toBeInTheDocument();
   });
 
   it("keeps an established platform label and URL when price enrichment names a reseller", () => {
@@ -181,10 +178,10 @@ describe("game detail presentation", () => {
     renderDetail();
     await screen.findByRole("heading", { name: "Steam price history" });
 
-    fireEvent.click(screen.getByRole("button", { name: "1 month" }));
+    fireEvent.click(screen.getByRole("button", { name: "2 years" }));
 
     await waitFor(() =>
-      expect(api.getPriceHistory).toHaveBeenLastCalledWith("274755", "US", "1m"),
+      expect(api.getPriceHistory).toHaveBeenLastCalledWith("274755", "US", "2y"),
     );
   });
 
