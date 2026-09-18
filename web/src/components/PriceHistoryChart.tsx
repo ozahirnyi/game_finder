@@ -49,7 +49,7 @@ export function PriceHistoryChart({
     const point = points[0];
     return (
       <p className="text-sm text-muted-foreground">
-        Recorded {formatHistoryDate(point.date)} at {formatPrice(point.price, currency)}.
+        Recorded {formatHistoryDate(point.date)} at {formatPrice(point.price, point.currency ?? currency)}.
       </p>
     );
   }
@@ -63,7 +63,7 @@ export function PriceHistoryChart({
     const y = height - ((point.price - min) / (max - min || 1)) * (height - 16) - 8;
     return { x, y };
   });
-  const low = Math.min(...points.map((point) => point.price));
+  const lowPoint = points.reduce((lowest, point) => (point.price < lowest.price ? point : lowest));
 
   return (
     <div>
@@ -90,7 +90,10 @@ export function PriceHistoryChart({
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
         Historical low{" "}
-        <span className="font-bold text-foreground">{formatPrice(low, currency)}</span>
+        <span className="font-bold text-foreground">
+          {formatPrice(lowPoint.price, lowPoint.currency ?? currency)}
+        </span>
+        {lowPoint.currency && <span> History currency: {lowPoint.currency}</span>}
       </p>
     </div>
   );
