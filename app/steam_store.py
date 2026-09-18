@@ -84,7 +84,9 @@ async def fetch_steam_store_deals(country: str = "US", page_size: int = 12) -> l
     return payload["candidates"][:page_size]
 
 
-async def fetch_steam_store_game_price(title: str, country: str = "US") -> dict[str, Any]:
+async def fetch_steam_store_game_price(
+    title: str, country: str = "US", exact_title_only: bool = False
+) -> dict[str, Any]:
     params = {"term": title, "cc": country, "l": "english"}
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -97,17 +99,18 @@ async def fetch_steam_store_game_price(title: str, country: str = "US") -> dict[
                 if candidate.get("id") and candidate.get("type") in {"game", "app"}
             ]
             normalized_title = title.casefold()
-            item = next(
+            exact_match = next(
                 (candidate for candidate in candidates if (candidate.get("name") or "").casefold() == normalized_title),
-                next(
-                    (
-                        candidate
-                        for candidate in candidates
-                        if candidate.get("price")
-                        and (candidate.get("name") or "").casefold().startswith(normalized_title)
-                    ),
-                    next((candidate for candidate in candidates if candidate.get("price")), candidates[0] if candidates else None),
+                None,
+            )
+            item = exact_match if exact_title_only else exact_match or next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if candidate.get("price")
+                    and (candidate.get("name") or "").casefold().startswith(normalized_title)
                 ),
+                next((candidate for candidate in candidates if candidate.get("price")), candidates[0] if candidates else None),
             )
             if not item or not item.get("id"):
                 raise HTTPException(status_code=404, detail="Steam price data not found for this game")
