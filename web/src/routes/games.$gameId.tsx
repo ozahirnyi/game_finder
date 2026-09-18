@@ -536,7 +536,10 @@ function GameDetail() {
 
           {showPriceHistory && (
             <section>
-              <SectionHeader title="Price history" hint="Trend across storefronts" />
+              <SectionHeader
+                title="Steam price history"
+                hint="Steam historical prices; currency is shown as supplied by Steam history."
+              />
               <div className="rounded-2xl border border-border bg-surface p-6">
                 {priceQuery.isPending ? (
                   <p className="text-sm text-muted-foreground">Loading price history…</p>

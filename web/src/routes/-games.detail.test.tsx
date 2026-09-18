@@ -98,6 +98,28 @@ afterEach(() => {
 });
 
 describe("game detail presentation", () => {
+  it("labels source-currency history as Steam-only", async () => {
+    api.getPriceHistory.mockResolvedValue({
+      current: { price: { amount: 399, currency: "UAH" } },
+      history: [
+        {
+          timestamp: "2026-09-01T00:00:00Z",
+          shop: "Steam",
+          price: { amount: 9.99, currency: "USD" },
+        },
+      ],
+    });
+
+    renderDetail();
+
+    expect(
+      await screen.findByRole("heading", { name: "Steam price history" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/currency is shown as supplied by Steam history/i),
+    ).toBeInTheDocument();
+  });
+
   it("keeps an established platform label and URL when price enrichment names a reseller", () => {
     const merged = mergeGamePrice(
       { ...game, price: null, originalPrice: null, discount: null, store: "Steam", storeUrl: "https://store.steampowered.com/app/1145350/" },
