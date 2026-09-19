@@ -41,13 +41,16 @@ class LibraryGameRead(BaseModel):
 
 class LibraryOverviewRead(BaseModel):
     games: list[LibraryGameRead] = Field(default_factory=list)
-    total: int = 0
-    has_more: bool = False
     steam_available: bool = False
     steam_error: str | None = None
     raw_count: int = 0
     quarantined_count: int = 0
     pending_catalog_count: int = 0
+
+
+class LibraryOverviewPageRead(LibraryOverviewRead):
+    total: int = 0
+    has_more: bool = False
 
 
 class SteamLibraryResolveRead(BaseModel):

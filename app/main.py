@@ -71,7 +71,7 @@ from app import social_policy
 from app.schemas import ConversationReadUpdate
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportPreviewItem, PsnImportResult, PsnImportSelection, \
     RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
-    SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
+    SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, LibraryOverviewPageRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, PublicUserDirectoryRead, PublicUserDirectoryItemRead, RecentGamePlayerRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, PublicLibrarySummaryRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, CatalogCollectionPageRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
@@ -688,7 +688,7 @@ async def library_overview_route(
     )
 
 
-@app.get("/library/overview/page", response_model=LibraryOverviewRead)
+@app.get("/library/overview/page", response_model=LibraryOverviewPageRead)
 async def library_overview_page_route(
     q: str = Query(default="", max_length=255),
     source: Literal["all", "steam", "psn"] = "all",
@@ -710,7 +710,12 @@ async def library_overview_page_route(
         reverse=sort == "playtime-desc",
     )
     page = games[offset : offset + limit]
-    return overview.model_copy(update={"games": page, "total": len(games), "has_more": offset + len(page) < len(games)})
+    return LibraryOverviewPageRead(**{
+        **overview.model_dump(),
+        "games": page,
+        "total": len(games),
+        "has_more": offset + len(page) < len(games),
+    })
 
 
 @app.post("/library/steam-games/{appid}/resolve", response_model=SteamLibraryResolveRead)
