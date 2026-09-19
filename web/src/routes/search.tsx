@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
@@ -36,6 +36,17 @@ const filters: Array<{
   { label: "Strategy", type: "genre", value: "strategy" },
   { label: "Multiplayer", type: "feature", value: "multiplayer" },
 ];
+
+function useDebouncedValue(value: string, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => window.clearTimeout(timeout);
+  }, [delayMs, value]);
+
+  return debouncedValue;
+}
 
 function getAiSearchError(error: unknown) {
   const detail =
@@ -83,6 +94,7 @@ function SearchPage() {
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("q") ?? "";
   });
+  const debouncedQuery = useDebouncedValue(query, 700);
   const [platforms, setPlatforms] = useState<CatalogPlatform[]>([]);
   const [features, setFeatures] = useState<CatalogFeature[]>([]);
   const [genres, setGenres] = useState<CatalogGenre[]>([]);
@@ -93,8 +105,9 @@ function SearchPage() {
   });
   const queryClient = useQueryClient();
   const searchQuery = useQuery({
-    queryKey: ["search", query, platforms, features, genres, onSale],
-    queryFn: () => searchGames({ query: query.trim(), platforms, features, genres, onSale }),
+    queryKey: ["search", debouncedQuery, platforms, features, genres, onSale],
+    queryFn: () =>
+      searchGames({ query: debouncedQuery.trim(), platforms, features, genres, onSale }),
     enabled: mode === "catalog",
   });
   const aiRecommendationQuery = useQuery({
@@ -284,14 +297,14 @@ function SearchPage() {
               );
             })}
           </div>
-          {searchQuery.isFetching && (
+          {searchQuery.isPending && (
             <EmptyState
               icon={<Search className="size-5 animate-pulse" />}
               title="Searching games…"
               description="Checking the catalog and Steam."
             />
           )}
-          {!searchQuery.isFetching && results.length === 0 && (
+          {!searchQuery.isPending && results.length === 0 && (
             <EmptyState
               icon={<Search className="size-5" />}
               title="No games match your search"

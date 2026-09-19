@@ -78,7 +78,7 @@ describe("SearchPage", () => {
       await vi.advanceTimersByTimeAsync(1);
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("query=Counter-Strike"),
+      expect.stringContaining("q=Counter-Strike"),
       expect.anything(),
     );
   });
