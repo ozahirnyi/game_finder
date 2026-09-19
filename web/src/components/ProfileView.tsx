@@ -692,9 +692,11 @@ export function ProfileView({
                       />
                       <div className="p-3">
                         <p className="truncate text-sm font-bold">{g.title}</p>
-                        <p className="label-mono mt-1.5 text-muted-foreground">
-                          {g.playtime != null ? formatPlaytime(g.playtime) : "Playtime unavailable"}
-                        </p>
+                        {g.playtime != null && (
+                          <p className="label-mono mt-1.5 text-muted-foreground">
+                            {formatPlaytime(g.playtime)}
+                          </p>
+                        )}
                         {!g.detail && (
                           <p className="mt-2 text-xs text-muted-foreground">
                             Catalog details unavailable
