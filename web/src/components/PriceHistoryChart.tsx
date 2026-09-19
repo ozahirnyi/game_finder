@@ -13,6 +13,13 @@ function formatPrice(amount: number, currency?: string) {
   }
 }
 
+function formatAxisPrice(amount: number, currency?: string) {
+  const suffix = currency ? ` ${currency}` : "";
+  if (Math.abs(amount) >= 1_000) return `${Number((amount / 1_000).toFixed(1))}k${suffix}`;
+  if (Number.isInteger(amount)) return `${amount}${suffix}`;
+  return formatPrice(amount, currency);
+}
+
 export function PriceHistoryChart({
   points,
   currency,
@@ -97,8 +104,11 @@ export function PriceHistoryChart({
     ? undefined
     : activeCoordinate.x <= width * 0.15
       ? { left: "0%", transform: "translate(0, -115%)" }
-      : activeCoordinate.x >= width * 0.85
-        ? { left: "100%", transform: "translate(-100%, -115%)" }
+      : activeCoordinate.x >= plotLeft + plotWidth * 0.75
+        ? {
+            left: `${(activeCoordinate.x / width) * 100}%`,
+            transform: "translate(-100%, -115%)",
+          }
         : {
             left: `${(activeCoordinate.x / width) * 100}%`,
             transform: "translate(-50%, -115%)",
@@ -136,7 +146,7 @@ export function PriceHistoryChart({
                   vectorEffect="non-scaling-stroke"
                 />
                 <text x={plotLeft - 5} y={y + 3} textAnchor="end" fontSize={8} fill="currentColor">
-                  {formatPrice(value, currency)}
+                  {formatAxisPrice(value, currency)}
                 </text>
               </g>
             );
@@ -193,7 +203,7 @@ export function PriceHistoryChart({
       {activePoint && activeCoordinate && (
         <div
           role="tooltip"
-          className="pointer-events-none absolute z-10 rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-lg"
+          className="pointer-events-none absolute z-10 min-w-max whitespace-nowrap rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-lg"
           style={{
             ...tooltipStyle,
             top: `${(activeCoordinate.y / height) * 100}%`,

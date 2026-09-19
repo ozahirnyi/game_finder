@@ -132,6 +132,21 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByLabelText("Price scale")).toHaveTextContent("$19.99");
   });
 
+  it("uses compact whole-number labels for large price scales", () => {
+    render(
+      <PriceHistoryChart
+        currency="UAH"
+        points={[
+          { date: "2026-08-01T00:00:00Z", price: 289 },
+          { date: "2026-09-01T00:00:00Z", price: 1349 },
+        ]}
+      />,
+    );
+
+    expect(screen.getByLabelText("Price scale")).toHaveTextContent("1.3k UAH");
+    expect(screen.getByLabelText("Price scale")).not.toHaveTextContent("1,349.00");
+  });
+
   it("draws a vertical guide for the active observation", () => {
     render(
       <PriceHistoryChart
@@ -183,6 +198,25 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByRole("tooltip")).toHaveStyle({
       left: "0%",
       transform: "translate(0, -115%)",
+    });
+  });
+
+  it("opens the final point tooltip to the left of its point", () => {
+    render(
+      <PriceHistoryChart
+        currency="USD"
+        points={[
+          { date: "2025-08-01T00:00:00Z", price: 19.99 },
+          { date: "2025-09-25T00:00:00Z", price: 24.99 },
+        ]}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("button", { name: /25 Sep.*sale/i }));
+
+    expect(screen.getByRole("tooltip")).toHaveStyle({
+      left: "97.5%",
+      transform: "translate(-100%, -115%)",
     });
   });
 });
