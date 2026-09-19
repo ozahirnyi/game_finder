@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
@@ -109,6 +109,7 @@ function SearchPage() {
     queryFn: () =>
       searchGames({ query: debouncedQuery.trim(), platforms, features, genres, onSale }),
     enabled: mode === "catalog",
+    placeholderData: keepPreviousData,
   });
   const aiRecommendationQuery = useQuery({
     queryKey: ["ai-recommendations", query.trim()],

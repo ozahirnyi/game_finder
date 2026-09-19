@@ -115,6 +115,44 @@ describe("SearchPage", () => {
     expect(screen.queryByText("Searching gamesвЂ¦")).not.toBeInTheDocument();
   });
 
+  it("keeps the previous catalog cards visible while a new title is loading", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          results: [
+            {
+              id: 42,
+              name: "Hades",
+              genres: [],
+              platforms: [],
+              hero_image: null,
+              background_image: null,
+            },
+          ],
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.replaceState({}, "", "/search?q=Hades");
+    renderSearch();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.getByRole("link", { name: "Hades" })).toBeInTheDocument();
+
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+    fireEvent.change(screen.getByPlaceholderText(/search by title/i), {
+      target: { value: "Counter-Strike" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700);
+    });
+
+    expect(screen.getByRole("link", { name: "Hades" })).toBeInTheDocument();
+    expect(screen.queryByText("Searching gamesвЂ¦")).not.toBeInTheDocument();
+  });
+
   it("shows the remaining daily AI searches", async () => {
     vi.stubGlobal(
       "fetch",
