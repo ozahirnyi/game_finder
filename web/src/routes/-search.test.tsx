@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -35,6 +35,7 @@ function renderSearch(client = new QueryClient({ defaultOptions: { queries: { re
 describe("SearchPage", () => {
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     window.localStorage.removeItem("game_finder_token");
     window.history.replaceState({}, "", "/search");
@@ -53,6 +54,65 @@ describe("SearchPage", () => {
 
     expect(await screen.findByText("Searching games…")).toBeInTheDocument();
     expect(screen.queryByText("No games match your search")).not.toBeInTheDocument();
+  });
+
+  it("waits for a pause before requesting the completed catalog title", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+
+    await act(async () => {});
+    fetchMock.mockClear();
+
+    fireEvent.change(screen.getByPlaceholderText(/search by title/i), {
+      target: { value: "Counter-Strike" },
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(699);
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("query=Counter-Strike"),
+      expect.anything(),
+    );
+  });
+
+  it("keeps cached catalog cards visible while Search refreshes after a remount", async () => {
+    const firstFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          results: [
+            {
+              id: 42,
+              name: "Hades",
+              genres: [],
+              platforms: [],
+              hero_image: null,
+              background_image: null,
+            },
+          ],
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", firstFetch);
+    window.history.replaceState({}, "", "/search?q=Hades");
+    const client = renderSearch();
+    expect(await screen.findByRole("link", { name: "Hades" })).toBeInTheDocument();
+
+    const refreshFetch = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", refreshFetch);
+    cleanup();
+    renderSearch(client);
+
+    await waitFor(() => expect(refreshFetch).toHaveBeenCalled());
+    expect(await screen.findByRole("link", { name: "Hades" })).toBeInTheDocument();
+    expect(screen.queryByText("Searching gamesвЂ¦")).not.toBeInTheDocument();
   });
 
   it("shows the remaining daily AI searches", async () => {
