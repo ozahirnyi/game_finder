@@ -286,10 +286,16 @@ describe("ProfileView library visibility", () => {
     expect(screen.getByLabelText("Favorites visibility")).toHaveValue("private");
     expect(screen.getByLabelText("Steam profile visibility")).toHaveValue("private");
   });
-  it("formats friend game playtime from minutes", () => {
+  it("shows known game playtime as whole hours", () => {
     profile.games[0].playtime = 125;
     renderProfile(false);
-    expect(screen.getByText("2h 5m")).toBeInTheDocument();
+    expect(screen.getByText("2h")).toBeInTheDocument();
+    expect(screen.queryByText("2h 5m")).not.toBeInTheDocument();
+  });
+  it("omits playtime when a game has no playtime data", () => {
+    profile.games[0].playtime = null;
+    renderProfile(false);
+    expect(screen.queryByText("Playtime unavailable")).not.toBeInTheDocument();
   });
   it("keeps the dedicated message action without a redundant chat panel", () => {
     render(

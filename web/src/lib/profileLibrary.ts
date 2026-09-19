@@ -2,9 +2,7 @@ import type { PublicLibraryGame } from "./api";
 import type { GameDetailTarget } from "./gameRoute";
 
 export function formatPlaytime(minutes: number) {
-  const total = Math.max(0, Math.floor(minutes));
-  const hours = Math.floor(total / 60);
-  return hours ? `${hours}h${total % 60 ? ` ${total % 60}m` : ""}` : `${total}m`;
+  return `${Math.floor(Math.max(0, minutes) / 60)}h`;
 }
 
 export function formatWholeHours(minutes: number) {
