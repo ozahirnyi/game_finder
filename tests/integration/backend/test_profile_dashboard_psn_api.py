@@ -1434,6 +1434,45 @@ def test_library_overview_uses_matcher_version_for_psn_catalog_lookup_progress(
     }
 
 
+def test_library_overview_page_filters_sorts_and_paginates_titles(
+    api_client, db_session, user_factory, auth_as
+):
+    owner = auth_as(user_factory(email="library-page@example.com"))
+    db_session.add_all(
+        [
+            Game(
+                owner_id=owner.id,
+                source="psn",
+                external_id=f"psn:manual:{index}",
+                title=f"Hades {index}",
+                playtime_forever=index,
+                link_state="raw",
+            )
+            for index in range(21)
+        ]
+        + [
+            Game(
+                owner_id=owner.id,
+                source="psn",
+                external_id="psn:manual:celeste",
+                title="Celeste",
+                playtime_forever=100,
+                link_state="raw",
+            )
+        ]
+    )
+    db_session.commit()
+
+    response = api_client.get(
+        "/library/overview/page?q=hades&source=psn&sort=playtime-asc&limit=20&offset=20"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 21
+    assert response.json()["has_more"] is False
+    assert [game["playtime_forever"] for game in response.json()["games"]] == [20]
+
+
 def test_library_overview_exposes_clean_catalog_search_query_only_for_raw_psn_rows(
     api_client, db_session, user_factory, auth_as
 ):

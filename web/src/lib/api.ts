@@ -85,6 +85,8 @@ export type LibraryOverviewGame = {
 
 export type LibraryOverview = {
   games: LibraryOverviewGame[];
+  total?: number;
+  has_more?: boolean;
   steam_available: boolean;
   steam_error?: string | null;
   raw_count: number;
@@ -108,6 +110,8 @@ export type CollectionGame = {
   title: string;
   cover_url?: string | null;
 };
+export type CollectionPage<T> = { items: T[]; total: number; has_more: boolean };
+export type CollectionPageOptions = { q?: string; offset?: number; source?: "all" | "steam" | "psn"; sort?: "playtime-desc" | "playtime-asc" };
 
 export type Visibility = "public" | "friends" | "private";
 
@@ -765,8 +769,22 @@ export function getLibraryOverview() {
   return apiRequest<LibraryOverview>("/library/overview", { auth: true });
 }
 
+function collectionPageQuery(options: CollectionPageOptions) {
+  const params = new URLSearchParams({ limit: "20", offset: String(options.offset ?? 0) });
+  if (options.q?.trim()) params.set("q", options.q.trim());
+  if (options.source && options.source !== "all") params.set("source", options.source);
+  if (options.sort) params.set("sort", options.sort);
+  return params;
+}
+export function getLibraryOverviewPage(options: CollectionPageOptions = {}) {
+  return apiRequest<LibraryOverview>(`/library/overview/page?${collectionPageQuery(options)}`, { auth: true });
+}
+
 export function getWishlist() {
   return apiRequest<CollectionGame[]>("/wishlist", { auth: true });
+}
+export function getWishlistPage(options: CollectionPageOptions = {}) {
+  return apiRequest<CollectionPage<CollectionGame>>(`/wishlist/page?${collectionPageQuery(options)}`, { auth: true });
 }
 
 export function getFavorites() {

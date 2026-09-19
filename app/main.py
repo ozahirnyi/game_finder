@@ -74,7 +74,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, PublicUserDirectoryRead, PublicUserDirectoryItemRead, RecentGamePlayerRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, PublicLibrarySummaryRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
-    CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
+    CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, CatalogCollectionPageRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult, BackgroundJobRead
 from app.recommendation_quota import (
     QuotaDenied,
@@ -686,6 +686,31 @@ async def library_overview_route(
             for game in repair_games
         ),
     )
+
+
+@app.get("/library/overview/page", response_model=LibraryOverviewRead)
+async def library_overview_page_route(
+    q: str = Query(default="", max_length=255),
+    source: Literal["all", "steam", "psn"] = "all",
+    sort: Literal["playtime-desc", "playtime-asc"] = "playtime-desc",
+    limit: int = Query(default=20, ge=1, le=20),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    overview = await library_overview_route(db=db, current_user=current_user)
+    query = q.strip().casefold()
+    games = [
+        game
+        for game in overview.games
+        if (not query or query in game.title.casefold()) and (source == "all" or game.source == source)
+    ]
+    games.sort(
+        key=lambda game: ((game.playtime_forever or 0), game.title.casefold(), game.id),
+        reverse=sort == "playtime-desc",
+    )
+    page = games[offset : offset + limit]
+    return overview.model_copy(update={"games": page, "total": len(games), "has_more": offset + len(page) < len(games)})
 
 
 @app.post("/library/steam-games/{appid}/resolve", response_model=SteamLibraryResolveRead)
@@ -2844,6 +2869,27 @@ def list_wishlist(
 ):
     items = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id).order_by(WishlistItem.created_at.desc()).offset(offset).limit(limit).all()
     return [collection_response(item) for item in items]
+
+
+@app.get("/wishlist/page", response_model=CatalogCollectionPageRead)
+def list_wishlist_page(
+    q: str = Query(default="", max_length=255),
+    limit: int = Query(default=20, ge=1, le=20),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    items_query = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id)
+    query = q.strip()
+    if query:
+        items_query = items_query.filter(func.lower(WishlistItem.title).contains(query.casefold()))
+    total = items_query.count()
+    items = items_query.order_by(WishlistItem.created_at.desc()).offset(offset).limit(limit).all()
+    return CatalogCollectionPageRead(
+        items=[collection_response(item) for item in items],
+        total=total,
+        has_more=offset + len(items) < total,
+    )
 
 
 @app.post("/wishlist", status_code=201, response_model=CatalogCollectionRead)

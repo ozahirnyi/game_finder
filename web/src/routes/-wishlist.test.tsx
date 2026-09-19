@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   getProfile: vi.fn(),
   getTelegramAccount: vi.fn(),
   getWishlist: vi.fn(),
+  getWishlistPage: vi.fn(),
   removeWishlist: vi.fn(),
 }));
 
@@ -46,6 +47,11 @@ describe("WishlistPage", () => {
         cover_url: null,
       },
     ]);
+    api.getWishlistPage.mockImplementation(async () => ({
+      items: await api.getWishlist(),
+      total: (await api.getWishlist()).length,
+      has_more: false,
+    }));
     api.removeWishlist.mockResolvedValue(undefined);
     api.getPriceAlerts.mockResolvedValue([]);
     api.getProfile.mockResolvedValue({ price_country_code: "US" });
