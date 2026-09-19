@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatHistoryDate, type PriceHistoryPoint } from "@/lib/gamePresentation";
 
 function formatPrice(amount: number, currency?: string) {
@@ -12,6 +12,9 @@ function formatPrice(amount: number, currency?: string) {
     return `${amount.toFixed(2)}${currency ? ` ${currency}` : ""}`;
   }
 }
+
+const DEFAULT_CHART_WIDTH = 320;
+const CHART_HEIGHT = 88;
 
 export function PriceHistoryChart({
   points,
@@ -31,6 +34,26 @@ export function PriceHistoryChart({
   onRetry?: () => void;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const chartRef = useRef<SVGSVGElement>(null);
+  const [width, setWidth] = useState(DEFAULT_CHART_WIDTH);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || typeof ResizeObserver === "undefined") return;
+
+    const updateWidth = () => {
+      const bounds = chart.getBoundingClientRect();
+      if (bounds.width > 0 && bounds.height > 0) {
+        setWidth(Math.round((bounds.width / bounds.height) * CHART_HEIGHT));
+      }
+    };
+
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(chart);
+    return () => observer.disconnect();
+  }, []);
+
   if (points.length === 0) {
     if (historyAvailable === false) {
       const currentPriceSuffix =
@@ -52,8 +75,7 @@ export function PriceHistoryChart({
     }
     return <p className="text-sm text-muted-foreground">No price history is available yet.</p>;
   }
-  const width = 320;
-  const height = 88;
+  const height = CHART_HEIGHT;
   const plotLeft = 42;
   const plotRight = 8;
   const plotWidth = width - plotLeft - plotRight;
@@ -97,8 +119,11 @@ export function PriceHistoryChart({
     ? undefined
     : activeCoordinate.x <= width * 0.15
       ? { left: "0%", transform: "translate(0, -115%)" }
-      : activeCoordinate.x >= width * 0.85
-        ? { left: "100%", transform: "translate(-100%, -115%)" }
+      : activeCoordinate.x >= plotLeft + plotWidth * 0.75
+        ? {
+            left: `${(activeCoordinate.x / width) * 100}%`,
+            transform: "translate(-100%, -115%)",
+          }
         : {
             left: `${(activeCoordinate.x / width) * 100}%`,
             transform: "translate(-50%, -115%)",
@@ -108,10 +133,10 @@ export function PriceHistoryChart({
     <div>
       <div className="relative h-24">
       <svg
+        ref={chartRef}
         aria-label="Price history chart"
         role="img"
         viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
         className="h-24 w-full text-primary"
         onPointerMove={(event) => {
           const bounds = event.currentTarget.getBoundingClientRect();
@@ -193,7 +218,7 @@ export function PriceHistoryChart({
       {activePoint && activeCoordinate && (
         <div
           role="tooltip"
-          className="pointer-events-none absolute z-10 rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-lg"
+          className="pointer-events-none absolute z-10 min-w-max whitespace-nowrap rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-lg"
           style={{
             ...tooltipStyle,
             top: `${(activeCoordinate.y / height) * 100}%`,

@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PriceHistoryChart } from "./PriceHistoryChart";
 
 describe("PriceHistoryChart", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
   it("explains an empty normalized history", () => {
     render(<PriceHistoryChart points={[]} currency="USD" />);
 
@@ -132,6 +135,21 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByLabelText("Price scale")).toHaveTextContent("$19.99");
   });
 
+  it("keeps full currency values on large price scales", () => {
+    render(
+      <PriceHistoryChart
+        currency="UAH"
+        points={[
+          { date: "2026-08-01T00:00:00Z", price: 289 },
+          { date: "2026-09-01T00:00:00Z", price: 1349 },
+        ]}
+      />,
+    );
+
+    expect(screen.getByLabelText("Price scale")).toHaveTextContent("1,349.00");
+    expect(screen.getByLabelText("Price scale")).not.toHaveTextContent("1.3k UAH");
+  });
+
   it("draws a vertical guide for the active observation", () => {
     render(
       <PriceHistoryChart
@@ -163,8 +181,36 @@ describe("PriceHistoryChart", () => {
     vi.spyOn(chart, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 320, 88));
     fireEvent.pointerMove(chart, { clientX: 5, clientY: 40 });
 
-    expect(chart).toHaveAttribute("preserveAspectRatio", "none");
+    expect(chart).not.toHaveAttribute("preserveAspectRatio", "none");
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("matches its viewBox to the rendered chart without distorting text", () => {
+    let onResize: (() => void) | undefined;
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) {
+        onResize = callback;
+      }
+      observe() {}
+      disconnect() {}
+    });
+
+    render(
+      <PriceHistoryChart
+        currency="USD"
+        points={[
+          { date: "2026-08-01T00:00:00Z", price: 9.99 },
+          { date: "2026-09-01T00:00:00Z", price: 19.99 },
+        ]}
+      />,
+    );
+
+    const chart = screen.getByLabelText("Price history chart");
+    vi.spyOn(chart, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 480, 96));
+    act(() => onResize?.());
+
+    expect(chart).toHaveAttribute("viewBox", "0 0 440 88");
+    expect(chart).not.toHaveAttribute("preserveAspectRatio", "none");
   });
 
   it("keeps an edge tooltip inside the plot", () => {
@@ -183,6 +229,25 @@ describe("PriceHistoryChart", () => {
     expect(screen.getByRole("tooltip")).toHaveStyle({
       left: "0%",
       transform: "translate(0, -115%)",
+    });
+  });
+
+  it("opens the final point tooltip to the left of its point", () => {
+    render(
+      <PriceHistoryChart
+        currency="USD"
+        points={[
+          { date: "2025-08-01T00:00:00Z", price: 19.99 },
+          { date: "2025-09-25T00:00:00Z", price: 24.99 },
+        ]}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("button", { name: /25 Sep.*sale/i }));
+
+    expect(screen.getByRole("tooltip")).toHaveStyle({
+      left: "97.5%",
+      transform: "translate(-100%, -115%)",
     });
   });
 });
