@@ -7,15 +7,16 @@ each collection incrementally instead of fetching every game up front.
 
 ## API contract
 
-- `GET /library/overview` accepts `q`, `limit`, and `offset`. It also accepts
+- New `GET /library/overview/page` accepts `q`, `limit`, and `offset`. It also accepts
   the existing source and playtime sort selections needed by the Library UI.
-- `GET /wishlist` accepts `q`, `limit`, and `offset`.
+- New `GET /wishlist/page` accepts `q`, `limit`, and `offset`.
 - Both endpoints return a page envelope with `items`, `total`, and `has_more`.
   `limit` defaults to and is capped at 20 for this UI flow. `offset` defaults
   to zero.
 - Search is a case-insensitive title match. It does not search source/platform;
   the Library's All games, Steam, and PlayStation tabs remain the source filter.
 - Resource ownership and existing authentication behavior remain unchanged.
+- Existing unpaged collection endpoints remain available to their current consumers.
 
 ## Frontend behavior
 

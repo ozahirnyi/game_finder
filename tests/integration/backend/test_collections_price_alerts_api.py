@@ -70,6 +70,45 @@ def test_wishlist_manual_crud_and_owner_scoping(api_client, db_session, user_fac
     assert db_session.query(WishlistItem).filter_by(id=UUID(item_id)).one_or_none() is None
 
 
+def test_wishlist_page_searches_titles_and_reports_next_page(
+    api_client, db_session, user_factory, auth_as
+):
+    owner = auth_as(user_factory(email="wishlist-page@example.com"))
+    db_session.add_all(
+        [
+            WishlistItem(
+                user_id=owner.id,
+                catalog_game_id=index,
+                title=f"Hades {index}",
+                source="catalog",
+                external_id=f"igdb:{index}",
+            )
+            for index in range(1, 22)
+        ]
+        + [
+            WishlistItem(
+                user_id=owner.id,
+                catalog_game_id=99,
+                title="Celeste",
+                source="catalog",
+                external_id="igdb:99",
+            )
+        ]
+    )
+    db_session.commit()
+
+    first = api_client.get("/wishlist/page?limit=20&offset=0")
+    searched = api_client.get("/wishlist/page?q=CELESTE&limit=20&offset=0")
+
+    assert first.status_code == 200
+    assert len(first.json()["items"]) == 20
+    assert first.json()["total"] == 22
+    assert first.json()["has_more"] is True
+    assert [item["title"] for item in searched.json()["items"]] == ["Celeste"]
+    assert searched.json()["total"] == 1
+    assert searched.json()["has_more"] is False
+
+
 def test_wishlist_saves_steam_games_by_app_id(api_client, db_session, user_factory, auth_as, app_main, monkeypatch):
     owner = auth_as(user_factory(email="steam-wishlist@example.com"))
     monkeypatch.setattr(

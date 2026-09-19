@@ -41,6 +41,8 @@ class LibraryGameRead(BaseModel):
 
 class LibraryOverviewRead(BaseModel):
     games: list[LibraryGameRead] = Field(default_factory=list)
+    total: int = 0
+    has_more: bool = False
     steam_available: bool = False
     steam_error: str | None = None
     raw_count: int = 0
@@ -775,6 +777,12 @@ class CatalogCollectionRead(BaseModel):
     cover_url: str | None = None
     created_at: datetime
     updated_at: datetime | None = None
+
+
+class CatalogCollectionPageRead(BaseModel):
+    items: list[CatalogCollectionRead] = Field(default_factory=list)
+    total: int = 0
+    has_more: bool = False
 
 
 class PriceAlertCreate(BaseModel):

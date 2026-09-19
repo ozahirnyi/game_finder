@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
@@ -8,11 +8,11 @@ import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   applyPsnLibraryRepair,
   enrichPsnLibrary,
-  searchGames,
+  getLibraryOverviewPage, searchGames,
   type LibraryOverviewGame,
 } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
-import { libraryOverviewQueryOptions } from "@/lib/navigationQueries";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -42,9 +42,13 @@ type SortOrder = "playtime-desc" | "playtime-asc";
 function LibraryPage() {
   const [tab, setTab] = useState<Tab>("All games");
   const [sortOrder, setSortOrder] = useState<SortOrder>("playtime-desc");
+  const [searchText, setSearchText] = useState("");
+  const [query, setQuery] = useState("");
   const enrichmentStarted = useRef(false);
   const queryClient = useQueryClient();
-  const libraryQuery = useQuery(libraryOverviewQueryOptions());
+  useEffect(() => { const timer = window.setTimeout(() => setQuery(searchText), 250); return () => window.clearTimeout(timer); }, [searchText]);
+  const source = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : "all";
+  const libraryQuery = useInfiniteQuery({ queryKey: ["library-overview-page", query, source, sortOrder], queryFn: ({ pageParam }) => getLibraryOverviewPage({ q: query, source, sort: sortOrder, offset: pageParam }), initialPageParam: 0, getNextPageParam: (last, pages) => last.has_more ? pages.reduce((total, page) => total + page.games.length, 0) : undefined });
   const enrichment = useMutation({
     mutationFn: async () => {
       let result = await enrichPsnLibrary();
@@ -55,20 +59,14 @@ function LibraryPage() {
   });
   const enrichCatalog = enrichment.mutate;
   useEffect(() => {
-    if ((libraryQuery.data?.pending_catalog_count ?? 0) > 0 && !enrichmentStarted.current) {
+    if ((libraryQuery.data?.pages[0]?.pending_catalog_count ?? 0) > 0 && !enrichmentStarted.current) {
       enrichmentStarted.current = true;
       enrichCatalog();
     }
-  }, [enrichCatalog, libraryQuery.data?.pending_catalog_count]);
-  const owned = libraryQuery.data?.games ?? [];
-  const sourceForTab = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : null;
-  const visible = useMemo(() => {
-    const filtered = sourceForTab ? owned.filter((game) => game.source === sourceForTab) : owned;
-    return [...filtered].sort((left, right) => {
-      const difference = (left.playtime_forever ?? 0) - (right.playtime_forever ?? 0);
-      return sortOrder === "playtime-desc" ? -difference : difference;
-    });
-  }, [owned, sourceForTab, sortOrder]);
+  }, [enrichCatalog, libraryQuery.data?.pages]);
+  const owned = libraryQuery.data?.pages.flatMap((page) => page.games) ?? [];
+  const visible = owned;
+  const loadMoreRef = useInfiniteScroll({ hasNextPage: libraryQuery.hasNextPage, isFetchingNextPage: libraryQuery.isFetchingNextPage, fetchNextPage: () => void libraryQuery.fetchNextPage() });
 
   return (
     <AppShell>
@@ -89,7 +87,8 @@ function LibraryPage() {
           ))}
         </div>
       </div>
-      {libraryQuery.data?.raw_count || libraryQuery.data?.quarantined_count ? (
+      <label className="mb-4 block text-sm font-bold">Search games<input aria-label="Search games" value={searchText} onChange={(event) => setSearchText(event.target.value)} className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" /></label>
+      {libraryQuery.data?.pages[0]?.raw_count || libraryQuery.data?.pages[0]?.quarantined_count ? (
         <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
           <p className="font-bold">Improve PlayStation details</p>
           <p className="mt-1 text-muted-foreground">
@@ -108,7 +107,7 @@ function LibraryPage() {
               Retry catalog matching
             </button>
           ) : null}
-          {libraryQuery.data?.quarantined_count ? (
+          {libraryQuery.data?.pages[0]?.quarantined_count ? (
             <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">
               Review hidden PSN entries
             </Link>
@@ -191,6 +190,7 @@ function LibraryPage() {
           {visible.map((game) => (
             <LibraryCard key={game.id} game={game} />
           ))}
+          <div ref={loadMoreRef} data-testid="library-load-more" className="py-3 text-center text-sm text-muted-foreground">{libraryQuery.isFetchingNextPage ? "Loading more games…" : libraryQuery.hasNextPage ? "Scroll to load more" : null}</div>
         </div>
       )}
     </AppShell>

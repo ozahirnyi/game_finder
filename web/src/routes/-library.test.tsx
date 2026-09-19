@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
   getLibraryOverview: vi.fn(),
+  getLibraryOverviewPage: vi.fn(),
   enrichPsnLibrary: vi.fn(),
   searchGames: vi.fn(),
   applyPsnLibraryRepair: vi.fn(),
@@ -57,6 +58,7 @@ beforeEach(() => {
     quarantined_count: 0,
     pending_catalog_count: 0,
   });
+  api.getLibraryOverviewPage.mockImplementation(() => api.getLibraryOverview());
 });
 afterEach(cleanup);
 

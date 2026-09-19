@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { PriceAlertForm } from "@/components/PriceAlertForm";
@@ -13,11 +13,13 @@ import {
   getProfile,
   getSteamPriceHistory,
   getWishlist,
+  getWishlistPage,
   removeWishlist,
   type PriceAlertCreate,
 } from "@/lib/api";
 import { wishlistPriceLabel } from "@/lib/collectionPresentation";
 import { Bell, Heart, Trash2 } from "lucide-react";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 export const Route = createFileRoute("/wishlist")({
   head: () => ({
@@ -45,11 +47,10 @@ function WishlistPage() {
   const navigate = useNavigate();
   const [showAlerts, setShowAlerts] = useState(false);
   const [catalogGameId, setCatalogGameId] = useState("");
-  const wishlistQuery = useQuery({
-    queryKey: ["wishlist"],
-    queryFn: getWishlist,
-    refetchOnMount: "always",
-  });
+  const [searchText, setSearchText] = useState("");
+  const [query, setQuery] = useState("");
+  useEffect(() => { const timer = window.setTimeout(() => setQuery(searchText), 250); return () => window.clearTimeout(timer); }, [searchText]);
+  const wishlistQuery = useInfiniteQuery({ queryKey: ["wishlist-page", query], queryFn: ({ pageParam }) => getWishlistPage({ q: query, offset: pageParam }), initialPageParam: 0, getNextPageParam: (last, pages) => last.has_more ? pages.reduce((total, page) => total + page.items.length, 0) : undefined });
   const removeMutation = useMutation({
     mutationFn: removeWishlist,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
@@ -67,7 +68,8 @@ function WishlistPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["price-alerts"] }),
   });
 
-  const wl = wishlistQuery.data ?? [];
+  const wl = wishlistQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const loadMoreRef = useInfiniteScroll({ hasNextPage: wishlistQuery.hasNextPage, isFetchingNextPage: wishlistQuery.isFetchingNextPage, fetchNextPage: () => void wishlistQuery.fetchNextPage() });
   const priceCountry = profileQuery.data?.price_country_code ?? "US";
   const priceQueries = useQueries({
     queries: wl.map((game) => ({
@@ -100,6 +102,7 @@ function WishlistPage() {
           </div>
         }
       />
+      <label className="mb-4 block text-sm font-bold">Search games<input aria-label="Search games" value={searchText} onChange={(event) => setSearchText(event.target.value)} className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" /></label>
 
       {showAlerts && (
         <section
@@ -174,8 +177,8 @@ function WishlistPage() {
       {wl.length === 0 && (
         <EmptyState
           icon={<Heart className="size-5" />}
-          title="Your wishlist is empty"
-          description="Add games you're waiting on and we'll track their price for you."
+          title={query ? "No wishlist games match your search" : "Your wishlist is empty"}
+          description={query ? "Try another title." : "Add games you're waiting on and we'll track their price for you."}
           action={
             <Link
               to="/search"
@@ -266,6 +269,7 @@ function WishlistPage() {
               </div>
             </div>
           ))}
+          <div ref={loadMoreRef} data-testid="wishlist-load-more" className="py-3 text-center text-sm text-muted-foreground">{wishlistQuery.isFetchingNextPage ? "Loading more games…" : wishlistQuery.hasNextPage ? "Scroll to load more" : null}</div>
         </div>
       )}
     </AppShell>
