@@ -129,6 +129,21 @@ def test_normalize_igdb_game_prefers_wide_artwork_for_the_detail_hero():
     assert result["hero_image"] == "https://images.igdb.com/igdb/image/upload/t_1080p/artwork.jpg"
 
 
+def test_normalize_igdb_game_keeps_portrait_cover_out_of_hero_field():
+    from app.integrations.igdb import normalize_igdb_game
+
+    result = normalize_igdb_game(
+        {
+            "id": 1,
+            "name": "Portrait Only",
+            "cover": {"url": "//images.igdb.com/igdb/image/upload/t_thumb/cover.jpg"},
+        }
+    )
+
+    assert result["cover_image"] == "https://images.igdb.com/igdb/image/upload/t_cover_big/cover.jpg"
+    assert result["hero_image"] is None
+
+
 def test_normalize_igdb_game_uses_total_rating_when_critic_rating_is_missing():
     from app.integrations.igdb import normalize_igdb_game
 

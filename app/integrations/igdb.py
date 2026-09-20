@@ -149,16 +149,14 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
         ),
         None,
     )
-    hero_image = _igdb_image_url(artwork, "t_1080p") or _igdb_image_url(
-        (game.get("cover") or {}).get("url"), "t_720p"
-    )
+    hero_image = _igdb_image_url(artwork, "t_1080p")
     release = game.get("first_release_date")
     released = datetime.fromtimestamp(release, timezone.utc).date().isoformat() if isinstance(release, (int, float)) else None
     steam_appid = next((int(item["uid"]) for item in game.get("external_games", [])
                         if item.get("category") == 1 and str(item.get("uid", "")).isdigit()), None)
     return {
         "id": game.get("id"), "name": game.get("name"), "released": released,
-        "background_image": cover, "hero_image": hero_image, "description_raw": game.get("summary"),
+        "cover_image": cover, "background_image": cover, "hero_image": hero_image, "description_raw": game.get("summary"),
         "rating": game.get("rating") if game.get("rating") is not None else game.get("total_rating"), "genres": [x["name"] for x in game.get("genres", []) if x.get("name")],
         "platforms": [x.get("name") or (x.get("platform") or {}).get("name") for x in game.get("platforms", []) if x.get("name") or (x.get("platform") or {}).get("name")],
         "game_type": (game.get("game_type") or {}).get("type") if isinstance(game.get("game_type"), dict) else game.get("game_type"),
