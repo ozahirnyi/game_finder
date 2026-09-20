@@ -274,7 +274,12 @@ function GameDetail() {
   const { returnTo } = Route.useSearch();
   const [historyPeriod, setHistoryPeriod] = useState<PriceHistoryPeriod>("6m");
   const priceQuery = useQuery({
-    queryKey: ["price-history", catalogGame.steamAppId ? "steam" : "catalog", catalogGame.id, historyPeriod],
+    queryKey: [
+      "price-history",
+      catalogGame.steamAppId ? "steam" : "catalog",
+      catalogGame.id,
+      historyPeriod,
+    ],
     queryFn: () =>
       catalogGame.steamAppId
         ? getSteamPriceHistory(catalogGame.steamAppId, "US", historyPeriod)
@@ -548,23 +553,27 @@ function GameDetail() {
             <section>
               <SectionHeader
                 title="Steam price history"
-                hint={historyCurrency
-                  ? `Steam history source currency: ${historyCurrency}.`
-                  : "Steam price events."}
+                hint={
+                  historyCurrency
+                    ? `Steam history source currency: ${historyCurrency}.`
+                    : "Steam price events."
+                }
               />
               <div className="rounded-2xl border border-border bg-surface p-6">
                 <div className="mb-5 flex gap-2" aria-label="Price history period">
-                  {(Object.entries(historyPeriodLabels) as Array<[PriceHistoryPeriod, string]>).map(([period, label]) => (
-                    <button
-                      key={period}
-                      type="button"
-                      aria-pressed={historyPeriod === period}
-                      onClick={() => setHistoryPeriod(period)}
-                      className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  {(Object.entries(historyPeriodLabels) as Array<[PriceHistoryPeriod, string]>).map(
+                    ([period, label]) => (
+                      <button
+                        key={period}
+                        type="button"
+                        aria-pressed={historyPeriod === period}
+                        onClick={() => setHistoryPeriod(period)}
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+                      >
+                        {label}
+                      </button>
+                    ),
+                  )}
                 </div>
                 {priceQuery.isPending ? (
                   <p className="text-sm text-muted-foreground">Loading price history…</p>

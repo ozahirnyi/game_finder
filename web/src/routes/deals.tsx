@@ -46,13 +46,19 @@ function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
           from="#dc2626"
           to="#111827"
           title={deal.name}
-          image={large ? deal.hero_image ?? undefined : deal.cover_image ?? deal.background_image ?? undefined}
+          image={
+            large
+              ? (deal.hero_image ?? undefined)
+              : (deal.cover_image ?? deal.background_image ?? undefined)
+          }
           fallbackImage={
             deal.steam_appid
               ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${deal.steam_appid}/header.jpg`
               : undefined
           }
-          portraitImage={large ? deal.cover_image ?? deal.background_image ?? undefined : undefined}
+          portraitImage={
+            large ? (deal.cover_image ?? deal.background_image ?? undefined) : undefined
+          }
           variant={large ? "hero" : "card"}
           compact={!large}
           className={large ? "aspect-[4/3] w-full rounded-xl" : "size-20 shrink-0 rounded-xl"}

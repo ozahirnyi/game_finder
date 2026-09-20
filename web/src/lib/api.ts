@@ -113,7 +113,12 @@ export type CollectionGame = {
   cover_url?: string | null;
 };
 export type CollectionPage<T> = { items: T[]; total: number; has_more: boolean };
-export type CollectionPageOptions = { q?: string; offset?: number; source?: "all" | "steam" | "psn"; sort?: "playtime-desc" | "playtime-asc" };
+export type CollectionPageOptions = {
+  q?: string;
+  offset?: number;
+  source?: "all" | "steam" | "psn";
+  sort?: "playtime-desc" | "playtime-asc";
+};
 
 export type Visibility = "public" | "friends" | "private";
 
@@ -721,7 +726,11 @@ export function getGenreDeals() {
   return apiRequest<GenreDealResponse>("/prices/genre-deals", { includeToken: true });
 }
 
-export function getPriceHistory(id: string | number, country = "US", period: PriceHistoryPeriod = "6m") {
+export function getPriceHistory(
+  id: string | number,
+  country = "US",
+  period: PriceHistoryPeriod = "6m",
+) {
   return apiRequest<{
     current?: Deal["current"];
     deals: Deal["current"][];
@@ -734,10 +743,16 @@ export function getPriceHistory(id: string | number, country = "US", period: Pri
       regular?: Money | null;
       cut?: number | null;
     }>;
-  }>(`/prices/games/${id}?country=${encodeURIComponent(country)}&period=${period}`, { includeToken: true });
+  }>(`/prices/games/${id}?country=${encodeURIComponent(country)}&period=${period}`, {
+    includeToken: true,
+  });
 }
 
-export function getSteamPriceHistory(appid: string | number, country = "US", period: PriceHistoryPeriod = "6m") {
+export function getSteamPriceHistory(
+  appid: string | number,
+  country = "US",
+  period: PriceHistoryPeriod = "6m",
+) {
   return apiRequest<{
     current?: Deal["current"];
     deals: Deal["current"][];
@@ -779,14 +794,19 @@ function collectionPageQuery(options: CollectionPageOptions) {
   return params;
 }
 export function getLibraryOverviewPage(options: CollectionPageOptions = {}) {
-  return apiRequest<LibraryOverview>(`/library/overview/page?${collectionPageQuery(options)}`, { auth: true });
+  return apiRequest<LibraryOverview>(`/library/overview/page?${collectionPageQuery(options)}`, {
+    auth: true,
+  });
 }
 
 export function getWishlist() {
   return apiRequest<CollectionGame[]>("/wishlist", { auth: true });
 }
 export function getWishlistPage(options: CollectionPageOptions = {}) {
-  return apiRequest<CollectionPage<CollectionGame>>(`/wishlist/page?${collectionPageQuery(options)}`, { auth: true });
+  return apiRequest<CollectionPage<CollectionGame>>(
+    `/wishlist/page?${collectionPageQuery(options)}`,
+    { auth: true },
+  );
 }
 
 export function getFavorites() {

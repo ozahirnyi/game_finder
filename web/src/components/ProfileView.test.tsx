@@ -432,12 +432,14 @@ describe("ProfileView library visibility", () => {
             friendId: "friend-1",
             sharedLibrary: {
               status: "ready",
-              data: [{
-                source: "steam",
-                external_id: "620",
-                title: "Portal 2",
-                cover_url: "https://images.example.test/portal.jpg",
-              }],
+              data: [
+                {
+                  source: "steam",
+                  external_id: "620",
+                  title: "Portal 2",
+                  cover_url: "https://images.example.test/portal.jpg",
+                },
+              ],
             },
           }}
           isSelf={false}
