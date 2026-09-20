@@ -276,7 +276,8 @@ function Home() {
                 game={{
                   gameId: String(game.id),
                   title: game.name,
-                  coverUrl: game.hero_image ?? game.background_image ?? undefined,
+                  heroUrl: game.hero_image ?? undefined,
+                  coverUrl: game.cover_image ?? game.background_image ?? undefined,
                   coverFrom: "#c75f28",
                   coverTo: "#22243a",
                 }}
@@ -348,7 +349,11 @@ function Home() {
                     gameId: target?.gameId,
                     source: target?.source,
                     title: deal.name,
-                    coverUrl: deal.hero_image ?? deal.background_image ?? undefined,
+                    heroUrl: deal.hero_image ?? undefined,
+                    heroFallbackUrl: deal.steam_appid
+                      ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${deal.steam_appid}/header.jpg`
+                      : undefined,
+                    coverUrl: deal.cover_image ?? deal.background_image ?? undefined,
                     coverFrom: "#c75f28",
                     coverTo: "#22243a",
                     price: deal.current?.price?.amount ?? undefined,
@@ -402,7 +407,8 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
     <Panel interactive={hasVerifiedCatalogId} className="h-full p-5">
       <GameCover
         title={recommendation.title}
-        image={recommendation.cover_url ?? undefined}
+        portraitImage={recommendation.cover_url ?? undefined}
+        variant="hero"
         from="#c75f28"
         to="#22243a"
         className="mb-4 aspect-[16/9] w-full"
@@ -468,7 +474,14 @@ function FeaturedDeal({
         from="#c75f28"
         to="#22243a"
         title={deal.name}
-        image={deal.hero_image ?? deal.background_image ?? undefined}
+        image={deal.hero_image ?? undefined}
+        fallbackImage={
+          deal.steam_appid
+            ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${deal.steam_appid}/header.jpg`
+            : undefined
+        }
+        portraitImage={deal.cover_image ?? deal.background_image ?? undefined}
+        variant="hero"
         bare
         className="aspect-[16/9] w-full"
       />

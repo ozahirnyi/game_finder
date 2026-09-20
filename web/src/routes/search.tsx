@@ -326,7 +326,8 @@ function SearchPage() {
                       title: game.name,
                       coverFrom: "#312e81",
                       coverTo: "#111827",
-                      coverUrl: game.hero_image ?? game.background_image ?? undefined,
+                      heroUrl: game.hero_image ?? undefined,
+                      coverUrl: game.cover_image ?? game.background_image ?? undefined,
                       genres: game.genres,
                       platforms: game.platforms,
                     }}
@@ -373,7 +374,8 @@ function SearchPage() {
                       returnTo: `/search?mode=ai&q=${encodeURIComponent(query.trim())}`,
                       coverFrom: "#312e81",
                       coverTo: "#111827",
-                      coverUrl: game.background_image ?? undefined,
+                      heroUrl: game.hero_image ?? undefined,
+                      coverUrl: game.cover_image ?? game.background_image ?? undefined,
                       platforms: game.platforms,
                     }}
                   />,

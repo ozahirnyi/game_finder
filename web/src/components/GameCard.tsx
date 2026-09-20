@@ -14,6 +14,8 @@ export type GameCardData = {
   title: string;
   description?: string;
   returnTo?: string;
+  heroUrl?: string;
+  heroFallbackUrl?: string;
   coverUrl?: string;
   coverFrom: string;
   coverTo: string;
@@ -43,7 +45,10 @@ export function GameCard({
           from={game.coverFrom}
           to={game.coverTo}
           title={game.title}
-          image={game.coverUrl}
+          image={game.heroUrl}
+          fallbackImage={game.heroFallbackUrl}
+          portraitImage={game.coverUrl}
+          variant="hero"
           bare
           className={`${aspect} w-full transition-transform duration-500 ease-[var(--ease-studio)] group-hover:scale-[1.04]`}
         />

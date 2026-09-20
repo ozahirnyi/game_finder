@@ -72,7 +72,8 @@ export const Route = createFileRoute("/games/$gameId")({
                 title: catalog.name,
                 coverFrom: "#1d4ed8",
                 coverTo: "#111827",
-                coverUrl: catalog.hero_image ?? catalog.background_image ?? undefined,
+                heroUrl: catalog.hero_image ?? undefined,
+                coverUrl: catalog.cover_image ?? catalog.background_image ?? undefined,
                 fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/library_hero.jpg`,
                 genres: catalog.genres ?? steamGame.genres ?? [],
                 platforms: catalog.platforms ?? steamGame.platforms ?? ["PC"],
@@ -99,7 +100,8 @@ export const Route = createFileRoute("/games/$gameId")({
             title: steamGame.name,
             coverFrom: "#1d4ed8",
             coverTo: "#111827",
-            coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/library_hero.jpg`,
+            heroUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/library_hero.jpg`,
+            coverUrl: undefined,
             fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/header.jpg`,
             genres: steamGame.genres ?? [],
             platforms: steamGame.platforms ?? ["PC"],
@@ -147,7 +149,8 @@ export const Route = createFileRoute("/games/$gameId")({
           title: catalog.name,
           coverFrom: "#1d4ed8",
           coverTo: "#111827",
-          coverUrl: catalog.hero_image ?? catalog.background_image ?? undefined,
+          heroUrl: catalog.hero_image ?? undefined,
+          coverUrl: catalog.cover_image ?? catalog.background_image ?? undefined,
           fallbackCoverUrl: undefined,
           genres: catalog.genres ?? [],
           platforms: catalog.platforms ?? [],
@@ -428,8 +431,9 @@ function GameDetail() {
           from={game.coverFrom}
           to={game.coverTo}
           title={game.title}
-          image={game.coverUrl}
+          image={game.heroUrl}
           fallbackImage={game.fallbackCoverUrl}
+          portraitImage={game.coverUrl}
           bare
           variant="hero"
           className="h-72 w-full sm:h-96"
@@ -621,7 +625,8 @@ function GameDetail() {
                     game={{
                       gameId: String(candidate.id),
                       title: candidate.name,
-                      coverUrl: candidate.background_image ?? undefined,
+                      heroUrl: candidate.hero_image ?? undefined,
+                      coverUrl: candidate.cover_image ?? candidate.background_image ?? undefined,
                       coverFrom: "#1d4ed8",
                       coverTo: "#111827",
                       genres: candidate.genres,

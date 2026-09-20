@@ -3958,7 +3958,7 @@ async def catalog_similar_games(igdb_id: int):
             "platforms": platforms,
             "_score": score,
         }
-        for field in ("released", "background_image", "hero_image", "rating"):
+        for field in ("released", "cover_image", "background_image", "hero_image", "rating"):
             if candidate.get(field) is not None:
                 result[field] = candidate[field]
         results.append(result)
@@ -4255,6 +4255,7 @@ async def homepage_deals(
                 "steam_appid": deal.get("steam_appid"),
                 "name": deal["name"],
                 "released": match.get("released") if match else None,
+                "cover_image": (match.get("cover_image") if match else None) or deal.get("background_image"),
                 "background_image": deal.get("background_image") or (match.get("background_image") if match else None),
                 "url": deal.get("url"),
                 "current": deal.get("current"),

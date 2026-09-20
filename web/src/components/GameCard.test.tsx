@@ -13,6 +13,21 @@ import { gameDetailSearch } from "@/lib/gameCardPresentation";
 import { GameCard } from "./GameCard";
 
 describe("GameCard", () => {
+  it("passes portrait-only catalog media to the composed hero treatment", () => {
+    render(
+      <GameCard
+        game={{
+          title: "Portrait Only",
+          coverUrl: "https://images.example.test/cover.jpg",
+          coverFrom: "#111111",
+          coverTo: "#222222",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Portrait Only" })).toHaveClass("object-contain");
+  });
+
   it("links to the internal game details route instead of a store URL", async () => {
     const rootRoute = createRootRoute({ component: Outlet });
     const indexRoute = createRoute({
