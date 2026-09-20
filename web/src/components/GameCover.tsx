@@ -8,6 +8,8 @@ type Props = {
   image?: string;
   /** Optional alternate cover when the primary provider asset is unavailable. */
   fallbackImage?: string;
+  /** Portrait cover art used without cropping when a wide hero is unavailable. */
+  portraitImage?: string;
   className?: string;
   compact?: boolean;
   /** A wide, detail-page composition for existing provider cover art. */
@@ -22,6 +24,7 @@ export function GameCover({
   title,
   image,
   fallbackImage,
+  portraitImage,
   className = "",
   compact = false,
   variant = "card",
@@ -30,15 +33,18 @@ export function GameCover({
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
+  const [portraitBroken, setPortraitBroken] = useState(false);
 
   useEffect(() => {
     setBroken(false);
     setLoaded(false);
     setUsingFallback(false);
-  }, [image, fallbackImage]);
+    setPortraitBroken(false);
+  }, [image, fallbackImage, portraitImage]);
 
   const activeImage = usingFallback ? fallbackImage : image;
   const showImage = !!activeImage && !broken;
+  const showPortrait = !showImage && variant === "hero" && !!portraitImage && !portraitBroken;
 
   const initials = title
     .split(/\s|:/)
@@ -74,10 +80,22 @@ export function GameCover({
           } transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
         />
       )}
+      {showPortrait && (
+        <div className="absolute inset-0 grid place-items-center p-3">
+          <img
+            src={portraitImage}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            onError={() => setPortraitBroken(true)}
+            className="h-[88%] max-w-[58%] rounded-md object-contain shadow-2xl shadow-black/60"
+          />
+        </div>
+      )}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_92%,rgba(255,255,255,0.10),transparent_52%)]" />
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/75 to-transparent" />
       <div className="absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/10" />
-      {!showImage && (
+      {!showImage && !showPortrait && (
         <div className="absolute inset-0 flex flex-col justify-end p-3">
           {bare ? null : compact ? (
             <span className="font-display text-2xl font-bold leading-none tracking-tight text-white/90">

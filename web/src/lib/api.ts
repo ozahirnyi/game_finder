@@ -28,6 +28,7 @@ export type CatalogGame = {
   id: number | null;
   name: string;
   released?: string | null;
+  cover_image?: string | null;
   background_image?: string | null;
   hero_image?: string | null;
   description_raw?: string | null;

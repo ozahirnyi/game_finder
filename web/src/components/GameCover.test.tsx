@@ -62,4 +62,39 @@ describe("GameCover", () => {
     expect(within(container).queryByRole("img", { name: "Live game" })).not.toBeInTheDocument();
     expect(cover?.getAttribute("style")).toContain("linear-gradient");
   });
+
+  it("shows portrait art without cropping when a hero has no landscape image", () => {
+    render(
+      <GameCover
+        from="#111111"
+        to="#222222"
+        title="Portrait Only"
+        variant="hero"
+        portraitImage="https://images.example.test/cover.jpg"
+        bare
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Portrait Only" })).toHaveClass("object-contain");
+  });
+
+  it("uses its alternate image before the title fallback", () => {
+    render(
+      <GameCover
+        from="#111111"
+        to="#222222"
+        title="Retry"
+        variant="hero"
+        image="https://images.example.test/primary.jpg"
+        fallbackImage="https://images.example.test/alternate.jpg"
+      />,
+    );
+
+    fireEvent.error(screen.getByRole("img", { name: "Retry" }));
+
+    expect(screen.getByRole("img", { name: "Retry" })).toHaveAttribute(
+      "src",
+      "https://images.example.test/alternate.jpg",
+    );
+  });
 });
