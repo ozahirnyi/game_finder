@@ -73,7 +73,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, LibraryOverviewPageRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
-    PublicUserRead, PublicUserDirectoryRead, PublicUserDirectoryItemRead, RecentGamePlayerRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, PublicLibrarySummaryRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
+    PublicUserRead, PublicUserDirectoryRead, PublicUserDirectoryItemRead, RecentGamePlayerRead, RecentGamePlayersRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, PublicLibrarySummaryRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, CatalogCollectionPageRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult, BackgroundJobRead
 from app.recommendation_quota import (
@@ -1694,7 +1694,7 @@ async def recent_steam_players_for_app(
     db: Session,
     current_user: User,
     catalog_game_id: int | None = None,
-) -> list[RecentGamePlayerRead]:
+) -> RecentGamePlayersRead:
     visible_filters = (
         User.id != current_user.id,
         User.public_nickname.is_not(None),
@@ -1707,7 +1707,7 @@ async def recent_steam_players_for_app(
     elif steam_appid is not None:
         game_filters.append(Game.external_id == str(steam_appid))
     else:
-        return []
+        return RecentGamePlayersRead(status="ready")
     rows = (
         db.query(Game, User)
         .join(User, Game.owner_id == User.id)
@@ -1716,6 +1716,8 @@ async def recent_steam_players_for_app(
     )
     playtime_by_user: dict[uuid.UUID, int] = {}
     users_by_id: dict[uuid.UUID, User] = {}
+    steam_lookup_failed = False
+    steam_lookup_succeeded = False
     for game, user in rows:
         if not can_view_section(user, current_user, user.library_visibility, db):
             continue
@@ -1729,8 +1731,11 @@ async def recent_steam_players_for_app(
                 continue
             try:
                 steam_games = await fetch_owned_games(user.steam_id)
-            except HTTPException:
+            except HTTPException as exc:
+                if exc.status_code != 409:
+                    steam_lookup_failed = True
                 continue
+            steam_lookup_succeeded = True
             recent_minutes = next(
                 (
                     int(game.get("playtime_2weeks") or 0)
@@ -1746,15 +1751,19 @@ async def recent_steam_players_for_app(
     ordered_users = sorted(
         users_by_id.values(), key=lambda user: (-playtime_by_user[user.id], str(user.id))
     )[:10]
-    return [
+    players = [
         RecentGamePlayerRead(
             **public_user_response(user).model_dump(), playtime_2weeks=playtime_by_user[user.id]
         )
         for user in ordered_users
     ]
+    status = "ready"
+    if steam_lookup_failed:
+        status = "partial" if players or steam_lookup_succeeded else "unavailable"
+    return RecentGamePlayersRead(players=players, status=status)
 
 
-@app.get("/catalog/games/{catalog_game_id}/active-players", response_model=list[RecentGamePlayerRead])
+@app.get("/catalog/games/{catalog_game_id}/active-players", response_model=RecentGamePlayersRead)
 async def recent_game_players(
     catalog_game_id: int,
     db: Session = Depends(get_db),
@@ -1773,7 +1782,7 @@ async def recent_game_players(
     )
 
 
-@app.get("/steam/games/{steam_appid}/active-players", response_model=list[RecentGamePlayerRead])
+@app.get("/steam/games/{steam_appid}/active-players", response_model=RecentGamePlayersRead)
 async def recent_steam_game_players(
     steam_appid: int,
     db: Session = Depends(get_db),

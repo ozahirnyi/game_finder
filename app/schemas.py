@@ -642,6 +642,11 @@ class RecentGamePlayerRead(PublicUserRead):
     playtime_2weeks: int
 
 
+class RecentGamePlayersRead(BaseModel):
+    players: list[RecentGamePlayerRead] = Field(default_factory=list)
+    status: Literal["ready", "partial", "unavailable"]
+
+
 class FriendRequestCreate(BaseModel):
     recipient_id: uuid.UUID
     message: str | None = Field(default=None, max_length=280)

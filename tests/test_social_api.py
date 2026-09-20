@@ -4,6 +4,7 @@ import re
 import uuid
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -125,8 +126,9 @@ def test_recent_game_players_returns_distinct_active_users(social_db):
     response = use_social_api(viewer, social_db).get("/catalog/games/72/active-players")
 
     assert response.status_code == 200
-    assert response.json()[0]["public_id"] == "active-id"
-    assert response.json()[0]["playtime_2weeks"] == 120
+    assert response.json()["status"] == "ready"
+    assert response.json()["players"][0]["public_id"] == "active-id"
+    assert response.json()["players"][0]["playtime_2weeks"] == 120
 
 
 def test_recent_steam_game_players_match_the_steam_app_id(social_db):
@@ -148,8 +150,9 @@ def test_recent_steam_game_players_match_the_steam_app_id(social_db):
     response = use_social_api(viewer, social_db).get("/steam/games/12345/active-players")
 
     assert response.status_code == 200
-    assert response.json()[0]["public_id"] == "active-id"
-    assert response.json()[0]["playtime_2weeks"] == 90
+    assert response.json()["status"] == "ready"
+    assert response.json()["players"][0]["public_id"] == "active-id"
+    assert response.json()["players"][0]["playtime_2weeks"] == 90
 
 
 def test_recent_steam_game_players_reads_current_steam_library(monkeypatch, social_db):
@@ -172,8 +175,90 @@ def test_recent_steam_game_players_reads_current_steam_library(monkeypatch, soci
     response = use_social_api(viewer, social_db).get("/steam/games/12345/active-players")
 
     assert response.status_code == 200
-    assert response.json()[0]["public_id"] == "active-id"
-    assert response.json()[0]["playtime_2weeks"] == 90
+    assert response.json()["status"] == "ready"
+    assert response.json()["players"][0]["public_id"] == "active-id"
+    assert response.json()["players"][0]["playtime_2weeks"] == 90
+
+
+def test_recent_steam_players_marks_provider_failure_as_partial(monkeypatch, social_db):
+    viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
+    stored_active = User(email="stored@example.com", public_id="stored-id", public_nickname="Stored")
+    unavailable = User(
+        email="unavailable@example.com",
+        public_id="unavailable-id",
+        public_nickname="Unavailable",
+        steam_id="unavailable-steam",
+    )
+    social_db.add_all([viewer, stored_active, unavailable])
+    social_db.commit()
+    social_db.add(
+        Game(
+            owner_id=stored_active.id,
+            title="Steam-only game",
+            source="steam",
+            external_id="12345",
+            playtime_2weeks=90,
+        )
+    )
+    social_db.commit()
+
+    async def failing_owned_games(steam_id):
+        assert steam_id == "unavailable-steam"
+        raise HTTPException(status_code=502, detail="Steam library request failed")
+
+    monkeypatch.setattr(main, "fetch_owned_games", failing_owned_games)
+
+    response = use_social_api(viewer, social_db).get("/steam/games/12345/active-players")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "partial"
+    assert [player["public_id"] for player in response.json()["players"]] == ["stored-id"]
+
+
+def test_recent_steam_players_marks_all_provider_failures_unavailable(monkeypatch, social_db):
+    viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
+    unavailable = User(
+        email="unavailable@example.com",
+        public_id="unavailable-id",
+        public_nickname="Unavailable",
+        steam_id="unavailable-steam",
+    )
+    social_db.add_all([viewer, unavailable])
+    social_db.commit()
+
+    async def failing_owned_games(steam_id):
+        assert steam_id == "unavailable-steam"
+        raise HTTPException(status_code=503, detail="STEAM_API_KEY is not configured")
+
+    monkeypatch.setattr(main, "fetch_owned_games", failing_owned_games)
+
+    response = use_social_api(viewer, social_db).get("/steam/games/12345/active-players")
+
+    assert response.status_code == 200
+    assert response.json() == {"players": [], "status": "unavailable"}
+
+
+def test_recent_steam_players_keeps_private_library_ready(monkeypatch, social_db):
+    viewer = User(email="viewer@example.com", public_id="viewer-id", public_nickname="Viewer")
+    private = User(
+        email="private@example.com",
+        public_id="private-id",
+        public_nickname="Private",
+        steam_id="private-steam",
+    )
+    social_db.add_all([viewer, private])
+    social_db.commit()
+
+    async def private_owned_games(steam_id):
+        assert steam_id == "private-steam"
+        raise HTTPException(status_code=409, detail="Steam library is private")
+
+    monkeypatch.setattr(main, "fetch_owned_games", private_owned_games)
+
+    response = use_social_api(viewer, social_db).get("/steam/games/12345/active-players")
+
+    assert response.status_code == 200
+    assert response.json() == {"players": [], "status": "ready"}
 
 
 def test_recent_game_players_hide_private_libraries(social_db):
@@ -194,7 +279,7 @@ def test_recent_game_players_hide_private_libraries(social_db):
     response = use_social_api(viewer, social_db).get("/catalog/games/72/active-players")
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json() == {"players": [], "status": "ready"}
 
 
 def test_profile_visibility_defaults_to_public_for_existing_user(social_db):
