@@ -87,7 +87,7 @@ beforeEach(() => {
     current: { price: { amount: 19.99, currency: "USD" } },
     history: [],
   });
-  api.getRecentGamePlayers.mockResolvedValue([]);
+  api.getRecentGamePlayers.mockResolvedValue({ players: [], status: "ready" });
   api.getSimilarCatalogGames.mockResolvedValue({ results: [] });
   api.getWishlist.mockResolvedValue([]);
 });
@@ -267,9 +267,12 @@ describe("game detail presentation", () => {
   });
 
   it("shows recently active Steam players with profile links and two-week hours", async () => {
-    api.getRecentGamePlayers.mockResolvedValue([
-      { id: "player-1", public_id: "sam-public", display_name: "Sam", playtime_2weeks: 125 },
-    ]);
+    api.getRecentGamePlayers.mockResolvedValue({
+      players: [
+        { id: "player-1", public_id: "sam-public", display_name: "Sam", playtime_2weeks: 125 },
+      ],
+      status: "ready",
+    });
     renderDetail();
 
     expect(

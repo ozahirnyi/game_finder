@@ -925,20 +925,24 @@ export type PublicUserDirectory = {
   total: number;
 };
 export type RecentGamePlayer = Friend["user"] & { playtime_2weeks: number };
+export type RecentGamePlayers = {
+  players: RecentGamePlayer[];
+  status: "ready" | "partial" | "unavailable";
+};
 
 export function getPublicUsers(page = 1) {
   return apiRequest<PublicUserDirectory>(`/users?page=${encodeURIComponent(page)}`, { auth: true });
 }
 
 export function getRecentGamePlayers(catalogGameId: string | number) {
-  return apiRequest<RecentGamePlayer[]>(
+  return apiRequest<RecentGamePlayers>(
     `/catalog/games/${encodeURIComponent(catalogGameId)}/active-players`,
     { auth: true },
   );
 }
 
 export function getRecentSteamGamePlayers(steamAppId: string | number) {
-  return apiRequest<RecentGamePlayer[]>(
+  return apiRequest<RecentGamePlayers>(
     `/steam/games/${encodeURIComponent(steamAppId)}/active-players`,
     { auth: true },
   );

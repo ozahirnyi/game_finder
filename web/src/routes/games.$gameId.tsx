@@ -825,7 +825,8 @@ function GameDetail() {
             )}
           </div>
           <GameRecentPlayers
-            players={activePlayersQuery.data ?? []}
+            players={activePlayersQuery.data?.players ?? []}
+            status={activePlayersQuery.data?.status ?? "ready"}
             isPending={activePlayersQuery.isPending}
             isError={activePlayersQuery.isError}
             onRetry={() => void activePlayersQuery.refetch()}

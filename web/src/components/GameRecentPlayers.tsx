@@ -1,16 +1,17 @@
 import { Avatar } from "@/components/GameCover";
 import { UserProfileLink } from "@/components/UserProfileLink";
 import { Panel, SectionHeader } from "@/components/ui-bits";
-import type { RecentGamePlayer } from "@/lib/api";
+import type { RecentGamePlayer, RecentGamePlayers } from "@/lib/api";
 
 type Props = {
   players: RecentGamePlayer[];
+  status: RecentGamePlayers["status"];
   isPending: boolean;
   isError: boolean;
   onRetry: () => void;
 };
 
-export function GameRecentPlayers({ players, isPending, isError, onRetry }: Props) {
+export function GameRecentPlayers({ players, status, isPending, isError, onRetry }: Props) {
   const ranked = [...players].sort((a, b) => b.playtime_2weeks - a.playtime_2weeks);
 
   return (
@@ -19,7 +20,7 @@ export function GameRecentPlayers({ players, isPending, isError, onRetry }: Prop
       <Panel className="divide-y divide-border">
         {isPending ? (
           <p className="px-4 py-3 text-sm text-muted-foreground">Loading recent players…</p>
-        ) : isError ? (
+        ) : isError || status === "unavailable" ? (
           <div className="px-4 py-3 text-sm text-muted-foreground">
             <p>Recent player activity is unavailable.</p>
             <button
@@ -31,11 +32,24 @@ export function GameRecentPlayers({ players, isPending, isError, onRetry }: Prop
             </button>
           </div>
         ) : ranked.length === 0 ? (
+          <>
+            {status === "partial" && (
+              <p className="px-4 pt-3 text-sm text-muted-foreground">
+                Some Steam activity is temporarily unavailable.
+              </p>
+            )}
           <p className="px-4 py-3 text-sm text-muted-foreground">
             No public players logged time in the last two weeks.
           </p>
+          </>
         ) : (
-          ranked.map((player) => (
+          <>
+            {status === "partial" && (
+              <p className="px-4 py-3 text-sm text-muted-foreground">
+                Some Steam activity is temporarily unavailable.
+              </p>
+            )}
+            {ranked.map((player) => (
             <div
               key={player.id}
               data-testid="recent-player-row"
@@ -59,7 +73,8 @@ export function GameRecentPlayers({ players, isPending, isError, onRetry }: Prop
                 {(player.playtime_2weeks / 60).toFixed(1)} h
               </p>
             </div>
-          ))
+            ))}
+          </>
         )}
       </Panel>
     </section>
