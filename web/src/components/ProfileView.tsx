@@ -593,21 +593,32 @@ export function ProfileView({
                 {profile.sharedLibrary.data.map((game) => (
                   <div
                     key={`${game.source}:${game.external_id}`}
-                    className="rounded-xl border border-border bg-surface-2 p-3"
+                    className="overflow-hidden rounded-xl border border-border bg-surface-2"
                   >
-                    <p className="truncate text-sm font-bold">{game.title}</p>
-                    <p className="label-mono mt-1.5 text-muted-foreground">{game.source}</p>
-                    <button
-                      type="button"
-                      aria-label={`Invite ${game.title}`}
-                      onClick={() => {
-                        setSelectedGameKey(`${game.source}:${game.external_id}`);
-                        setInviteOpen(true);
-                      }}
-                      className="mt-3 w-full rounded-md bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground"
-                    >
-                      Invite
-                    </button>
+                    <GameCover
+                      from="#7c3aed"
+                      to="#111827"
+                      title={game.title}
+                      image={game.cover_url ?? undefined}
+                      compact
+                      bare
+                      className="aspect-[2/3] w-full"
+                    />
+                    <div className="p-3">
+                      <p className="truncate text-sm font-bold">{game.title}</p>
+                      <p className="label-mono mt-1.5 text-muted-foreground">{game.source}</p>
+                      <button
+                        type="button"
+                        aria-label={`Invite ${game.title}`}
+                        onClick={() => {
+                          setSelectedGameKey(`${game.source}:${game.external_id}`);
+                          setInviteOpen(true);
+                        }}
+                        className="mt-3 w-full rounded-md bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground"
+                      >
+                        Invite
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

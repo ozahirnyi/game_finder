@@ -422,4 +422,32 @@ describe("ProfileView library visibility", () => {
     fireEvent.click(screen.getByRole("button", { name: "Invite Portal 2" }));
     expect(screen.getByRole("dialog", { name: "Invite Player" })).toBeVisible();
   });
+
+  it("renders a shared game's supplied cover artwork", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{
+            ...profile,
+            friendId: "friend-1",
+            sharedLibrary: {
+              status: "ready",
+              data: [{
+                source: "steam",
+                external_id: "620",
+                title: "Portal 2",
+                cover_url: "https://images.example.test/portal.jpg",
+              }],
+            },
+          }}
+          isSelf={false}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("img", { name: "Portal 2" })).toHaveAttribute(
+      "src",
+      "https://images.example.test/portal.jpg",
+    );
+  });
 });

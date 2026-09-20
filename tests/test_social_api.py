@@ -472,7 +472,13 @@ def test_friend_shared_games_match_saved_source_and_external_id_only(social_db):
     social_db.add_all([
         Friendship(user_low_id=min(alice.id, bob.id), user_high_id=max(alice.id, bob.id)),
         Game(owner_id=alice.id, title="Portal Two", source="steam", external_id="620"),
-        Game(owner_id=bob.id, title="Portal 2", source="steam", external_id="620"),
+        Game(
+            owner_id=bob.id,
+            title="Portal 2",
+            source="steam",
+            external_id="620",
+            img_icon_url="https://cover.test/portal.jpg",
+        ),
         Game(owner_id=alice.id, title="Same title", source="manual", external_id="first"),
         Game(owner_id=bob.id, title="Same title", source="manual", external_id="second"),
     ])
@@ -483,7 +489,12 @@ def test_friend_shared_games_match_saved_source_and_external_id_only(social_db):
     assert response.status_code == 200
     assert response.json() == {
         "status": "ready",
-        "data": [{"source": "steam", "external_id": "620", "title": "Portal 2", "cover_url": None}],
+        "data": [{
+            "source": "steam",
+            "external_id": "620",
+            "title": "Portal 2",
+            "cover_url": "https://cover.test/portal.jpg",
+        }],
         "message": None,
     }
     assert use_social_api(alice, social_db).get(f"/friends/{charlie.id}/shared-games").status_code == 404
