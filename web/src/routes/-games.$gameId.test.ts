@@ -38,7 +38,8 @@ describe("Steam library game loader", () => {
       deps: {},
     } as never);
 
-    expect(result.game.coverUrl).toBe("https://images.example.test/portal-hero.jpg");
+    expect(result.game.heroUrl).toBe("https://images.example.test/portal-hero.jpg");
+    expect(result.game.coverUrl).toBe("https://images.example.test/portal-cover.jpg");
   });
 
   it("keeps the linked Steam app ID for a catalog game detail", async () => {
@@ -90,7 +91,7 @@ describe("Steam library game loader", () => {
     expect(result.game).toMatchObject({
       id: "72",
       isSteamLibrary: false,
-      coverUrl: "https://images.example.test/portal-hero.jpg",
+      heroUrl: "https://images.example.test/portal-hero.jpg",
       releaseDate: "2011-04-18",
       rating: 91.2,
       price: 9.99,
@@ -171,7 +172,7 @@ describe("Steam library game loader", () => {
       deps: { source: "steam" },
     } as never);
 
-    expect(result.game.coverUrl).toBe(
+    expect(result.game.heroUrl).toBe(
       "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_hero.jpg",
     );
   });
