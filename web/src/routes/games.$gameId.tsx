@@ -384,6 +384,7 @@ function GameDetail() {
   });
   const current = priceQuery.data?.current;
   const game = mergeGamePrice(catalogGame, current);
+  const hasHero = Boolean(game.heroUrl);
   const isInWishlist =
     wishlistAdded ||
     wishlistQuery.data?.some((item) =>
@@ -430,20 +431,33 @@ function GameDetail() {
         className="mb-6 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
       />
 
-      {/* Hero cover */}
-      <section className="relative mb-10 overflow-hidden rounded-3xl border border-border">
+      {/* Use a wide treatment only when the catalog supplies actual hero artwork. */}
+      <section
+        className={
+          hasHero
+            ? "relative mb-10 overflow-hidden rounded-3xl border border-border"
+            : "mb-10 flex flex-col gap-6 rounded-3xl border border-border bg-surface-1 p-6 sm:flex-row sm:items-end"
+        }
+      >
         <GameCover
           from={game.coverFrom}
           to={game.coverTo}
           title={game.title}
-          image={game.heroUrl}
-          fallbackImage={game.fallbackCoverUrl}
-          portraitImage={game.coverUrl}
+          image={hasHero ? game.heroUrl : game.coverUrl}
+          fallbackImage={hasHero ? game.fallbackCoverUrl : undefined}
           bare
-          variant="hero"
-          className="h-72 w-full sm:h-96"
+          variant={hasHero ? "hero" : "card"}
+          className={
+            hasHero ? "h-72 w-full sm:h-96" : "aspect-[2/3] w-40 shrink-0 self-center sm:w-52"
+          }
         />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 sm:p-8">
+        <div
+          className={
+            hasHero
+              ? "absolute inset-x-0 bottom-0 bg-background/90 p-6 backdrop-blur-sm sm:p-8"
+              : "min-w-0"
+          }
+        >
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {game.coop && <Chip tone="primary">Co-op</Chip>}
             {game.discount ? <Chip tone="primary">-{game.discount}%</Chip> : null}

@@ -61,22 +61,7 @@ describe("GameCover", () => {
 
     expect(within(container).queryByRole("img", { name: "Live game" })).not.toBeInTheDocument();
     expect(cover).toHaveClass("bg-surface-2");
-    expect(cover?.getAttribute("style")).not.toContain("gradient");
-  });
-
-  it("shows portrait art without cropping when a hero has no landscape image", () => {
-    render(
-      <GameCover
-        from="#111111"
-        to="#222222"
-        title="Portrait Only"
-        variant="hero"
-        portraitImage="https://images.example.test/cover.jpg"
-        bare
-      />,
-    );
-
-    expect(screen.getByRole("img", { name: "Portrait Only" })).toHaveClass("object-contain");
+    expect(cover).not.toHaveAttribute("style");
   });
 
   it("uses its alternate image before the title fallback", () => {
@@ -114,7 +99,7 @@ describe("GameCover", () => {
     fireEvent.error(screen.getByRole("img", { name: "Missing" }));
 
     expect(container.firstElementChild).toHaveClass("bg-surface-2");
-    expect(container.firstElementChild?.getAttribute("style")).not.toContain("gradient");
+    expect(container.firstElementChild).not.toHaveAttribute("style");
     expect(screen.getByText("Missing")).toBeVisible();
   });
 });

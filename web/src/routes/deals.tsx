@@ -29,6 +29,7 @@ function gameLink(deal: Deal) {
 
 function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
   const link = gameLink(deal);
+  const hasHero = Boolean(deal.hero_image);
   return (
     <div className="relative">
       {link && (
@@ -47,21 +48,22 @@ function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
           to="#111827"
           title={deal.name}
           image={
-            large
-              ? (deal.hero_image ?? undefined)
-              : (deal.cover_image ?? deal.background_image ?? undefined)
+            large && hasHero ? (deal.hero_image ?? undefined) : (deal.cover_image ?? undefined)
           }
           fallbackImage={
-            deal.steam_appid
+            large && hasHero && deal.steam_appid
               ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${deal.steam_appid}/header.jpg`
               : undefined
           }
-          portraitImage={
-            large ? (deal.cover_image ?? deal.background_image ?? undefined) : undefined
-          }
-          variant={large ? "hero" : "card"}
+          variant={large && hasHero ? "hero" : "card"}
           compact={!large}
-          className={large ? "aspect-[4/3] w-full rounded-xl" : "size-20 shrink-0 rounded-xl"}
+          className={
+            large && hasHero
+              ? "aspect-[4/3] w-full rounded-xl"
+              : large
+                ? "aspect-[2/3] w-full rounded-xl"
+                : "size-20 shrink-0 rounded-xl"
+          }
         />
         <div className="min-w-0 flex-1">
           <h3

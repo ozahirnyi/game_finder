@@ -38,6 +38,7 @@ export function GameCard({
   aspect?: string;
   showPrice?: boolean;
 }) {
+  const hasHero = Boolean(game.heroUrl);
   const inner = (
     <>
       <div className="relative">
@@ -45,12 +46,11 @@ export function GameCard({
           from={game.coverFrom}
           to={game.coverTo}
           title={game.title}
-          image={game.heroUrl}
-          fallbackImage={game.heroFallbackUrl}
-          portraitImage={game.coverUrl}
-          variant="hero"
+          image={hasHero ? game.heroUrl : game.coverUrl}
+          fallbackImage={hasHero ? game.heroFallbackUrl : undefined}
+          variant={hasHero ? "hero" : "card"}
           bare
-          className={`${aspect} w-full transition-transform duration-500 ease-[var(--ease-studio)] group-hover:scale-[1.04]`}
+          className={`${hasHero ? aspect : "aspect-[2/3]"} w-full transition-transform duration-500 ease-[var(--ease-studio)] group-hover:scale-[1.04]`}
         />
         {game.discount ? (
           <span className="label-mono absolute right-3 top-3 rounded-md bg-primary px-1.5 py-1 text-primary-foreground">

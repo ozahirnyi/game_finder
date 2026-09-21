@@ -407,11 +407,11 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
     <Panel interactive={hasVerifiedCatalogId} className="h-full p-5">
       <GameCover
         title={recommendation.title}
-        portraitImage={recommendation.cover_url ?? undefined}
-        variant="hero"
+        image={recommendation.cover_url ?? undefined}
+        variant="card"
         from="#c75f28"
         to="#22243a"
-        className="mb-4 aspect-[16/9] w-full"
+        className="mb-4 aspect-[2/3] w-full"
       />
       <h3 className="text-lg font-bold">{recommendation.title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{recommendation.reason}</p>
@@ -468,22 +468,22 @@ function FeaturedDeal({
       : never
   >;
 }) {
+  const hasHero = Boolean(deal.hero_image);
   return (
     <Panel interactive className="h-full">
       <GameCover
         from="#c75f28"
         to="#22243a"
         title={deal.name}
-        image={deal.hero_image ?? undefined}
+        image={hasHero ? (deal.hero_image ?? undefined) : (deal.cover_image ?? undefined)}
         fallbackImage={
-          deal.steam_appid
+          hasHero && deal.steam_appid
             ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${deal.steam_appid}/header.jpg`
             : undefined
         }
-        portraitImage={deal.cover_image ?? deal.background_image ?? undefined}
-        variant="hero"
+        variant={hasHero ? "hero" : "card"}
         bare
-        className="aspect-[16/9] w-full"
+        className={`${hasHero ? "aspect-[16/9]" : "aspect-[2/3]"} w-full`}
       />
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 pt-16">
         <div className="mb-3 flex flex-wrap items-center gap-2">

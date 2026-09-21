@@ -423,6 +423,26 @@ describe("ProfileView library visibility", () => {
     expect(screen.getByRole("dialog", { name: "Invite Player" })).toBeVisible();
   });
 
+  it("uses a compact six-column shared-games grid on large screens", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{
+            ...profile,
+            friendId: "friend-1",
+            sharedLibrary: {
+              status: "ready",
+              data: [{ source: "steam", external_id: "620", title: "Portal 2" }],
+            },
+          }}
+          isSelf={false}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByTestId("shared-games-grid")).toHaveClass("lg:grid-cols-6");
+  });
+
   it("renders a shared game's supplied cover artwork", () => {
     render(
       <QueryClientProvider client={new QueryClient()}>

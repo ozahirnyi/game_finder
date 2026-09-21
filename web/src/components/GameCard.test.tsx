@@ -13,7 +13,39 @@ import { gameDetailSearch } from "@/lib/gameCardPresentation";
 import { GameCard } from "./GameCard";
 
 describe("GameCard", () => {
-  it("passes portrait-only catalog media to the composed hero treatment", () => {
+  it("uses a compact portrait card when a game has no hero artwork", () => {
+    const { container } = render(
+      <GameCard
+        game={{
+          title: "Cover Only",
+          coverUrl: "https://images.example.test/cover.jpg",
+          coverFrom: "#111111",
+          coverTo: "#222222",
+        }}
+      />,
+    );
+
+    expect(container.querySelector('[data-visual-role="card"]')).toBeInTheDocument();
+    expect(container.querySelector(".aspect-\\[2\\/3\\]")).toBeInTheDocument();
+  });
+
+  it("keeps the wide hero treatment when artwork is available", () => {
+    const { container } = render(
+      <GameCard
+        game={{
+          title: "Hero",
+          heroUrl: "https://images.example.test/hero.jpg",
+          coverUrl: "https://images.example.test/cover.jpg",
+          coverFrom: "#111111",
+          coverTo: "#222222",
+        }}
+      />,
+    );
+
+    expect(container.querySelector('[data-visual-role="hero"]')).toBeInTheDocument();
+  });
+
+  it("uses the portrait cover directly instead of composing a fake hero", () => {
     render(
       <GameCard
         game={{
@@ -25,7 +57,7 @@ describe("GameCard", () => {
       />,
     );
 
-    expect(screen.getByRole("img", { name: "Portrait Only" })).toHaveClass("object-contain");
+    expect(screen.getByRole("img", { name: "Portrait Only" })).toHaveClass("object-cover");
   });
 
   it("links to the internal game details route instead of a store URL", async () => {

@@ -205,14 +205,9 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
         to="#111827"
         title={game.title}
         image={game.cover_url ?? undefined}
-        fallbackImage={
-          game.source === "steam" && game.external_id
-            ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.external_id}/header.jpg`
-            : undefined
-        }
         compact
         bare
-        className="size-16 shrink-0 rounded-lg"
+        className="h-20 w-14 shrink-0 rounded-lg"
       />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">

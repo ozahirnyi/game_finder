@@ -601,7 +601,10 @@ export function ProfileView({
               hint={`${profile.sharedLibrary?.data.length ?? 0} saved matches`}
             />
             {profile.sharedLibrary?.status === "ready" ? (
-              <div className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              <div
+                data-testid="shared-games-grid"
+                className="stagger grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6"
+              >
                 {profile.sharedLibrary.data.map((game) => (
                   <div
                     key={`${game.source}:${game.external_id}`}
@@ -616,9 +619,9 @@ export function ProfileView({
                       bare
                       className="aspect-[2/3] w-full"
                     />
-                    <div className="p-3">
-                      <p className="truncate text-sm font-bold">{game.title}</p>
-                      <p className="label-mono mt-1.5 text-muted-foreground">{game.source}</p>
+                    <div className="p-2.5">
+                      <p className="truncate text-xs font-bold">{game.title}</p>
+                      <p className="label-mono mt-1 text-muted-foreground">{game.source}</p>
                       <button
                         type="button"
                         aria-label={`Invite ${game.title}`}
@@ -626,7 +629,7 @@ export function ProfileView({
                           setSelectedGameKey(`${game.source}:${game.external_id}`);
                           setInviteOpen(true);
                         }}
-                        className="mt-3 w-full rounded-md bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground"
+                        className="mt-2 w-full rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground"
                       >
                         Invite
                       </button>
@@ -720,7 +723,8 @@ export function ProfileView({
                         title={g.title}
                         image={g.coverUrl}
                         bare
-                        className="aspect-video w-full"
+                        variant="card"
+                        className="aspect-[2/3] w-full"
                       />
                       <div className="p-3">
                         <p className="truncate text-sm font-bold">{g.title}</p>
