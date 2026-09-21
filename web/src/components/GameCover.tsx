@@ -45,6 +45,8 @@ export function GameCover({
   const activeImage = usingFallback ? fallbackImage : image;
   const showImage = !!activeImage && !broken;
   const showPortrait = !showImage && variant === "hero" && !!portraitImage && !portraitBroken;
+  const hasRenderableMedia = showImage || showPortrait;
+  const mediaBackground = `radial-gradient(130% 100% at 12% 4%, ${from}66 0%, transparent 58%), linear-gradient(150deg, ${to} 0%, #0f0f0f 100%)`;
 
   const initials = title
     .split(/\s|:/)
@@ -54,11 +56,9 @@ export function GameCover({
     .join("");
   return (
     <div
-      className={`grain relative overflow-hidden ${className}`}
+      className={`grain relative overflow-hidden ${hasRenderableMedia ? "" : "bg-surface-2"} ${className}`}
       data-visual-role={variant}
-      style={{
-        background: `radial-gradient(130% 100% at 12% 4%, ${from}66 0%, transparent 58%), linear-gradient(150deg, ${to} 0%, #0f0f0f 100%)`,
-      }}
+      style={hasRenderableMedia ? { background: mediaBackground } : undefined}
     >
       {showImage && (
         <img
@@ -92,8 +92,12 @@ export function GameCover({
           />
         </div>
       )}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_92%,rgba(255,255,255,0.10),transparent_52%)]" />
-      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/75 to-transparent" />
+      {hasRenderableMedia && (
+        <>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_92%,rgba(255,255,255,0.10),transparent_52%)]" />
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/75 to-transparent" />
+        </>
+      )}
       <div className="absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/10" />
       {!showImage && !showPortrait && (
         <div className="absolute inset-0 flex flex-col justify-end p-3">

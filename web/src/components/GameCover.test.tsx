@@ -40,7 +40,7 @@ describe("GameCover", () => {
     );
   });
 
-  it("uses a cropped hero treatment and returns to the gradient after its provider image fails", () => {
+  it("uses a cropped hero treatment and returns to a neutral surface after its provider image fails", () => {
     const { container } = render(
       <GameCover
         from="#111111"
@@ -60,7 +60,8 @@ describe("GameCover", () => {
     fireEvent.error(image);
 
     expect(within(container).queryByRole("img", { name: "Live game" })).not.toBeInTheDocument();
-    expect(cover?.getAttribute("style")).toContain("linear-gradient");
+    expect(cover).toHaveClass("bg-surface-2");
+    expect(cover?.getAttribute("style")).not.toContain("gradient");
   });
 
   it("shows portrait art without cropping when a hero has no landscape image", () => {
@@ -96,5 +97,24 @@ describe("GameCover", () => {
       "src",
       "https://images.example.test/alternate.jpg",
     );
+  });
+
+  it("uses a neutral surface after every image source fails", () => {
+    const { container } = render(
+      <GameCover
+        from="#111111"
+        to="#222222"
+        title="Missing"
+        image="https://images.example.test/primary.jpg"
+        fallbackImage="https://images.example.test/fallback.jpg"
+      />,
+    );
+
+    fireEvent.error(screen.getByRole("img", { name: "Missing" }));
+    fireEvent.error(screen.getByRole("img", { name: "Missing" }));
+
+    expect(container.firstElementChild).toHaveClass("bg-surface-2");
+    expect(container.firstElementChild?.getAttribute("style")).not.toContain("gradient");
+    expect(screen.getByText("Missing")).toBeVisible();
   });
 });
