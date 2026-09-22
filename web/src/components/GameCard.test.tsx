@@ -29,7 +29,7 @@ describe("GameCard", () => {
     expect(container.querySelector(".aspect-\\[2\\/3\\]")).toBeInTheDocument();
   });
 
-  it("keeps the wide hero treatment when artwork is available", () => {
+  it("keeps ordinary cards as posters even when wide artwork is available", () => {
     const { container } = render(
       <GameCard
         game={{
@@ -42,7 +42,8 @@ describe("GameCard", () => {
       />,
     );
 
-    expect(container.querySelector('[data-visual-role="hero"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-visual-role="card"]')).toBeInTheDocument();
+    expect(container.querySelector(".aspect-\\[2\\/3\\]")).toBeInTheDocument();
   });
 
   it("uses the portrait cover directly instead of composing a fake hero", () => {
@@ -57,7 +58,7 @@ describe("GameCard", () => {
       />,
     );
 
-    expect(screen.getByRole("img", { name: "Portrait Only" })).toHaveClass("object-cover");
+    expect(screen.getByRole("img", { name: "Portrait Only" })).toHaveClass("object-contain");
   });
 
   it("links to the internal game details route instead of a store URL", async () => {
@@ -168,8 +169,6 @@ describe("GameCard", () => {
     expect(
       gameDetailSearch({
         title: "Return game",
-        coverFrom: "#111111",
-        coverTo: "#222222",
         returnTo: "/search?mode=ai&q=roguelike",
       }),
     ).toEqual({ title: "Return game", returnTo: "/search?mode=ai&q=roguelike" });

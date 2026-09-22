@@ -615,9 +615,10 @@ export function ProfileView({
                       to="#111827"
                       title={game.title}
                       image={game.cover_url ?? undefined}
+                      sizes="264px"
                       compact
                       bare
-                      className="aspect-[2/3] w-full"
+                      className="mx-auto aspect-[2/3] w-full max-w-[264px]"
                     />
                     <div className="p-2.5">
                       <p className="truncate text-xs font-bold">{game.title}</p>
@@ -722,9 +723,10 @@ export function ProfileView({
                         to={g.coverTo}
                         title={g.title}
                         image={g.coverUrl}
+                        sizes="264px"
                         bare
                         variant="card"
-                        className="aspect-[2/3] w-full"
+                        className="mx-auto aspect-[2/3] w-full max-w-[264px]"
                       />
                       <div className="p-3">
                         <p className="truncate text-sm font-bold">{g.title}</p>

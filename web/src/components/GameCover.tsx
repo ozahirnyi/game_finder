@@ -1,82 +1,152 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { getGameMediaCandidates, type MediaCandidate } from "@/lib/gameMedia";
 
 type Props = {
   from: string;
   to: string;
   title: string;
-  /** Real cover art. Falls back to a neutral title tile when missing or broken. */
   image?: string;
-  /** Optional alternate cover when the primary provider asset is unavailable. */
   fallbackImage?: string;
+  candidates?: MediaCandidate[];
+  sizes?: string;
+  priority?: boolean;
+  fit?: "contain" | "cover";
+  onExhausted?: () => void;
   className?: string;
   compact?: boolean;
-  /** A wide composition for verified hero artwork. */
   variant?: "card" | "hero";
-  /** Hide the large title — use when the surrounding card already shows it. */
   bare?: boolean;
 };
+
+function normalizeCandidates(
+  candidates: MediaCandidate[] | undefined,
+  image?: string,
+  fallbackImage?: string,
+  variant: "card" | "hero" = "card",
+) {
+  const values = candidates?.length
+    ? candidates
+    : variant === "card"
+      ? getGameMediaCandidates({ coverUrl: image, heroUrl: fallbackImage }, "poster")
+      : [
+          ...(image ? [{ src: image, kind: "unknown" as const }] : []),
+          ...(fallbackImage ? [{ src: fallbackImage, kind: "unknown" as const }] : []),
+        ];
+  const seen = new Set<string>();
+  return values.filter(
+    (value) => value.src && !seen.has(value.src) && Boolean(seen.add(value.src)),
+  );
+}
 
 export function GameCover({
   title,
   image,
   fallbackImage,
+  candidates,
+  sizes,
+  priority = false,
+  fit,
+  onExhausted,
   className = "",
   compact = false,
   variant = "card",
   bare = false,
 }: Props) {
-  const [broken, setBroken] = useState(false);
+  const queue = useMemo(
+    () => normalizeCandidates(candidates, image, fallbackImage, variant),
+    [candidates, image, fallbackImage, variant],
+  );
+  const queueKey = queue.map((value) => `${value.src}|${value.srcSet ?? ""}`).join("\n");
+  const [index, setIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const [usingFallback, setUsingFallback] = useState(false);
+  const [retryingBaseSource, setRetryingBaseSource] = useState(false);
 
   useEffect(() => {
-    setBroken(false);
+    setIndex(0);
     setLoaded(false);
-    setUsingFallback(false);
-  }, [image, fallbackImage]);
+    setRetryingBaseSource(false);
+  }, [queueKey]);
 
-  const activeImage = usingFallback ? fallbackImage : image;
-  const showImage = !!activeImage && !broken;
+  const active = queue[index];
+  const activeKey = `${index}:${active?.src ?? ""}:${retryingBaseSource}`;
+  const activeKeyRef = useRef(activeKey);
+  activeKeyRef.current = activeKey;
+  useEffect(() => {
+    if (!active) onExhausted?.();
+  }, [active, onExhausted]);
+
   const initials = title
     .split(/\s|:/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((w) => w[0])
+    .map((word) => word[0])
     .join("");
+  // A banner-shaped container must not turn a portrait cover into a crop.  Only
+  // media that was verified as wide is safe to use with `object-cover`.
+  const resolvedFit =
+    fit ??
+    (active?.kind === "wide" || (variant === "hero" && active?.kind === "unknown")
+      ? "cover"
+      : "contain");
+
   return (
     <div
-      className={`grain relative overflow-hidden ${showImage ? "" : "bg-surface-2"} ${className}`}
+      className={`relative overflow-hidden ${active ? "" : "bg-surface-2"} ${className}`}
       data-visual-role={variant}
     >
-      {showImage && (
+      {active && (
         <img
-          src={activeImage}
+          key={activeKey}
+          ref={(node) => {
+            if (node?.complete && node.naturalWidth > 0) setLoaded(true);
+          }}
+          src={active.src}
+          srcSet={retryingBaseSource ? undefined : active.srcSet}
+          sizes={
+            !retryingBaseSource && active.srcSet
+              ? (sizes ?? (variant === "hero" ? "100vw" : "264px"))
+              : undefined
+          }
           alt={title}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
           decoding="async"
           onLoad={() => setLoaded(true)}
-          onError={() => {
-            if (!usingFallback && fallbackImage) {
-              setLoaded(false);
-              setUsingFallback(true);
-            } else {
-              setBroken(true);
+          onError={(event) => {
+            if (activeKeyRef.current !== activeKey) return;
+            setLoaded(false);
+            if (
+              !retryingBaseSource &&
+              active.srcSet &&
+              event.currentTarget.currentSrc &&
+              event.currentTarget.currentSrc !== event.currentTarget.src
+            ) {
+              setRetryingBaseSource(true);
+              return;
             }
+            setRetryingBaseSource(false);
+            setIndex((current) => current + 1);
           }}
-          className={`absolute inset-0 size-full object-cover ${
-            variant === "hero" ? "object-[center_35%]" : ""
-          } transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 size-full ${resolvedFit === "contain" ? "object-contain" : "object-cover"} ${variant === "hero" && resolvedFit === "cover" ? "object-[center_35%]" : ""} transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
         />
       )}
       <div className="absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/10" />
-      {!showImage && (
-        <div className="absolute inset-0 flex flex-col justify-end p-3">
-          {bare ? null : compact ? (
+      {!active && (
+        <div
+          className="absolute inset-0 flex flex-col justify-end p-3"
+          aria-label={`${title} image unavailable`}
+        >
+          {bare ? (
+            <span aria-hidden="true" className="self-center text-2xl text-muted-foreground">
+              ◈
+            </span>
+          ) : compact ? (
             <span className="font-display text-2xl font-bold leading-none tracking-tight text-white/90">
               {initials}
             </span>
           ) : (
-            <span className="font-display text-[1.6rem] font-bold leading-[0.95] tracking-tight text-white text-balance drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
+            <span className="font-display text-[1.6rem] font-bold leading-[0.95] tracking-tight text-white text-balance">
               {title}
             </span>
           )}
@@ -102,11 +172,12 @@ export function Avatar({
   className?: string;
 }) {
   const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [image]);
   const initials = name
     .split(/\s|\./)
     .filter(Boolean)
     .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
+    .map((word) => word[0]?.toUpperCase())
     .join("");
   return (
     <div

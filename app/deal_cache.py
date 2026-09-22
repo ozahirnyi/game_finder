@@ -15,11 +15,11 @@ def canonical_deal_genres(genres: list[str] | tuple[str, ...]) -> tuple[str, ...
 
 
 def steam_deal_candidates_key(country: str) -> str:
-    return build_cache_key("steam_deal_candidates_v1", country=country.upper())
+    return build_cache_key("steam_deal_candidates_v2", country=country.upper())
 
 
 def igdb_deal_match_key(steam_appid: int) -> str:
-    return build_cache_key("igdb_deal_match_v1", steam_appid=steam_appid)
+    return build_cache_key("igdb_deal_match_v2", steam_appid=steam_appid)
 
 
 async def get_cached_steam_deal_candidates(

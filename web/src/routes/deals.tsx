@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import { type Deal, getGenreDeals } from "@/lib/api";
+import { getGameMediaCandidates } from "@/lib/gameMedia";
 
 export const Route = createFileRoute("/deals")({
   head: () => ({
@@ -29,7 +30,6 @@ function gameLink(deal: Deal) {
 
 function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
   const link = gameLink(deal);
-  const hasHero = Boolean(deal.hero_image);
   return (
     <div className="relative">
       {link && (
@@ -47,22 +47,25 @@ function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
           from="#dc2626"
           to="#111827"
           title={deal.name}
-          image={
-            large && hasHero ? (deal.hero_image ?? undefined) : (deal.cover_image ?? undefined)
-          }
-          fallbackImage={
-            large && hasHero && deal.steam_appid
-              ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${deal.steam_appid}/header.jpg`
-              : undefined
-          }
-          variant={large && hasHero ? "hero" : "card"}
+          candidates={getGameMediaCandidates(
+            {
+              coverUrl: deal.cover_image,
+              heroUrl: deal.hero_image,
+              screenshotUrl: deal.screenshot_image,
+              steamAppId: deal.steam_appid,
+              coverWidth: deal.cover_width,
+              coverHeight: deal.cover_height,
+              heroWidth: deal.hero_width,
+              heroHeight: deal.hero_height,
+              screenshotWidth: deal.screenshot_width,
+              screenshotHeight: deal.screenshot_height,
+            },
+            large ? "banner" : "poster",
+          )}
+          variant={large ? "hero" : "card"}
           compact={!large}
           className={
-            large && hasHero
-              ? "aspect-[4/3] w-full rounded-xl"
-              : large
-                ? "aspect-[2/3] w-full rounded-xl"
-                : "size-20 shrink-0 rounded-xl"
+            large ? "aspect-[16/9] w-full rounded-xl" : "h-[84px] w-14 shrink-0 rounded-xl"
           }
         />
         <div className="min-w-0 flex-1">

@@ -3896,7 +3896,7 @@ async def search(
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v5", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
+    key = build_cache_key("igdb_search_v6", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
         if on_sale:
@@ -3915,7 +3915,7 @@ async def search(
 async def catalog_game_detail(igdb_id: int, db: Session = Depends(get_db)):
     if igdb_id < 1:
         raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
-    key = build_cache_key("catalog_game_v2", igdb_id=igdb_id)
+    key = build_cache_key("catalog_game_v3", igdb_id=igdb_id)
 
     async def fetch():
         return await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
@@ -3958,7 +3958,11 @@ async def catalog_similar_games(igdb_id: int):
             "platforms": platforms,
             "_score": score,
         }
-        for field in ("released", "cover_image", "background_image", "hero_image", "rating"):
+        for field in (
+            "released", "cover_image", "background_image", "hero_image", "screenshot_image",
+            "cover_width", "cover_height", "hero_width", "hero_height", "screenshot_width", "screenshot_height",
+            "rating",
+        ):
             if candidate.get(field) is not None:
                 result[field] = candidate[field]
         results.append(result)
@@ -3973,7 +3977,7 @@ async def upcoming_games(request: Request, page: int = 1, page_size: int = 8):
         raise HTTPException(status_code=400, detail="page must be >= 1")
     if page_size < 1 or page_size > 20:
         raise HTTPException(status_code=400, detail="page_size must be between 1 and 20")
-    key = build_cache_key("upcoming_games", page=page, page_size=page_size)
+    key = build_cache_key("upcoming_games_v2", page=page, page_size=page_size)
 
     async def fetch():
         return await fetch_igdb_upcoming_games(page=page, page_size=page_size)
@@ -3991,7 +3995,7 @@ async def trending_games(request: Request, page: int = 1, page_size: int = 8):
         raise HTTPException(status_code=400, detail="page must be >= 1")
     if page_size < 1 or page_size > 20:
         raise HTTPException(status_code=400, detail="page_size must be between 1 and 20")
-    key = build_cache_key("trending_games", page=page, page_size=page_size)
+    key = build_cache_key("trending_games_v2", page=page, page_size=page_size)
 
     async def fetch():
         return await fetch_igdb_trending_games(page=page, page_size=page_size)
@@ -4217,7 +4221,7 @@ async def homepage_deals(
     if page_size < 1 or page_size > 13:
         raise HTTPException(status_code=400, detail="page_size must be between 1 and 13")
 
-    key = build_cache_key("steam_store_deals_v2", country=normalized_country, page_size=page_size)
+    key = build_cache_key("steam_store_deals_v3", country=normalized_country, page_size=page_size)
 
     async def fetch():
         steam_deals = await fetch_steam_store_deals(country=normalized_country, page_size=page_size)
@@ -4255,7 +4259,7 @@ async def homepage_deals(
                 "steam_appid": deal.get("steam_appid"),
                 "name": deal["name"],
                 "released": match.get("released") if match else None,
-                "cover_image": (match.get("cover_image") if match else None) or deal.get("background_image"),
+                "cover_image": match.get("cover_image") if match else None,
                 "background_image": deal.get("background_image") or (match.get("background_image") if match else None),
                 "url": deal.get("url"),
                 "current": deal.get("current"),
@@ -4277,7 +4281,7 @@ async def genre_deals(current_user: User | None = Depends(get_optional_current_u
         current_user.favorite_genres if current_user else []
     )
     key = build_cache_key(
-        "steam_genre_deals_v6",
+        "steam_genre_deals_v7",
         country=country,
         genres=canonical_genres,
     )
@@ -4328,7 +4332,15 @@ async def resolve_recommendation_catalog_matches(result: dict) -> dict:
             )
             if exact_match and isinstance(exact_match.get("id"), int):
                 item["igdb_id"] = exact_match["id"]
-                item["cover_url"] = exact_match.get("background_image")
+                item["cover_url"] = exact_match.get("cover_image") or exact_match.get("background_image")
+                item["game"] = {
+                    key: exact_match.get(key)
+                    for key in (
+                        "id", "name", "released", "background_image", "cover_image", "hero_image",
+                        "screenshot_image", "steam_appid", "cover_width", "cover_height", "hero_width",
+                        "hero_height", "screenshot_width", "screenshot_height", "platforms",
+                    )
+                }
         resolved.append(item)
     return {**result, "recommendations": resolved}
 

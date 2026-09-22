@@ -526,7 +526,15 @@ def test_catalog_game_detail_returns_normalized_igdb_data(monkeypatch):
         "name": "Hades",
         "released": "2020-09-17",
         "background_image": "https://example.com/hades.jpg",
+        "cover_image": None,
         "hero_image": None,
+        "screenshot_image": None,
+        "cover_width": None,
+        "cover_height": None,
+        "hero_width": None,
+        "hero_height": None,
+        "screenshot_width": None,
+        "screenshot_height": None,
         "steam_appid": None,
         "description_raw": "A roguelike dungeon crawler.",
         "rating": 4.42,
@@ -551,7 +559,17 @@ def test_catalog_game_detail_uses_versioned_json_cache_key(monkeypatch):
     response = client.get("/catalog/games/274755")
 
     assert response.status_code == 200
-    assert cache_keys == [main.build_cache_key("catalog_game_v2", igdb_id=274755)]
+    assert cache_keys == [main.build_cache_key("catalog_game_v3", igdb_id=274755)]
+
+
+def test_media_cache_versions_do_not_reuse_payloads_without_media_dimensions():
+    """Legacy cached heroes have no dimensions and must be fetched under the new contract."""
+    assert main.build_cache_key("catalog_game_v3", igdb_id=274755) != main.build_cache_key(
+        "catalog_game_v2", igdb_id=274755
+    )
+    assert main.build_cache_key("igdb_search_v6", q="hades", page=1) != main.build_cache_key(
+        "igdb_search_v5", q="hades", page=1
+    )
 
 
 def test_upcoming_games_returns_igdb_results(monkeypatch):
@@ -1022,7 +1040,7 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
     assert len(first.json()["sections"][0]["results"]) == 5
     assert second.status_code == 200
     assert cache_keys[0] == cache_keys[1]
-    assert cache_keys[0].startswith("steam_genre_deals_v6:")
+    assert cache_keys[0].startswith("steam_genre_deals_v7:")
 
 
 def test_genre_deals_share_canonical_completed_responses_and_country_sources(monkeypatch):

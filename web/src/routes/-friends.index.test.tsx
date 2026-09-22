@@ -148,7 +148,7 @@ describe("FriendsPage", () => {
     expect(screen.queryByLabelText("Player name")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Browse all players" })).toHaveAttribute(
       "href",
-      "/users",
+      "/users?page=1",
     );
   });
 

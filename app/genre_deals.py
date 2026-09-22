@@ -30,9 +30,13 @@ def select_deal_genres(favorite_genres: list[str] | None) -> list[str]:
 
 def _apply_catalog_media(deal: dict[str, Any], catalog: dict[str, Any] | None) -> dict[str, Any]:
     enriched = dict(deal)
-    hero_image = catalog.get("hero_image") if catalog else None
-    if isinstance(hero_image, str) and hero_image:
-        enriched["hero_image"] = hero_image
+    for field in (
+        "hero_image", "screenshot_image", "cover_width", "cover_height", "hero_width", "hero_height",
+        "screenshot_width", "screenshot_height",
+    ):
+        value = catalog.get(field) if catalog else None
+        if value is not None:
+            enriched[field] = value
     return enriched
 
 
@@ -46,7 +50,7 @@ def _enrich_deal(deal: dict[str, Any], results: list[dict[str, Any]]) -> tuple[d
         "steam_appid": deal["steam_appid"],
         "name": deal["name"],
         "released": match.get("released") if match else None,
-        "cover_image": (match.get("cover_image") if match else None) or deal.get("background_image"),
+        "cover_image": match.get("cover_image") if match else None,
         "background_image": deal.get("background_image") or (match.get("background_image") if match else None),
         "url": deal.get("url"),
         "current": deal.get("current"),
@@ -61,7 +65,7 @@ def _unenriched_deal(deal: dict[str, Any]) -> tuple[dict[str, Any], set[str]]:
         "steam_appid": deal["steam_appid"],
         "name": deal["name"],
         "released": None,
-        "cover_image": deal.get("background_image"),
+        "cover_image": None,
         "background_image": deal.get("background_image"),
         "url": deal.get("url"),
         "current": deal.get("current"),

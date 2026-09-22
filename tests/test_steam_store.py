@@ -20,7 +20,7 @@ async def test_steam_search_uses_portrait_library_cover(monkeypatch):
 
     results = await steam_store.fetch_steam_store_search("hades")
 
-    assert results[0]["background_image"] == (
+    assert results[0]["cover_image"] == (
         "https://cdn.cloudflare.steamstatic.com/steam/apps/1145360/library_600x900.jpg"
     )
 
@@ -176,6 +176,7 @@ def test_steam_deal_helpers_reject_incomplete_data_and_enforce_regional_currency
     })
 
     assert deal["background_image"] == "https://images.test/wide.jpg"
+    assert deal["cover_image"] is None
     assert steam_store._has_expected_currency(deal, "UA") is True
     assert steam_store._has_expected_currency({**deal, "current": {**deal["current"], "price": {"amount": 19.99, "currency": "USD"}}}, "UA") is False
 
@@ -255,6 +256,7 @@ async def test_steam_search_skips_incomplete_results_and_obeys_page_size(monkeyp
     assert await steam_store.fetch_steam_store_search("first", page_size=1) == [{
         "steam_appid": 2,
         "name": "First",
+        "cover_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/2/library_600x900.jpg",
         "background_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/2/library_600x900.jpg",
         "url": "https://store.steampowered.com/app/2/",
     }]

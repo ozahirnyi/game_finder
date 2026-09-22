@@ -130,7 +130,7 @@ function UsersPage() {
               >
                 {page > 1 && (
                   <Link
-                    to="/users/"
+                    to="/users"
                     search={{ page: page - 1 }}
                     className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold"
                   >
@@ -140,7 +140,7 @@ function UsersPage() {
                 {Array.from({ length: totalPages }, (_, index) => index + 1).map((value) => (
                   <Link
                     key={value}
-                    to="/users/"
+                    to="/users"
                     search={{ page: value }}
                     aria-current={value === page ? "page" : undefined}
                     className={
@@ -154,7 +154,7 @@ function UsersPage() {
                 ))}
                 {page < totalPages && (
                   <Link
-                    to="/users/"
+                    to="/users"
                     search={{ page: page + 1 }}
                     className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold"
                   >

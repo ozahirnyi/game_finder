@@ -8,7 +8,8 @@ import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   applyPsnLibraryRepair,
   enrichPsnLibrary,
-  getLibraryOverviewPage, searchGames,
+  getLibraryOverviewPage,
+  searchGames,
   type LibraryOverviewGame,
 } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
@@ -46,9 +47,19 @@ function LibraryPage() {
   const [query, setQuery] = useState("");
   const enrichmentStarted = useRef(false);
   const queryClient = useQueryClient();
-  useEffect(() => { const timer = window.setTimeout(() => setQuery(searchText), 250); return () => window.clearTimeout(timer); }, [searchText]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(searchText), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchText]);
   const source = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : "all";
-  const libraryQuery = useInfiniteQuery({ queryKey: ["library-overview-page", query, source, sortOrder], queryFn: ({ pageParam }) => getLibraryOverviewPage({ q: query, source, sort: sortOrder, offset: pageParam }), initialPageParam: 0, getNextPageParam: (last, pages) => last.has_more ? pages.reduce((total, page) => total + page.games.length, 0) : undefined });
+  const libraryQuery = useInfiniteQuery({
+    queryKey: ["library-overview-page", query, source, sortOrder],
+    queryFn: ({ pageParam }) =>
+      getLibraryOverviewPage({ q: query, source, sort: sortOrder, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) =>
+      last.has_more ? pages.reduce((total, page) => total + page.games.length, 0) : undefined,
+  });
   const enrichment = useMutation({
     mutationFn: async () => {
       let result = await enrichPsnLibrary();
@@ -59,14 +70,21 @@ function LibraryPage() {
   });
   const enrichCatalog = enrichment.mutate;
   useEffect(() => {
-    if ((libraryQuery.data?.pages[0]?.pending_catalog_count ?? 0) > 0 && !enrichmentStarted.current) {
+    if (
+      (libraryQuery.data?.pages[0]?.pending_catalog_count ?? 0) > 0 &&
+      !enrichmentStarted.current
+    ) {
       enrichmentStarted.current = true;
       enrichCatalog();
     }
   }, [enrichCatalog, libraryQuery.data?.pages]);
   const owned = libraryQuery.data?.pages.flatMap((page) => page.games) ?? [];
   const visible = owned;
-  const loadMoreRef = useInfiniteScroll({ hasNextPage: libraryQuery.hasNextPage, isFetchingNextPage: libraryQuery.isFetchingNextPage, fetchNextPage: () => void libraryQuery.fetchNextPage() });
+  const loadMoreRef = useInfiniteScroll({
+    hasNextPage: libraryQuery.hasNextPage,
+    isFetchingNextPage: libraryQuery.isFetchingNextPage,
+    fetchNextPage: () => void libraryQuery.fetchNextPage(),
+  });
 
   return (
     <AppShell>
@@ -87,7 +105,15 @@ function LibraryPage() {
           ))}
         </div>
       </div>
-      <label className="mb-4 block text-sm font-bold">Search games<input aria-label="Search games" value={searchText} onChange={(event) => setSearchText(event.target.value)} className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" /></label>
+      <label className="mb-4 block text-sm font-bold">
+        Search games
+        <input
+          aria-label="Search games"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
+        />
+      </label>
       {libraryQuery.data?.pages[0]?.raw_count || libraryQuery.data?.pages[0]?.quarantined_count ? (
         <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
           <p className="font-bold">Improve PlayStation details</p>
@@ -190,7 +216,17 @@ function LibraryPage() {
           {visible.map((game) => (
             <LibraryCard key={game.id} game={game} />
           ))}
-          <div ref={loadMoreRef} data-testid="library-load-more" className="py-3 text-center text-sm text-muted-foreground">{libraryQuery.isFetchingNextPage ? "Loading more games…" : libraryQuery.hasNextPage ? "Scroll to load more" : null}</div>
+          <div
+            ref={loadMoreRef}
+            data-testid="library-load-more"
+            className="py-3 text-center text-sm text-muted-foreground"
+          >
+            {libraryQuery.isFetchingNextPage
+              ? "Loading more games…"
+              : libraryQuery.hasNextPage
+                ? "Scroll to load more"
+                : null}
+          </div>
         </div>
       )}
     </AppShell>
@@ -207,7 +243,9 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
         image={game.cover_url ?? undefined}
         compact
         bare
-        className="h-20 w-14 shrink-0 rounded-lg"
+        sizes="56px"
+        fit="contain"
+        className="h-[84px] w-14 shrink-0 rounded-lg"
       />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">

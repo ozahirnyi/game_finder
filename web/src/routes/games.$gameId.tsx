@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
@@ -46,6 +46,7 @@ import {
   type PriceHistoryPeriod,
 } from "@/lib/api";
 import { exactCatalogMatch, hasCatalogId } from "@/lib/catalogMatch";
+import { getGameMediaCandidates } from "@/lib/gameMedia";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
 export const Route = createFileRoute("/games/$gameId")({
@@ -73,6 +74,11 @@ export const Route = createFileRoute("/games/$gameId")({
                 coverFrom: "#1d4ed8",
                 coverTo: "#111827",
                 heroUrl: catalog.hero_image ?? undefined,
+                heroWidth: catalog.hero_width ?? undefined,
+                heroHeight: catalog.hero_height ?? undefined,
+                screenshotUrl: catalog.screenshot_image ?? undefined,
+                screenshotWidth: catalog.screenshot_width ?? undefined,
+                screenshotHeight: catalog.screenshot_height ?? undefined,
                 coverUrl: catalog.cover_image ?? catalog.background_image ?? undefined,
                 fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/library_hero.jpg`,
                 genres: catalog.genres ?? steamGame.genres ?? [],
@@ -101,6 +107,9 @@ export const Route = createFileRoute("/games/$gameId")({
             coverFrom: "#1d4ed8",
             coverTo: "#111827",
             heroUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/library_hero.jpg`,
+            // Steam's library hero asset is the documented 3840×1240 library-art slot.
+            heroWidth: 3840,
+            heroHeight: 1240,
             coverUrl: undefined,
             fallbackCoverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${params.gameId}/header.jpg`,
             genres: steamGame.genres ?? [],
@@ -150,6 +159,11 @@ export const Route = createFileRoute("/games/$gameId")({
           coverFrom: "#1d4ed8",
           coverTo: "#111827",
           heroUrl: catalog.hero_image ?? undefined,
+          heroWidth: catalog.hero_width ?? undefined,
+          heroHeight: catalog.hero_height ?? undefined,
+          screenshotUrl: catalog.screenshot_image ?? undefined,
+          screenshotWidth: catalog.screenshot_width ?? undefined,
+          screenshotHeight: catalog.screenshot_height ?? undefined,
           coverUrl: catalog.cover_image ?? catalog.background_image ?? undefined,
           fallbackCoverUrl: undefined,
           genres: catalog.genres ?? [],
@@ -192,10 +206,38 @@ export const Route = createFileRoute("/games/$gameId")({
           },
           { property: "og:type", content: "website" },
           { name: "twitter:card", content: "summary_large_image" },
-          ...(loaderData.game.coverUrl
+          ...((
+            loaderData.game.heroUrl &&
+            loaderData.game.heroWidth &&
+            loaderData.game.heroHeight &&
+            loaderData.game.heroWidth >= 1280 &&
+            loaderData.game.heroWidth / loaderData.game.heroHeight >= 1.5
+              ? loaderData.game.heroUrl
+              : loaderData.game.coverUrl
+          )
             ? [
-                { property: "og:image", content: loaderData.game.coverUrl },
-                { name: "twitter:image", content: loaderData.game.coverUrl },
+                {
+                  property: "og:image",
+                  content:
+                    (loaderData.game.heroUrl &&
+                    loaderData.game.heroWidth &&
+                    loaderData.game.heroHeight &&
+                    loaderData.game.heroWidth >= 1280 &&
+                    loaderData.game.heroWidth / loaderData.game.heroHeight >= 1.5
+                      ? loaderData.game.heroUrl
+                      : loaderData.game.coverUrl) ?? "",
+                },
+                {
+                  name: "twitter:image",
+                  content:
+                    (loaderData.game.heroUrl &&
+                    loaderData.game.heroWidth &&
+                    loaderData.game.heroHeight &&
+                    loaderData.game.heroWidth >= 1280 &&
+                    loaderData.game.heroWidth / loaderData.game.heroHeight >= 1.5
+                      ? loaderData.game.heroUrl
+                      : loaderData.game.coverUrl) ?? "",
+                },
               ]
             : []),
         ]
@@ -384,7 +426,23 @@ function GameDetail() {
   });
   const current = priceQuery.data?.current;
   const game = mergeGamePrice(catalogGame, current);
-  const hasHero = Boolean(game.heroUrl);
+  const wideCandidates = getGameMediaCandidates(
+    {
+      heroUrl: game.heroUrl,
+      coverUrl: game.coverUrl,
+      screenshotUrl: game.screenshotUrl,
+      steamAppId: game.steamAppId,
+      heroWidth: game.heroWidth,
+      heroHeight: game.heroHeight,
+      screenshotWidth: game.screenshotWidth,
+      screenshotHeight: game.screenshotHeight,
+    },
+    "banner",
+  ).filter((candidate) => candidate.kind === "wide");
+  const wideKey = wideCandidates.map((candidate) => candidate.src).join("\n");
+  const [wideExhausted, setWideExhausted] = useState(false);
+  useEffect(() => setWideExhausted(false), [wideKey]);
+  const hasHero = wideCandidates.length > 0 && !wideExhausted;
   const isInWishlist =
     wishlistAdded ||
     wishlistQuery.data?.some((item) =>
@@ -417,6 +475,7 @@ function GameDetail() {
   const historyCurrency = priceHistory.points.find((point) => point.currency)?.currency;
   const showPriceHistory = shouldRenderPriceHistory(priceQuery.data?.is_free === true);
   const historyPeriodLabels: Record<PriceHistoryPeriod, string> = {
+    "1m": "1 month",
     "6m": "6 months",
     "1y": "1 year",
     "2y": "2 years",
@@ -431,7 +490,6 @@ function GameDetail() {
         className="mb-6 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
       />
 
-      {/* Use a wide treatment only when the catalog supplies actual hero artwork. */}
       <section
         className={
           hasHero
@@ -443,20 +501,27 @@ function GameDetail() {
           from={game.coverFrom}
           to={game.coverTo}
           title={game.title}
-          image={hasHero ? game.heroUrl : game.coverUrl}
-          fallbackImage={hasHero ? game.fallbackCoverUrl : undefined}
+          candidates={
+            hasHero
+              ? wideCandidates
+              : getGameMediaCandidates(
+                  { coverUrl: game.coverUrl, steamAppId: game.steamAppId },
+                  "poster",
+                )
+          }
+          onExhausted={hasHero ? () => setWideExhausted(true) : undefined}
+          priority={hasHero}
+          fit={hasHero ? "cover" : "contain"}
           bare
           variant={hasHero ? "hero" : "card"}
           className={
-            hasHero ? "h-72 w-full sm:h-96" : "aspect-[2/3] w-40 shrink-0 self-center sm:w-52"
+            hasHero
+              ? "aspect-[16/9] max-h-[420px] w-full"
+              : "aspect-[2/3] w-40 shrink-0 self-center sm:w-52"
           }
         />
         <div
-          className={
-            hasHero
-              ? "absolute inset-x-0 bottom-0 bg-background/90 p-6 backdrop-blur-sm sm:p-8"
-              : "min-w-0"
-          }
+          className={hasHero ? "min-w-0 border-t border-border bg-surface-1 p-6 sm:p-8" : "min-w-0"}
         >
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {game.coop && <Chip tone="primary">Co-op</Chip>}
@@ -643,13 +708,20 @@ function GameDetail() {
                 {similar.map((candidate) => (
                   <GameCard
                     key={candidate.id}
-                    aspect="aspect-[16/9]"
                     showPrice={false}
                     game={{
                       gameId: String(candidate.id),
                       title: candidate.name,
                       heroUrl: candidate.hero_image ?? undefined,
                       coverUrl: candidate.cover_image ?? candidate.background_image ?? undefined,
+                      screenshotUrl: candidate.screenshot_image ?? undefined,
+                      steamAppId: candidate.steam_appid,
+                      coverWidth: candidate.cover_width,
+                      coverHeight: candidate.cover_height,
+                      heroWidth: candidate.hero_width,
+                      heroHeight: candidate.hero_height,
+                      screenshotWidth: candidate.screenshot_width,
+                      screenshotHeight: candidate.screenshot_height,
                       coverFrom: "#1d4ed8",
                       coverTo: "#111827",
                       genres: candidate.genres,

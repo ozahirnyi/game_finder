@@ -11,7 +11,7 @@ test("wishlist alert saves the Any discount payload and refreshes visible alerts
   await page.getByRole("link", { name: "Wishlist" }).first().click();
   await page.waitForURL("**/wishlist");
   await waitForHydration(page);
-  await expect.poll(() => api.requests.some((request) => request.path === "/wishlist")).toBe(true);
+  await expect.poll(() => api.requests.some((request) => request.path === "/wishlist/page")).toBe(true);
   await expect(page.getByRole("button", { name: "Price alerts" })).toBeEnabled();
   await page.getByRole("button", { name: "Price alerts" }).click();
   await expect(page.getByText("Telegram delivery is not configured.")).toBeVisible();

@@ -10,7 +10,7 @@ from app.integrations.igdb import IGDBError
 
 
 _SNAPSHOT_FORMAT_KEY = "_catalog_snapshot_format"
-_SNAPSHOT_FORMAT_VERSION = 2
+_SNAPSHOT_FORMAT_VERSION = 3
 
 
 def _stored_snapshot(snapshot: dict) -> dict:
@@ -54,7 +54,9 @@ def get_cached_snapshot(
             snapshot = await fetch(igdb_id)
         except IGDBError:
             if cached:
-                return cached.snapshot
+                # Never expose the internal format marker, including when an
+                # old record is the only safe fallback during an IGDB outage.
+                return _public_snapshot(cached.snapshot)
             raise
         if cached:
             cached.snapshot = _stored_snapshot(snapshot)

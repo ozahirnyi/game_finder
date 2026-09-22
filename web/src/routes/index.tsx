@@ -22,6 +22,7 @@ import {
   type DashboardRecommendation,
 } from "@/lib/api";
 import { gameDetailTarget } from "@/lib/gameRoute";
+import { getGameMediaCandidates } from "@/lib/gameMedia";
 import { normalizePriceCountry } from "@/lib/priceRegion";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -278,6 +279,14 @@ function Home() {
                   title: game.name,
                   heroUrl: game.hero_image ?? undefined,
                   coverUrl: game.cover_image ?? game.background_image ?? undefined,
+                  screenshotUrl: game.screenshot_image ?? undefined,
+                  steamAppId: game.steam_appid ?? undefined,
+                  coverWidth: game.cover_width,
+                  coverHeight: game.cover_height,
+                  heroWidth: game.hero_width,
+                  heroHeight: game.hero_height,
+                  screenshotWidth: game.screenshot_width,
+                  screenshotHeight: game.screenshot_height,
                   coverFrom: "#c75f28",
                   coverTo: "#22243a",
                 }}
@@ -350,10 +359,15 @@ function Home() {
                     source: target?.source,
                     title: deal.name,
                     heroUrl: deal.hero_image ?? undefined,
-                    heroFallbackUrl: deal.steam_appid
-                      ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${deal.steam_appid}/header.jpg`
-                      : undefined,
-                    coverUrl: deal.cover_image ?? deal.background_image ?? undefined,
+                    coverUrl: deal.cover_image ?? undefined,
+                    screenshotUrl: deal.screenshot_image ?? undefined,
+                    steamAppId: deal.steam_appid ?? undefined,
+                    coverWidth: deal.cover_width,
+                    coverHeight: deal.cover_height,
+                    heroWidth: deal.hero_width,
+                    heroHeight: deal.hero_height,
+                    screenshotWidth: deal.screenshot_width,
+                    screenshotHeight: deal.screenshot_height,
                     coverFrom: "#c75f28",
                     coverTo: "#22243a",
                     price: deal.current?.price?.amount ?? undefined,
@@ -411,7 +425,8 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
         variant="card"
         from="#c75f28"
         to="#22243a"
-        className="mb-4 aspect-[2/3] w-full"
+        sizes="264px"
+        className="mx-auto mb-4 aspect-[2/3] w-full max-w-[264px]"
       />
       <h3 className="text-lg font-bold">{recommendation.title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{recommendation.reason}</p>
@@ -468,24 +483,32 @@ function FeaturedDeal({
       : never
   >;
 }) {
-  const hasHero = Boolean(deal.hero_image);
   return (
     <Panel interactive className="h-full">
       <GameCover
         from="#c75f28"
         to="#22243a"
         title={deal.name}
-        image={hasHero ? (deal.hero_image ?? undefined) : (deal.cover_image ?? undefined)}
-        fallbackImage={
-          hasHero && deal.steam_appid
-            ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${deal.steam_appid}/header.jpg`
-            : undefined
-        }
-        variant={hasHero ? "hero" : "card"}
+        candidates={getGameMediaCandidates(
+          {
+            coverUrl: deal.cover_image,
+            heroUrl: deal.hero_image,
+            screenshotUrl: deal.screenshot_image,
+            steamAppId: deal.steam_appid,
+            coverWidth: deal.cover_width,
+            coverHeight: deal.cover_height,
+            heroWidth: deal.hero_width,
+            heroHeight: deal.hero_height,
+            screenshotWidth: deal.screenshot_width,
+            screenshotHeight: deal.screenshot_height,
+          },
+          "banner",
+        )}
+        variant="hero"
         bare
-        className={`${hasHero ? "aspect-[16/9]" : "aspect-[2/3]"} w-full`}
+        className="aspect-[16/9] w-full"
       />
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/85 to-transparent p-6 pt-16">
+      <div className="p-6">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Chip tone="solid">-{deal.current?.cut ?? 0}%</Chip>
           <Chip tone="primary">{deal.current?.shop ?? "Store"}</Chip>

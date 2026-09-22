@@ -31,6 +31,13 @@ export type CatalogGame = {
   cover_image?: string | null;
   background_image?: string | null;
   hero_image?: string | null;
+  screenshot_image?: string | null;
+  cover_width?: number | null;
+  cover_height?: number | null;
+  hero_width?: number | null;
+  hero_height?: number | null;
+  screenshot_width?: number | null;
+  screenshot_height?: number | null;
   description_raw?: string | null;
   rating?: number | null;
   genres?: string[];
@@ -47,6 +54,13 @@ export type Deal = {
   cover_image?: string | null;
   background_image?: string | null;
   hero_image?: string | null;
+  screenshot_image?: string | null;
+  cover_width?: number | null;
+  cover_height?: number | null;
+  hero_width?: number | null;
+  hero_height?: number | null;
+  screenshot_width?: number | null;
+  screenshot_height?: number | null;
   url?: string | null;
   current?: {
     shop?: string | null;
@@ -59,7 +73,7 @@ export type Deal = {
 export type GenreDealResponse = { popular: Deal[]; sections: { genre: string; results: Deal[] }[] };
 
 export type Money = { amount: number; currency: string };
-export type PriceHistoryPeriod = "6m" | "1y" | "2y";
+export type PriceHistoryPeriod = "1m" | "6m" | "1y" | "2y";
 
 export type LibraryGame = {
   id: string;
@@ -314,6 +328,16 @@ export type RecommendationGame = {
   name: string;
   released: string | null;
   background_image: string | null;
+  cover_image?: string | null;
+  hero_image?: string | null;
+  screenshot_image?: string | null;
+  steam_appid?: number | null;
+  cover_width?: number | null;
+  cover_height?: number | null;
+  hero_width?: number | null;
+  hero_height?: number | null;
+  screenshot_width?: number | null;
+  screenshot_height?: number | null;
   platforms: string[];
 };
 export type RecommendationResponse = {
@@ -666,7 +690,9 @@ export async function getRecommendations(prompt: string): Promise<Recommendation
   });
   for (let attempt = 0; attempt < BACKGROUND_JOB_MAX_POLLS; attempt += 1) {
     const current = await apiRequest<BackgroundJob>(`/background-jobs/${job.id}`, { auth: true });
-    if (current.status === "succeeded") return current.result ?? { recommendations: [] };
+    if (current.status === "succeeded") {
+      return { recommendations: current.result?.recommendations ?? [] };
+    }
     if (current.status === "failed") {
       throw new ApiError(current.error ?? "AI search could not be completed.", 502);
     }
@@ -735,6 +761,8 @@ export function getPriceHistory(
     current?: Deal["current"];
     deals: Deal["current"][];
     history_available: boolean;
+    is_free?: boolean;
+    provider_message?: string | null;
     history_low_all?: Money | null;
     history: Array<{
       timestamp?: string | null;
@@ -757,6 +785,8 @@ export function getSteamPriceHistory(
     current?: Deal["current"];
     deals: Deal["current"][];
     history_available: boolean;
+    is_free?: boolean;
+    provider_message?: string | null;
     history_low_all?: Money | null;
     history: Array<{
       timestamp?: string | null;

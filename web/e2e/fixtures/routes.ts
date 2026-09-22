@@ -134,6 +134,17 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
       await route.fulfill({ json: state.wishlist });
       return;
     }
+    if (request.method() === "GET" && path === "/wishlist/page") {
+      const query = (url.searchParams.get("q") ?? "").toLowerCase();
+      const offset = Number(url.searchParams.get("offset") ?? 0);
+      const limit = Number(url.searchParams.get("limit") ?? 20);
+      const matches = state.wishlist.filter((game) => game.title.toLowerCase().includes(query));
+      const items = matches.slice(offset, offset + limit);
+      await route.fulfill({
+        json: { items, total: matches.length, has_more: offset + items.length < matches.length },
+      });
+      return;
+    }
     if (request.method() === "POST" && path === "/wishlist/steam-games/440") {
       await route.fulfill({
         json: {

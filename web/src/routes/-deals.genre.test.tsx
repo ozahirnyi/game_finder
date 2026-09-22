@@ -152,6 +152,8 @@ describe("DealsPage genre deals", () => {
           ...deal("Project Zomboid", 108600),
           background_image: "https://images.test/steam-capsule.jpg",
           hero_image: "https://images.test/wide.jpg",
+          hero_width: 1920,
+          hero_height: 1080,
         },
       ],
       sections: [],

@@ -314,6 +314,16 @@ class RecommendationCatalogGame(BaseModel):
     name: str
     released: str | None = None
     background_image: str | None = None
+    cover_image: str | None = None
+    hero_image: str | None = None
+    screenshot_image: str | None = None
+    steam_appid: int | None = None
+    cover_width: int | None = Field(default=None, gt=0)
+    cover_height: int | None = Field(default=None, gt=0)
+    hero_width: int | None = Field(default=None, gt=0)
+    hero_height: int | None = Field(default=None, gt=0)
+    screenshot_width: int | None = Field(default=None, gt=0)
+    screenshot_height: int | None = Field(default=None, gt=0)
     platforms: list[str] = Field(default_factory=list)
 
 
@@ -346,7 +356,15 @@ class GameSearchItem(BaseModel):
     name: str | None = None
     released: str | None = None
     background_image: str | None = None
+    cover_image: str | None = None
     hero_image: str | None = None
+    screenshot_image: str | None = None
+    cover_width: int | None = Field(default=None, gt=0)
+    cover_height: int | None = Field(default=None, gt=0)
+    hero_width: int | None = Field(default=None, gt=0)
+    hero_height: int | None = Field(default=None, gt=0)
+    screenshot_width: int | None = Field(default=None, gt=0)
+    screenshot_height: int | None = Field(default=None, gt=0)
     source: str | None = None
     steam_appid: int | None = None
     url: str | None = None
@@ -365,7 +383,15 @@ class GameCatalogDetail(BaseModel):
     name: str
     released: str | None = None
     background_image: str | None = None
+    cover_image: str | None = None
     hero_image: str | None = None
+    screenshot_image: str | None = None
+    cover_width: int | None = Field(default=None, gt=0)
+    cover_height: int | None = Field(default=None, gt=0)
+    hero_width: int | None = Field(default=None, gt=0)
+    hero_height: int | None = Field(default=None, gt=0)
+    screenshot_width: int | None = Field(default=None, gt=0)
+    screenshot_height: int | None = Field(default=None, gt=0)
     steam_appid: int | None = None
     description_raw: str | None = None
     rating: float | None = None
@@ -597,7 +623,15 @@ class HomeDealItem(BaseModel):
     name: str
     released: str | None = None
     background_image: str | None = None
+    cover_image: str | None = None
     hero_image: str | None = None
+    screenshot_image: str | None = None
+    cover_width: int | None = Field(default=None, gt=0)
+    cover_height: int | None = Field(default=None, gt=0)
+    hero_width: int | None = Field(default=None, gt=0)
+    hero_height: int | None = Field(default=None, gt=0)
+    screenshot_width: int | None = Field(default=None, gt=0)
+    screenshot_height: int | None = Field(default=None, gt=0)
     url: str | None = None
     current: PriceDeal | None = None
     history_low_all: PriceMoney | None = None

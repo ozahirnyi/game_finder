@@ -118,15 +118,19 @@ def test_normalize_igdb_game_prefers_wide_artwork_for_the_detail_hero():
         {
             "id": 1,
             "name": "Wide Game",
-            "cover": {"url": "//images.igdb.com/igdb/image/upload/t_thumb/cover.jpg"},
+            "cover": {"url": "//images.igdb.com/igdb/image/upload/t_thumb/cover.jpg", "width": 264, "height": 374},
             "artworks": [
-                {"url": "//images.igdb.com/igdb/image/upload/t_thumb/artwork.jpg"},
+                {"url": "//images.igdb.com/igdb/image/upload/t_thumb/portrait.jpg", "width": 800, "height": 1200},
+                {"url": "//images.igdb.com/igdb/image/upload/t_thumb/artwork.jpg", "width": 1920, "height": 1080},
             ],
+            "screenshots": [{"url": "//images.igdb.com/igdb/image/upload/t_thumb/screenshot.jpg", "width": 1600, "height": 900}],
         }
     )
 
     assert result["background_image"] == "https://images.igdb.com/igdb/image/upload/t_cover_big/cover.jpg"
     assert result["hero_image"] == "https://images.igdb.com/igdb/image/upload/t_1080p/artwork.jpg"
+    assert result["hero_width"] == 1920
+    assert result["screenshot_image"] == "https://images.igdb.com/igdb/image/upload/t_1080p/screenshot.jpg"
 
 
 def test_normalize_igdb_game_keeps_portrait_cover_out_of_hero_field():
@@ -493,7 +497,7 @@ async def test_catalog_cache_uses_fresh_and_refreshes_stale_entries():
     from app.database import CatalogGameCache
     fresh = CatalogGameCache(
         igdb_id=8,
-        snapshot={"id": 8, "_catalog_snapshot_format": 2},
+        snapshot={"id": 8, "_catalog_snapshot_format": 3},
         fetched_at=datetime.now(timezone.utc),
     )
     class Db:
@@ -508,3 +512,58 @@ async def test_catalog_cache_uses_fresh_and_refreshes_stale_entries():
     async def fetch(_): return {"id": 9, "steam_appid": 10}
     assert await get_cached_snapshot(db, 9, fetch) == {"id": 9, "steam_appid": 10}
     assert db.commits == 1 and stale.steam_appid == 10
+
+
+@pytest.mark.anyio
+async def test_catalog_cache_refreshes_a_fresh_v2_media_snapshot_and_keeps_v3_without_artwork():
+    from app.catalog_cache import get_cached_snapshot
+    from app.database import CatalogGameCache
+
+    old = CatalogGameCache(
+        igdb_id=20,
+        snapshot={"id": 20, "hero_image": "legacy", "_catalog_snapshot_format": 2},
+        fetched_at=datetime.now(timezone.utc),
+    )
+
+    class Db:
+        def __init__(self, cached): self.cached, self.commits = cached, 0
+        def get(self, *_): return self.cached
+        def commit(self): self.commits += 1
+
+    async def refreshed(_):
+        return {"id": 20, "hero_image": "fresh", "hero_width": 1920, "hero_height": 1080}
+
+    db = Db(old)
+    assert await get_cached_snapshot(db, 20, refreshed) == await refreshed(20)
+    assert old.snapshot["_catalog_snapshot_format"] == 3
+    assert db.commits == 1
+
+    no_artwork = CatalogGameCache(
+        igdb_id=21,
+        snapshot={"id": 21, "name": "Text only", "_catalog_snapshot_format": 3},
+        fetched_at=datetime.now(timezone.utc),
+    )
+
+    async def unexpected(_): raise AssertionError("current snapshot without artwork must be reused")
+
+    assert await get_cached_snapshot(Db(no_artwork), 21, unexpected) == {"id": 21, "name": "Text only"}
+
+
+@pytest.mark.anyio
+async def test_catalog_cache_hides_format_marker_when_an_old_snapshot_is_the_outage_fallback():
+    from app.catalog_cache import get_cached_snapshot
+    from app.database import CatalogGameCache
+    from app.integrations.igdb import IGDBError
+
+    cached = CatalogGameCache(
+        igdb_id=22,
+        snapshot={"id": 22, "cover_image": "cover", "_catalog_snapshot_format": 2},
+        fetched_at=datetime.now(timezone.utc),
+    )
+
+    class Db:
+        def get(self, *_): return cached
+
+    async def unavailable(_): raise IGDBError("offline")
+
+    assert await get_cached_snapshot(Db(), 22, unavailable) == {"id": 22, "cover_image": "cover"}

@@ -139,24 +139,37 @@ def _igdb_image_url(value: Any, size: str) -> str | None:
     return re.sub(r"t_[^/]+(?=/)", size, url)
 
 
+def _positive_dimension(value: Any) -> int | None:
+    return value if isinstance(value, int) and value > 0 else None
+
+
+def _wide_media(values: Any) -> dict[str, Any] | None:
+    """Return the first IGDB asset that is demonstrably wide enough for a hero."""
+    for item in values or []:
+        if not isinstance(item, dict):
+            continue
+        width = _positive_dimension(item.get("width"))
+        height = _positive_dimension(item.get("height"))
+        if width is not None and height is not None and width >= 1280 and width / height >= 1.5:
+            return item
+    return None
+
+
 def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
-    cover = _igdb_image_url((game.get("cover") or {}).get("url"), "t_cover_big")
-    artwork = next(
-        (
-            item.get("url")
-            for item in game.get("artworks") or []
-            if isinstance(item, dict) and isinstance(item.get("url"), str)
-        ),
-        None,
-    )
-    hero_image = _igdb_image_url(artwork, "t_1080p")
+    cover_data = game.get("cover") if isinstance(game.get("cover"), dict) else {}
+    cover = _igdb_image_url(cover_data.get("url"), "t_cover_big")
+    artwork = _wide_media(game.get("artworks"))
+    screenshot = _wide_media(game.get("screenshots"))
+    hero_image = _igdb_image_url((artwork or {}).get("url"), "t_1080p")
+    screenshot_image = _igdb_image_url((screenshot or {}).get("url"), "t_1080p")
     release = game.get("first_release_date")
     released = datetime.fromtimestamp(release, timezone.utc).date().isoformat() if isinstance(release, (int, float)) else None
     steam_appid = next((int(item["uid"]) for item in game.get("external_games", [])
                         if item.get("category") == 1 and str(item.get("uid", "")).isdigit()), None)
-    return {
+    result = {
         "id": game.get("id"), "name": game.get("name"), "released": released,
-        "cover_image": cover, "background_image": cover, "hero_image": hero_image, "description_raw": game.get("summary"),
+        "cover_image": cover, "background_image": cover, "hero_image": hero_image,
+        "description_raw": game.get("summary"),
         "rating": game.get("rating") if game.get("rating") is not None else game.get("total_rating"), "genres": [x["name"] for x in game.get("genres", []) if x.get("name")],
         "platforms": [x.get("name") or (x.get("platform") or {}).get("name") for x in game.get("platforms", []) if x.get("name") or (x.get("platform") or {}).get("name")],
         "game_type": (game.get("game_type") or {}).get("type") if isinstance(game.get("game_type"), dict) else game.get("game_type"),
@@ -164,9 +177,20 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
         "keywords": [x["name"] for x in game.get("keywords", []) if x.get("name")],
         "steam_appid": steam_appid,
     }
+    media = {
+        "cover_width": _positive_dimension(cover_data.get("width")),
+        "cover_height": _positive_dimension(cover_data.get("height")),
+        "hero_width": _positive_dimension((artwork or {}).get("width")),
+        "hero_height": _positive_dimension((artwork or {}).get("height")),
+        "screenshot_image": screenshot_image,
+        "screenshot_width": _positive_dimension((screenshot or {}).get("width")),
+        "screenshot_height": _positive_dimension((screenshot or {}).get("height")),
+    }
+    result.update({key: value for key, value in media.items() if value is not None})
+    return result
 
 
-_FIELDS = "fields id,name,first_release_date,summary,rating,total_rating,cover.url,artworks.url,genres.name,platforms.name,game_type.type,game_modes.name,keywords.name,external_games.category,external_games.uid;"
+_FIELDS = "fields id,name,first_release_date,summary,rating,total_rating,cover.url,cover.width,cover.height,artworks.url,artworks.width,artworks.height,screenshots.url,screenshots.width,screenshots.height,genres.name,platforms.name,game_type.type,game_modes.name,keywords.name,external_games.category,external_games.uid;"
 
 
 async def fetch_igdb_games(

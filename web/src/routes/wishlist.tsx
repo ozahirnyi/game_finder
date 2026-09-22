@@ -1,5 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
@@ -49,8 +55,17 @@ function WishlistPage() {
   const [catalogGameId, setCatalogGameId] = useState("");
   const [searchText, setSearchText] = useState("");
   const [query, setQuery] = useState("");
-  useEffect(() => { const timer = window.setTimeout(() => setQuery(searchText), 250); return () => window.clearTimeout(timer); }, [searchText]);
-  const wishlistQuery = useInfiniteQuery({ queryKey: ["wishlist-page", query], queryFn: ({ pageParam }) => getWishlistPage({ q: query, offset: pageParam }), initialPageParam: 0, getNextPageParam: (last, pages) => last.has_more ? pages.reduce((total, page) => total + page.items.length, 0) : undefined });
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(searchText), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchText]);
+  const wishlistQuery = useInfiniteQuery({
+    queryKey: ["wishlist-page", query],
+    queryFn: ({ pageParam }) => getWishlistPage({ q: query, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) =>
+      last.has_more ? pages.reduce((total, page) => total + page.items.length, 0) : undefined,
+  });
   const removeMutation = useMutation({
     mutationFn: removeWishlist,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
@@ -69,7 +84,11 @@ function WishlistPage() {
   });
 
   const wl = wishlistQuery.data?.pages.flatMap((page) => page.items) ?? [];
-  const loadMoreRef = useInfiniteScroll({ hasNextPage: wishlistQuery.hasNextPage, isFetchingNextPage: wishlistQuery.isFetchingNextPage, fetchNextPage: () => void wishlistQuery.fetchNextPage() });
+  const loadMoreRef = useInfiniteScroll({
+    hasNextPage: wishlistQuery.hasNextPage,
+    isFetchingNextPage: wishlistQuery.isFetchingNextPage,
+    fetchNextPage: () => void wishlistQuery.fetchNextPage(),
+  });
   const priceCountry = profileQuery.data?.price_country_code ?? "US";
   const priceQueries = useQueries({
     queries: wl.map((game) => ({
@@ -102,7 +121,15 @@ function WishlistPage() {
           </div>
         }
       />
-      <label className="mb-4 block text-sm font-bold">Search games<input aria-label="Search games" value={searchText} onChange={(event) => setSearchText(event.target.value)} className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" /></label>
+      <label className="mb-4 block text-sm font-bold">
+        Search games
+        <input
+          aria-label="Search games"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
+        />
+      </label>
 
       {showAlerts && (
         <section
@@ -178,7 +205,11 @@ function WishlistPage() {
         <EmptyState
           icon={<Heart className="size-5" />}
           title={query ? "No wishlist games match your search" : "Your wishlist is empty"}
-          description={query ? "Try another title." : "Add games you're waiting on and we'll track their price for you."}
+          description={
+            query
+              ? "Try another title."
+              : "Add games you're waiting on and we'll track their price for you."
+          }
           action={
             <Link
               to="/search"
@@ -229,7 +260,9 @@ function WishlistPage() {
                   image={g.cover_url ?? undefined}
                   compact
                   bare
-                  className="size-20 rounded-lg"
+                  sizes="56px"
+                  fit="contain"
+                  className="h-[84px] w-14 rounded-lg"
                 />
               </Link>
               <div className="min-w-0">
@@ -269,7 +302,17 @@ function WishlistPage() {
               </div>
             </div>
           ))}
-          <div ref={loadMoreRef} data-testid="wishlist-load-more" className="py-3 text-center text-sm text-muted-foreground">{wishlistQuery.isFetchingNextPage ? "Loading more games…" : wishlistQuery.hasNextPage ? "Scroll to load more" : null}</div>
+          <div
+            ref={loadMoreRef}
+            data-testid="wishlist-load-more"
+            className="py-3 text-center text-sm text-muted-foreground"
+          >
+            {wishlistQuery.isFetchingNextPage
+              ? "Loading more games…"
+              : wishlistQuery.hasNextPage
+                ? "Scroll to load more"
+                : null}
+          </div>
         </div>
       )}
     </AppShell>
