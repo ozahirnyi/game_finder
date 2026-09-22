@@ -107,8 +107,8 @@ describe("PriceHistoryChart", () => {
       <PriceHistoryChart
         currency="USD"
         points={[
-          { date: "2025-08-01T00:00:00Z", price: 19.99 },
-          { date: "2025-09-25T00:00:00Z", price: 24.99 },
+          { date: "2025-08-01T00:00:00Z", price: 24.99 },
+          { date: "2025-09-25T00:00:00Z", price: 19.99 },
         ]}
       />,
     );
@@ -117,7 +117,7 @@ describe("PriceHistoryChart", () => {
 
     fireEvent.pointerMove(chart, { clientX: 120, clientY: 40 });
 
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/1 Aug.*Sale price: \$19\.99/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/1 Aug.*Sale price: \$24\.99/i);
   });
 
   it("shows labelled price grid lines", () => {
@@ -213,13 +213,13 @@ describe("PriceHistoryChart", () => {
     expect(chart).not.toHaveAttribute("preserveAspectRatio", "none");
   });
 
-  it("keeps an edge tooltip inside the plot", () => {
+  it("places a tooltip below an upper-left observation without covering controls", () => {
     render(
       <PriceHistoryChart
         currency="USD"
         points={[
-          { date: "2025-08-01T00:00:00Z", price: 19.99 },
-          { date: "2025-09-25T00:00:00Z", price: 24.99 },
+          { date: "2025-08-01T00:00:00Z", price: 24.99 },
+          { date: "2025-09-25T00:00:00Z", price: 19.99 },
         ]}
       />,
     );
@@ -228,7 +228,7 @@ describe("PriceHistoryChart", () => {
 
     expect(screen.getByRole("tooltip")).toHaveStyle({
       left: "0%",
-      transform: "translate(0, -115%)",
+      transform: "translate(0, 8px)",
     });
   });
 
@@ -237,8 +237,8 @@ describe("PriceHistoryChart", () => {
       <PriceHistoryChart
         currency="USD"
         points={[
-          { date: "2025-08-01T00:00:00Z", price: 19.99 },
-          { date: "2025-09-25T00:00:00Z", price: 24.99 },
+          { date: "2025-08-01T00:00:00Z", price: 24.99 },
+          { date: "2025-09-25T00:00:00Z", price: 19.99 },
         ]}
       />,
     );

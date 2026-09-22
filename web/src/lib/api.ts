@@ -73,7 +73,7 @@ export type Deal = {
 export type GenreDealResponse = { popular: Deal[]; sections: { genre: string; results: Deal[] }[] };
 
 export type Money = { amount: number; currency: string };
-export type PriceHistoryPeriod = "1m" | "6m" | "1y" | "2y";
+export type PriceHistoryPeriod = "6m" | "1y" | "2y";
 
 export type LibraryGame = {
   id: string;
