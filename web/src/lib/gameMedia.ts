@@ -10,6 +10,7 @@ export type MediaCandidate = {
 
 export type GameMediaInput = {
   coverUrl?: string | null;
+  backgroundUrl?: string | null;
   heroUrl?: string | null;
   screenshotUrl?: string | null;
   steamAppId?: number | null;
@@ -22,6 +23,22 @@ export type GameMediaInput = {
 };
 
 const IGDB_HOST = "images.igdb.com";
+
+function steamImage(value?: string) {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    if (!url.hostname.endsWith(".steamstatic.com")) return undefined;
+    const match = url.pathname.match(/\/steam\/apps\/(\d+)\//);
+    if (!match) return undefined;
+    return {
+      appid: Number(match[1]),
+      wide: /\/(?:header|capsule_|library_hero)/.test(url.pathname),
+    };
+  } catch {
+    return undefined;
+  }
+}
 
 function validUrl(value: string | null | undefined) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
@@ -54,6 +71,9 @@ function candidate(
     const standard = replaceIgdbSize(value, "t_cover_big");
     resolved.src = standard;
     resolved.srcSet = `${standard} 264w, ${replaceIgdbSize(value, "t_cover_big_2x")} 528w`;
+    if (typeof width === "number" && width > 528) {
+      resolved.srcSet += `, ${replaceIgdbSize(value, "t_original")} ${width}w`;
+    }
   }
   if (kind === "cover") {
     try {
@@ -99,6 +119,9 @@ export function getGameMediaCandidates(
   role: "poster" | "banner",
 ): MediaCandidate[] {
   const cover = validUrl(input.coverUrl);
+  const background = validUrl(input.backgroundUrl);
+  const savedSteam = steamImage(cover);
+  const portrait = savedSteam?.wide ? undefined : cover;
   const hero = validUrl(input.heroUrl);
   const screenshot = validUrl(input.screenshotUrl);
   const appid =
@@ -106,15 +129,27 @@ export function getGameMediaCandidates(
     Number.isInteger(input.steamAppId) &&
     input.steamAppId > 0
       ? input.steamAppId
-      : undefined;
+      : savedSteam?.appid;
 
   if (role === "poster") {
     return unique([
-      ...(cover ? [candidate(cover, "cover", input.coverWidth, input.coverHeight)] : []),
+      ...(portrait ? [candidate(portrait, "cover", input.coverWidth, input.coverHeight)] : []),
       ...(appid ? [candidate(steamAsset(appid, "library_600x900.jpg"), "cover")] : []),
       ...(hero ? [candidate(hero, "unknown", input.heroWidth, input.heroHeight)] : []),
       ...(screenshot
         ? [candidate(screenshot, "unknown", input.screenshotWidth, input.screenshotHeight)]
+        : []),
+      ...(background
+        ? [candidate(background, steamImage(background)?.wide ? "wide" : "unknown")]
+        : []),
+      ...(cover && !portrait ? [candidate(cover, "wide")] : []),
+      ...(appid
+        ? [
+            candidate(
+              `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`,
+              "wide",
+            ),
+          ]
         : []),
     ]);
   }
@@ -127,6 +162,7 @@ export function getGameMediaCandidates(
     ...(screenshot && isWide(input.screenshotWidth, input.screenshotHeight)
       ? [candidate(screenshot, "wide", input.screenshotWidth, input.screenshotHeight)]
       : []),
+    ...(background && steamImage(background)?.wide ? [candidate(background, "wide")] : []),
     ...(cover ? [candidate(cover, "cover", input.coverWidth, input.coverHeight)] : []),
     ...(appid ? [candidate(steamAsset(appid, "library_600x900.jpg"), "cover")] : []),
   ]);

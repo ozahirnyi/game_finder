@@ -26,7 +26,7 @@ describe("GameCard", () => {
     );
 
     expect(container.querySelector('[data-visual-role="card"]')).toBeInTheDocument();
-    expect(container.querySelector(".aspect-\\[2\\/3\\]")).toBeInTheDocument();
+    expect(container.querySelector(".aspect-\\[3\\/4\\]")).toBeInTheDocument();
   });
 
   it("keeps ordinary cards as posters even when wide artwork is available", () => {
@@ -43,7 +43,7 @@ describe("GameCard", () => {
     );
 
     expect(container.querySelector('[data-visual-role="card"]')).toBeInTheDocument();
-    expect(container.querySelector(".aspect-\\[2\\/3\\]")).toBeInTheDocument();
+    expect(container.querySelector(".aspect-\\[3\\/4\\]")).toBeInTheDocument();
   });
 
   it("uses the portrait cover directly instead of composing a fake hero", () => {
@@ -58,7 +58,7 @@ describe("GameCard", () => {
       />,
     );
 
-    expect(screen.getByRole("img", { name: "Portrait Only" })).toHaveClass("object-contain");
+    expect(screen.getByRole("img", { name: "Portrait Only" })).toHaveClass("object-cover");
   });
 
   it("links to the internal game details route instead of a store URL", async () => {

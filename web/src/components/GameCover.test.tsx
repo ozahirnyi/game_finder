@@ -1,10 +1,30 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { GameCover } from "./GameCover";
 import { Avatar } from "./GameCover";
 
 describe("GameCover", () => {
+  it("keeps an already cached image visible after initializing its source queue", () => {
+    const complete = vi.spyOn(HTMLImageElement.prototype, "complete", "get").mockReturnValue(true);
+    const width = vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(600);
+    try {
+      const { container } = render(
+        <GameCover
+          title="Cached artwork"
+          from="#111"
+          to="#222"
+          image="https://example.test/cached.jpg"
+        />,
+      );
+      expect(within(container).getByRole("img", { name: "Cached artwork" })).toHaveClass(
+        "opacity-100",
+      );
+    } finally {
+      complete.mockRestore();
+      width.mockRestore();
+    }
+  });
   it("renders the supplied real cover image", () => {
     render(
       <GameCover
@@ -170,7 +190,7 @@ describe("GameCover", () => {
     );
   });
 
-  it("uses contain for poster candidates and cover for wide candidates", () => {
+  it("fills portrait slots with covers but contains a wide fallback", () => {
     const { container, rerender } = render(
       <GameCover
         from="#111"
@@ -179,7 +199,7 @@ describe("GameCover", () => {
         candidates={[{ src: "https://example.test/p.jpg", kind: "cover" }]}
       />,
     );
-    expect(within(container).getByRole("img", { name: "Poster" })).toHaveClass("object-contain");
+    expect(within(container).getByRole("img", { name: "Poster" })).toHaveClass("object-cover");
 
     rerender(
       <GameCover
@@ -189,7 +209,7 @@ describe("GameCover", () => {
         candidates={[{ src: "https://example.test/w.jpg", kind: "wide" }]}
       />,
     );
-    expect(within(container).getByRole("img", { name: "Wide" })).toHaveClass("object-cover");
+    expect(within(container).getByRole("img", { name: "Wide" })).toHaveClass("object-contain");
   });
 
   it("does not crop a poster when it is the fallback for a hero slot", () => {

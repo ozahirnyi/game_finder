@@ -3,6 +3,20 @@ import { describe, expect, it } from "vitest";
 import { getGameMediaCandidates } from "./gameMedia";
 
 describe("getGameMediaCandidates", () => {
+  it("retains the actual Steam store capsule when guessed library assets fail", () => {
+    const backgroundUrl =
+      "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4358690/hash/capsule_616x353.jpg";
+    expect(getGameMediaCandidates({ steamAppId: 4358690, backgroundUrl }, "banner")).toContainEqual(
+      { src: backgroundUrl, kind: "wide" },
+    );
+  });
+
+  it("tries a portrait before a saved Steam header and retains that header as fallback", () => {
+    const coverUrl = "https://cdn.cloudflare.steamstatic.com/steam/apps/620/header.jpg";
+    const queue = getGameMediaCandidates({ coverUrl }, "poster");
+    expect(queue[0].src).toContain("library_600x900.jpg");
+    expect(queue.at(-1)).toMatchObject({ src: coverUrl, kind: "wide" });
+  });
   it("upgrades known IGDB covers without losing their query string", () => {
     expect(
       getGameMediaCandidates(
@@ -38,8 +52,10 @@ describe("getGameMediaCandidates", () => {
       {
         src: "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900.jpg",
         kind: "cover",
-        srcSet: "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900.jpg 300w, https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900_2x.jpg 600w",
+        srcSet:
+          "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900.jpg 300w, https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900_2x.jpg 600w",
       },
+      { src: "https://cdn.cloudflare.steamstatic.com/steam/apps/620/header.jpg", kind: "wide" },
     ]);
   });
 
@@ -51,12 +67,12 @@ describe("getGameMediaCandidates", () => {
     });
   });
 
-  it("does not rewrite unknown hosts or other Steam artwork", () => {
-    for (const coverUrl of [
-      "https://example.test/steam/apps/620/library_600x900.jpg",
-      "https://cdn.cloudflare.steamstatic.com/steam/apps/620/header.jpg",
-    ]) {
-      expect(getGameMediaCandidates({ coverUrl }, "poster")[0]).toEqual({ src: coverUrl, kind: "cover" });
+  it("does not rewrite unknown hosts", () => {
+    for (const coverUrl of ["https://example.test/steam/apps/620/library_600x900.jpg"]) {
+      expect(getGameMediaCandidates({ coverUrl }, "poster")[0]).toEqual({
+        src: coverUrl,
+        kind: "cover",
+      });
     }
   });
 
