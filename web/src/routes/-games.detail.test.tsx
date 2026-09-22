@@ -98,24 +98,59 @@ afterEach(() => {
 });
 
 describe("game detail presentation", () => {
+  it("uses the verified Steam library hero for a Steam-only social preview", async () => {
+    const head = await Route.options.head?.({
+      loaderData: {
+        game: {
+          title: "Steam only",
+          genres: [],
+          platforms: ["PC"],
+          heroUrl: "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_hero.jpg",
+          heroWidth: 3840,
+          heroHeight: 1240,
+        },
+      },
+    } as never);
+
+    expect(head?.meta).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          property: "og:image",
+          content: "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_hero.jpg",
+        }),
+      ]),
+    );
+  });
+
   it("labels foreign-currency Steam history without changing the current Steam price", async () => {
     api.getPriceHistory.mockResolvedValue({
       current: { price: { amount: 399, currency: "UAH" } },
-      history: [{ timestamp: "2026-09-01T00:00:00Z", shop: "Steam", price: { amount: 41.99, currency: "USD" } }],
+      history: [
+        {
+          timestamp: "2026-09-01T00:00:00Z",
+          shop: "Steam",
+          price: { amount: 41.99, currency: "USD" },
+        },
+      ],
       history_available: true,
     });
 
     renderDetail();
 
-    expect(
-      await screen.findByRole("heading", { name: "Steam price history" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Steam price history" })).toBeInTheDocument();
     expect(await screen.findByText(/source currency: USD/i)).toBeInTheDocument();
   });
 
   it("keeps an established platform label and URL when price enrichment names a reseller", () => {
     const merged = mergeGamePrice(
-      { ...game, price: null, originalPrice: null, discount: null, store: "Steam", storeUrl: "https://store.steampowered.com/app/1145350/" },
+      {
+        ...game,
+        price: null,
+        originalPrice: null,
+        discount: null,
+        store: "Steam",
+        storeUrl: "https://store.steampowered.com/app/1145350/",
+      },
       {
         shop: "Arbitrary reseller",
         url: "https://reseller.example/hades",
@@ -180,9 +215,7 @@ describe("game detail presentation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "2 years" }));
 
-    await waitFor(() =>
-      expect(api.getPriceHistory).toHaveBeenLastCalledWith("274755", "US", "2y"),
-    );
+    await waitFor(() => expect(api.getPriceHistory).toHaveBeenLastCalledWith("274755", "US", "2y"));
   });
 
   it("hides price history for free games", async () => {

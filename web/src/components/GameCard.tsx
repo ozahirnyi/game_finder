@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { GameCover } from "@/components/GameCover";
 import { Chip, PriceBlock } from "@/components/ui-bits";
 import { gameDetailSearch } from "@/lib/gameCardPresentation";
+import { getGameMediaCandidates } from "@/lib/gameMedia";
 import { summarizePlatforms } from "@/lib/platformPresentation";
 
 export type GameCardData = {
@@ -17,6 +18,14 @@ export type GameCardData = {
   heroUrl?: string;
   heroFallbackUrl?: string;
   coverUrl?: string;
+  screenshotUrl?: string;
+  steamAppId?: number;
+  coverWidth?: number | null;
+  coverHeight?: number | null;
+  heroWidth?: number | null;
+  heroHeight?: number | null;
+  screenshotWidth?: number | null;
+  screenshotHeight?: number | null;
   coverFrom: string;
   coverTo: string;
   genres?: string[];
@@ -31,14 +40,14 @@ export type GameCardData = {
 /** Canonical game card. It never guesses an internal game identity. */
 export function GameCard({
   game,
-  aspect = "aspect-[16/9]",
+  layout = "poster",
   showPrice = true,
 }: {
   game: GameCardData;
-  aspect?: string;
+  layout?: "poster" | "banner";
   showPrice?: boolean;
 }) {
-  const hasHero = Boolean(game.heroUrl);
+  const banner = layout === "banner";
   const inner = (
     <>
       <div className="relative">
@@ -46,11 +55,30 @@ export function GameCard({
           from={game.coverFrom}
           to={game.coverTo}
           title={game.title}
-          image={hasHero ? game.heroUrl : game.coverUrl}
-          fallbackImage={hasHero ? game.heroFallbackUrl : undefined}
-          variant={hasHero ? "hero" : "card"}
+          candidates={getGameMediaCandidates(
+            {
+              coverUrl: game.coverUrl,
+              heroUrl: game.heroUrl,
+              screenshotUrl: game.screenshotUrl,
+              steamAppId: game.steamAppId,
+              coverWidth: game.coverWidth,
+              coverHeight: game.coverHeight,
+              heroWidth: game.heroWidth,
+              heroHeight: game.heroHeight,
+              screenshotWidth: game.screenshotWidth,
+              screenshotHeight: game.screenshotHeight,
+            },
+            banner ? "banner" : "poster",
+          )}
+          variant={banner ? "hero" : "card"}
+          fit={banner ? "cover" : "contain"}
           bare
-          className={`${hasHero ? aspect : "aspect-[2/3]"} w-full transition-transform duration-500 ease-[var(--ease-studio)] group-hover:scale-[1.04]`}
+          sizes={
+            banner
+              ? "(min-width: 1024px) 50vw, 100vw"
+              : "(min-width: 1024px) 264px, (min-width: 640px) 33vw, 50vw"
+          }
+          className={`${banner ? "aspect-[16/9]" : "aspect-[2/3] max-w-[264px]"} w-full transition-transform duration-500 ease-[var(--ease-studio)] group-hover:scale-[1.04]`}
         />
         {game.discount ? (
           <span className="label-mono absolute right-3 top-3 rounded-md bg-primary px-1.5 py-1 text-primary-foreground">

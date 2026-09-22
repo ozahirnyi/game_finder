@@ -12,6 +12,7 @@ import {
   type CatalogFeature,
   type CatalogGenre,
   type CatalogPlatform,
+  type RecommendationResponse,
 } from "@/lib/api";
 import { gameDetailTarget } from "@/lib/gameRoute";
 import { Search, Sparkles } from "lucide-react";
@@ -111,7 +112,7 @@ function SearchPage() {
     enabled: mode === "catalog",
     placeholderData: keepPreviousData,
   });
-  const aiRecommendationQuery = useQuery({
+  const aiRecommendationQuery = useQuery<RecommendationResponse>({
     queryKey: ["ai-recommendations", query.trim()],
     enabled: false,
     staleTime: Infinity,
@@ -319,7 +320,6 @@ function SearchPage() {
                 return (
                   <GameCard
                     key={game.id ?? game.steam_appid}
-                    aspect="aspect-[3/4]"
                     game={{
                       gameId: target?.gameId,
                       source: target?.source,
@@ -328,6 +328,14 @@ function SearchPage() {
                       coverTo: "#111827",
                       heroUrl: game.hero_image ?? undefined,
                       coverUrl: game.cover_image ?? game.background_image ?? undefined,
+                      screenshotUrl: game.screenshot_image ?? undefined,
+                      steamAppId: game.steam_appid ?? undefined,
+                      coverWidth: game.cover_width,
+                      coverHeight: game.cover_height,
+                      heroWidth: game.hero_width,
+                      heroHeight: game.hero_height,
+                      screenshotWidth: game.screenshot_width,
+                      screenshotHeight: game.screenshot_height,
                       genres: game.genres,
                       platforms: game.platforms,
                     }}
@@ -365,7 +373,6 @@ function SearchPage() {
                 return [
                   <GameCard
                     key={game.id}
-                    aspect="aspect-[3/4]"
                     showPrice={false}
                     game={{
                       gameId: String(game.id),
@@ -376,6 +383,14 @@ function SearchPage() {
                       coverTo: "#111827",
                       heroUrl: game.hero_image ?? undefined,
                       coverUrl: game.cover_image ?? game.background_image ?? undefined,
+                      screenshotUrl: game.screenshot_image ?? undefined,
+                      steamAppId: game.steam_appid ?? undefined,
+                      coverWidth: game.cover_width,
+                      coverHeight: game.cover_height,
+                      heroWidth: game.hero_width,
+                      heroHeight: game.hero_height,
+                      screenshotWidth: game.screenshot_width,
+                      screenshotHeight: game.screenshot_height,
                       platforms: game.platforms,
                     }}
                   />,

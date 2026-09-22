@@ -79,6 +79,7 @@ async def fetch_steam_store_search(query: str, page_size: int = 20) -> list[dict
         results.append({
             "steam_appid": int(appid),
             "name": name,
+            "cover_image": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg",
             "background_image": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg",
             "url": f"{STEAM_STORE_BASE_URL}/app/{appid}/",
         })
@@ -115,6 +116,7 @@ def _steam_deal(item: dict[str, Any]) -> dict[str, Any] | None:
     return {
         "steam_appid": int(appid),
         "name": name,
+        "cover_image": None,
         "background_image": item.get("large_capsule_image") or item.get("header_image"),
         "url": current["url"],
         "current": current,

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { Route } from "./__root";
 
 describe("root document head", () => {
-  it("declares the Playfinder favicon assets", () => {
-    const head = Route.options.head?.();
+  it("declares the Playfinder favicon assets", async () => {
+    const head = await Route.options.head?.({} as never);
 
     expect(head?.links).toEqual(
       expect.arrayContaining([

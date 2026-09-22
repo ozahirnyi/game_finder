@@ -226,7 +226,7 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     assert "source" not in response.json()["results"][0]
     fetch_igdb.assert_awaited_once_with("hades", page=2, filters=app_main.CatalogSearchFilters())
     assert cached.await_count == 1
-    assert "igdb_search_v5" in cached.await_args.args[0]
+    assert "igdb_search_v6" in cached.await_args.args[0]
 
 
 @pytest.mark.parametrize("params", [{"q": "hades", "page": 0}, {"platform": "unsupported"}])
@@ -287,7 +287,15 @@ def test_catalog_detail_normalizes_response(api_client, app_main, monkeypatch):
         "name": "Hades",
         "released": "2020-09-17",
         "background_image": "https://img.test/hades.jpg",
+        "cover_image": None,
         "hero_image": None,
+        "screenshot_image": None,
+        "cover_width": None,
+        "cover_height": None,
+        "hero_width": None,
+        "hero_height": None,
+        "screenshot_width": None,
+        "screenshot_height": None,
         "steam_appid": None,
         "description_raw": "A dungeon crawler",
         "rating": 4.5,
@@ -749,7 +757,7 @@ def test_homepage_deals_enriches_and_normalizes_payload(api_client, app_main, mo
     response = api_client.get("/prices/deals", params={"country": "ua", "page_size": 1})
 
     assert response.status_code == 200
-    assert cached.await_args.args[0].startswith("steam_store_deals_v2:")
+    assert cached.await_args.args[0].startswith("steam_store_deals_v3:")
     assert response.json()["results"][0]["id"] == 42
     assert response.json()["results"][0]["hero_image"] == "https://images.test/wide.jpg"
     igdb.assert_awaited_once_with(108600)
@@ -800,5 +808,5 @@ def test_genre_deals_uses_authenticated_favorite_genres(api_client, app_main, mo
     assert response.json()["sections"][0]["genre"] == "rpg"
     assert response.json()["sections"][0]["results"][0]["id"] == 42
     assert response.json()["sections"][0]["results"][0]["hero_image"] == "https://images.test/hades-wide.jpg"
-    assert cached.await_args.args[0].startswith("steam_genre_deals_v6:")
+    assert cached.await_args.args[0].startswith("steam_genre_deals_v7:")
     igdb_batches.assert_awaited_once_with(["Hades"])

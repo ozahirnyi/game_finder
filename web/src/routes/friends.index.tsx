@@ -201,7 +201,8 @@ function FriendsPage() {
                     <UserPlus className="size-3.5" /> Add friend
                   </button>
                   <Link
-                    to="/users/"
+                    to="/users"
+                    search={{ page: 1 }}
                     className="rounded-lg border border-border px-3 py-2 text-xs font-bold"
                   >
                     Browse all players
