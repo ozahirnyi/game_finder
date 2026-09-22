@@ -106,7 +106,7 @@ test("poster geometry stays stable at tablet and desktop widths", async ({
   }
 });
 
-test("game detail places its heading after, not over, the hero media", async ({
+test("game detail places its heading on the artwork without a separate dark strip", async ({
   page,
   api,
 }, testInfo) => {
@@ -149,10 +149,15 @@ test("game detail places its heading after, not over, the hero media", async ({
   await expect(hero).toBeVisible();
   await expect(hero.locator("img")).toHaveClass(/opacity-100/);
   await expect(heading).toBeVisible();
-  const heroBox = await hero.boundingBox();
-  const headingBox = await heading.boundingBox();
-  expect(headingBox?.y).toBeGreaterThanOrEqual((heroBox?.y ?? 0) + (heroBox?.height ?? 0));
-  await page.screenshot({ path: testInfo.outputPath("detail-wide.png"), fullPage: true });
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const heroBox = await hero.boundingBox();
+    const headingBox = await heading.boundingBox();
+    expect(headingBox?.y).toBeGreaterThanOrEqual(heroBox?.y ?? 0);
+    expect((headingBox?.y ?? 0) + (headingBox?.height ?? 0)).toBeLessThanOrEqual((heroBox?.y ?? 0) + (heroBox?.height ?? 0));
+    await expect(heading.locator("..")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await page.screenshot({ path: testInfo.outputPath(`detail-wide-${width}.png`), fullPage: true });
+  }
 });
 
 test("game detail accepts a verified screenshot when no artwork is available", async ({
