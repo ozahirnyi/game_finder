@@ -82,7 +82,7 @@ describe("PriceHistoryChart", () => {
     expect(screen.queryByText(/₴13/)).not.toBeInTheDocument();
   });
 
-  it("uses stepped sale and regular-price lines and exposes each point by hover and keyboard", () => {
+  it("connects sale and regular-price observations with continuous lines", () => {
     render(
       <PriceHistoryChart
         currency="USD"
@@ -93,7 +93,8 @@ describe("PriceHistoryChart", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Sale price history")).toHaveAttribute("d", expect.stringContaining("H"));
+    expect(screen.getByLabelText("Sale price history")).toHaveAttribute("d", expect.stringContaining("L"));
+    expect(screen.getByLabelText("Sale price history")).not.toHaveAttribute("d", expect.stringContaining("H"));
     expect(screen.getByLabelText("Regular price history")).toBeInTheDocument();
     const firstPoint = screen.getByRole("button", { name: /1 Aug.*sale/i });
     fireEvent.mouseEnter(firstPoint);
