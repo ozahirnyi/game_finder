@@ -103,8 +103,8 @@ export function PriceHistoryChart({
       ? Math.round((1 - activePoint.price / activePoint.regular) * 100)
       : 0
   );
-  const linePath = (values: Array<{ x: number; y: number }>) => values.reduce(
-    (path, point, index) => index === 0 ? `M ${point.x} ${point.y}` : `${path} L ${point.x} ${point.y}`,
+  const steppedPath = (values: Array<{ x: number; y: number }>) => values.reduce(
+    (path, point, index) => index === 0 ? `M ${point.x} ${point.y}` : `${path} H ${point.x} V ${point.y}`,
     "",
   );
   const activeCoordinate = activeIndex == null ? undefined : coordinates[Math.min(activeIndex, coordinates.length - 1)];
@@ -172,7 +172,7 @@ export function PriceHistoryChart({
         </g>
         <path
           aria-label="Sale price history"
-          d={linePath(coordinates)}
+          d={steppedPath(coordinates)}
           fill="none"
           stroke="currentColor"
           strokeWidth={2}
@@ -195,7 +195,7 @@ export function PriceHistoryChart({
         {regularCoordinates.length > 0 && (
           <path
             aria-label="Regular price history"
-            d={linePath(regularCoordinates)}
+            d={steppedPath(regularCoordinates)}
             fill="none"
             stroke="currentColor"
             strokeOpacity={0.35}
