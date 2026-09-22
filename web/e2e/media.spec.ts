@@ -5,6 +5,24 @@ import { expect, test } from "./fixtures/test";
 const POSTER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="264" height="374" viewBox="0 0 264 374"><rect width="264" height="374" fill="#2157a5"/><rect x="12" y="12" width="240" height="350" fill="none" stroke="#f8c44f" stroke-width="8"/><circle cx="132" cy="187" r="70" fill="#e75d3f"/><text x="132" y="195" text-anchor="middle" fill="white" font-family="sans-serif" font-size="24">POSTER</text><text x="18" y="42" fill="white" font-size="18">TL</text><text x="212" y="350" fill="white" font-size="18">BR</text></svg>`;
 const WIDE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080"><rect width="1920" height="1080" fill="#253349"/><rect x="30" y="30" width="1860" height="1020" fill="none" stroke="#f8c44f" stroke-width="24"/><path d="M0 1080L960 180 1920 1080" fill="#e75d3f"/><text x="960" y="560" text-anchor="middle" fill="white" font-family="sans-serif" font-size="120">WIDE ART</text><text x="80" y="140" fill="white" font-size="72">TOP LEFT</text><text x="1480" y="980" fill="white" font-size="72">BOTTOM RIGHT</text></svg>`;
 
+test("a real store capsule survives missing guessed Steam artwork on home and deals", async ({ page }) => {
+  const capsule = "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4358690/hash/capsule_616x353.jpg";
+  const deal = { name: "Graveyard Keeper 2", steam_appid: 4358690, cover_image: null, background_image: capsule };
+  await page.route("**/api/prices/deals**", route => route.fulfill({ json: { results: [deal] } }));
+  await page.route("**/api/prices/genre-deals**", route => route.fulfill({ json: { popular: [deal], sections: [] } }));
+  await page.route("https://cdn.cloudflare.steamstatic.com/**", route => route.fulfill({ status: 404 }));
+  await page.route(capsule, route => route.fulfill({ contentType: "image/svg+xml", body: WIDE_SVG }));
+  for (const path of ["/", "/deals"]) {
+    await page.goto(path);
+    await page.getByRole("heading", { name: "Graveyard Keeper 2", exact: true }).scrollIntoViewIfNeeded();
+    const img = page.getByRole("img", { name: "Graveyard Keeper 2", exact: true });
+    await expect(img).toHaveAttribute("src", capsule);
+    await expect(img).toHaveCSS("opacity", "1");
+    await expect(img).toHaveCSS("object-fit", "cover");
+    expect(await img.evaluate(el => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  }
+});
+
 test("mixed catalog artwork keeps poster geometry and falls back after a 404", async ({
   page,
   api,
@@ -41,8 +59,8 @@ test("mixed catalog artwork keeps poster geometry and falls back after a 404", a
   await expect(covers.first()).toBeVisible();
   const first = await covers.nth(0).boundingBox();
   const second = await covers.nth(1).boundingBox();
-  expect(first?.height).toBeCloseTo((first?.width ?? 0) * 1.5, 0);
-  expect(second?.height).toBeCloseTo((second?.width ?? 0) * 1.5, 0);
+  expect(first?.height).toBeCloseTo((first?.width ?? 0) * (4 / 3), 0);
+  expect(second?.height).toBeCloseTo((second?.width ?? 0) * (4 / 3), 0);
   await expect(page.getByLabel("Broken first source image unavailable")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("home-mobile-fallback.png"), fullPage: true });
 });
@@ -79,8 +97,8 @@ test("poster geometry stays stable at tablet and desktop widths", async ({
     await expect(covers.first()).toBeVisible();
     const first = await covers.nth(0).boundingBox();
     const second = await covers.nth(1).boundingBox();
-    expect(first?.height).toBeCloseTo((first?.width ?? 0) * 1.5, 0);
-    expect(second?.height).toBeCloseTo((second?.width ?? 0) * 1.5, 0);
+    expect(first?.height).toBeCloseTo((first?.width ?? 0) * (4 / 3), 0);
+    expect(second?.height).toBeCloseTo((second?.width ?? 0) * (4 / 3), 0);
     await page.screenshot({
       path: testInfo.outputPath(`home-${viewport.width}.png`),
       fullPage: true,
@@ -252,11 +270,16 @@ test.describe("DPR 2 media", () => {
   test.use({ deviceScaleFactor: 2 });
 
   for (const failHighResolution of [false, true]) {
-    test(`Steam cover selects 2x and handles its failure: ${failHighResolution}`, async ({ page, api }) => {
+    test(`Steam cover selects 2x and handles its failure: ${failHighResolution}`, async ({
+      page,
+      api,
+    }) => {
       const base = "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900.jpg";
       const high = base.replace(".jpg", "_2x.jpg");
       const requested: string[] = [];
-      api.state.trendingGames.results = [{ id: 101, name: "Steam density", cover_image: base, genres: [], platforms: [] }];
+      api.state.trendingGames.results = [
+        { id: 101, name: "Steam density", cover_image: base, genres: [], platforms: [] },
+      ];
       await page.route("https://cdn.cloudflare.steamstatic.com/**", async (route) => {
         requested.push(route.request().url());
         if (failHighResolution && route.request().url() === high) {
@@ -268,11 +291,15 @@ test.describe("DPR 2 media", () => {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/");
       const img = page.getByRole("img", { name: "Steam density" });
-      await img.scrollIntoViewIfNeeded();
-      await expect.poll(() => img.evaluate((el) => {
-        const image = el as HTMLImageElement;
-        return image.complete && image.naturalWidth > 0 ? image.currentSrc : "";
-      })).toBe(failHighResolution ? base : high);
+      await page.getByRole("heading", { name: "Steam density" }).scrollIntoViewIfNeeded();
+      await expect
+        .poll(() =>
+          img.evaluate((el) => {
+            const image = el as HTMLImageElement;
+            return image.complete && image.naturalWidth > 0 ? image.currentSrc : "";
+          }),
+        )
+        .toBe(failHighResolution ? base : high);
       await expect(img).toHaveCSS("opacity", "1");
       expect(requested).toContain(high);
       if (failHighResolution) {
@@ -308,7 +335,9 @@ test.describe("DPR 2 media", () => {
     expect(await image.evaluate((element) => (element as HTMLImageElement).currentSrc)).toContain(
       "t_cover_big_2x",
     );
-    expect((await image.boundingBox())?.width).toBeLessThanOrEqual(264);
+    const slot = await image.locator("..").boundingBox();
+    expect((await image.boundingBox())?.width).toBe(slot?.width);
+    expect(slot?.width).toBeGreaterThan(264);
     await page.screenshot({ path: testInfo.outputPath("home-dpr2.png"), fullPage: true });
   });
 });

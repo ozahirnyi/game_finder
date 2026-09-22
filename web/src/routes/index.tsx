@@ -360,6 +360,7 @@ function Home() {
                     title: deal.name,
                     heroUrl: deal.hero_image ?? undefined,
                     coverUrl: deal.cover_image ?? undefined,
+                    backgroundUrl: deal.background_image ?? undefined,
                     screenshotUrl: deal.screenshot_image ?? undefined,
                     steamAppId: deal.steam_appid ?? undefined,
                     coverWidth: deal.cover_width,
@@ -421,12 +422,20 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
     <Panel interactive={hasVerifiedCatalogId} className="h-full p-5">
       <GameCover
         title={recommendation.title}
-        image={recommendation.cover_url ?? undefined}
+        candidates={getGameMediaCandidates(
+          {
+            coverUrl: recommendation.game?.cover_image ?? recommendation.cover_url,
+            coverWidth: recommendation.game?.cover_width,
+            coverHeight: recommendation.game?.cover_height,
+            steamAppId: recommendation.game?.steam_appid,
+          },
+          "poster",
+        )}
         variant="card"
         from="#c75f28"
         to="#22243a"
-        sizes="264px"
-        className="mx-auto mb-4 aspect-[2/3] w-full max-w-[264px]"
+        sizes="(min-width: 1280px) 360px, (min-width: 640px) 45vw, 90vw"
+        className="mb-4 aspect-[3/4] w-full"
       />
       <h3 className="text-lg font-bold">{recommendation.title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{recommendation.reason}</p>
@@ -492,6 +501,7 @@ function FeaturedDeal({
         candidates={getGameMediaCandidates(
           {
             coverUrl: deal.cover_image,
+            backgroundUrl: deal.background_image,
             heroUrl: deal.hero_image,
             screenshotUrl: deal.screenshot_image,
             steamAppId: deal.steam_appid,

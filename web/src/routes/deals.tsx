@@ -50,6 +50,7 @@ function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
           candidates={getGameMediaCandidates(
             {
               coverUrl: deal.cover_image,
+              backgroundUrl: deal.background_image,
               heroUrl: deal.hero_image,
               screenshotUrl: deal.screenshot_image,
               steamAppId: deal.steam_appid,

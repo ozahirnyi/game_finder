@@ -18,6 +18,7 @@ export type GameCardData = {
   heroUrl?: string;
   heroFallbackUrl?: string;
   coverUrl?: string;
+  backgroundUrl?: string;
   screenshotUrl?: string;
   steamAppId?: number;
   coverWidth?: number | null;
@@ -58,6 +59,7 @@ export function GameCard({
           candidates={getGameMediaCandidates(
             {
               coverUrl: game.coverUrl,
+              backgroundUrl: game.backgroundUrl,
               heroUrl: game.heroUrl,
               screenshotUrl: game.screenshotUrl,
               steamAppId: game.steamAppId,
@@ -71,14 +73,13 @@ export function GameCard({
             banner ? "banner" : "poster",
           )}
           variant={banner ? "hero" : "card"}
-          fit={banner ? "cover" : "contain"}
           bare
           sizes={
             banner
               ? "(min-width: 1024px) 50vw, 100vw"
-              : "(min-width: 1024px) 264px, (min-width: 640px) 33vw, 50vw"
+              : "(min-width: 1280px) 300px, (min-width: 640px) 33vw, 100vw"
           }
-          className={`${banner ? "aspect-[16/9]" : "aspect-[2/3] max-w-[264px]"} w-full transition-transform duration-500 ease-[var(--ease-studio)] group-hover:scale-[1.04]`}
+          className={`${banner ? "aspect-[16/9]" : "aspect-[3/4]"} w-full transition-transform duration-500 ease-[var(--ease-studio)] group-hover:scale-[1.04]`}
         />
         {game.discount ? (
           <span className="label-mono absolute right-3 top-3 rounded-md bg-primary px-1.5 py-1 text-primary-foreground">

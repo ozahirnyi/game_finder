@@ -49,7 +49,9 @@ vi.mock("@/components/GameCover", () => ({
 }));
 vi.mock("@/components/GameCard", () => ({
   GameCard: ({ game }: { game: { title: string; gameId?: string } }) => (
-    <div data-game-id={game.gameId} data-media={JSON.stringify(game)}>{game.title}</div>
+    <div data-game-id={game.gameId} data-media={JSON.stringify(game)}>
+      {game.title}
+    </div>
   ),
 }));
 
@@ -176,7 +178,10 @@ describe("Home recommendations", () => {
     expect((await screen.findByTestId("cover-Coverless")).getAttribute("data-image")).toBe(
       "fallback",
     );
-    expect(screen.getByTestId("cover-Coverless")).toHaveAttribute("data-sizes", "264px");
+    expect(screen.getByTestId("cover-Coverless")).toHaveAttribute(
+      "data-sizes",
+      "(min-width: 1280px) 360px, (min-width: 640px) 45vw, 90vw",
+    );
   });
 
   it("shows an honest signed-in empty state", async () => {
@@ -286,31 +291,51 @@ describe("Home recommendations", () => {
 
   it("uses high-density Steam posters for unmatched standard deals and retains trending media fallbacks", async () => {
     api.getAuthSnapshot.mockReturnValue(false);
-    api.getDeals.mockResolvedValue({ results: [
-      { id: 1, name: "Featured" },
-      { name: "Unmatched deal", steam_appid: 620, cover_image: null,
-        background_image: "https://images.test/horizontal-capsule.jpg" },
-    ] });
-    api.getTrendingGames.mockResolvedValue({ results: [{
-      id: 44, name: "Trending fallback", steam_appid: 400,
-      screenshot_image: "https://images.test/screenshot.jpg",
-      screenshot_width: 1920, screenshot_height: 1080,
-    }] });
+    api.getDeals.mockResolvedValue({
+      results: [
+        { id: 1, name: "Featured" },
+        {
+          name: "Unmatched deal",
+          steam_appid: 620,
+          cover_image: null,
+          background_image: "https://images.test/horizontal-capsule.jpg",
+        },
+      ],
+    });
+    api.getTrendingGames.mockResolvedValue({
+      results: [
+        {
+          id: 44,
+          name: "Trending fallback",
+          steam_appid: 400,
+          screenshot_image: "https://images.test/screenshot.jpg",
+          screenshot_width: 1920,
+          screenshot_height: 1080,
+        },
+      ],
+    });
 
     renderHome();
 
-    const deal = JSON.parse((await screen.findByText("Unmatched deal")).getAttribute("data-media")!);
+    const deal = JSON.parse(
+      (await screen.findByText("Unmatched deal")).getAttribute("data-media")!,
+    );
     const dealMedia = getGameMediaCandidates(deal, "poster");
     expect(dealMedia[0]).toMatchObject({
       src: "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900.jpg",
       srcSet: expect.stringContaining("library_600x900_2x.jpg 600w"),
     });
-    expect(dealMedia.some((candidate) => candidate.src.includes("horizontal-capsule"))).toBe(false);
+    expect(
+      dealMedia.find((candidate) => candidate.src.includes("horizontal-capsule"))?.kind,
+    ).not.toBe("cover");
 
-    const trending = JSON.parse((await screen.findByText("Trending fallback")).getAttribute("data-media")!);
+    const trending = JSON.parse(
+      (await screen.findByText("Trending fallback")).getAttribute("data-media")!,
+    );
     expect(getGameMediaCandidates(trending, "poster")).toMatchObject([
       { src: "https://cdn.cloudflare.steamstatic.com/steam/apps/400/library_600x900.jpg" },
       { src: "https://images.test/screenshot.jpg", width: 1920, height: 1080 },
+      { src: "https://cdn.cloudflare.steamstatic.com/steam/apps/400/header.jpg", kind: "wide" },
     ]);
   });
 

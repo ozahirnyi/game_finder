@@ -59,17 +59,17 @@ export function GameCover({
   );
   const queueKey = queue.map((value) => `${value.src}|${value.srcSet ?? ""}`).join("\n");
   const [index, setIndex] = useState(0);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [retryingBaseSource, setRetryingBaseSource] = useState(false);
 
   useEffect(() => {
     setIndex(0);
-    setLoaded(false);
     setRetryingBaseSource(false);
   }, [queueKey]);
 
   const active = queue[index];
   const activeKey = `${index}:${active?.src ?? ""}:${retryingBaseSource}`;
+  const loaded = loadedKey === activeKey;
   const activeKeyRef = useRef(activeKey);
   activeKeyRef.current = activeKey;
   useEffect(() => {
@@ -86,7 +86,9 @@ export function GameCover({
   // media that was verified as wide is safe to use with `object-cover`.
   const resolvedFit =
     fit ??
-    (active?.kind === "wide" || (variant === "hero" && active?.kind === "unknown")
+    ((variant === "card" && active?.kind === "cover") ||
+    (variant === "hero" && active?.kind === "wide") ||
+    (variant === "hero" && active?.kind === "unknown")
       ? "cover"
       : "contain");
 
@@ -99,7 +101,7 @@ export function GameCover({
         <img
           key={activeKey}
           ref={(node) => {
-            if (node?.complete && node.naturalWidth > 0) setLoaded(true);
+            if (node?.complete && node.naturalWidth > 0) setLoadedKey(activeKey);
           }}
           src={active.src}
           srcSet={retryingBaseSource ? undefined : active.srcSet}
@@ -112,10 +114,10 @@ export function GameCover({
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
           decoding="async"
-          onLoad={() => setLoaded(true)}
+          onLoad={() => setLoadedKey(activeKey)}
           onError={(event) => {
             if (activeKeyRef.current !== activeKey) return;
-            setLoaded(false);
+            setLoadedKey(null);
             if (
               !retryingBaseSource &&
               active.srcSet &&
@@ -131,7 +133,6 @@ export function GameCover({
           className={`absolute inset-0 size-full ${resolvedFit === "contain" ? "object-contain" : "object-cover"} ${variant === "hero" && resolvedFit === "cover" ? "object-[center_35%]" : ""} transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
         />
       )}
-      <div className="absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/10" />
       {!active && (
         <div
           className="absolute inset-0 flex flex-col justify-end p-3"
