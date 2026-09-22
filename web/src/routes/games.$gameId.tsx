@@ -475,7 +475,6 @@ function GameDetail() {
   const historyCurrency = priceHistory.points.find((point) => point.currency)?.currency;
   const showPriceHistory = shouldRenderPriceHistory(priceQuery.data?.is_free === true);
   const historyPeriodLabels: Record<PriceHistoryPeriod, string> = {
-    "1m": "1 month",
     "6m": "6 months",
     "1y": "1 year",
     "2y": "2 years",

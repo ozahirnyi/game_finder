@@ -218,6 +218,17 @@ describe("game detail presentation", () => {
     await waitFor(() => expect(api.getPriceHistory).toHaveBeenLastCalledWith("274755", "US", "2y"));
   });
 
+    it("offers the restored three price-history periods", async () => {
+      renderDetail();
+
+      await screen.findByRole("heading", { name: "Steam price history" });
+
+      expect(screen.queryByRole("button", { name: "1 month" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "6 months" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "1 year" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "2 years" })).toBeInTheDocument();
+    });
+
   it("hides price history for free games", async () => {
     api.getPriceHistory.mockResolvedValue({ is_free: true, current: undefined, history: [] });
     renderDetail();

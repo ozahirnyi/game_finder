@@ -118,15 +118,18 @@ export function PriceHistoryChart({
   const tooltipStyle = !activeCoordinate
     ? undefined
     : activeCoordinate.x <= width * 0.15
-      ? { left: "0%", transform: "translate(0, -115%)" }
+      ? {
+          left: "0%",
+          transform: activeCoordinate.y <= height * 0.3 ? "translate(0, 8px)" : "translate(0, -115%)",
+        }
       : activeCoordinate.x >= plotLeft + plotWidth * 0.75
         ? {
             left: `${(activeCoordinate.x / width) * 100}%`,
-            transform: "translate(-100%, -115%)",
+            transform: activeCoordinate.y <= height * 0.3 ? "translate(-100%, 8px)" : "translate(-100%, -115%)",
           }
         : {
             left: `${(activeCoordinate.x / width) * 100}%`,
-            transform: "translate(-50%, -115%)",
+            transform: activeCoordinate.y <= height * 0.3 ? "translate(-50%, 8px)" : "translate(-50%, -115%)",
           };
 
   return (
