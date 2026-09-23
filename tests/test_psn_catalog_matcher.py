@@ -72,6 +72,31 @@ def test_cleaned_exact_match_links_playstation_release():
     assert decision.match["id"] == 2
 
 
+def test_localized_provider_alternative_name_links_playstation_release():
+    from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
+
+    decision = choose_psn_catalog_match(
+        PsnCatalogEvidence("Ведьмак 3: Дикая Охота", platforms=("PS4",)),
+        {
+            "Ведьмак 3: Дикая Охота": [
+                {
+                    "id": 2921,
+                    "name": "The Witcher 3: Wild Hunt",
+                    "alternative_names": ["Ведьмак 3: Дикая Охота"],
+                    "platforms": ["PlayStation 4"],
+                    "game_type": 0,
+                }
+            ]
+        },
+    )
+
+    assert (decision.state, decision.evidence, decision.match["id"]) == (
+        "linked",
+        "alternative_name",
+        2921,
+    )
+
+
 def test_fuzzy_result_is_never_auto_linked():
     from app.psn_catalog_matcher import PsnCatalogEvidence, choose_psn_catalog_match
 

@@ -221,6 +221,11 @@ def score_candidate(
     catalog_id = int(game["id"])
     candidate_name = str(game.get("name") or "")
     candidate_key = normalize_psn_catalog_identity(candidate_name)
+    alternative_name_keys = {
+        normalize_psn_catalog_identity(value)
+        for value in game.get("alternative_names") or ()
+        if isinstance(value, str)
+    }
     title_key = normalize_psn_catalog_identity(evidence.title)
     alias_keys = {normalize_psn_catalog_identity(value) for value in evidence.aliases}
     query_keys = {
@@ -233,6 +238,8 @@ def score_candidate(
     }
     if candidate_key == title_key:
         score, identity_evidence = FULL_TITLE_SCORE, "full_title"
+    elif title_key in alternative_name_keys:
+        score, identity_evidence = SAFE_ALIAS_SCORE, "alternative_name"
     elif candidate_key in alias_keys:
         score, identity_evidence = SAFE_ALIAS_SCORE, "safe_alias"
     elif query_keys.intersection(candidate_query_keys):
