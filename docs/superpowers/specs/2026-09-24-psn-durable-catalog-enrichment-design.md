@@ -41,9 +41,32 @@ completed batch. It finishes only when no pending rows remain. The worker uses
 the existing linking, quarantine, matcher-version, and owner-scoping rules so
 the HTTP endpoint and worker cannot diverge in matching behavior.
 
+### Localized titles
+
+Catalog retrieval also resolves provider-maintained alternative game names.
+This lets a PSN title written in Russian, Japanese, Korean, Chinese, or another
+locale locate the same IGDB game whose primary `name` is in English. The IGDB
+integration returns a game's alternative-name values as part of its normalized
+catalog result, and the matcher treats an exact normalized equality with one of
+those values as explicit catalog evidence. It does not transliterate or call a
+generative translation provider during automatic enrichment.
+
+An alternative-name result must still pass every existing PlayStation platform,
+game-type, edition, score, and ambiguity guard. Multiple eligible games remain
+`review`; an absent alternative name remains `no_match`. Thus localization
+increases retrieval recall but never permits a guessed cross-language link.
+
+For a raw review/no-match entry, the manual catalog picker retains its editable
+search field and gains a clearly labelled option to request English-title
+suggestions. Suggestions are query text only, never a catalog id or an automatic
+link; the user chooses an IGDB result before any state changes. The suggestion
+endpoint returns a bounded list, uses existing OpenAI configuration only when
+available, and degrades to a clear unavailable message without blocking manual
+search.
+
 If IGDB is temporarily unavailable for a batch, the worker rolls back that
-batch, returns the durable job to `queued`, clears its lease, and raises so ARQ
-stops the current invocation. The recovery cron will redeliver it; affected
+batch, returns the durable job to `queued`, clears its lease, and ends the
+current invocation. The recovery cron will redeliver it; affected
 games retain their previous pending state and are never incorrectly marked
 `no_match`. A permanent unexpected error is recorded as the existing safe
 generic `failed` job error. A new import can create a subsequent job after a
@@ -73,6 +96,8 @@ titles or provider responses in `background_jobs.result`.
 
 - No fuzzy matching is introduced. Existing exact/normalized aliases,
   platform, edition, type, and ambiguity thresholds remain authoritative.
+- A generated or transliterated title is never enough to auto-link a PSN game;
+  only an exact provider primary or alternative name can be automatic evidence.
 - All database queries remain constrained by the job owner. A user may poll
   only their own job through the existing endpoint.
 - No migration is needed: `BackgroundJob.operation`, JSON `payload`, and JSON
@@ -89,13 +114,16 @@ titles or provider responses in `background_jobs.result`.
 Backend tests cover job creation/reuse and nonfatal Redis dispatch failure from
 import confirmation; worker success across multiple batches; persisted aggregate
 progress; temporary IGDB unavailability returning the job to queued without
-advancing lookup state; and owner-safe result polling. Existing matcher tests
-remain the authority for match safety.
+advancing lookup state; and owner-safe result polling. Matcher tests cover a
+localized exact alternative name, rejected ambiguous localized records, and an
+absent alternative name. Existing matcher tests remain the authority for match
+safety.
 
 Frontend Vitest tests cover receiving a job from import confirmation, polling
-until terminal state, progress copy, exact query-key invalidation, and rendering
-an unlinked row with its manual catalog picker after completion. Tests mock the
-polling API and do not require Redis, IGDB, or a worker.
+until terminal state, progress copy, exact query-key invalidation, rendering an
+unlinked row with its manual catalog picker after completion, and using an
+English-title suggestion only as an editable manual search query. Tests mock
+polling, IGDB, and translation calls; they do not require Redis or a worker.
 
 ## Acceptance Criteria
 
@@ -107,3 +135,5 @@ polling API and do not require Redis, IGDB, or a worker.
 4. The library refreshes automatically on successful enrichment and no longer
    displays a stale RAW card for a row that the worker linked.
 5. Ambiguous and absent matches remain manually linkable.
+6. A localized PSN title is automatically linked only when IGDB returns an
+   exact provider-maintained alternative name and all existing safety rules pass.
