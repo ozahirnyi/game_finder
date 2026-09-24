@@ -627,8 +627,12 @@ export function getBackgroundJob(jobId: string) {
   return apiRequest<BackgroundJob>(`/background-jobs/${jobId}`, { auth: true });
 }
 
-export function suggestPsnCatalogTitles(title: string) {
+export function findPsnCatalogTitles(title: string) {
   return apiRequest<{ suggestions: string[] }>(`/psn/catalog-title-suggestions?q=${encodeURIComponent(title)}`, { auth: true });
+}
+
+export function getCurrentPsnCatalogEnrichment() {
+  return apiRequest<BackgroundJob>("/psn/catalog-enrichment/current", { auth: true });
 }
 
 export function previewPsnLibraryRepair() {

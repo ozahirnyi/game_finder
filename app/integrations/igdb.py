@@ -280,6 +280,36 @@ async def fetch_igdb_games_by_ids(igdb_ids: list[int]) -> dict[int, dict[str, An
     return results
 
 
+async def fetch_igdb_localized_games(titles: list[str]) -> dict[str, list[dict[str, Any]]]:
+    """Resolve provider-maintained localized names to hydrated canonical games."""
+    unique_titles = list(dict.fromkeys(title.strip() for title in titles if title and title.strip()))[:10]
+    if not unique_titles:
+        return {}
+    result: dict[str, list[dict[str, Any]]] = {title: [] for title in unique_titles}
+    localized_by_game: dict[int, list[tuple[str, str]]] = {}
+    for title in unique_titles:
+        safe_title = title.replace('"', "").replace("\\", "")
+        localizations = await _query(
+            "game_localizations",
+            f'fields game,name,region; where name ~ "{safe_title}"; limit 20;',
+        )
+        for localization in localizations:
+            game_id = localization.get("game")
+            name = localization.get("name")
+            if isinstance(game_id, int) and game_id > 0 and isinstance(name, str) and name.strip():
+                localized_by_game.setdefault(game_id, []).append((title, name.strip()))
+    games_by_id = await fetch_igdb_games_by_ids(list(localized_by_game))
+    for game_id, matches in localized_by_game.items():
+        game = games_by_id.get(game_id)
+        if game is None:
+            continue
+        for title, localized_name in matches:
+            hydrated = dict(game)
+            hydrated["localized_names"] = list(dict.fromkeys([*(game.get("localized_names") or ()), localized_name]))
+            result[title].append(hydrated)
+    return result
+
+
 async def fetch_igdb_games_by_steam_appids(appids: list[int]) -> dict[int, dict[str, Any]]:
     """Resolve Steam app IDs in bounded catalog queries for library matching."""
     unique_appids = list(dict.fromkeys(value for value in appids if isinstance(value, int) and value > 0))

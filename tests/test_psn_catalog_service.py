@@ -1,4 +1,6 @@
 import asyncio
+import ast
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
@@ -24,6 +26,7 @@ def test_service_combines_raw_and_clean_query_results():
         {"row": PsnCatalogEvidence("EA SPORTS™ FIFA 16", platforms=("PS4",))},
         batch_fetcher=batch,
         single_fetcher=AsyncMock(),
+        localization_fetcher=AsyncMock(return_value={}),
     ))
 
     assert decisions["row"].match["id"] == 2
@@ -42,6 +45,7 @@ def test_service_flattens_shared_variants_once_and_scores_duplicate_catalog_ids_
         },
         batch_fetcher=batch,
         single_fetcher=AsyncMock(),
+        localization_fetcher=AsyncMock(return_value={}),
     ))
 
     batch.assert_awaited_once_with(["Example - PS5", "Example"])
@@ -58,6 +62,7 @@ def test_service_uses_bounded_fallback_for_every_unresolved_query():
         {"row": PsnCatalogEvidence("EA SPORTS™ FIFA 16")},
         batch_fetcher=batch,
         single_fetcher=single,
+        localization_fetcher=AsyncMock(return_value={}),
     ))
 
     queries = batch.await_args.args[0]
@@ -76,6 +81,7 @@ def test_service_raises_when_any_attempted_query_is_unavailable():
             {"row": PsnCatalogEvidence("Example")},
             batch_fetcher=batch,
             single_fetcher=single,
+            localization_fetcher=AsyncMock(return_value={}),
         ))
 
 
@@ -90,8 +96,58 @@ def test_service_logs_aggregate_outcome_without_titles(caplog):
             {"row": PsnCatalogEvidence("Private Imported Title")},
             batch_fetcher=batch,
             single_fetcher=AsyncMock(),
+            localization_fetcher=AsyncMock(return_value={}),
         ))
 
     assert "matcher_version=2" in caplog.text
     assert "no_match=1" in caplog.text
     assert "Private Imported Title" not in caplog.text
+
+
+def test_service_uses_localizations_only_after_exact_matching_is_unresolved():
+    from app.psn_catalog_service import resolve_psn_catalog_evidence
+
+    localized = AsyncMock(return_value={"Ведьмак 3": [{
+        "id": 2921, "name": "The Witcher 3: Wild Hunt",
+        "localized_names": ["Ведьмак 3"], "platforms": ["PlayStation 4"], "game_type": 0,
+    }]})
+    decisions = asyncio.run(resolve_psn_catalog_evidence(
+        {"row": PsnCatalogEvidence("Ведьмак 3", platforms=("PS4",))},
+        batch_fetcher=AsyncMock(return_value={"Ведьмак 3": []}),
+        single_fetcher=AsyncMock(return_value={"results": []}),
+        localization_fetcher=localized,
+    ))
+
+    assert decisions["row"].match["id"] == 2921
+    localized.assert_awaited_once_with(["Ведьмак 3"])
+
+
+def test_psn_catalog_path_has_no_openai_dependency():
+    root = Path(__file__).resolve().parents[1]
+    psn_modules = [
+        root / "app" / "psn_catalog_service.py",
+        root / "app" / "psn_library_enrichment.py",
+        root / "app" / "psn_resolution.py",
+        root / "app" / "psn_catalog_matcher.py",
+        root / "app" / "worker.py",
+        root / "app" / "main.py",
+    ]
+
+    for module in psn_modules:
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        imports = [node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
+        assert "app.openai_client" not in imports, module.name
+
+
+def test_manual_psn_catalog_helper_returns_canonical_igdb_titles():
+    from app.psn_catalog_service import find_psn_catalog_titles
+
+    result = asyncio.run(find_psn_catalog_titles(
+        "Ведьмак 3",
+        batch_fetcher=AsyncMock(return_value={"Ведьмак 3": []}),
+        localization_fetcher=AsyncMock(return_value={"Ведьмак 3": [{
+            "id": 2921, "name": "The Witcher 3: Wild Hunt", "localized_names": ["Ведьмак 3"],
+        }]}),
+    ))
+
+    assert result == ["The Witcher 3: Wild Hunt"]

@@ -38,11 +38,10 @@ def test_worker_executes_recommendation_without_request_handler(monkeypatch):
     from types import SimpleNamespace
     from app import worker
 
-    monkeypatch.setattr(
-        worker,
-        "get_recommendation",
-        lambda prompt, liked_game_ids: {"recommendations": [{"title": f"{prompt}:{liked_game_ids[0]}"}]},
-    )
+    def recommend(prompt, liked_game_ids):
+        return {"recommendations": [{"title": f"{prompt}:{liked_game_ids[0]}"}]}
+
+    monkeypatch.setattr(worker, "get_recommendation", recommend)
 
     async def enrich(items, _fetch):
         return [{**item, "game": {"id": 570}} for item in items]
@@ -71,7 +70,7 @@ def test_worker_executes_psn_catalog_enrichment_in_batches(monkeypatch):
     ])
     calls = []
     persisted = []
-    job = SimpleNamespace(operation="psn_catalog_enrichment", owner_id=uuid.uuid4(), payload={}, result=None)
+    job = SimpleNamespace(operation="psn_catalog_enrichment", owner_id=uuid.uuid4(), payload={"total": 11}, result={"total": 11, "attempted": 0, "linked": 0, "review": 0, "quarantined": 0, "remaining": 11})
 
     class FakeSession:
         def commit(self):
@@ -86,9 +85,9 @@ def test_worker_executes_psn_catalog_enrichment_in_batches(monkeypatch):
     monkeypatch.setattr(worker, "enrich_pending_psn_catalog_batch", enrich, raising=False)
     result = asyncio.run(worker.execute_background_operation(db, job))
 
-    assert result == {"attempted": 11, "linked": 9, "review": 2, "quarantined": 0, "remaining": 0}
+    assert result == {"total": 11, "attempted": 11, "linked": 9, "review": 2, "quarantined": 0, "remaining": 0}
     assert persisted == [
-        {"attempted": 8, "linked": 6, "review": 2, "quarantined": 0, "remaining": 3},
+        {"total": 11, "attempted": 8, "linked": 6, "review": 2, "quarantined": 0, "remaining": 3},
         result,
     ]
     assert calls == [
@@ -116,7 +115,7 @@ def test_worker_resumes_psn_catalog_enrichment_from_persisted_progress(monkeypat
     monkeypatch.setattr(worker, "enrich_pending_psn_catalog_batch", enrich, raising=False)
     result = asyncio.run(worker.execute_background_operation(FakeSession(), job))
 
-    assert result == {"attempted": 11, "linked": 9, "review": 2, "quarantined": 0, "remaining": 0}
+    assert result == {"total": 11, "attempted": 11, "linked": 9, "review": 2, "quarantined": 0, "remaining": 0}
     assert job.result == result
     assert previous["remaining"] == 3
 
@@ -200,7 +199,6 @@ def test_recommendation_submission_enqueues_without_inline_openai(monkeypatch):
     dispatched = []
     monkeypatch.setattr(main, "check_quota_available", lambda *_args: SimpleNamespace())
     monkeypatch.setattr(main, "enqueue_or_get_job", lambda *_args, **_kwargs: job, raising=False)
-    monkeypatch.setattr(main, "get_recommendation", lambda *_args: (_ for _ in ()).throw(AssertionError("inline OpenAI call")))
 
     async def dispatch(created_job):
         dispatched.append(created_job.id)

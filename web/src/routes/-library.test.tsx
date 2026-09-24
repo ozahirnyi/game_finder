@@ -16,6 +16,8 @@ const api = vi.hoisted(() => ({
   searchGames: vi.fn(),
   applyPsnLibraryRepair: vi.fn(),
   deletePsnLibrary: vi.fn(),
+  findPsnCatalogTitles: vi.fn(),
+  getCurrentPsnCatalogEnrichment: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => api);
@@ -59,6 +61,7 @@ beforeEach(() => {
     pending_catalog_count: 0,
   });
   api.getLibraryOverviewPage.mockImplementation(() => api.getLibraryOverview());
+  api.getCurrentPsnCatalogEnrichment.mockRejectedValue(new Error("Background job not found"));
 });
 afterEach(cleanup);
 
@@ -184,6 +187,22 @@ describe("Library", () => {
     expect(screen.queryByRole("button", { name: "Retry catalog matching" })).not.toBeInTheDocument();
   });
 
+  it("polls and displays durable PlayStation catalog progress", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [], steam_available: false, steam_error: null,
+      raw_count: 10, quarantined_count: 0, pending_catalog_count: 6,
+    });
+    api.getCurrentPsnCatalogEnrichment.mockResolvedValue({
+      id: "job", status: "running",
+      result: { total: 10, attempted: 3, linked: 2, review: 1, quarantined: 0, remaining: 6 },
+    });
+
+    renderLibrary();
+
+    expect(await screen.findByText(/Checking 4 of 10 PlayStation titles/)).toBeInTheDocument();
+    expect(screen.getByText(/2 linked, 1 for review, 6 remaining/)).toBeInTheDocument();
+  });
+
   it("chooses a catalog game inline for a raw PSN entry", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [
@@ -266,6 +285,23 @@ describe("Library", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
     expect(screen.getByLabelText("Catalog search for EA SPORTS™ FIFA 16")).toHaveValue("FIFA 16");
+  });
+
+  it("uses a catalog-backed title and immediately searches it", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{ id: "raw", source: "psn", title: "Ведьмак 3", link_state: "raw", catalog_search_query: "Ведьмак 3" }],
+      raw_count: 1, quarantined_count: 0, pending_catalog_count: 0,
+    });
+    api.findPsnCatalogTitles.mockResolvedValue({ suggestions: ["The Witcher 3: Wild Hunt"] });
+    api.searchGames.mockResolvedValue({ results: [] });
+
+    renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
+    fireEvent.click(screen.getByRole("button", { name: "Find catalog title" }));
+
+    expect(await screen.findByRole("button", { name: "Use The Witcher 3: Wild Hunt" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Use The Witcher 3: Wild Hunt" }));
+    await waitFor(() => expect(api.searchGames).toHaveBeenCalledWith({ query: "The Witcher 3: Wild Hunt" }));
   });
 
   it("does not reprocess a stale review row in the browser", async () => {

@@ -14,6 +14,7 @@ from app.psn_catalog_matcher import (
     choose_psn_catalog_match,
 )
 from app.psn_resolution import resolve_psn_catalog_titles
+from app.integrations.igdb import IGDBError, fetch_igdb_games_batch, fetch_igdb_localized_games
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,8 @@ class PsnCatalogUnavailable(RuntimeError):
 
 
 async def resolve_psn_catalog_evidence(
-    items: Mapping[str, PsnCatalogEvidence], *, batch_fetcher=None, single_fetcher=None
+    items: Mapping[str, PsnCatalogEvidence], *, batch_fetcher=None, single_fetcher=None,
+    localization_fetcher=None,
 ) -> dict[str, PsnCatalogDecision]:
     """Resolve all row evidence together, without partially applying provider results."""
     variants = {
@@ -58,8 +60,40 @@ async def resolve_psn_catalog_evidence(
         )
         for key, evidence in items.items()
     }
+    unresolved = {
+        key: evidence for key, evidence in items.items()
+        if decisions[key].state != "linked"
+    }
+    if unresolved:
+        try:
+            localizations = await (localization_fetcher or fetch_igdb_localized_games)(
+                [evidence.title for evidence in unresolved.values()]
+            )
+        except (IGDBError, TypeError, ValueError):
+            logger.warning("PSN localized catalog lookup unavailable row_count=%s", len(unresolved))
+            localizations = {}
+        for key, evidence in unresolved.items():
+            localized = localizations.get(evidence.title, [])
+            if localized:
+                decisions[key] = choose_psn_catalog_match(
+                    evidence,
+                    {evidence.title: localized},
+                )
     log_matcher_summary(decisions, query_count=len(queries))
     return decisions
+
+
+async def find_psn_catalog_titles(
+    title: str, *, batch_fetcher=None, localization_fetcher=None
+) -> list[str]:
+    """Return bounded canonical provider titles for a manual PSN catalog search."""
+    direct = await (batch_fetcher or fetch_igdb_games_batch)([title])
+    localized = await (localization_fetcher or fetch_igdb_localized_games)([title])
+    candidates = [*(direct.get(title, []) if isinstance(direct, dict) else []), *localized.get(title, [])]
+    return list(dict.fromkeys(
+        game["name"] for game in candidates
+        if isinstance(game, dict) and isinstance(game.get("name"), str) and game["name"].strip()
+    ))[:3]
 
 
 def log_matcher_summary(

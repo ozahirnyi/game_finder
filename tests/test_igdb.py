@@ -150,6 +150,30 @@ def test_normalize_igdb_game_keeps_provider_alternative_names():
     ]
 
 
+@pytest.mark.anyio
+async def test_igdb_localization_lookup_hydrates_canonical_games(monkeypatch):
+    from app.integrations import igdb
+
+    statements = []
+
+    async def query(endpoint, statement):
+        statements.append((endpoint, statement))
+        if endpoint == "game_localizations":
+            return [{"game": 2921, "name": "Ведьмак 3: Дикая Охота", "region": 8}]
+        return [{"id": 2921, "name": "The Witcher 3: Wild Hunt", "platforms": [{"name": "PlayStation 4"}]}]
+
+    monkeypatch.setattr(igdb, "_query", query)
+
+    result = await igdb.fetch_igdb_localized_games(["Ведьмак 3: Дикая Охота"])
+
+    assert len(result["Ведьмак 3: Дикая Охота"]) == 1
+    assert result["Ведьмак 3: Дикая Охота"][0]["id"] == 2921
+    assert result["Ведьмак 3: Дикая Охота"][0]["name"] == "The Witcher 3: Wild Hunt"
+    assert result["Ведьмак 3: Дикая Охота"][0]["localized_names"] == ["Ведьмак 3: Дикая Охота"]
+    assert statements[0][0] == "game_localizations"
+    assert 'fields game,name,region;' in statements[0][1]
+
+
 def test_normalize_igdb_game_prefers_wide_artwork_for_the_detail_hero():
     from app.integrations.igdb import normalize_igdb_game
 

@@ -8,7 +8,6 @@ from datetime import datetime, timedelta, timezone
 from arq.connections import RedisSettings
 from arq import cron
 from fastapi.encoders import jsonable_encoder
-from app.openai_client import get_recommendation
 from app.database import BackgroundJob, SessionLocal
 from app.integrations.igdb import fetch_igdb_games, fetch_igdb_games_batch
 from app.recommendations import enrich_recommendations
@@ -24,12 +23,16 @@ class BackgroundJobOperationError(RuntimeError):
     """Raised when a durable job cannot be executed safely."""
 
 
+def get_recommendation(prompt: str, liked_game_ids: list[int]) -> dict:
+    """Load the non-PSN recommendation implementation only when needed."""
+    from app.recommendation_worker import execute_recommendation as run_recommendation
+    return run_recommendation(prompt, liked_game_ids)
+
+
 async def execute_background_operation(_db, job) -> dict:
     if job.operation == "recommendations":
         generated = await asyncio.to_thread(
-            get_recommendation,
-            job.payload["prompt"],
-            job.payload.get("liked_game_ids", []),
+            get_recommendation, job.payload["prompt"], job.payload.get("liked_game_ids", [])
         )
         enriched = await enrich_recommendations(
             generated.get("recommendations", []), fetch_igdb_games_batch
@@ -46,6 +49,9 @@ async def _enrich_psn_catalog_job(db, job) -> dict:
         key: previous.get(key, 0)
         for key in ("attempted", "linked", "review", "quarantined")
     }
+    total["total"] = previous.get("total") or getattr(job, "payload", {}).get("total") or (
+        total["attempted"] + previous.get("remaining", 0)
+    )
     total["remaining"] = previous.get("remaining", 0)
     while True:
         batch = await enrich_pending_psn_catalog_batch(

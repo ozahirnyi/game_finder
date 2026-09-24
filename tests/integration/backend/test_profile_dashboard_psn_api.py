@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from openpyxl import Workbook
 
-from app.database import Favorite, Friendship, Game, PriceAlert, WishlistItem
+from app.database import BackgroundJob, Favorite, Friendship, Game, PriceAlert, WishlistItem
 from app.psn_catalog_matcher import PSN_CATALOG_MATCHER_VERSION, PsnCatalogDecision, PsnCatalogEvidence
 from app.psn_catalog_service import PsnCatalogUnavailable
 from app import psn_library_enrichment
@@ -1373,6 +1373,27 @@ def test_psn_import_confirmation_enqueues_catalog_enrichment(
     }
     app_main.enqueue_or_get_job.assert_called_once()
     app_main.dispatch_job.assert_awaited_once_with(queued)
+
+
+def test_current_psn_catalog_enrichment_is_owner_scoped(api_client, db_session, user_factory, auth_as):
+    owner = auth_as(user_factory(email="psn-job-owner@example.com"))
+    other = user_factory(email="psn-job-other@example.com")
+    job = BackgroundJob(
+        owner_id=owner.id, operation="psn_catalog_enrichment", idempotency_key="current",
+        status="running", payload={"total": 10},
+        result={"total": 10, "attempted": 3, "linked": 2, "review": 1, "quarantined": 0, "remaining": 6},
+    )
+    db_session.add_all([
+        job,
+        BackgroundJob(owner_id=other.id, operation="psn_catalog_enrichment", idempotency_key="current", payload={"total": 99}),
+    ])
+    db_session.commit()
+
+    response = api_client.get("/psn/catalog-enrichment/current")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(job.id)
+    assert response.json()["result"]["total"] == 10
 
 
 def test_psn_library_repair_links_raw_rows_and_hides_quarantine(

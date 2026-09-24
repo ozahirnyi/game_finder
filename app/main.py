@@ -24,7 +24,11 @@ from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from app.openai_client import get_catalog_title_suggestions, get_recommendation
+
+
+def get_recommendation(*_args, **_kwargs):
+    """Legacy seam; recommendations are executed only by the durable worker."""
+    raise RuntimeError("Recommendations are executed by the background worker")
 from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations, get_personalized_recommendations
 from app.cache import build_cache_key, get_json_cached
 from app.catalog_cache import get_cached_snapshot
@@ -51,7 +55,7 @@ from app.psn_catalog_matcher import (
     preferred_psn_catalog_query,
     safe_psn_search_aliases,
 )
-from app.psn_catalog_service import PsnCatalogUnavailable
+from app.psn_catalog_service import PsnCatalogUnavailable, find_psn_catalog_titles
 from app.psn_library_enrichment import (
     PSN_CANDIDATE_EVIDENCE_LIMIT,
     PSN_CATALOG_ENRICHMENT_BATCH_SIZE,
@@ -1054,11 +1058,25 @@ async def apply_psn_library_repair(data: PsnLibraryRepairApplyRequest, db: Sessi
 
 
 @app.get("/psn/catalog-title-suggestions", response_model=PsnCatalogTitleSuggestions)
-def psn_catalog_title_suggestions(
+async def psn_catalog_title_suggestions(
     q: str = Query(min_length=1, max_length=255),
     current_user: User = Depends(get_current_user),
 ):
-    return PsnCatalogTitleSuggestions(suggestions=get_catalog_title_suggestions(q))
+    return PsnCatalogTitleSuggestions(suggestions=await find_psn_catalog_titles(q))
+
+
+@app.get("/psn/catalog-enrichment/current", response_model=BackgroundJobRead)
+def get_current_psn_catalog_enrichment(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    job = db.query(BackgroundJob).filter(
+        BackgroundJob.owner_id == current_user.id,
+        BackgroundJob.operation == "psn_catalog_enrichment",
+        BackgroundJob.idempotency_key == "current",
+    ).order_by(BackgroundJob.created_at.desc()).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Background job not found")
+    return BackgroundJobRead.model_validate(job)
 
 
 @app.delete("/psn/library")
@@ -1229,9 +1247,13 @@ async def confirm_psn_import(
         raise
     catalog_job = None
     if _pending_psn_catalog_query(db, current_user.id).first() is not None:
+        pending_total = _pending_psn_catalog_query(db, current_user.id).count()
         job = enqueue_or_get_job(
-            db, current_user.id, "psn_catalog_enrichment", "current", {}
+            db, current_user.id, "psn_catalog_enrichment", "current", {"total": pending_total}
         )
+        if job.result is None and isinstance(job, BackgroundJob):
+            job.result = {"total": pending_total, "attempted": 0, "linked": 0, "review": 0, "quarantined": 0, "remaining": pending_total}
+            db.commit()
         if job.status == "queued":
             try:
                 await dispatch_job(job)

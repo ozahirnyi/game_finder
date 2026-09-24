@@ -11,7 +11,8 @@ import {
   getLibraryOverview,
   getLibraryOverviewPage,
   searchGames,
-  suggestPsnCatalogTitles,
+  findPsnCatalogTitles,
+  getCurrentPsnCatalogEnrichment,
   type LibraryOverviewGame,
 } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
@@ -63,6 +64,21 @@ function LibraryPage() {
     getNextPageParam: (last, pages) =>
       last.has_more ? pages.reduce((total, page) => total + page.games.length, 0) : undefined,
   });
+  const psnCatalogJob = useQuery({
+    queryKey: ["psn-catalog-enrichment", "current"],
+    queryFn: getCurrentPsnCatalogEnrichment,
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "queued" || query.state.data?.status === "running" ? 1500 : false,
+  });
+  const psnCatalogProgress = psnCatalogJob.data?.result as {
+    total?: number; attempted?: number; linked?: number; review?: number; remaining?: number;
+  } | undefined;
+  useEffect(() => {
+    if (psnCatalogJob.data?.status === "succeeded") {
+      void queryClient.invalidateQueries({ queryKey: ["library-overview-page"] });
+    }
+  }, [psnCatalogJob.data?.status, queryClient]);
   const owned = libraryQuery.data?.pages.flatMap((page) => page.games) ?? [];
   const totals = overviewQuery.data?.games ?? [];
   const removePsnLibrary = useMutation({
@@ -123,6 +139,13 @@ function LibraryPage() {
           <p className="mt-1 text-muted-foreground">
             Catalog matching continues in the background. Exact matches will appear automatically; uncertain titles can be chosen below.
           </p>
+          {psnCatalogProgress ? (
+            <p className="mt-1 text-muted-foreground">
+              {psnCatalogJob.data.status === "queued" || psnCatalogJob.data.status === "running"
+                ? `Checking ${Math.min((psnCatalogProgress.attempted ?? 0) + 1, psnCatalogProgress.total ?? 0)} of ${psnCatalogProgress.total ?? 0} PlayStation titles — ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`
+                : `Catalog matching: ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`}
+            </p>
+          ) : null}
           {libraryQuery.data?.pages[0]?.quarantined_count ? (
             <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">
               Review hidden PSN entries
@@ -320,7 +343,7 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
   const search = useMutation({
     mutationFn: (value: string) => searchGames({ query: value }),
   });
-  const titleSuggestions = useMutation({ mutationFn: () => suggestPsnCatalogTitles(query) });
+  const titleSuggestions = useMutation({ mutationFn: () => findPsnCatalogTitles(query) });
   const link = useMutation({
     mutationFn: (catalogId: number) =>
       applyPsnLibraryRepair([
@@ -375,12 +398,12 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
           >
             {search.isPending ? "Searching…" : "Search catalog"}
           </button>
-          <button type="button" onClick={() => titleSuggestions.mutate()} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">
-            Suggest English title
+          <button type="button" disabled={titleSuggestions.isPending || !query.trim()} onClick={() => titleSuggestions.mutate()} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-50">
+            {titleSuggestions.isPending ? "Finding catalog title…" : "Find catalog title"}
           </button>
-          {titleSuggestions.isError ? <p className="text-sm text-muted-foreground">Title suggestions are temporarily unavailable. Try editing the search title.</p> : null}
+          {titleSuggestions.isError ? <p className="text-sm text-muted-foreground">Catalog title lookup is temporarily unavailable. Try editing the search title.</p> : null}
           {titleSuggestions.data?.suggestions.map((suggestion) => (
-            <button key={suggestion} type="button" onClick={() => setQuery(suggestion)} className="mr-2 rounded-lg border border-border px-2 py-1 text-xs">Use {suggestion}</button>
+            <button key={suggestion} type="button" onClick={() => { setQuery(suggestion); search.mutate(suggestion); }} className="mr-2 rounded-lg border border-border px-2 py-1 text-xs">Use {suggestion}</button>
           ))}
           {search.isError ? (
             <p role="alert" className="text-sm text-red-600">
