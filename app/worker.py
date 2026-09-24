@@ -10,9 +10,11 @@ from arq import cron
 from fastapi.encoders import jsonable_encoder
 from app.openai_client import get_recommendation
 from app.database import BackgroundJob, SessionLocal
-from app.integrations.igdb import fetch_igdb_games_batch
+from app.integrations.igdb import fetch_igdb_games, fetch_igdb_games_batch
 from app.recommendations import enrich_recommendations
 from app.background_jobs import dispatch_job_id
+from app.psn_catalog_service import PsnCatalogUnavailable
+from app.psn_library_enrichment import enrich_pending_psn_catalog_batch
 
 LEASE_DURATION = timedelta(minutes=15)
 LEASE_HEARTBEAT_SECONDS = 30
@@ -33,7 +35,32 @@ async def execute_background_operation(_db, job) -> dict:
             generated.get("recommendations", []), fetch_igdb_games_batch
         )
         return {"recommendations": enriched}
+    if job.operation == "psn_catalog_enrichment":
+        return await _enrich_psn_catalog_job(_db, job)
     raise BackgroundJobOperationError("Unsupported background operation")
+
+
+async def _enrich_psn_catalog_job(db, job) -> dict:
+    previous = job.result or {}
+    total = {
+        key: previous.get(key, 0)
+        for key in ("attempted", "linked", "review", "quarantined")
+    }
+    total["remaining"] = previous.get("remaining", 0)
+    while True:
+        batch = await enrich_pending_psn_catalog_batch(
+            db,
+            job.owner_id,
+            batch_fetcher=fetch_igdb_games_batch,
+            single_fetcher=fetch_igdb_games,
+        )
+        for key in ("attempted", "linked", "review", "quarantined"):
+            total[key] += getattr(batch, key)
+        total["remaining"] = batch.remaining
+        job.result = total.copy()
+        db.commit()
+        if batch.remaining == 0:
+            return total
 
 
 def redis_settings() -> RedisSettings:
@@ -92,6 +119,25 @@ async def run_background_job(_ctx: dict, job_id: str) -> None:
         db.commit()
         if not completed:
             return
+    except PsnCatalogUnavailable:
+        db.rollback()
+        if job is not None:
+            db.query(BackgroundJob).filter(
+                BackgroundJob.id == job.id,
+                BackgroundJob.status == "running",
+                BackgroundJob.lease_token == lease_token,
+            ).update(
+                {
+                    "status": "queued",
+                    "error": None,
+                    "lease_token": None,
+                    "lease_expires_at": None,
+                    "updated_at": datetime.now(timezone.utc),
+                },
+                synchronize_session=False,
+            )
+            db.commit()
+        return
     except Exception:
         if job is not None:
             db.query(BackgroundJob).filter(

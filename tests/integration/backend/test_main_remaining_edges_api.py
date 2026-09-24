@@ -316,6 +316,35 @@ def test_worker_marks_claimed_job_failed_when_execution_raises(db_session, user_
     assert failed_job.lease_expires_at is None
 
 
+def test_worker_requeues_catalog_job_when_provider_is_unavailable(db_session, user_factory, monkeypatch):
+    from sqlalchemy.orm import sessionmaker
+    from app import worker
+    from app.psn_catalog_service import PsnCatalogUnavailable
+
+    owner = user_factory(email="worker-catalog-retry@example.com")
+    job = BackgroundJob(
+        owner_id=owner.id, operation="psn_catalog_enrichment", idempotency_key="catalog-retry", payload={},
+        result={"attempted": 8, "linked": 6, "review": 2, "quarantined": 0, "remaining": 3},
+    )
+    db_session.add(job)
+    db_session.commit()
+    monkeypatch.setattr(worker, "SessionLocal", sessionmaker(bind=db_session.get_bind()))
+
+    async def unavailable(_db, _job):
+        raise PsnCatalogUnavailable("IGDB unavailable")
+
+    monkeypatch.setattr(worker, "execute_background_operation", unavailable)
+    asyncio.run(worker.run_background_job({}, str(job.id)))
+
+    db_session.expire_all()
+    queued = db_session.get(BackgroundJob, job.id)
+    assert queued.status == "queued"
+    assert queued.result == {"attempted": 8, "linked": 6, "review": 2, "quarantined": 0, "remaining": 3}
+    assert queued.lease_token is None
+    assert queued.lease_expires_at is None
+    assert queued.error is None
+
+
 def test_worker_recovery_redelivers_queued_and_expired_jobs(db_session, user_factory, monkeypatch):
     from datetime import timedelta
     from sqlalchemy.orm import sessionmaker
