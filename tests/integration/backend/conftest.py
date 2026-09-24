@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -35,7 +37,8 @@ def app_main():
 
 
 @pytest.fixture
-def api_client(app_main, db_session):
+def api_client(app_main, db_session, monkeypatch):
+    monkeypatch.setattr(app_main, "dispatch_job", AsyncMock())
     app_main.app.dependency_overrides[app_main.get_db] = lambda: db_session
     with TestClient(app_main.app) as client:
         yield client

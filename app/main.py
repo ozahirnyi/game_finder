@@ -1218,7 +1218,25 @@ async def confirm_psn_import(
     except Exception:
         db.rollback()
         raise
-    return PsnImportResult(created=created, updated=updated, skipped=skipped, total=len(unique_games))
+    catalog_job = None
+    if _pending_psn_catalog_query(db, current_user.id).first() is not None:
+        job = enqueue_or_get_job(
+            db, current_user.id, "psn_catalog_enrichment", "current", {}
+        )
+        if job.status == "queued":
+            try:
+                await dispatch_job(job)
+            except Exception:
+                # Redis delivery is recoverable; the durable queued job remains available to cron.
+                pass
+        catalog_job = BackgroundJobRead.model_validate(job)
+    return PsnImportResult(
+        created=created,
+        updated=updated,
+        skipped=skipped,
+        total=len(unique_games),
+        catalog_job=catalog_job,
+    )
 
 
 @app.post("/auth/register", response_model=UserRead)

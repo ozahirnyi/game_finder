@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from io import BytesIO
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from openpyxl import Workbook
@@ -920,7 +920,7 @@ def test_psn_import_mixed_preview_and_confirmation_flow(
         {"candidate_token": items[1]["candidate_token"], "action": "raw"},
     ]})
 
-    assert confirm.json() == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
+    assert {key: confirm.json()[key] for key in ("created", "updated", "skipped", "total")} == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2
 
 
@@ -1041,7 +1041,7 @@ def test_raw_reimport_preserves_protected_psn_catalog_state(
 
     response = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": item["candidate_token"], "action": "raw"}]})
 
-    assert response.json() == {"created": 0, "updated": 1, "skipped": 0, "total": 1}
+    assert {key: response.json()[key] for key in ("created", "updated", "skipped", "total")} == {"created": 0, "updated": 1, "skipped": 0, "total": 1}
     db_session.refresh(stored)
     assert (
         stored.link_state,
@@ -1085,10 +1085,10 @@ def test_psn_import_confirm_persists_owner_scoped_idempotent_games(
     tokens = {title: item["candidate_token"] for title, item in zip(["Hades", "Celeste"], preview["items"])}
     first = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": tokens["Hades"], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens["Hades"], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens["Celeste"], "action": "catalog", "catalog_id": 102}]})
     assert first.status_code == 200
-    assert first.json() == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
+    assert first.json() == {"created": 2, "updated": 0, "skipped": 0, "total": 2, "catalog_job": None}
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 2
     second = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": tokens["Hades"], "action": "catalog", "catalog_id": 101}, {"candidate_token": tokens["Celeste"], "action": "catalog", "catalog_id": 102}]})
-    assert second.json() == {"created": 0, "updated": 0, "skipped": 2, "total": 2}
+    assert {key: second.json()[key] for key in ("created", "updated", "skipped", "total")} == {"created": 0, "updated": 0, "skipped": 2, "total": 2}
 
     other = auth_as(user_factory(email="psn-other@example.com"))
     other_preview = api_client.post("/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")}).json()
@@ -1205,7 +1205,7 @@ def test_psn_catalog_confirmation_enriches_linked_row_and_merges_raw_duplicate(a
         "candidate_token": preview["items"][0]["candidate_token"], "action": "catalog", "catalog_id": 101,
     }]})
 
-    assert response.json() == {"created": 0, "updated": 1, "skipped": 0, "total": 1}
+    assert {key: response.json()[key] for key in ("created", "updated", "skipped", "total")} == {"created": 0, "updated": 1, "skipped": 0, "total": 1}
     games = db_session.query(Game).filter_by(owner_id=owner.id, source="psn").all()
     assert len(games) == 1
     assert (games[0].img_icon_url, games[0].notes, games[0].playtime_forever, games[0].created_at) == (
@@ -1275,7 +1275,7 @@ def test_psn_import_confirm_accepts_typed_catalog_and_manual_selections(
     )
 
     assert first.status_code == 200
-    assert first.json() == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
+    assert {key: first.json()[key] for key in ("created", "updated", "skipped", "total")} == {"created": 2, "updated": 0, "skipped": 0, "total": 2}
     games = db_session.query(Game).filter_by(owner_id=owner.id, source="psn").order_by(Game.external_id).all()
     assert [(game.external_id, game.title) for game in games] == [
         ("psn:101", "Hades"),
@@ -1283,7 +1283,7 @@ def test_psn_import_confirm_accepts_typed_catalog_and_manual_selections(
     ]
 
     second = api_client.post("/psn/import/confirm", json={"selections": [{"candidate_token": items[1]["candidate_token"], "action": "raw"}]})
-    assert second.json() == {"created": 0, "updated": 0, "skipped": 1, "total": 1}
+    assert {key: second.json()[key] for key in ("created", "updated", "skipped", "total")} == {"created": 0, "updated": 0, "skipped": 1, "total": 1}
 
 
 @pytest.mark.parametrize(
@@ -1346,6 +1346,33 @@ def test_psn_import_confirm_allows_a_suggested_skip_to_be_restored_as_raw(
 
     assert response.status_code == 200
     assert db_session.query(Game).filter_by(owner_id=owner.id, source="psn").count() == 1
+
+
+def test_psn_import_confirmation_enqueues_catalog_enrichment(
+    api_client, user_factory, auth_as, app_main, monkeypatch
+):
+    import uuid
+    from types import SimpleNamespace
+
+    auth_as(user_factory(email="psn-enqueue-catalog@example.com"))
+    preview = api_client.post(
+        "/psn/import/preview", files={"file": ("export.csv", b"Game Name\nHades\n", "text/csv")}
+    ).json()
+    queued = SimpleNamespace(id=uuid.uuid4(), status="queued", result=None, error=None)
+    monkeypatch.setattr(app_main, "enqueue_or_get_job", Mock(return_value=queued))
+    monkeypatch.setattr(app_main, "dispatch_job", AsyncMock())
+
+    response = api_client.post(
+        "/psn/import/confirm",
+        json={"selections": [{"candidate_token": preview["items"][0]["candidate_token"], "action": "raw"}]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["catalog_job"] == {
+        "id": str(queued.id), "status": "queued", "result": None, "error": None,
+    }
+    app_main.enqueue_or_get_job.assert_called_once()
+    app_main.dispatch_job.assert_awaited_once_with(queued)
 
 
 def test_psn_library_repair_links_raw_rows_and_hides_quarantine(

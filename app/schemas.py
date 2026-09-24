@@ -510,6 +510,7 @@ class PsnImportResult(BaseModel):
     updated: int = 0
     skipped: int = 0
     total: int = 0
+    catalog_job: BackgroundJobRead | None = None
 
 
 class PsnLibraryRepairItem(BaseModel):
