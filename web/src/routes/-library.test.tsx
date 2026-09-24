@@ -102,6 +102,22 @@ describe("Library", () => {
     });
   });
 
+  it("offers PSN deletion only on the PlayStation tab", async () => {
+    api.deletePsnLibrary.mockResolvedValue({ deleted: 2 });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderLibrary();
+
+    await screen.findByText("Library");
+    expect(screen.queryByRole("button", { name: "Delete all PlayStation games" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "PlayStation" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Delete all PlayStation games" }),
+    );
+
+    await waitFor(() => expect(api.deletePsnLibrary).toHaveBeenCalledOnce());
+  });
+
   it("renders raw PSN entries without catalog links and keeps linked entries navigable", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [

@@ -7,6 +7,7 @@ import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   applyPsnLibraryRepair,
+  deletePsnLibrary,
   getLibraryOverview,
   getLibraryOverviewPage,
   searchGames,
@@ -46,6 +47,8 @@ function LibraryPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("playtime-desc");
   const [searchText, setSearchText] = useState("");
   const [query, setQuery] = useState("");
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(searchText), 250);
     return () => window.clearTimeout(timer);
@@ -62,6 +65,23 @@ function LibraryPage() {
   });
   const owned = libraryQuery.data?.pages.flatMap((page) => page.games) ?? [];
   const totals = overviewQuery.data?.games ?? [];
+  const removePsnLibrary = useMutation({
+    mutationFn: deletePsnLibrary,
+    onSuccess: async ({ deleted }) => {
+      setDeleteMessage(`Deleted ${deleted} PlayStation games.`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["library"] }),
+        queryClient.invalidateQueries({ queryKey: ["library-overview-page"] }),
+        queryClient.invalidateQueries({ queryKey: ["psn-library-repair"] }),
+      ]);
+    },
+    onError: (error) =>
+      setDeleteMessage(
+        error instanceof Error
+          ? `Could not delete PlayStation games: ${error.message}`
+          : "Could not delete PlayStation games.",
+      ),
+  });
   const visible = owned;
   const loadMoreRef = useInfiniteScroll({
     hasNextPage: libraryQuery.hasNextPage,
@@ -121,6 +141,30 @@ function LibraryPage() {
             {item}
           </button>
         ))}
+        {tab === "PlayStation" && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={removePsnLibrary.isPending}
+              onClick={() => {
+                setDeleteMessage(null);
+                if (
+                  window.confirm(
+                    "Delete every PlayStation entry from your library? This cannot be undone.",
+                  )
+                ) {
+                  removePsnLibrary.mutate();
+                }
+              }}
+              className="rounded-full border border-red-500 px-3 py-1.5 text-xs font-bold text-red-600 disabled:opacity-50"
+            >
+              {removePsnLibrary.isPending
+                ? "Deleting PlayStation games…"
+                : "Delete all PlayStation games"}
+            </button>
+            {deleteMessage && <span role="status" className="text-xs text-muted-foreground">{deleteMessage}</span>}
+          </div>
+        )}
         <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
           Sort by time
           <select
