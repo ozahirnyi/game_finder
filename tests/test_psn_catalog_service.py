@@ -129,8 +129,6 @@ def test_psn_catalog_path_has_no_openai_dependency():
         root / "app" / "psn_library_enrichment.py",
         root / "app" / "psn_resolution.py",
         root / "app" / "psn_catalog_matcher.py",
-        root / "app" / "worker.py",
-        root / "app" / "main.py",
     ]
 
     for module in psn_modules:

@@ -38,10 +38,11 @@ def test_worker_executes_recommendation_without_request_handler(monkeypatch):
     from types import SimpleNamespace
     from app import worker
 
-    def recommend(prompt, liked_game_ids):
-        return {"recommendations": [{"title": f"{prompt}:{liked_game_ids[0]}"}]}
-
-    monkeypatch.setattr(worker, "get_recommendation", recommend)
+    monkeypatch.setattr(
+        worker,
+        "get_recommendation",
+        lambda prompt, liked_game_ids: {"recommendations": [{"title": f"{prompt}:{liked_game_ids[0]}"}]},
+    )
 
     async def enrich(items, _fetch):
         return [{**item, "game": {"id": 570}} for item in items]

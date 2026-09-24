@@ -199,8 +199,23 @@ describe("Library", () => {
 
     renderLibrary();
 
-    expect(await screen.findByText(/Checking 4 of 10 PlayStation titles/)).toBeInTheDocument();
+    expect(await screen.findByText(/Checking 3 of 10 PlayStation titles/)).toBeInTheDocument();
     expect(screen.getByText(/2 linked, 1 for review, 6 remaining/)).toBeInTheDocument();
+  });
+
+  it("shows zero completed titles before the first durable catalog batch", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [], steam_available: false, steam_error: null,
+      raw_count: 10, quarantined_count: 0, pending_catalog_count: 10,
+    });
+    api.getCurrentPsnCatalogEnrichment.mockResolvedValue({
+      id: "job", status: "queued",
+      result: { total: 10, attempted: 0, linked: 0, review: 0, quarantined: 0, remaining: 10 },
+    });
+
+    renderLibrary();
+
+    expect(await screen.findByText(/Checking 0 of 10 PlayStation titles/)).toBeInTheDocument();
   });
 
   it("chooses a catalog game inline for a raw PSN entry", async () => {

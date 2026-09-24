@@ -24,11 +24,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-
-
-def get_recommendation(*_args, **_kwargs):
-    """Legacy seam; recommendations are executed only by the durable worker."""
-    raise RuntimeError("Recommendations are executed by the background worker")
+from app.openai_client import get_catalog_title_suggestions, get_recommendation
 from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations, get_personalized_recommendations
 from app.cache import build_cache_key, get_json_cached
 from app.catalog_cache import get_cached_snapshot

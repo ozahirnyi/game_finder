@@ -142,7 +142,7 @@ function LibraryPage() {
           {psnCatalogProgress ? (
             <p className="mt-1 text-muted-foreground">
               {psnCatalogJob.data.status === "queued" || psnCatalogJob.data.status === "running"
-                ? `Checking ${Math.min((psnCatalogProgress.attempted ?? 0) + 1, psnCatalogProgress.total ?? 0)} of ${psnCatalogProgress.total ?? 0} PlayStation titles — ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`
+                ? `Checking ${psnCatalogProgress.attempted ?? 0} of ${psnCatalogProgress.total ?? 0} PlayStation titles — ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`
                 : `Catalog matching: ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`}
             </p>
           ) : null}
