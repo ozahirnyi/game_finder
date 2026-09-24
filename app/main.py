@@ -24,7 +24,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from app.openai_client import get_recommendation
+from app.openai_client import get_catalog_title_suggestions, get_recommendation
 from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations, get_personalized_recommendations
 from app.cache import build_cache_key, get_json_cached
 from app.catalog_cache import get_cached_snapshot
@@ -82,6 +82,7 @@ from app.database import get_db, User, Game, CatalogGameCache, OAuthIdentity, OA
 from app.database import SocialBlock, SteamFriendSuppression
 from app import social_policy
 from app.schemas import ConversationReadUpdate
+from app.schemas import PsnCatalogTitleSuggestions
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportPreviewItem, PsnImportResult, PsnImportSelection, \
     RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, LibraryOverviewPageRead, SteamLibraryResolveRead, \
@@ -1050,6 +1051,14 @@ async def apply_psn_library_repair(data: PsnLibraryRepairApplyRequest, db: Sessi
         db.rollback()
         raise
     return {"updated": len(decisions)}
+
+
+@app.get("/psn/catalog-title-suggestions", response_model=PsnCatalogTitleSuggestions)
+def psn_catalog_title_suggestions(
+    q: str = Query(min_length=1, max_length=255),
+    current_user: User = Depends(get_current_user),
+):
+    return PsnCatalogTitleSuggestions(suggestions=get_catalog_title_suggestions(q))
 
 
 @app.delete("/psn/library")

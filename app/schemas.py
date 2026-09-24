@@ -513,6 +513,10 @@ class PsnImportResult(BaseModel):
     catalog_job: BackgroundJobRead | None = None
 
 
+class PsnCatalogTitleSuggestions(BaseModel):
+    suggestions: list[str] = Field(default_factory=list, max_length=3)
+
+
 class PsnLibraryRepairItem(BaseModel):
     game_id: uuid.UUID
     title: str

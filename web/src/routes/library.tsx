@@ -9,6 +9,7 @@ import {
   applyPsnLibraryRepair,
   getLibraryOverviewPage,
   searchGames,
+  suggestPsnCatalogTitles,
   type LibraryOverviewGame,
 } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
@@ -272,6 +273,7 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
   const search = useMutation({
     mutationFn: (value: string) => searchGames({ query: value }),
   });
+  const titleSuggestions = useMutation({ mutationFn: () => suggestPsnCatalogTitles(query) });
   const link = useMutation({
     mutationFn: (catalogId: number) =>
       applyPsnLibraryRepair([
@@ -326,6 +328,13 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
           >
             {search.isPending ? "Searching…" : "Search catalog"}
           </button>
+          <button type="button" onClick={() => titleSuggestions.mutate()} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">
+            Suggest English title
+          </button>
+          {titleSuggestions.isError ? <p className="text-sm text-muted-foreground">Title suggestions are temporarily unavailable. Try editing the search title.</p> : null}
+          {titleSuggestions.data?.suggestions.map((suggestion) => (
+            <button key={suggestion} type="button" onClick={() => setQuery(suggestion)} className="mr-2 rounded-lg border border-border px-2 py-1 text-xs">Use {suggestion}</button>
+          ))}
           {search.isError ? (
             <p role="alert" className="text-sm text-red-600">
               Catalog search failed. Try again.
