@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -7,6 +7,7 @@ import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   applyPsnLibraryRepair,
+  getLibraryOverview,
   getLibraryOverviewPage,
   searchGames,
   suggestPsnCatalogTitles,
@@ -50,6 +51,7 @@ function LibraryPage() {
     return () => window.clearTimeout(timer);
   }, [searchText]);
   const source = tab === "Steam" ? "steam" : tab === "PlayStation" ? "psn" : "all";
+  const overviewQuery = useQuery({ queryKey: ["library"], queryFn: getLibraryOverview });
   const libraryQuery = useInfiniteQuery({
     queryKey: ["library-overview-page", query, source, sortOrder],
     queryFn: ({ pageParam }) =>
@@ -59,6 +61,7 @@ function LibraryPage() {
       last.has_more ? pages.reduce((total, page) => total + page.games.length, 0) : undefined,
   });
   const owned = libraryQuery.data?.pages.flatMap((page) => page.games) ?? [];
+  const totals = overviewQuery.data?.games ?? [];
   const visible = owned;
   const loadMoreRef = useInfiniteScroll({
     hasNextPage: libraryQuery.hasNextPage,
@@ -72,9 +75,9 @@ function LibraryPage() {
         <SectionHeader title="Library" hint="Everything you own, across connected stores" />
         <div className="flex items-center gap-6 font-mono">
           {[
-            { label: "Games", value: owned.length },
-            { label: "Steam", value: owned.filter((game) => game.source === "steam").length },
-            { label: "PlayStation", value: owned.filter((game) => game.source === "psn").length },
+            { label: "Games", value: totals.length },
+            { label: "Steam", value: totals.filter((game) => game.source === "steam").length },
+            { label: "PlayStation", value: totals.filter((game) => game.source === "psn").length },
           ].map((stat) => (
             <div key={stat.label}>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">

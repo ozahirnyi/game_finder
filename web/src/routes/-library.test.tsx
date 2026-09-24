@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   getLibraryOverviewPage: vi.fn(),
   searchGames: vi.fn(),
   applyPsnLibraryRepair: vi.fn(),
+  deletePsnLibrary: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => api);
@@ -68,6 +69,37 @@ describe("Library", () => {
     renderLibrary();
 
     expect(await screen.findByTestId("library-loading")).toBeInTheDocument();
+  });
+
+  it("shows aggregate counts rather than the first loaded page", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [
+        { id: "steam-1", source: "steam", title: "Steam One" },
+        { id: "steam-2", source: "steam", title: "Steam Two" },
+        { id: "psn-1", source: "psn", title: "PSN One" },
+      ],
+      steam_available: true,
+      raw_count: 0,
+      quarantined_count: 0,
+      pending_catalog_count: 0,
+    });
+    api.getLibraryOverviewPage.mockResolvedValue({
+      games: [{ id: "steam-1", source: "steam", title: "Steam One" }],
+      total: 3,
+      has_more: false,
+      steam_available: true,
+      raw_count: 0,
+      quarantined_count: 0,
+      pending_catalog_count: 0,
+    });
+
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("Games").parentElement).toHaveTextContent("3");
+      expect(screen.getAllByText("Steam")[0].parentElement).toHaveTextContent("2");
+      expect(screen.getAllByText("PlayStation")[0].parentElement).toHaveTextContent("1");
+    });
   });
 
   it("renders raw PSN entries without catalog links and keeps linked entries navigable", async () => {
