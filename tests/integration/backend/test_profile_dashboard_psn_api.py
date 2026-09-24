@@ -8,6 +8,7 @@ from openpyxl import Workbook
 from app.database import Favorite, Friendship, Game, PriceAlert, WishlistItem
 from app.psn_catalog_matcher import PSN_CATALOG_MATCHER_VERSION, PsnCatalogDecision, PsnCatalogEvidence
 from app.psn_catalog_service import PsnCatalogUnavailable
+from app import psn_library_enrichment
 from app.psn_export import psn_manual_external_id
 from app.psn_resolution import CatalogResolution
 
@@ -1237,7 +1238,7 @@ def test_automatic_psn_duplicate_linking_merges_catalog_evidence(
     )
     db_session.add_all([raw, linked])
     db_session.commit()
-    monkeypatch.setattr(app_main, "resolve_psn_catalog_evidence", AsyncMock(return_value={
+    monkeypatch.setattr(psn_library_enrichment, "resolve_psn_catalog_evidence", AsyncMock(return_value={
         str(raw.id): PsnCatalogDecision("linked", {"id": 101, "name": "Hades"}, "safe_winner", "safe_alias", 150),
     }))
 
@@ -1501,7 +1502,7 @@ def test_enrichment_uses_stored_alias_and_platform(
     db_session.add(game)
     db_session.commit()
     resolver = AsyncMock(return_value={str(game.id): PsnCatalogDecision("linked", {"id": 2, "name": "FIFA 16", "platforms": ["PlayStation 4"], "game_type": 0}, "safe_winner", "safe_alias", 150)})
-    monkeypatch.setattr(app_main, "resolve_psn_catalog_evidence", resolver)
+    monkeypatch.setattr(psn_library_enrichment, "resolve_psn_catalog_evidence", resolver)
 
     response = api_client.post("/psn/library-repair/enrich")
 
@@ -1513,6 +1514,50 @@ def test_enrichment_uses_stored_alias_and_platform(
     assert game.catalog_lookup_version == PSN_CATALOG_MATCHER_VERSION
 
 
+def test_enrichment_endpoint_uses_shared_batch_for_one_linked_game(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    assert hasattr(app_main, "enrich_pending_psn_catalog_batch")
+    assert app_main.enrich_pending_psn_catalog_batch is psn_library_enrichment.enrich_pending_psn_catalog_batch
+    owner = auth_as(user_factory(email="psn-shared-linked@example.com"))
+    game = Game(owner_id=owner.id, source="psn", external_id="psn:manual:shared", title="Hades", link_state="raw")
+    db_session.add(game)
+    db_session.commit()
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", AsyncMock(return_value={
+        "Hades": [{"id": 101, "name": "Hades", "background_image": "https://covers/hades.jpg"}],
+    }))
+
+    response = api_client.post("/psn/library-repair/enrich")
+
+    assert response.status_code == 200
+    assert response.json() == {"attempted": 1, "linked": 1, "review": 0, "quarantined": 0, "remaining": 0}
+    db_session.refresh(game)
+    assert (game.link_state, game.catalog_game_id) == ("linked", 101)
+
+
+def test_enrichment_endpoint_preserves_pending_version_when_shared_batch_is_unavailable(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    assert hasattr(app_main, "enrich_pending_psn_catalog_batch")
+    assert app_main.enrich_pending_psn_catalog_batch is psn_library_enrichment.enrich_pending_psn_catalog_batch
+    owner = auth_as(user_factory(email="psn-shared-unavailable@example.com"))
+    game = Game(owner_id=owner.id, source="psn", external_id="psn:manual:shared-retry", title="Retry", link_state="raw")
+    db_session.add(game)
+    db_session.commit()
+    monkeypatch.setattr(
+        psn_library_enrichment,
+        "resolve_psn_catalog_evidence",
+        AsyncMock(side_effect=PsnCatalogUnavailable),
+    )
+
+    response = api_client.post("/psn/library-repair/enrich")
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Catalog is temporarily unavailable"
+    db_session.refresh(game)
+    assert game.catalog_lookup_version is None
+
+
 def test_provider_failure_does_not_advance_matcher_version(
     api_client, db_session, user_factory, auth_as, app_main, monkeypatch
 ):
@@ -1520,7 +1565,7 @@ def test_provider_failure_does_not_advance_matcher_version(
     game = Game(owner_id=user.id, source="psn", external_id="psn:manual:retry", title="Retry", link_state="raw")
     db_session.add(game)
     db_session.commit()
-    monkeypatch.setattr(app_main, "resolve_psn_catalog_evidence", AsyncMock(side_effect=PsnCatalogUnavailable))
+    monkeypatch.setattr(psn_library_enrichment, "resolve_psn_catalog_evidence", AsyncMock(side_effect=PsnCatalogUnavailable))
 
     response = api_client.post("/psn/library-repair/enrich")
 
@@ -1554,7 +1599,7 @@ def test_unresolved_success_records_matcher_version(
     game = Game(owner_id=user.id, source="psn", external_id="psn:manual:review", title="Review", link_state="raw")
     db_session.add(game)
     db_session.commit()
-    monkeypatch.setattr(app_main, "resolve_psn_catalog_evidence", AsyncMock(return_value={str(game.id): PsnCatalogDecision("review", reason="ambiguous_top_candidates")}))
+    monkeypatch.setattr(psn_library_enrichment, "resolve_psn_catalog_evidence", AsyncMock(return_value={str(game.id): PsnCatalogDecision("review", reason="ambiguous_top_candidates")}))
 
     assert api_client.post("/psn/library-repair/enrich").status_code == 200
     db_session.refresh(game)
