@@ -510,6 +510,11 @@ class PsnImportResult(BaseModel):
     updated: int = 0
     skipped: int = 0
     total: int = 0
+    catalog_job: BackgroundJobRead | None = None
+
+
+class PsnCatalogTitleSuggestions(BaseModel):
+    suggestions: list[str] = Field(default_factory=list, max_length=3)
 
 
 class PsnLibraryRepairItem(BaseModel):

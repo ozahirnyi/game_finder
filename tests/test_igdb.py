@@ -40,6 +40,23 @@ async def test_igdb_batches_ignores_duplicate_titles(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_igdb_batch_searches_provider_alternative_names(monkeypatch):
+    import app.integrations.igdb as client
+
+    statements = []
+
+    async def query(_endpoint, statement):
+        statements.append(statement)
+        return []
+
+    monkeypatch.setattr(client, "_query", query)
+
+    await client.fetch_igdb_games_batch(["Ведьмак 3"])
+
+    assert 'alternative_names.name ~ "Ведьмак 3"' in statements[0]
+
+
+@pytest.mark.anyio
 async def test_igdb_query_limits_open_requests_to_eight(monkeypatch):
     import asyncio
     import app.integrations.igdb as client
@@ -109,6 +126,28 @@ def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
     assert result["steam_appid"] == 1145350
     assert result["genres"] == ["RPG"]
     assert result["game_type"] == 0
+
+
+def test_normalize_igdb_game_keeps_provider_alternative_names():
+    from app.integrations.igdb import normalize_igdb_game
+
+    result = normalize_igdb_game(
+        {
+            "id": 2921,
+            "name": "The Witcher 3: Wild Hunt",
+            "alternative_names": [
+                {"name": "Ведьмак 3: Дикая Охота"},
+                {"name": "The Witcher 3: Wild Hunt"},
+                {"name": "Ведьмак 3: Дикая Охота"},
+                {},
+            ],
+        }
+    )
+
+    assert result["alternative_names"] == [
+        "Ведьмак 3: Дикая Охота",
+        "The Witcher 3: Wild Hunt",
+    ]
 
 
 def test_normalize_igdb_game_prefers_wide_artwork_for_the_detail_hero():

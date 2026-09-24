@@ -347,7 +347,7 @@ export type RecommendationResponse = {
 export type BackgroundJob = {
   id: string;
   status: "queued" | "running" | "succeeded" | "failed";
-  result?: { recommendations?: RecommendationItem[] } | null;
+  result?: Record<string, unknown> | null;
   error?: string | null;
 };
 export type DashboardBlock<T> = {
@@ -419,7 +419,7 @@ export type PsnImportPreviewItem = {
 export type PsnImportSelection =
   | { candidate_token: string; action: "catalog"; catalog_id: number }
   | { candidate_token: string; action: "raw" };
-export type PsnImportResult = { created: number; updated: number; skipped: number; total: number };
+export type PsnImportResult = { created: number; updated: number; skipped: number; total: number; catalog_job?: BackgroundJob | null };
 export type PsnLibraryRepairItem = {
   game_id: string;
   title: string;
@@ -623,15 +623,16 @@ export function confirmPsnImport(selections: PsnImportSelection[]) {
   });
 }
 
-export function previewPsnLibraryRepair() {
-  return apiRequest<PsnLibraryRepairPreview>("/psn/library-repair/preview", { auth: true });
+export function getBackgroundJob(jobId: string) {
+  return apiRequest<BackgroundJob>(`/background-jobs/${jobId}`, { auth: true });
 }
 
-export function enrichPsnLibrary() {
-  return apiRequest<PsnCatalogEnrichmentResult>("/psn/library-repair/enrich", {
-    auth: true,
-    method: "POST",
-  });
+export function suggestPsnCatalogTitles(title: string) {
+  return apiRequest<{ suggestions: string[] }>(`/psn/catalog-title-suggestions?q=${encodeURIComponent(title)}`, { auth: true });
+}
+
+export function previewPsnLibraryRepair() {
+  return apiRequest<PsnLibraryRepairPreview>("/psn/library-repair/preview", { auth: true });
 }
 
 export function applyPsnLibraryRepair(

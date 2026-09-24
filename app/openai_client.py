@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from openai import OpenAI
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AuthenticationError, PermissionDeniedError, RateLimitError
 from app.cache import logger
-from app.schemas import RecommendationResponse
+from app.schemas import PsnCatalogTitleSuggestions, RecommendationResponse
 
 load_dotenv()
 
@@ -244,3 +244,30 @@ def get_recommendation(prompt: str, liked_game_ids: list[int]) -> dict:
     except Exception as e:
         logger.exception(e)
         raise HTTPException(status_code=500, detail="OpenAI recommendations failed")
+
+
+def get_catalog_title_suggestions(title: str) -> list[str]:
+    if not title or not title.strip():
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+    try:
+        response = get_client().responses.create(
+            model="gpt-4.1-mini",
+            input=("Return only JSON {\"suggestions\":[\"English catalog title\"]}. "
+                   "Translate this PlayStation title for manual catalog search; return at most three strings and no ids: " + title.strip()),
+            timeout=float(os.getenv("OPENAI_TIMEOUT_SECONDS") or "8"),
+        )
+        values = PsnCatalogTitleSuggestions(**parse_ai_response(response.output_text)).suggestions
+        seen: set[str] = set()
+        original = title.strip().casefold()
+        result = []
+        for item in values:
+            value = item.strip()
+            if value and value.casefold() != original and value.casefold() not in seen:
+                seen.add(value.casefold())
+                result.append(value)
+        return result[:3]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(exc)
+        raise HTTPException(status_code=503, detail="Title suggestions are temporarily unavailable") from exc

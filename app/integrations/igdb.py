@@ -166,6 +166,11 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
     released = datetime.fromtimestamp(release, timezone.utc).date().isoformat() if isinstance(release, (int, float)) else None
     steam_appid = next((int(item["uid"]) for item in game.get("external_games", [])
                         if item.get("category") == 1 and str(item.get("uid", "")).isdigit()), None)
+    alternative_names = list(dict.fromkeys(
+        item["name"]
+        for item in game.get("alternative_names", [])
+        if isinstance(item, dict) and isinstance(item.get("name"), str) and item["name"].strip()
+    ))
     result = {
         "id": game.get("id"), "name": game.get("name"), "released": released,
         "cover_image": cover, "background_image": cover, "hero_image": hero_image,
@@ -176,6 +181,7 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
         "game_modes": [x["name"] for x in game.get("game_modes", []) if x.get("name")],
         "keywords": [x["name"] for x in game.get("keywords", []) if x.get("name")],
         "steam_appid": steam_appid,
+        "alternative_names": alternative_names,
     }
     media = {
         "cover_width": _positive_dimension(cover_data.get("width")),
@@ -190,7 +196,7 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-_FIELDS = "fields id,name,first_release_date,summary,rating,total_rating,cover.url,cover.width,cover.height,artworks.url,artworks.width,artworks.height,screenshots.url,screenshots.width,screenshots.height,genres.name,platforms.name,game_type.type,game_modes.name,keywords.name,external_games.category,external_games.uid;"
+_FIELDS = "fields id,name,alternative_names.name,first_release_date,summary,rating,total_rating,cover.url,cover.width,cover.height,artworks.url,artworks.width,artworks.height,screenshots.url,screenshots.width,screenshots.height,genres.name,platforms.name,game_type.type,game_modes.name,keywords.name,external_games.category,external_games.uid;"
 
 
 async def fetch_igdb_games(
@@ -229,7 +235,7 @@ async def fetch_igdb_games_batch(titles: list[str]) -> dict[str, list[dict[str, 
         alias = f"deal_{index}"
         aliases[alias] = title
         safe_title = title.replace('"', "").replace("\\", "")
-        queries.append(f'query games "{alias}" {{ {_FIELDS} where name ~ "{safe_title}"; limit 20; }};')
+        queries.append(f'query games "{alias}" {{ {_FIELDS} where name ~ "{safe_title}" | alternative_names.name ~ "{safe_title}"; limit 20; }};')
     responses = await _query("multiquery", "".join(queries))
     results: dict[str, list[dict[str, Any]]] = {}
     for response in responses:

@@ -204,3 +204,14 @@ def test_openai_provider_failure_is_unavailable_by_default(monkeypatch):
 
     assert exc.value.status_code == 503
     assert exc.value.detail["code"] == "ai_recommendations_unavailable"
+def test_catalog_title_suggestions_are_bounded_and_manual_only(monkeypatch):
+    from types import SimpleNamespace
+    from app import openai_client
+
+    class Responses:
+        def create(self, **_kwargs):
+            return SimpleNamespace(output_text='{"suggestions":["The Witcher 3: Wild Hunt","The Witcher 3: Wild Hunt","Ведьмак 3"]}')
+
+    monkeypatch.setattr(openai_client, "get_client", lambda: SimpleNamespace(responses=Responses()))
+
+    assert openai_client.get_catalog_title_suggestions("Ведьмак 3") == ["The Witcher 3: Wild Hunt"]

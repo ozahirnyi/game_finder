@@ -59,6 +59,68 @@ def test_worker_executes_recommendation_without_request_handler(monkeypatch):
     assert result == {"recommendations": [{"title": "cozy:570", "game": {"id": 570}}]}
 
 
+def test_worker_executes_psn_catalog_enrichment_in_batches(monkeypatch):
+    import asyncio
+    import uuid
+    from types import SimpleNamespace
+    from app import worker
+
+    batches = iter([
+        SimpleNamespace(attempted=8, linked=6, review=2, quarantined=0, remaining=3),
+        SimpleNamespace(attempted=3, linked=3, review=0, quarantined=0, remaining=0),
+    ])
+    calls = []
+    persisted = []
+    job = SimpleNamespace(operation="psn_catalog_enrichment", owner_id=uuid.uuid4(), payload={}, result=None)
+
+    class FakeSession:
+        def commit(self):
+            persisted.append(dict(job.result))
+
+    db = FakeSession()
+
+    async def enrich(batch_db, owner_id, *, batch_fetcher, single_fetcher):
+        calls.append((batch_db, owner_id, batch_fetcher, single_fetcher))
+        return next(batches)
+
+    monkeypatch.setattr(worker, "enrich_pending_psn_catalog_batch", enrich, raising=False)
+    result = asyncio.run(worker.execute_background_operation(db, job))
+
+    assert result == {"attempted": 11, "linked": 9, "review": 2, "quarantined": 0, "remaining": 0}
+    assert persisted == [
+        {"attempted": 8, "linked": 6, "review": 2, "quarantined": 0, "remaining": 3},
+        result,
+    ]
+    assert calls == [
+        (db, job.owner_id, worker.fetch_igdb_games_batch, worker.fetch_igdb_games),
+        (db, job.owner_id, worker.fetch_igdb_games_batch, worker.fetch_igdb_games),
+    ]
+
+
+def test_worker_resumes_psn_catalog_enrichment_from_persisted_progress(monkeypatch):
+    import asyncio
+    import uuid
+    from types import SimpleNamespace
+    from app import worker
+
+    previous = {"attempted": 8, "linked": 6, "review": 2, "quarantined": 0, "remaining": 3}
+    job = SimpleNamespace(operation="psn_catalog_enrichment", owner_id=uuid.uuid4(), result=previous)
+
+    class FakeSession:
+        def commit(self):
+            pass
+
+    async def enrich(*_args, **_kwargs):
+        return SimpleNamespace(attempted=3, linked=3, review=0, quarantined=0, remaining=0)
+
+    monkeypatch.setattr(worker, "enrich_pending_psn_catalog_batch", enrich, raising=False)
+    result = asyncio.run(worker.execute_background_operation(FakeSession(), job))
+
+    assert result == {"attempted": 11, "linked": 9, "review": 2, "quarantined": 0, "remaining": 0}
+    assert job.result == result
+    assert previous["remaining"] == 3
+
+
 def test_dispatch_enqueues_only_the_durable_job_id(monkeypatch):
     import asyncio
     import sys
