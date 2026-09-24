@@ -13,7 +13,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({
   getLibraryOverview: vi.fn(),
   getLibraryOverviewPage: vi.fn(),
-  enrichPsnLibrary: vi.fn(),
   searchGames: vi.fn(),
   applyPsnLibraryRepair: vi.fn(),
 }));
@@ -121,7 +120,6 @@ describe("Library", () => {
     });
     renderLibrary();
     expect(await screen.findByText(/Catalog matching continues in the background/)).toBeInTheDocument();
-    expect(api.enrichPsnLibrary).not.toHaveBeenCalled();
   });
 
   it("does not expose a browser retry when catalog matching is pending", async () => {
@@ -246,6 +244,5 @@ describe("Library", () => {
     });
     renderLibrary();
     expect(await screen.findByText(/Catalog matching continues in the background/)).toBeInTheDocument();
-    expect(api.enrichPsnLibrary).not.toHaveBeenCalled();
   });
 });

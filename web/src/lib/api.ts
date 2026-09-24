@@ -635,13 +635,6 @@ export function previewPsnLibraryRepair() {
   return apiRequest<PsnLibraryRepairPreview>("/psn/library-repair/preview", { auth: true });
 }
 
-export function enrichPsnLibrary() {
-  return apiRequest<PsnCatalogEnrichmentResult>("/psn/library-repair/enrich", {
-    auth: true,
-    method: "POST",
-  });
-}
-
 export function applyPsnLibraryRepair(
   decisions: {
     game_id: string;
