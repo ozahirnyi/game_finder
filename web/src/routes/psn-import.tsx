@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Check, FileUp, Loader2, RotateCcw } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Chip, InlineError, Panel, SectionHeader } from "@/components/ui-bits";
 import {
   confirmPsnImport,
+  getBackgroundJob,
   previewPsnImport,
   type PsnImportPreviewItem,
   type PsnImportSelection,
@@ -84,6 +85,8 @@ function PsnImportPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [catalogJobId, setCatalogJobId] = useState<string | null>(null);
+  const refreshedCatalog = useRef(false);
   const input = useRef<HTMLInputElement>(null);
   const client = useQueryClient();
   const preview = useMutation({
@@ -97,13 +100,31 @@ function PsnImportPage() {
   });
   const confirm = useMutation({
     mutationFn: confirmPsnImport,
-    onSuccess: () => {
+    onSuccess: (data) => {
       client.invalidateQueries({ queryKey: ["library"] });
+      setCatalogJobId(data.catalog_job?.id ?? null);
       setStep("result");
     },
     onError: (value) =>
       setError(value instanceof Error ? value.message : "Could not import titles."),
   });
+  const catalogJob = useQuery({
+    queryKey: ["background-job", catalogJobId],
+    queryFn: () => getBackgroundJob(catalogJobId!),
+    enabled: Boolean(catalogJobId),
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "queued" || query.state.data?.status === "running" ? 1500 : false,
+  });
+  useEffect(() => {
+    if (catalogJob.data?.status === "succeeded" && !refreshedCatalog.current) {
+      refreshedCatalog.current = true;
+      void Promise.all([
+        client.invalidateQueries({ queryKey: ["library-overview-page"] }),
+        client.invalidateQueries({ queryKey: ["psn-library-repair"] }),
+      ]);
+    }
+  }, [catalogJob.data?.status, client]);
   const update = (token: string, patch: Partial<Row>) =>
     setRows((current) =>
       current.map((row) => (row.candidate_token === token ? { ...row, ...patch } : row)),
@@ -129,6 +150,8 @@ function PsnImportPage() {
     setFileName(null);
     setUploadedFile(null);
     setError(null);
+    setCatalogJobId(null);
+    refreshedCatalog.current = false;
     if (input.current) input.current.value = "";
     setStep("upload");
   };
@@ -433,6 +456,10 @@ function PsnImportPage() {
             <p className="mt-2 text-sm text-muted-foreground">
               Your selected PlayStation games are now in your library.
             </p>
+            {catalogJob.data?.status === "queued" && <p className="mt-2 text-sm text-muted-foreground">Your games are imported. Catalog matching is queued.</p>}
+            {catalogJob.data?.status === "running" && <p className="mt-2 text-sm text-muted-foreground">Matching imported PlayStation games to the catalog…</p>}
+            {catalogJob.data?.status === "succeeded" && <p className="mt-2 text-sm text-muted-foreground">Catalog matching is complete.</p>}
+            {catalogJob.data?.status === "failed" && <p className="mt-2 text-sm text-muted-foreground">Catalog matching could not be completed. You can still find games manually in your library.</p>}
             <div className="mt-6 flex justify-center gap-2">
               <Link
                 to="/library"

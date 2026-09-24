@@ -1,13 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   applyPsnLibraryRepair,
-  enrichPsnLibrary,
   getLibraryOverviewPage,
   searchGames,
   type LibraryOverviewGame,
@@ -45,8 +44,6 @@ function LibraryPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("playtime-desc");
   const [searchText, setSearchText] = useState("");
   const [query, setQuery] = useState("");
-  const enrichmentStarted = useRef(false);
-  const queryClient = useQueryClient();
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(searchText), 250);
     return () => window.clearTimeout(timer);
@@ -60,24 +57,6 @@ function LibraryPage() {
     getNextPageParam: (last, pages) =>
       last.has_more ? pages.reduce((total, page) => total + page.games.length, 0) : undefined,
   });
-  const enrichment = useMutation({
-    mutationFn: async () => {
-      let result = await enrichPsnLibrary();
-      while (result.remaining > 0) result = await enrichPsnLibrary();
-      return result;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["library-overview"] }),
-  });
-  const enrichCatalog = enrichment.mutate;
-  useEffect(() => {
-    if (
-      (libraryQuery.data?.pages[0]?.pending_catalog_count ?? 0) > 0 &&
-      !enrichmentStarted.current
-    ) {
-      enrichmentStarted.current = true;
-      enrichCatalog();
-    }
-  }, [enrichCatalog, libraryQuery.data?.pages]);
   const owned = libraryQuery.data?.pages.flatMap((page) => page.games) ?? [];
   const visible = owned;
   const loadMoreRef = useInfiniteScroll({
@@ -118,21 +97,8 @@ function LibraryPage() {
         <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
           <p className="font-bold">Improve PlayStation details</p>
           <p className="mt-1 text-muted-foreground">
-            {enrichment.isPending
-              ? "Matching imported PlayStation games to the catalog…"
-              : enrichment.isError
-                ? "Catalog matching stopped because the catalog is temporarily unavailable."
-                : "Exact matches are linked automatically. You can choose uncertain matches below."}
+            Catalog matching continues in the background. Exact matches will appear automatically; uncertain titles can be chosen below.
           </p>
-          {enrichment.isError ? (
-            <button
-              type="button"
-              onClick={() => enrichCatalog()}
-              className="mt-2 font-bold text-primary"
-            >
-              Retry catalog matching
-            </button>
-          ) : null}
           {libraryQuery.data?.pages[0]?.quarantined_count ? (
             <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">
               Review hidden PSN entries
@@ -318,7 +284,7 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
     onSuccess: async () => {
       setOpen(false);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["library-overview"] }),
+        queryClient.invalidateQueries({ queryKey: ["library-overview-page"] }),
         queryClient.invalidateQueries({ queryKey: ["psn-library-repair"] }),
       ]);
     },

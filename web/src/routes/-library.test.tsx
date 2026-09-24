@@ -110,7 +110,7 @@ describe("Library", () => {
     );
   });
 
-  it("enriches pending PSN catalog rows sequentially", async () => {
+  it("leaves pending PSN catalog rows to the durable worker", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [],
       steam_available: false,
@@ -119,19 +119,12 @@ describe("Library", () => {
       quarantined_count: 0,
       pending_catalog_count: 3,
     });
-    api.enrichPsnLibrary
-      .mockResolvedValueOnce({ attempted: 1, linked: 1, review: 0, quarantined: 0, remaining: 2 })
-      .mockResolvedValueOnce({ attempted: 2, linked: 1, review: 1, quarantined: 0, remaining: 0 });
-
     renderLibrary();
-
-    await waitFor(() => expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(2));
-    expect(
-      screen.queryByRole("button", { name: "Retry catalog matching" }),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByText(/Catalog matching continues in the background/)).toBeInTheDocument();
+    expect(api.enrichPsnLibrary).not.toHaveBeenCalled();
   });
 
-  it("stops after a catalog error and lets the user retry", async () => {
+  it("does not expose a browser retry when catalog matching is pending", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [],
       steam_available: false,
@@ -140,16 +133,9 @@ describe("Library", () => {
       quarantined_count: 0,
       pending_catalog_count: 1,
     });
-    api.enrichPsnLibrary
-      .mockRejectedValueOnce(new Error("Catalog is temporarily unavailable"))
-      .mockResolvedValueOnce({ attempted: 1, linked: 1, review: 0, quarantined: 0, remaining: 0 });
-
     renderLibrary();
-
-    const retry = await screen.findByRole("button", { name: "Retry catalog matching" });
-    expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(1);
-    fireEvent.click(retry);
-    await waitFor(() => expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/Catalog matching continues in the background/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry catalog matching" })).not.toBeInTheDocument();
   });
 
   it("chooses a catalog game inline for a raw PSN entry", async () => {
@@ -236,7 +222,7 @@ describe("Library", () => {
     expect(screen.getByLabelText("Catalog search for EA SPORTS™ FIFA 16")).toHaveValue("FIFA 16");
   });
 
-  it("reprocesses a stale review row when backend marks it pending", async () => {
+  it("does not reprocess a stale review row in the browser", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [
         {
@@ -258,16 +244,8 @@ describe("Library", () => {
       quarantined_count: 0,
       pending_catalog_count: 1,
     });
-    api.enrichPsnLibrary.mockResolvedValue({
-      attempted: 1,
-      linked: 0,
-      review: 1,
-      quarantined: 0,
-      remaining: 0,
-    });
-
     renderLibrary();
-
-    await waitFor(() => expect(api.enrichPsnLibrary).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/Catalog matching continues in the background/)).toBeInTheDocument();
+    expect(api.enrichPsnLibrary).not.toHaveBeenCalled();
   });
 });
