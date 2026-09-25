@@ -12,6 +12,7 @@ EXPECTED_CURRENCY_BY_COUNTRY = {"UA": "UAH"}
 _STORE_TITLE_NOISE = re.compile(r"[™®©]")
 _STORE_TITLE_WORDS = re.compile(r"[^a-z0-9]+")
 _STORE_ACCESSORY_WORDS = {"dlc", "soundtrack", "artbook", "ost"}
+_STORE_EDITION_SUFFIXES = {"complete edition", "definitive edition", "the definitive edition"}
 
 
 def _normalized_store_title(value: str) -> str:
@@ -57,6 +58,17 @@ def _rank_steam_store_candidates(title: str, candidates: list[dict[str, Any]]) -
             key=lambda item: (-item[0], -item[1], item[2]),
         )
     ]
+
+
+def _is_exact_steam_store_title(title: str, candidate: dict[str, Any]) -> bool:
+    requested = _normalized_store_title(title)
+    offered = _normalized_store_title(str(candidate.get("name") or ""))
+    if offered == requested:
+        return True
+    if not offered.startswith(f"{requested} "):
+        return False
+    suffix = offered[len(requested) + 1:]
+    return suffix in _STORE_EDITION_SUFFIXES
 
 
 async def fetch_steam_store_search(query: str, page_size: int = 20) -> list[dict[str, Any]]:
@@ -151,6 +163,12 @@ async def fetch_steam_store_game_price(
                 if candidate.get("id") and candidate.get("type") in {"game", "app"}
             ]
             ranked_candidates = _rank_steam_store_candidates(title, candidates)
+            if exact_title_only:
+                ranked_candidates = [
+                    candidate
+                    for candidate in ranked_candidates
+                    if _is_exact_steam_store_title(title, candidate)
+                ]
             if not ranked_candidates:
                 raise HTTPException(status_code=404, detail="Steam price data not found for this game")
             item = None

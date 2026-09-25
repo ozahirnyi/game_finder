@@ -3777,14 +3777,30 @@ async def _enrich_catalog_game_prices(payload: dict, country: str) -> dict:
         if not isinstance(game, dict) or game.get("current"):
             return game
         steam_appid = game.get("steam_appid")
-        if not isinstance(steam_appid, int) or isinstance(steam_appid, bool) or steam_appid < 1:
-            return game
+        has_steam_appid = isinstance(steam_appid, int) and not isinstance(steam_appid, bool) and steam_appid > 0
+        if has_steam_appid:
+            key = build_cache_key("catalog_steam_price_v1", steam_appid=steam_appid, country=country)
 
-        key = build_cache_key("catalog_steam_price_v1", steam_appid=steam_appid, country=country)
+            async def fetch():
+                async with semaphore:
+                    return await fetch_steam_store_game_detail(steam_appid, country=country)
+        else:
+            title = str(game.get("name") or "").strip()
+            if not title:
+                return game
+            key = build_cache_key(
+                "catalog_steam_price_title_v1",
+                title=_search_title_key(title),
+                country=country,
+            )
 
-        async def fetch():
-            async with semaphore:
-                return await fetch_steam_store_game_detail(steam_appid, country=country)
+            async def fetch():
+                async with semaphore:
+                    return await fetch_steam_store_game_price(
+                        title,
+                        country=country,
+                        exact_title_only=True,
+                    )
 
         try:
             detail = await get_json_cached(key, CATALOG_PRICE_CACHE_TTL, fetch)
@@ -3792,11 +3808,14 @@ async def _enrich_catalog_game_prices(payload: dict, country: str) -> dict:
             logger.warning("Catalog price lookup failed appid=%s country=%s", steam_appid, country)
             return game
 
-        return {
+        enriched = {
             **game,
             "current": detail.get("current"),
             "is_free": bool(detail.get("is_free")),
         }
+        if not has_steam_appid and isinstance(detail.get("appid"), int):
+            enriched["steam_appid"] = detail["appid"]
+        return enriched
 
     return {**payload, "results": await asyncio.gather(*(enrich(game) for game in results))}
 
@@ -3855,7 +3874,7 @@ async def search(
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v6", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
+    key = build_cache_key("igdb_search_v7", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
         if on_sale:
@@ -3963,7 +3982,7 @@ async def trending_games(
     if page_size < 1 or page_size > 20:
         raise HTTPException(status_code=400, detail="page_size must be between 1 and 20")
     normalized_country = effective_price_country(current_user, country)
-    key = build_cache_key("trending_games_v3", page=page, page_size=page_size, country=normalized_country)
+    key = build_cache_key("trending_games_v4", page=page, page_size=page_size, country=normalized_country)
 
     async def fetch():
         payload = await fetch_igdb_trending_games(page=page, page_size=page_size)

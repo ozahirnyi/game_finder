@@ -68,6 +68,31 @@ async def test_exact_title_price_lookup_rejects_a_similar_store_search_result(mo
 
 
 @pytest.mark.anyio
+async def test_exact_title_price_lookup_rejects_a_purchasable_title_suffix(monkeypatch):
+    async def fake_get(self, url, *, params):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                if url.endswith("storesearch/"):
+                    return {"items": [{"id": 1145361, "name": "Hades II", "type": "game"}]}
+                return {"1145361": {"data": {
+                    "name": "Hades II",
+                    "price_overview": {"final": 2999, "initial": 2999, "currency": "USD"},
+                }}}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    with pytest.raises(HTTPException) as exc:
+        await steam_store.fetch_steam_store_game_price("Hades", exact_title_only=True)
+
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.anyio
 async def test_popular_deals_fill_from_specials_after_discounted_top_sellers(monkeypatch):
     async def fake_get(self, *_args, **_kwargs):
         class Response:

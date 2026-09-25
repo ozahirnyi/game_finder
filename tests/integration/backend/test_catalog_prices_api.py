@@ -232,7 +232,7 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     fetch_igdb.assert_awaited_once_with("hades", page=2, filters=app_main.CatalogSearchFilters())
     cache_keys = [call.args[0] for call in cached.await_args_list]
     assert len(cache_keys) == 2
-    assert any("igdb_search_v6" in key for key in cache_keys)
+    assert any("igdb_search_v7" in key for key in cache_keys)
     assert any("catalog_steam_price_v1" in key for key in cache_keys)
 
 
@@ -254,6 +254,43 @@ def test_search_games_maps_igdb_error(api_client, app_main, monkeypatch):
 
     assert response.status_code == 502
     assert response.json()["detail"] == "IGDB request failed"
+
+
+@pytest.mark.parametrize(
+    "path, fetch_name, fetch_payload",
+    [
+        (
+            "/search/games?q=hades",
+            "fetch_igdb_games",
+            {"results": [{"id": 1, "name": "Hades", "steam_appid": None}]},
+        ),
+        (
+            "/catalog/trending-games",
+            "fetch_igdb_trending_games",
+            {"results": [{"id": 1, "name": "Hades", "steam_appid": None}]},
+        ),
+    ],
+)
+def test_catalog_prices_fall_back_to_exact_steam_title_when_appid_is_missing(
+    api_client, app_main, monkeypatch, path, fetch_name, fetch_payload
+):
+    monkeypatch.setattr(app_main, fetch_name, AsyncMock(return_value=fetch_payload))
+    price = {
+        "appid": 1145360,
+        "current": {"shop": "Steam", "price": {"amount": 24.99, "currency": "USD"}},
+        "is_free": False,
+        "url": "https://store.steampowered.com/app/1145360/",
+    }
+    steam_lookup = AsyncMock(return_value=price)
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_price", steam_lookup)
+    monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
+
+    response = api_client.get(path)
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["current"] == price["current"]
+    assert response.json()["results"][0]["steam_appid"] == 1145360
+    steam_lookup.assert_awaited_once_with("Hades", country="US", exact_title_only=True)
 
 
 def test_search_ranks_exact_title_before_partial_matches(api_client, app_main, monkeypatch):

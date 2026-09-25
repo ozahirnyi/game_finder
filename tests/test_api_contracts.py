@@ -590,8 +590,8 @@ def test_media_cache_versions_do_not_reuse_payloads_without_media_dimensions():
     assert main.build_cache_key("catalog_game_v3", igdb_id=274755) != main.build_cache_key(
         "catalog_game_v2", igdb_id=274755
     )
-    assert main.build_cache_key("igdb_search_v6", q="hades", page=1) != main.build_cache_key(
-        "igdb_search_v5", q="hades", page=1
+    assert main.build_cache_key("igdb_search_v7", q="hades", page=1) != main.build_cache_key(
+        "igdb_search_v6", q="hades", page=1
     )
 
 
