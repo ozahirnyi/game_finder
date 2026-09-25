@@ -330,6 +330,7 @@ function SearchPage() {
                       coverUrl: game.cover_image ?? game.background_image ?? undefined,
                       screenshotUrl: game.screenshot_image ?? undefined,
                       steamAppId: game.steam_appid ?? undefined,
+                      steamPriceTitle: game.steam_price_title ?? undefined,
                       coverWidth: game.cover_width,
                       coverHeight: game.cover_height,
                       heroWidth: game.hero_width,

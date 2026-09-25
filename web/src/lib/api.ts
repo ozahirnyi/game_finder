@@ -44,6 +44,7 @@ export type CatalogGame = {
   platforms?: string[];
   source?: "steam";
   steam_appid?: number;
+  steam_price_title?: string | null;
   url?: string;
   current?: Deal["current"] | null;
   is_free?: boolean;

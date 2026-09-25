@@ -271,12 +271,13 @@ def test_search_games_maps_igdb_error(api_client, app_main, monkeypatch):
         ),
     ],
 )
-def test_catalog_prices_fall_back_to_exact_steam_title_when_appid_is_missing(
+def test_catalog_prices_fall_back_to_steam_title_and_label_edition_when_appid_is_missing(
     api_client, app_main, monkeypatch, path, fetch_name, fetch_payload
 ):
     monkeypatch.setattr(app_main, fetch_name, AsyncMock(return_value=fetch_payload))
     price = {
         "appid": 1145360,
+        "title": "Hades Complete Edition",
         "current": {"shop": "Steam", "price": {"amount": 24.99, "currency": "USD"}},
         "is_free": False,
         "url": "https://store.steampowered.com/app/1145360/",
@@ -290,7 +291,8 @@ def test_catalog_prices_fall_back_to_exact_steam_title_when_appid_is_missing(
     assert response.status_code == 200
     assert response.json()["results"][0]["current"] == price["current"]
     assert response.json()["results"][0]["steam_appid"] == 1145360
-    steam_lookup.assert_awaited_once_with("Hades", country="US", exact_title_only=True)
+    assert response.json()["results"][0]["steam_price_title"] == "Hades Complete Edition"
+    steam_lookup.assert_awaited_once_with("Hades", country="US", exact_title_only=False)
 
 
 def test_search_ranks_exact_title_before_partial_matches(api_client, app_main, monkeypatch):

@@ -367,6 +367,7 @@ class GameSearchItem(BaseModel):
     screenshot_height: int | None = Field(default=None, gt=0)
     source: str | None = None
     steam_appid: int | None = None
+    steam_price_title: str | None = None
     url: str | None = None
     rating: float | None = None
     genres: list[str] = Field(default_factory=list)

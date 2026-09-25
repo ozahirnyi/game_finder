@@ -3799,7 +3799,7 @@ async def _enrich_catalog_game_prices(payload: dict, country: str) -> dict:
                     return await fetch_steam_store_game_price(
                         title,
                         country=country,
-                        exact_title_only=True,
+                        exact_title_only=False,
                     )
 
         try:
@@ -3815,6 +3815,9 @@ async def _enrich_catalog_game_prices(payload: dict, country: str) -> dict:
         }
         if not has_steam_appid and isinstance(detail.get("appid"), int):
             enriched["steam_appid"] = detail["appid"]
+            store_title = str(detail.get("title") or "").strip()
+            if store_title and _search_title_key(store_title) != _search_title_key(str(game.get("name") or "")):
+                enriched["steam_price_title"] = store_title
         return enriched
 
     return {**payload, "results": await asyncio.gather(*(enrich(game) for game in results))}

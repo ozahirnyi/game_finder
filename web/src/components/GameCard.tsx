@@ -21,6 +21,7 @@ export type GameCardData = {
   backgroundUrl?: string;
   screenshotUrl?: string;
   steamAppId?: number;
+  steamPriceTitle?: string;
   coverWidth?: number | null;
   coverHeight?: number | null;
   heroWidth?: number | null;
@@ -120,6 +121,14 @@ export function GameCard({
               size="sm"
               align="left"
             />
+            {game.steamPriceTitle && (
+              <p
+                className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground"
+                title={`Steam edition: ${game.steamPriceTitle}`}
+              >
+                Steam edition: {game.steamPriceTitle}
+              </p>
+            )}
           </div>
         )}
       </div>

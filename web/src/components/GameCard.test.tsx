@@ -29,6 +29,26 @@ describe("GameCard", () => {
     expect(container.querySelector(".aspect-\\[3\\/4\\]")).toBeInTheDocument();
   });
 
+  it("labels a Steam edition price with the actual storefront title", () => {
+    render(
+      <GameCard
+        game={{
+          title: "The Witcher 3: Wild Hunt",
+          steamPriceTitle: "The Witcher 3: Wild Hunt - Complete Edition",
+          price: 49.99,
+          currency: "USD",
+          store: "Steam",
+          coverFrom: "#111111",
+          coverTo: "#222222",
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText("Steam edition: The Witcher 3: Wild Hunt - Complete Edition"),
+    ).toBeInTheDocument();
+  });
+
   it("keeps ordinary cards as posters even when wide artwork is available", () => {
     const { container } = render(
       <GameCard
