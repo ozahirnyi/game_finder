@@ -324,13 +324,20 @@
 
 @layer base {
   button,
-  [role="button"] {
+  [role="button"],
+  a[class*="font-bold"][class*="rounded"][class*="px-"] {
     transition:
       transform 160ms var(--ease-studio),
       opacity 160ms var(--ease-studio),
+      filter 160ms var(--ease-studio),
       background-color 200ms var(--ease-studio),
       border-color 200ms var(--ease-studio),
       color 200ms var(--ease-studio);
+  }
+  button:hover:not(:disabled),
+  [role="button"]:hover:not([aria-disabled="true"]),
+  a[class*="font-bold"][class*="rounded"][class*="px-"]:hover {
+    filter: brightness(1.1);
   }
   button:active:not(:disabled) {
     transform: scale(0.96);
