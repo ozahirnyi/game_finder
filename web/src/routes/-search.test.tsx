@@ -78,6 +78,61 @@ describe("SearchPage", () => {
     );
   });
 
+  it("hides previous-region prices while the newly selected region is loading", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/profile")) {
+        return Promise.resolve(new Response(JSON.stringify({ price_country_code: "UA" })));
+      }
+      if (url.includes("country=UA")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              results: [
+                {
+                  id: 3498,
+                  name: "Hades",
+                  current: { shop: "Steam", price: { amount: 515, currency: "UAH" } },
+                },
+              ],
+            }),
+          ),
+        );
+      }
+      return new Promise<Response>(() => {});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.localStorage.setItem("game_finder_token", "test-token");
+    const client = renderSearch();
+
+    const card = await screen.findByRole("link", { name: "Hades" });
+    expect(card).toHaveAttribute("data-currency", "UAH");
+
+    act(() => client.setQueryData(["profile"], { price_country_code: "US" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("country=US"),
+        expect.anything(),
+      ),
+    );
+    expect(screen.queryByRole("link", { name: "Hades" })).not.toBeInTheDocument();
+    expect(screen.getByText("Searching games…")).toBeInTheDocument();
+  });
+
+  it("does not search in the default region when the signed-in user's profile fails to load", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response("{}", { status: 500 })));
+    vi.stubGlobal("fetch", fetchMock);
+    window.localStorage.setItem("game_finder_token", "test-token");
+
+    renderSearch();
+
+    expect(await screen.findByText("Couldn't load your price region")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/search/games"))).toBe(
+      false,
+    );
+  });
+
   it("passes catalog Steam prices to the visible game cards", async () => {
     vi.stubGlobal(
       "fetch",

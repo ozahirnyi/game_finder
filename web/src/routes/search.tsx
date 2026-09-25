@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
@@ -116,7 +116,8 @@ function SearchPage() {
     enabled: signedIn,
     staleTime: 60_000,
   });
-  const regionReady = !signedIn || profileQuery.isFetched;
+  const regionReady = !signedIn || profileQuery.data !== undefined;
+  const profileFailed = signedIn && profileQuery.isError && profileQuery.data === undefined;
   const region = normalizePriceCountry(profileQuery.data?.price_country_code);
   const searchQuery = useQuery({
     queryKey: ["search", debouncedQuery, platforms, features, genres, onSale, region],
@@ -130,7 +131,8 @@ function SearchPage() {
         country: region,
       }),
     enabled: mode === "catalog" && regionReady,
-    placeholderData: keepPreviousData,
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[6] === region ? previousData : undefined,
   });
   const aiRecommendationQuery = useQuery<RecommendationResponse>({
     queryKey: ["ai-recommendations", query.trim()],
@@ -319,57 +321,76 @@ function SearchPage() {
               );
             })}
           </div>
-          {(!regionReady || searchQuery.isPending) && (
-            <EmptyState
-              icon={<Search className="size-5 animate-pulse" />}
-              title="Searching games…"
-              description="Checking the catalog and Steam."
-            />
-          )}
-          {regionReady && !searchQuery.isPending && results.length === 0 && (
+          {profileFailed ? (
             <EmptyState
               icon={<Search className="size-5" />}
-              title="No games match your search"
-              description="Try a different title or clear some filters."
+              title="Couldn't load your price region"
+              description="Search is paused so prices won't be shown in the wrong currency."
+              action={
+                <button
+                  type="button"
+                  onClick={() => void profileQuery.refetch()}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold"
+                >
+                  Retry
+                </button>
+              }
             />
-          )}
-          {results.length > 0 && (
-            <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
-              {results.map((game) => {
-                const target = gameDetailTarget(game.id, game.steam_appid);
-                return (
-                  <GameCard
-                    key={game.id ?? game.steam_appid}
-                    game={{
-                      gameId: target?.gameId,
-                      source: target?.source,
-                      title: game.name,
-                      coverFrom: "#312e81",
-                      coverTo: "#111827",
-                      heroUrl: game.hero_image ?? undefined,
-                      coverUrl: game.cover_image ?? game.background_image ?? undefined,
-                      screenshotUrl: game.screenshot_image ?? undefined,
-                      steamAppId: game.steam_appid ?? undefined,
-                      steamPriceTitle: game.steam_price_title ?? undefined,
-                      coverWidth: game.cover_width,
-                      coverHeight: game.cover_height,
-                      heroWidth: game.hero_width,
-                      heroHeight: game.hero_height,
-                      screenshotWidth: game.screenshot_width,
-                      screenshotHeight: game.screenshot_height,
-                      price: game.current?.price?.amount ?? null,
-                      originalPrice: game.current?.regular?.amount ?? null,
-                      discount: game.current?.cut,
-                      currency: game.current?.price?.currency,
-                      store: game.current?.shop ?? undefined,
-                      isFree: game.is_free,
-                      genres: game.genres,
-                      platforms: game.platforms,
-                    }}
-                  />
-                );
-              })}
-            </div>
+          ) : (
+            <>
+              {(!regionReady || searchQuery.isPending) && (
+                <EmptyState
+                  icon={<Search className="size-5 animate-pulse" />}
+                  title="Searching games…"
+                  description="Checking the catalog and Steam."
+                />
+              )}
+              {regionReady && !searchQuery.isPending && results.length === 0 && (
+                <EmptyState
+                  icon={<Search className="size-5" />}
+                  title="No games match your search"
+                  description="Try a different title or clear some filters."
+                />
+              )}
+              {results.length > 0 && (
+                <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
+                  {results.map((game) => {
+                    const target = gameDetailTarget(game.id, game.steam_appid);
+                    return (
+                      <GameCard
+                        key={game.id ?? game.steam_appid}
+                        game={{
+                          gameId: target?.gameId,
+                          source: target?.source,
+                          title: game.name,
+                          coverFrom: "#312e81",
+                          coverTo: "#111827",
+                          heroUrl: game.hero_image ?? undefined,
+                          coverUrl: game.cover_image ?? game.background_image ?? undefined,
+                          screenshotUrl: game.screenshot_image ?? undefined,
+                          steamAppId: game.steam_appid ?? undefined,
+                          steamPriceTitle: game.steam_price_title ?? undefined,
+                          coverWidth: game.cover_width,
+                          coverHeight: game.cover_height,
+                          heroWidth: game.hero_width,
+                          heroHeight: game.hero_height,
+                          screenshotWidth: game.screenshot_width,
+                          screenshotHeight: game.screenshot_height,
+                          price: game.current?.price?.amount ?? null,
+                          originalPrice: game.current?.regular?.amount ?? null,
+                          discount: game.current?.cut,
+                          currency: game.current?.price?.currency,
+                          store: game.current?.shop ?? undefined,
+                          isFree: game.is_free,
+                          genres: game.genres,
+                          platforms: game.platforms,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </>
       )}
