@@ -323,6 +323,11 @@
 }
 
 @layer base {
+  button:enabled,
+  [role="button"]:not([aria-disabled="true"]),
+  a[class*="font-bold"][class*="rounded"][class*="px-"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
   button,
   [role="button"],
   a[class*="font-bold"][class*="rounded"][class*="px-"] {
