@@ -3799,7 +3799,7 @@ async def _enrich_catalog_game_prices(payload: dict, country: str) -> dict:
                     return await fetch_steam_store_game_price(
                         title,
                         country=country,
-                        exact_title_only=False,
+                        allow_known_editions=True,
                     )
 
         try:

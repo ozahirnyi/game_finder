@@ -12,6 +12,13 @@ EXPECTED_CURRENCY_BY_COUNTRY = {"UA": "UAH"}
 _STORE_TITLE_NOISE = re.compile(r"[™®©]")
 _STORE_TITLE_WORDS = re.compile(r"[^a-z0-9]+")
 _STORE_ACCESSORY_WORDS = {"dlc", "soundtrack", "artbook", "ost"}
+_CATALOG_EDITION_SUFFIXES = {
+    "complete edition",
+    "definitive edition",
+    "the definitive edition",
+    "enhanced",
+    "special edition",
+}
 
 
 def _normalized_store_title(value: str) -> str:
@@ -63,6 +70,19 @@ def _is_exact_steam_store_title(title: str, candidate: dict[str, Any]) -> bool:
     requested = _normalized_store_title(title)
     offered = _normalized_store_title(str(candidate.get("name") or ""))
     return bool(requested) and offered == requested
+
+
+def _is_catalog_steam_title(title: str, candidate: dict[str, Any]) -> bool:
+    requested = _normalized_store_title(title)
+    offered = _normalized_store_title(str(candidate.get("name") or ""))
+    if not requested:
+        return False
+    if offered == requested:
+        return True
+    if not offered.startswith(f"{requested} "):
+        return False
+    suffix = offered[len(requested) + 1:]
+    return suffix in _CATALOG_EDITION_SUFFIXES
 
 
 def _steam_appdetails_data(payload: dict[str, Any], appid: int) -> dict[str, Any]:
@@ -156,7 +176,10 @@ async def fetch_steam_store_deals(country: str = "US", page_size: int = 12) -> l
 
 
 async def fetch_steam_store_game_price(
-    title: str, country: str = "US", exact_title_only: bool = False
+    title: str,
+    country: str = "US",
+    exact_title_only: bool = False,
+    allow_known_editions: bool = False,
 ) -> dict[str, Any]:
     params = {"term": title, "cc": country, "l": "english"}
     try:
@@ -175,6 +198,12 @@ async def fetch_steam_store_game_price(
                     candidate
                     for candidate in ranked_candidates
                     if _is_exact_steam_store_title(title, candidate)
+                ]
+            elif allow_known_editions:
+                ranked_candidates = [
+                    candidate
+                    for candidate in ranked_candidates
+                    if _is_catalog_steam_title(title, candidate)
                 ]
             if not ranked_candidates:
                 raise HTTPException(status_code=404, detail="Steam price data not found for this game")

@@ -125,6 +125,50 @@ async def test_exact_title_price_lookup_rejects_a_purchasable_title_suffix(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    "requested_title, store_title, should_resolve",
+    [
+        ("Grand Theft Auto V", "Grand Theft Auto V Enhanced", True),
+        ("Hades", "Hades II", False),
+        ("Hades", "Hades Original Soundtrack", False),
+    ],
+)
+async def test_catalog_title_lookup_only_accepts_exact_or_known_editions(
+    monkeypatch, requested_title, store_title, should_resolve
+):
+    async def fake_get(self, url, *, params):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                if url.endswith("storesearch/"):
+                    return {"items": [{"id": 3240220, "name": store_title, "type": "app"}]}
+                return {"3240220": {"data": {
+                    "steam_appid": 3240220,
+                    "name": store_title,
+                    "price_overview": {"final": 2999, "initial": 2999, "currency": "USD"},
+                }}}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    if should_resolve:
+        result = await steam_store.fetch_steam_store_game_price(
+            requested_title, allow_known_editions=True
+        )
+        assert result["appid"] == 3240220
+        assert result["title"] == store_title
+    else:
+        with pytest.raises(HTTPException) as exc:
+            await steam_store.fetch_steam_store_game_price(
+                requested_title, allow_known_editions=True
+            )
+        assert exc.value.status_code == 404
+
+
+@pytest.mark.anyio
 async def test_popular_deals_fill_from_specials_after_discounted_top_sellers(monkeypatch):
     async def fake_get(self, *_args, **_kwargs):
         class Response:

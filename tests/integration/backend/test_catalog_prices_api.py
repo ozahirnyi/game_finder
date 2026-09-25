@@ -292,7 +292,7 @@ def test_catalog_prices_fall_back_to_steam_title_and_label_edition_when_appid_is
     assert response.json()["results"][0]["current"] == price["current"]
     assert response.json()["results"][0]["steam_appid"] == 1145360
     assert response.json()["results"][0]["steam_price_title"] == "Hades Complete Edition"
-    steam_lookup.assert_awaited_once_with("Hades", country="US", exact_title_only=False)
+    steam_lookup.assert_awaited_once_with("Hades", country="US", allow_known_editions=True)
 
 
 def test_search_ranks_exact_title_before_partial_matches(api_client, app_main, monkeypatch):
