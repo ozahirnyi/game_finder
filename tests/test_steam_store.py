@@ -48,6 +48,32 @@ async def test_price_lookup_accepts_store_search_app_results(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_price_lookup_finds_appdetails_data_by_steam_appid_when_response_key_differs(monkeypatch):
+    async def fake_get(self, url, *, params):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                if url.endswith("storesearch/"):
+                    return {"items": [{"id": 1145360, "name": "Hades", "type": "app"}]}
+                return {"1206340": {"data": {
+                    "steam_appid": 1145360,
+                    "name": "Hades",
+                    "price_overview": {"final": 2499, "initial": 2499, "currency": "USD"},
+                }}}
+
+        return Response()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    result = await steam_store.fetch_steam_store_game_price("Hades", exact_title_only=True)
+
+    assert result["appid"] == 1145360
+    assert result["current"]["price"] == {"amount": 24.99, "currency": "USD"}
+
+
+@pytest.mark.anyio
 async def test_exact_title_price_lookup_rejects_a_similar_store_search_result(monkeypatch):
     async def fake_get(self, _url, *, params):
         class Response:

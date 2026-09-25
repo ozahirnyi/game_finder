@@ -65,6 +65,19 @@ def _is_exact_steam_store_title(title: str, candidate: dict[str, Any]) -> bool:
     return bool(requested) and offered == requested
 
 
+def _steam_appdetails_data(payload: dict[str, Any], appid: int) -> dict[str, Any]:
+    direct = payload.get(str(appid))
+    if isinstance(direct, dict) and isinstance(direct.get("data"), dict):
+        return direct["data"]
+    for result in payload.values():
+        if not isinstance(result, dict):
+            continue
+        data = result.get("data")
+        if isinstance(data, dict) and data.get("steam_appid") == appid:
+            return data
+    return {}
+
+
 async def fetch_steam_store_search(query: str, page_size: int = 20) -> list[dict[str, Any]]:
     params = {"term": query, "l": "english", "cc": "us"}
     try:
@@ -175,7 +188,7 @@ async def fetch_steam_store_game_price(
                     params={"appids": candidate_appid, "cc": country, "l": "english"},
                 )
                 candidate_detail.raise_for_status()
-                candidate_data = (candidate_detail.json().get(str(candidate_appid)) or {}).get("data") or {}
+                candidate_data = _steam_appdetails_data(candidate_detail.json(), candidate_appid)
                 overview = candidate_data.get("price_overview") or {}
                 if not candidate_data.get("is_free") and _money_from_steam_cents(overview.get("final"), overview.get("currency")) is None:
                     continue
@@ -188,7 +201,7 @@ async def fetch_steam_store_game_price(
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail="Steam Store request failed") from exc
 
-    data = (detail.json().get(str(appid)) or {}).get("data") or {}
+    data = _steam_appdetails_data(detail.json(), appid)
     is_free = bool(data.get("is_free"))
     overview = data.get("price_overview") or {}
     price = _money_from_steam_cents(overview.get("final"), overview.get("currency"))
@@ -228,7 +241,7 @@ async def fetch_steam_store_game_detail(appid: int, country: str = "US") -> dict
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail="Steam Store request failed") from exc
 
-    data = (response.json().get(str(appid)) or {}).get("data") or {}
+    data = _steam_appdetails_data(response.json(), appid)
     is_free = bool(data.get("is_free"))
     if not data:
         raise HTTPException(status_code=404, detail="Steam game not found")
