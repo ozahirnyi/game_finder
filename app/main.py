@@ -3877,7 +3877,7 @@ async def search(
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v8", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
+    key = build_cache_key("igdb_search_v9", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
         if on_sale:
@@ -3985,7 +3985,7 @@ async def trending_games(
     if page_size < 1 or page_size > 20:
         raise HTTPException(status_code=400, detail="page_size must be between 1 and 20")
     normalized_country = effective_price_country(current_user, country)
-    key = build_cache_key("trending_games_v5", page=page, page_size=page_size, country=normalized_country)
+    key = build_cache_key("trending_games_v6", page=page, page_size=page_size, country=normalized_country)
 
     async def fetch():
         payload = await fetch_igdb_trending_games(page=page, page_size=page_size)
