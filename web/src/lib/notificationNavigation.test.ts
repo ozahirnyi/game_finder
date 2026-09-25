@@ -31,6 +31,16 @@ describe("notificationDestination", () => {
       to: "/friends",
       search: { invite: "i-1", notification: "n" },
     });
+    expect(
+      notificationDestination(
+        notification("game_invite", { invite_id: "i-2", conversation_id: "c-2" }),
+      ),
+    ).toEqual({ to: "/messages/$conversationId", params: { conversationId: "c-2" } });
+    expect(
+      notificationDestination(
+        notification("game_invite_response", { invite_id: "i-2", conversation_id: "c-2" }),
+      ),
+    ).toEqual({ to: "/messages/$conversationId", params: { conversationId: "c-2" } });
   });
 
   it("rejects malformed targets", () => {

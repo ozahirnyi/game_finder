@@ -6,8 +6,57 @@ import pytest
 def test_alembic_has_a_single_upgrade_head():
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["e5f6a7b8c9d0"]
-    assert script.get_revision("e5f6a7b8c9d0").down_revision == "d4e5f6a7b8c9"
+    assert script.get_heads() == ["c6d8e0f2a4b6"]
+    assert script.get_revision("c6d8e0f2a4b6").down_revision == "e5f6a7b8c9d0"
+
+
+def test_typed_invite_message_migration_preserves_existing_messages(monkeypatch):
+    import uuid
+
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import Column, MetaData, String, Table, Uuid, create_engine, inspect, text
+
+    engine = create_engine("sqlite://")
+    metadata = MetaData()
+    Table("game_invites", metadata, Column("id", Uuid(), primary_key=True))
+    messages = Table(
+        "messages",
+        metadata,
+        Column("id", Uuid(), primary_key=True),
+        Column("conversation_id", Uuid(), nullable=False),
+        Column("sender_id", Uuid(), nullable=False),
+        Column("body", String(2000), nullable=False),
+    )
+    metadata.create_all(engine)
+    message_id = uuid.uuid4()
+    with engine.begin() as connection:
+        connection.execute(
+            messages.insert().values(
+                id=message_id,
+                conversation_id=uuid.uuid4(),
+                sender_id=uuid.uuid4(),
+                body="Existing history",
+            )
+        )
+        migration = ScriptDirectory.from_config(Config("alembic.ini")).get_revision("c6d8e0f2a4b6").module
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade()
+        assert connection.execute(text("select kind from messages")).scalar_one() == "text"
+        assert {column["name"] for column in inspect(connection).get_columns("messages")} >= {
+            "kind",
+            "game_invite_id",
+        }
+        assert inspect(connection).get_foreign_keys("messages")[0]["referred_table"] == "game_invites"
+        migration.downgrade()
+        assert {column["name"] for column in inspect(connection).get_columns("messages")} == {
+            "id",
+            "conversation_id",
+            "sender_id",
+            "body",
+        }
+        assert connection.execute(text("select body from messages")).scalar_one() == "Existing history"
+    engine.dispose()
 
 
 def test_background_jobs_lease_migration_accepts_the_table_left_by_the_rolled_back_release(monkeypatch):

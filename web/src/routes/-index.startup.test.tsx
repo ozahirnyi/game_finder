@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
   getAuthSnapshot: vi.fn(),
+  getConversationUnreadCount: vi.fn().mockResolvedValue({ unread_count: 0 }),
   subscribeToAuthChanges: vi.fn(() => () => {}),
   getDashboard: vi.fn(),
   getTrendingGames: vi.fn(),

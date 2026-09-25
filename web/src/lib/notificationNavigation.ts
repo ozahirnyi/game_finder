@@ -34,6 +34,10 @@ export function notificationDestination(
     }
     case "game_invite":
     case "game_invite_response": {
+      const conversation = stringField(notification.payload, "conversation_id");
+      if (conversation) {
+        return { to: "/messages/$conversationId", params: { conversationId: conversation } };
+      }
       const invite = stringField(notification.payload, "invite_id");
       return invite ? { to: "/friends", search: { invite, notification: notification.id } } : null;
     }

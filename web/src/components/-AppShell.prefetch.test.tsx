@@ -6,6 +6,7 @@ import { libraryOverviewQueryOptions } from "@/lib/navigationQueries";
 
 const api = vi.hoisted(() => ({
   getAuthSnapshot: () => false,
+  getConversationUnreadCount: vi.fn().mockResolvedValue({ unread_count: 0 }),
   getDeals: vi.fn().mockResolvedValue({ results: [] }),
   getFriends: vi.fn().mockResolvedValue([]),
   getIncomingFriendRequests: vi.fn().mockResolvedValue([]),
@@ -63,5 +64,32 @@ describe("AppShell navigation prefetching", () => {
     expect(
       await screen.findByText("12 price drops tracked · refreshed 7m ago"),
     ).toBeInTheDocument();
+  });
+
+  it("labels the messages destination Chats and shows the aggregate unread count", async () => {
+    api.getAuthSnapshot = () => true;
+    api.getConversationUnreadCount.mockResolvedValue({ unread_count: 4 });
+    renderShell();
+
+    expect(screen.getAllByRole("link", { name: /Chats/ })).toHaveLength(2);
+    expect(await screen.findAllByLabelText("4 unread messages")).toHaveLength(2);
+  });
+
+  it("caps the visible Chats badge at 99+", async () => {
+    api.getAuthSnapshot = () => true;
+    api.getConversationUnreadCount.mockResolvedValue({ unread_count: 120 });
+    renderShell();
+
+    expect(await screen.findAllByText("99+")).toHaveLength(2);
+    expect(screen.getAllByLabelText("120 unread messages")).toHaveLength(2);
+  });
+
+  it("hides the Chats badge when there are no unread messages", async () => {
+    api.getAuthSnapshot = () => true;
+    api.getConversationUnreadCount.mockResolvedValue({ unread_count: 0 });
+    renderShell();
+
+    expect(await screen.findAllByRole("link", { name: "Chats" })).toHaveLength(2);
+    expect(screen.queryByLabelText(/unread messages/)).not.toBeInTheDocument();
   });
 });

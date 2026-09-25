@@ -96,6 +96,7 @@ def test_block_is_bidirectional_and_unblock_does_not_restore_friendship(social):
     assert client.get("/social/blocks").json()[0]["user"]["id"] == str(bob.id)
     assert client.get("/conversations").json() == []
     assert client.get(f"/conversations/{cid}/messages").status_code == 404
+    assert client.get("/conversations/unread-count").json() == {"unread_count": 0}
     for viewer, target in [(alice, bob), (bob, alice)]:
         main.app.dependency_overrides[main.get_current_user] = lambda: viewer
         main.app.dependency_overrides[main.get_optional_current_user] = lambda: viewer
@@ -197,6 +198,55 @@ def test_message_retry_conflicts_and_blocked_routes(social):
     assert client.post(f"/social/friends/{bob.id}/messages", json={"text": "hidden"}).status_code == 403
     assert client.post("/game-invites", json={"recipient_id": str(bob.id), "game_name": "Portal"}).status_code == 403
     assert client.get(f"/social/friends/{bob.id}/common-games").status_code == 403
+
+
+def test_game_invite_creates_one_chat_card_and_deep_link(social):
+    client, db, alice, bob, _ = social
+    response = client.post("/game-invites", json={"recipient_id": str(bob.id), "game_name": "Portal", "note": "Tonight?"})
+    assert response.status_code == 201
+    invite = response.json()
+    assert invite["conversation_id"]
+    assert db.query(Conversation).count() == 1
+    card = db.query(Message).one()
+    assert card.kind == "game_invite"
+    assert card.game_invite_id == uuid.UUID(invite["id"])
+    assert card.sender_id == alice.id
+    assert card.body == "Game invitation: Portal"
+    main.app.dependency_overrides[main.get_current_user] = lambda: bob
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: bob
+    history = client.get(f"/conversations/{invite['conversation_id']}/messages").json()
+    assert history[0]["kind"] == "game_invite"
+    assert history[0]["game_invite"] == {
+        "id": invite["id"], "game_name": "Portal", "note": "Tonight?", "status": "pending",
+        "sender_id": str(alice.id), "sender_name": "Alice", "recipient_id": str(bob.id), "recipient_name": "Bob",
+    }
+    assert client.get(f"/conversations/{invite['conversation_id']}").json()["unread_count"] == 1
+    assert client.get("/conversations/unread-count").json() == {"unread_count": 1}
+    notification = client.get("/notifications").json()[0]
+    assert notification["type"] == "game_invite"
+    assert notification["payload"]["conversation_id"] == invite["conversation_id"]
+
+
+@pytest.mark.parametrize("status", ["accepted", "declined"])
+def test_game_invite_response_adds_one_system_message_and_notifies_sender(social, status):
+    client, db, alice, bob, _ = social
+    invite = client.post("/game-invites", json={"recipient_id": str(bob.id), "game_name": "Portal"}).json()
+    main.app.dependency_overrides[main.get_current_user] = lambda: bob
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: bob
+    response = client.post(f"/game-invites/{invite['id']}/response", json={"status": status})
+    assert response.status_code == 200
+    assert response.json()["status"] == status
+    assert db.query(Message).count() == 2
+    event = db.query(Message).filter(Message.kind == "system").one()
+    assert event.body == f"Bob {status} the invitation to Portal."
+    assert client.post(f"/game-invites/{invite['id']}/response", json={"status": "declined" if status == "accepted" else "accepted"}).status_code == 409
+    assert db.query(Message).count() == 2
+    main.app.dependency_overrides[main.get_current_user] = lambda: alice
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: alice
+    notification = client.get("/notifications").json()[0]
+    assert notification["type"] == "game_invite_response"
+    assert notification["payload"]["conversation_id"] == invite["conversation_id"]
+    assert client.get(f"/conversations/{invite['conversation_id']}").json()["unread_count"] == 1
 
 
 def test_manual_reconnect_and_sync_failure_do_not_erase_suppression(social, monkeypatch):

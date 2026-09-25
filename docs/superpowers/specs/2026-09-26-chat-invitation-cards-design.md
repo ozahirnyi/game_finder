@@ -1,6 +1,6 @@
 # Chat Invitation Cards Design
 
-**Status:** approved by the user for specification review  
+**Status:** approved  
 **Date:** 2026-09-26  
 **Baseline:** `origin/main` at `c8a3bbf`  
 **Scope:** chat navigation label, unread chat count, game invitation cards in conversations, and profile notification navigation.

@@ -28,12 +28,12 @@ def message_payload(*, conversation_id: UUID, from_name: str, preview: str) -> d
     return {"conversation_id": str(conversation_id), "from": from_name, "preview": preview}
 
 
-def game_invite_payload(*, invite_id: UUID, from_name: str, game_name: str) -> dict[str, str]:
-    return {"invite_id": str(invite_id), "from": from_name, "game_name": game_name}
+def game_invite_payload(*, invite_id: UUID, conversation_id: UUID, from_name: str, game_name: str) -> dict[str, str]:
+    return {"invite_id": str(invite_id), "conversation_id": str(conversation_id), "from": from_name, "game_name": game_name}
 
 
-def game_invite_response_payload(*, invite_id: UUID, by: str, status: str) -> dict[str, str]:
-    return {"invite_id": str(invite_id), "by": by, "status": status}
+def game_invite_response_payload(*, invite_id: UUID, conversation_id: UUID, by: str, status: str) -> dict[str, str]:
+    return {"invite_id": str(invite_id), "conversation_id": str(conversation_id), "by": by, "status": status}
 
 
 def price_alert_payload(*, catalog_game_id: int, message: str | None = None) -> dict[str, Any]:

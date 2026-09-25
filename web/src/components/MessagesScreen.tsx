@@ -8,6 +8,7 @@ import {
   getAuthSnapshot,
   getProfile,
   markConversationRead,
+  respondToGameInvite,
   type ConversationMessage,
 } from "@/lib/api";
 import { friendDisplayName } from "@/lib/friendIdentity";
@@ -53,7 +54,7 @@ export function MessagesScreen({
         id="messages-screen"
         className="grid h-[calc(100dvh-4rem)] place-items-center bg-background px-4 lg:h-screen"
       >
-        <p className="text-center text-muted-foreground">Sign in to view messages.</p>
+        <p className="text-center text-muted-foreground">Sign in to view chats.</p>
       </div>
     );
   }
@@ -65,7 +66,7 @@ export function MessagesScreen({
       <aside
         className={`${conversationId ? "hidden md:block" : ""} border-r border-border bg-surface p-4`}
       >
-        <h1 className="mb-4 text-2xl font-bold">Messages</h1>
+        <h1 className="mb-4 text-2xl font-bold">Chats</h1>
         {conversations.isPending && <p role="status">Loading conversations…</p>}
         {conversations.isError && (
           <p role="alert">
@@ -213,6 +214,18 @@ function ConversationThread({
       retryAttempt.current = null;
       atBottom.current = true;
       void client.invalidateQueries({ queryKey: ["conversations"] });
+      void client.invalidateQueries({ queryKey: ["conversation-unread-count"] });
+    },
+  });
+  const respond = useMutation({
+    mutationFn: ({ inviteId, status }: { inviteId: string; status: "accepted" | "declined" }) =>
+      respondToGameInvite(inviteId, status),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["conversation-messages", id] });
+      void client.invalidateQueries({ queryKey: ["conversation", id] });
+      void client.invalidateQueries({ queryKey: ["conversations"] });
+      void client.invalidateQueries({ queryKey: ["conversation-unread-count"] });
+      void client.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
   const newest = messages.data?.at(-1)?.id;
@@ -233,6 +246,7 @@ function ConversationThread({
         if (active) {
           lastRead.current = incoming.id;
           void client.invalidateQueries({ queryKey: ["conversations"] });
+          void client.invalidateQueries({ queryKey: ["conversation-unread-count"] });
           void client.invalidateQueries({ queryKey: ["notifications"] });
         }
       })
@@ -295,25 +309,95 @@ function ConversationThread({
         {messages.data?.length === 0 && (
           <p className="text-muted-foreground">No messages yet. Say hello.</p>
         )}
-        {messages.data?.map((message) => (
-          <article
-            key={message.id}
-            className={`max-w-[85%] rounded-2xl px-4 py-3 ${message.sender_id === me.data?.id ? "ml-auto bg-primary/15" : "bg-surface-2"}`}
-          >
-            <p className="mb-1 text-xs font-bold text-muted-foreground">
-              {message.sender_id === me.data?.id
-                ? "You"
-                : conversation.data && friendDisplayName(conversation.data.participant)}
-            </p>
-            <p className="whitespace-pre-wrap break-words">{message.body}</p>
-            <time
-              className="mt-1 block text-xs text-muted-foreground"
-              dateTime={message.created_at}
+        {messages.data?.map((message) => {
+          if (message.kind === "system") {
+            return (
+              <p
+                key={message.id}
+                className="mx-auto max-w-[90%] rounded-full bg-surface-2 px-4 py-2 text-center text-sm text-muted-foreground"
+              >
+                {message.body}
+              </p>
+            );
+          }
+          const invite = message.kind === "game_invite" ? message.game_invite : null;
+          if (invite) {
+            const isRecipient = invite.recipient_id === me.data?.id;
+            const isPending = invite.status === "pending";
+            return (
+              <article
+                key={message.id}
+                className="w-full max-w-md self-center rounded-2xl border border-primary/30 bg-surface p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-primary">
+                      Game invite
+                    </p>
+                    <h3 className="mt-1 text-lg font-bold">{invite.game_name}</h3>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${isPending ? "bg-primary/10 text-primary" : "bg-surface-2 text-muted-foreground"}`}
+                  >
+                    {invite.status === "pending"
+                      ? "Pending"
+                      : invite.status === "accepted"
+                        ? "Accepted"
+                        : "Declined"}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {invite.sender_name} invited {invite.recipient_name} to play.
+                </p>
+                {invite.note && (
+                  <p className="mt-2 rounded-lg bg-surface-2 p-3 text-sm">{invite.note}</p>
+                )}
+                {isPending && isRecipient && (
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      className={`${button} bg-primary text-primary-foreground`}
+                      disabled={respond.isPending}
+                      onClick={() => respond.mutate({ inviteId: invite.id, status: "accepted" })}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      className={button}
+                      disabled={respond.isPending}
+                      onClick={() => respond.mutate({ inviteId: invite.id, status: "declined" })}
+                    >
+                      Decline
+                    </button>
+                  </div>
+                )}
+                {respond.isError && respond.variables?.inviteId === invite.id && (
+                  <p role="alert" className="mt-3 text-sm text-destructive">
+                    Could not respond to this invite. Refresh and try again.
+                  </p>
+                )}
+              </article>
+            );
+          }
+          return (
+            <article
+              key={message.id}
+              className={`max-w-[85%] rounded-2xl px-4 py-3 ${message.sender_id === me.data?.id ? "ml-auto bg-primary/15" : "bg-surface-2"}`}
             >
-              {new Date(message.created_at).toLocaleString()}
-            </time>
-          </article>
-        ))}
+              <p className="mb-1 text-xs font-bold text-muted-foreground">
+                {message.sender_id === me.data?.id
+                  ? "You"
+                  : conversation.data && friendDisplayName(conversation.data.participant)}
+              </p>
+              <p className="whitespace-pre-wrap break-words">{message.body}</p>
+              <time
+                className="mt-1 block text-xs text-muted-foreground"
+                dateTime={message.created_at}
+              >
+                {new Date(message.created_at).toLocaleString()}
+              </time>
+            </article>
+          );
+        })}
       </div>
       {newBelow && (
         <button

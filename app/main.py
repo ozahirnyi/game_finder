@@ -88,7 +88,7 @@ from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, 
     RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, LibraryOverviewPageRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
-    PublicUserRead, PublicUserDirectoryRead, PublicUserDirectoryItemRead, RecentGamePlayerRead, RecentGamePlayersRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, PublicLibrarySummaryRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
+    PublicUserRead, PublicUserDirectoryRead, PublicUserDirectoryItemRead, RecentGamePlayerRead, RecentGamePlayersRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, PublicLibrarySummaryRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, ConversationUnreadCountRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, CatalogCollectionPageRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
     DirectMessageCreate, DirectMessagePageRead, DirectMessageRead, SocialCommonGameRead, SocialCommonGamesRead, SocialFriendRead, SocialFriendRequestCreate, SocialMeRead, SocialPlayerRead, SocialPlayersPageRead, SocialProfileRead, SocialProfileUpdate, SocialRequestRead, PublicDataBlock, PublicLibraryGameRead, PublicProfileRead, PublicSteamAccountRead, PsnLibraryRepairItem, PsnLibraryRepairPreview, PsnLibraryRepairDecision, PsnLibraryRepairApplyRequest, PsnCatalogEnrichmentResult, BackgroundJobRead
 from app.recommendation_quota import (
@@ -321,8 +321,13 @@ def friend_request_response(db: Session, request: FriendRequest) -> FriendReques
 def game_invite_response(db: Session, invite: GameInvite) -> GameInviteRead:
     sender = db.query(User).filter(User.id == invite.sender_id).first()
     recipient = db.query(User).filter(User.id == invite.recipient_id).first()
+    low_id, high_id = user_pair(invite.sender_id, invite.recipient_id)
+    conversation = db.query(Conversation).filter(
+        Conversation.user_low_id == low_id, Conversation.user_high_id == high_id
+    ).first()
     return GameInviteRead(
         id=invite.id,
+        conversation_id=conversation.id if conversation else None,
         sender=public_user_response(sender),
         recipient=public_user_response(recipient),
         game_name=invite.game_name,
@@ -2448,8 +2453,13 @@ def conversation_response(db, conversation, current_user):
     participant_id = conversation.user_high_id if conversation.user_low_id == current_user.id else conversation.user_low_id
     last = db.query(Message).filter_by(conversation_id=conversation.id).order_by(Message.created_at.desc(), Message.id.desc()).first()
     unread = db.query(Message).filter(Message.conversation_id == conversation.id, Message.sender_id != current_user.id, Message.read_at.is_(None)).count()
+    last_message_text = last.body if last else None
+    if last and last.kind == "game_invite":
+        invite = db.query(GameInvite).filter_by(id=last.game_invite_id).first()
+        if invite:
+            last_message_text = f"Game invitation: {invite.game_name}"
     return ConversationRead(id=conversation.id, participant=public_user_response(db.get(User, participant_id)), updated_at=conversation.updated_at,
-                            can_message=are_friends(db, current_user.id, participant_id), unread_count=unread, last_message=last.body if last else None)
+                            can_message=are_friends(db, current_user.id, participant_id), unread_count=unread, last_message=last_message_text)
 
 
 @app.get("/conversations", response_model=list[ConversationRead])
@@ -2474,6 +2484,19 @@ def list_conversations(
             continue
         result.append(conversation_response(db, conversation, current_user))
     return result
+
+
+@app.get("/conversations/unread-count", response_model=ConversationUnreadCountRead)
+def conversation_unread_count(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    visible_ids = db.query(User.id).filter(social_policy.visible_user_filter(current_user.id))
+    count = db.query(func.count(Message.id)).join(Conversation, Message.conversation_id == Conversation.id).filter(
+        (Conversation.user_low_id == current_user.id) | (Conversation.user_high_id == current_user.id),
+        Conversation.user_low_id.in_(visible_ids),
+        Conversation.user_high_id.in_(visible_ids),
+        Message.sender_id != current_user.id,
+        Message.read_at.is_(None),
+    ).scalar() or 0
+    return ConversationUnreadCountRead(unread_count=count)
 
 
 @app.post("/conversations", status_code=201, response_model=ConversationRead)
@@ -2521,8 +2544,29 @@ def message_cursor(db, conversation_id, message_id):
     return message
 
 
-def message_read_response(message):
-    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender_id=message.sender_id, body=message.body, created_at=message.created_at, read_at=message.read_at)
+def message_read_response(db, message):
+    card = None
+    if message.kind == "game_invite" and message.game_invite_id:
+        invite = db.query(GameInvite).filter_by(id=message.game_invite_id).first()
+        conversation = db.get(Conversation, message.conversation_id)
+        if invite and conversation and set(user_pair(invite.sender_id, invite.recipient_id)) == {
+            conversation.user_low_id, conversation.user_high_id
+        }:
+            sender = db.get(User, invite.sender_id)
+            recipient = db.get(User, invite.recipient_id)
+            card = {
+                "id": invite.id,
+                "game_name": invite.game_name,
+                "note": invite.note,
+                "status": invite.status,
+                "sender_id": invite.sender_id,
+                "sender_name": notification_actor_name(sender),
+                "recipient_id": invite.recipient_id,
+                "recipient_name": notification_actor_name(recipient),
+            }
+    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender_id=message.sender_id,
+                       body=message.body, kind=message.kind, game_invite=card,
+                       created_at=message.created_at, read_at=message.read_at)
 
 
 @app.post("/conversations/{conversation_id}/read", status_code=204)
@@ -2555,7 +2599,7 @@ def list_messages(
                              or_(Message.created_at > cursor.created_at, and_(Message.created_at == cursor.created_at, Message.id > cursor.id)))
     query = query.order_by(Message.created_at.asc(), Message.id.asc()) if after_id else query.order_by(Message.created_at.desc(), Message.id.desc())
     messages = query.offset(offset).limit(limit).all()
-    return [message_read_response(message) for message in (messages if after_id else reversed(messages))]
+    return [message_read_response(db, message) for message in (messages if after_id else reversed(messages))]
 
 
 @app.post("/conversations/{conversation_id}/messages", status_code=201, response_model=MessageRead)
@@ -2577,7 +2621,7 @@ def create_message(
         if existing:
             if existing.conversation_id != conversation_id or existing.body != data.body.strip():
                 raise HTTPException(status_code=409, detail="Client message ID has already been used")
-            return message_read_response(existing)
+            return message_read_response(db, existing)
     message = Message(conversation_id=conversation.id, sender_id=current_user.id, body=data.body.strip(), client_message_id=data.client_message_id)
     try:
         with db.begin_nested():
@@ -2586,13 +2630,13 @@ def create_message(
     except IntegrityError:
         existing = db.query(Message).filter_by(sender_id=current_user.id, client_message_id=data.client_message_id).first() if data.client_message_id else None
         if existing and existing.conversation_id == conversation_id and existing.body == data.body.strip():
-            return message_read_response(existing)
+            return message_read_response(db, existing)
         raise HTTPException(status_code=409, detail="Client message ID has already been used")
     conversation.updated_at = datetime.now(timezone.utc)
     create_notification(db, recipient_id, "message", message_payload(conversation_id=conversation.id, from_name=notification_actor_name(current_user), preview=message.body[:120]))
     db.commit()
     db.refresh(message)
-    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender_id=message.sender_id, body=message.body, created_at=message.created_at, read_at=message.read_at)
+    return message_read_response(db, message)
 
 
 @app.get("/game-invites", response_model=list[GameInviteRead])
@@ -2625,10 +2669,17 @@ def create_game_invite(
     recipient = db.query(User).filter(User.id == data.recipient_id).first()
     if data.recipient_id == current_user.id or not recipient or not social_target_visible(db, current_user, recipient) or not are_friends(db, current_user.id, data.recipient_id):
         raise HTTPException(status_code=403, detail="You can only invite PlayFinder friends")
+    low_id, high_id = user_pair(current_user.id, recipient.id)
+    conversation, _ = social_policy.insert_once(db, Conversation, user_low_id=low_id, user_high_id=high_id)
     invite = GameInvite(sender_id=current_user.id, recipient_id=recipient.id, game_id=data.game_id, game_name=data.game_name.strip(), source=data.source, external_id=data.external_id, note=data.note)
     db.add(invite)
     db.flush()
-    create_notification(db, recipient.id, "game_invite", game_invite_payload(invite_id=invite.id, from_name=notification_actor_name(current_user), game_name=invite.game_name))
+    card = Message(conversation_id=conversation.id, sender_id=current_user.id, body=f"Game invitation: {invite.game_name}",
+                   kind="game_invite", game_invite_id=invite.id)
+    db.add(card)
+    conversation.updated_at = card.created_at or datetime.now(timezone.utc)
+    create_notification(db, recipient.id, "game_invite", game_invite_payload(invite_id=invite.id, conversation_id=conversation.id,
+                        from_name=notification_actor_name(current_user), game_name=invite.game_name))
     db.commit()
     db.refresh(invite)
     return game_invite_response(db, invite)
@@ -2652,7 +2703,21 @@ def respond_to_game_invite(
         raise HTTPException(status_code=409, detail="Game invite has already been answered")
     invite.status = data.status
     invite.responded_at = datetime.now(timezone.utc)
-    create_notification(db, invite.sender_id, "game_invite_response", game_invite_response_payload(invite_id=invite.id, by=notification_actor_name(current_user), status=data.status))
+    low_id, high_id = user_pair(invite.sender_id, invite.recipient_id)
+    conversation, _ = social_policy.insert_once(db, Conversation, user_low_id=low_id, user_high_id=high_id)
+    card = db.query(Message).filter_by(game_invite_id=invite.id).first()
+    if card is None:
+        card = Message(conversation_id=conversation.id, sender_id=invite.sender_id, body=f"Game invitation: {invite.game_name}",
+                       kind="game_invite", game_invite_id=invite.id)
+        db.add(card)
+    result_word = "accepted" if data.status == "accepted" else "declined"
+    result_message = Message(conversation_id=conversation.id, sender_id=current_user.id,
+                             body=f"{notification_actor_name(current_user)} {result_word} the invitation to {invite.game_name}.",
+                             kind="system")
+    db.add(result_message)
+    conversation.updated_at = datetime.now(timezone.utc)
+    create_notification(db, invite.sender_id, "game_invite_response", game_invite_response_payload(invite_id=invite.id,
+                        conversation_id=conversation.id, by=notification_actor_name(current_user), status=data.status))
     db.commit()
     db.refresh(invite)
     return game_invite_response(db, invite)

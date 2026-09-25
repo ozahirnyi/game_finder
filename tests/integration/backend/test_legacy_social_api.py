@@ -170,7 +170,12 @@ def test_legacy_game_invites_persist_response_and_reject_non_owners(
     assert created.status_code == 201
     invite_id = created.json()["id"]
     invite_notice = db_session.query(Notification).filter(Notification.user_id == recipient.id).one()
-    assert invite_notice.payload == {"invite_id": invite_id, "from": "Sender", "game_name": "Elden Ring"}
+    assert invite_notice.payload == {
+        "invite_id": invite_id,
+        "conversation_id": created.json()["conversation_id"],
+        "from": "Sender",
+        "game_name": "Elden Ring",
+    }
     assert api_client.get("/game-invites").json()[0]["status"] == "pending"
     auth_as(outsider)
     assert api_client.post(f"/game-invites/{invite_id}/response", json={"status": "accepted"}).status_code == 404
@@ -178,7 +183,12 @@ def test_legacy_game_invites_persist_response_and_reject_non_owners(
     assert api_client.post(f"/game-invites/{invite_id}/response", json={"status": "accepted"}).status_code == 200
     assert db_session.query(GameInvite).one().status == "accepted"
     response_notice = db_session.query(Notification).filter(Notification.user_id == sender.id).one()
-    assert response_notice.payload == {"invite_id": invite_id, "by": "Recipient", "status": "accepted"}
+    assert response_notice.payload == {
+        "invite_id": invite_id,
+        "conversation_id": created.json()["conversation_id"],
+        "by": "Recipient",
+        "status": "accepted",
+    }
     assert api_client.post(f"/game-invites/{invite_id}/response", json={"status": "declined"}).status_code == 409
 
 
