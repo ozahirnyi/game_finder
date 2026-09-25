@@ -221,6 +221,7 @@ export type FriendActivity = {
 
 export type GameInvite = {
   id: string;
+  conversation_id?: string | null;
   sender: Friend["user"];
   recipient: Friend["user"];
   game_name: string;
@@ -283,6 +284,17 @@ export type ConversationMessage = {
   sender_id: string;
   body: string;
   created_at: string;
+  kind?: "text" | "game_invite" | "system";
+  game_invite?: {
+    id: string;
+    game_name: string;
+    note?: string | null;
+    status: "pending" | "accepted" | "declined";
+    sender_id: string;
+    sender_name: string;
+    recipient_id: string;
+    recipient_name: string;
+  } | null;
 };
 
 export type Profile = {
@@ -951,6 +963,10 @@ export async function getConversations(limit = 20) {
     if (page.length < size) break;
   }
   return result;
+}
+
+export function getConversationUnreadCount() {
+  return apiRequest<{ unread_count: number }>("/conversations/unread-count", { auth: true });
 }
 
 export function getConversationMessages(

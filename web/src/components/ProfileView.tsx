@@ -182,6 +182,8 @@ export function ProfileView({
       setSelectedGameKey("");
       setInviteOpen(false);
       queryClient.invalidateQueries({ queryKey: ["game-invites"] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["conversation-unread-count"] });
     },
   });
   const steam = profile.stores.find((s) => s.name === "Steam")?.count ?? 0;

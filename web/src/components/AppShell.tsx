@@ -4,7 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Home, Search, Library, Heart, Tag, Users, MessageCircle, Palette } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
 import { Avatar } from "./GameCover";
-import { getAuthSnapshot, getDeals, getProfile, subscribeToAuthChanges } from "@/lib/api";
+import {
+  getAuthSnapshot,
+  getConversationUnreadCount,
+  getDeals,
+  getProfile,
+  subscribeToAuthChanges,
+} from "@/lib/api";
 import {
   friendsQueryOptions,
   incomingFriendRequestsQueryOptions,
@@ -18,7 +24,7 @@ const nav = [
   { to: "/wishlist", label: "Wishlist", icon: Heart },
   { to: "/deals", label: "Deals", icon: Tag },
   { to: "/friends", label: "Friends", icon: Users },
-  { to: "/messages", label: "Messages", icon: MessageCircle },
+  { to: "/messages", label: "Chats", icon: MessageCircle },
 ] as const;
 
 function scheduleIdle(callback: () => void) {
@@ -54,6 +60,24 @@ export function AppShell({ children }: { children: ReactNode }) {
     queryFn: getProfile,
     enabled: signedIn,
   });
+  const unreadChatsQuery = useQuery({
+    queryKey: ["conversation-unread-count"],
+    queryFn: getConversationUnreadCount,
+    enabled: signedIn,
+    refetchInterval: signedIn ? 3000 : false,
+    refetchOnWindowFocus: "always",
+  });
+  const unreadChats = unreadChatsQuery.data?.unread_count ?? 0;
+  const unreadChatBadge =
+    unreadChats > 0 ? (
+      <span
+        aria-label={`${unreadChats} unread messages`}
+        title={`${unreadChats} unread messages`}
+        className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground"
+      >
+        {unreadChats > 99 ? "99+" : unreadChats}
+      </span>
+    ) : null;
   const priceCountry = profileQuery.data?.price_country_code ?? "US";
   const prefetchDestination = (to: (typeof nav)[number]["to"]) => {
     if (to === "/library") {
@@ -120,6 +144,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 )}
                 <Icon className="size-4 transition-transform duration-200 ease-[var(--ease-studio)] group-hover:scale-110" />
                 {item.label}
+                {item.to === "/messages" && unreadChatBadge}
               </Link>
             );
           })}
@@ -268,6 +293,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="text-[10px] font-semibold uppercase tracking-tight">
                 {item.label}
               </span>
+              {item.to === "/messages" && unreadChatBadge && (
+                <span
+                  aria-label={`${unreadChats} unread messages`}
+                  className="absolute right-1 top-0 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold leading-none text-primary-foreground"
+                >
+                  {unreadChats > 99 ? "99+" : unreadChats}
+                </span>
+              )}
             </Link>
           );
         })}

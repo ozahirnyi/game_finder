@@ -223,6 +223,7 @@ class Message(Base):
     __tablename__ = "messages"
     __table_args__ = (
         UniqueConstraint("sender_id", "client_message_id", name="uq_message_sender_client"),
+        UniqueConstraint("game_invite_id", name="uq_messages_game_invite_id"),
         Index("ix_messages_conversation_cursor", "conversation_id", "created_at", "id"),
     )
 
@@ -230,6 +231,10 @@ class Message(Base):
     conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     sender_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     body: Mapped[str] = mapped_column(String(2000), nullable=False)
+    kind: Mapped[str] = mapped_column(String(24), nullable=False, default="text", server_default="text")
+    game_invite_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("game_invites.id", ondelete="CASCADE"), nullable=True
+    )
     client_message_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -7,7 +7,7 @@ import { createConversation } from "@/lib/api";
 export const Route = createFileRoute("/messages/")({
   validateSearch: (search: Record<string, unknown>): { friend?: string } =>
     typeof search.friend === "string" ? { friend: search.friend } : {},
-  head: () => ({ meta: [{ title: "Messages — Playfinder" }] }),
+  head: () => ({ meta: [{ title: "Chats — Playfinder" }] }),
   component: MessagesPage,
 });
 function MessagesPage() {

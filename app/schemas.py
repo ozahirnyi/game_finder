@@ -749,6 +749,10 @@ class ConversationRead(BaseModel):
     can_message: bool = True
 
 
+class ConversationUnreadCountRead(BaseModel):
+    unread_count: int
+
+
 class MessageCreate(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
     client_message_id: uuid.UUID | None = None
@@ -758,11 +762,24 @@ class ConversationReadUpdate(BaseModel):
     message_id: uuid.UUID
 
 
+class GameInviteMessageRead(BaseModel):
+    id: uuid.UUID
+    game_name: str
+    note: str | None = None
+    status: Literal["pending", "accepted", "declined"]
+    sender_id: uuid.UUID
+    sender_name: str
+    recipient_id: uuid.UUID
+    recipient_name: str
+
+
 class MessageRead(BaseModel):
     id: uuid.UUID
     conversation_id: uuid.UUID
     sender_id: uuid.UUID
     body: str
+    kind: Literal["text", "game_invite", "system"] = "text"
+    game_invite: GameInviteMessageRead | None = None
     created_at: datetime
     read_at: datetime | None = None
 
@@ -778,6 +795,7 @@ class GameInviteCreate(BaseModel):
 
 class GameInviteRead(BaseModel):
     id: uuid.UUID
+    conversation_id: uuid.UUID | None = None
     sender: PublicUserRead
     recipient: PublicUserRead
     game_name: str
