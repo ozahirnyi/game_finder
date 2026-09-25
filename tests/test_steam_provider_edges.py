@@ -288,7 +288,7 @@ async def test_store_game_price_resolves_a_purchasable_normalized_or_edition_tit
         ("Grand Theft Auto: San Andreas", 1547000),
     ]:
         client = client_factory(monkeypatch, steam_store, [FakeResponse(search), FakeResponse({str(appid): details[str(appid)]})])
-        result = await steam_store.fetch_steam_store_game_price(title, country="UA", exact_title_only=True)
+        result = await steam_store.fetch_steam_store_game_price(title, country="UA")
         assert result["appid"] == appid
         assert result["current"]["price"]["currency"] == "UAH"
         assert client.calls[1][2]["params"]["appids"] == appid

@@ -593,6 +593,9 @@ def test_media_cache_versions_do_not_reuse_payloads_without_media_dimensions():
     assert main.build_cache_key("igdb_search_v7", q="hades", page=1) != main.build_cache_key(
         "igdb_search_v6", q="hades", page=1
     )
+    assert main.build_cache_key("trending_games_v4", page=1, page_size=8, country="US") != main.build_cache_key(
+        "trending_games_v3", page=1, page_size=8, country="US"
+    )
 
 
 def test_upcoming_games_returns_igdb_results(monkeypatch):

@@ -12,7 +12,6 @@ EXPECTED_CURRENCY_BY_COUNTRY = {"UA": "UAH"}
 _STORE_TITLE_NOISE = re.compile(r"[™®©]")
 _STORE_TITLE_WORDS = re.compile(r"[^a-z0-9]+")
 _STORE_ACCESSORY_WORDS = {"dlc", "soundtrack", "artbook", "ost"}
-_STORE_EDITION_SUFFIXES = {"complete edition", "definitive edition", "the definitive edition"}
 
 
 def _normalized_store_title(value: str) -> str:
@@ -63,12 +62,7 @@ def _rank_steam_store_candidates(title: str, candidates: list[dict[str, Any]]) -
 def _is_exact_steam_store_title(title: str, candidate: dict[str, Any]) -> bool:
     requested = _normalized_store_title(title)
     offered = _normalized_store_title(str(candidate.get("name") or ""))
-    if offered == requested:
-        return True
-    if not offered.startswith(f"{requested} "):
-        return False
-    suffix = offered[len(requested) + 1:]
-    return suffix in _STORE_EDITION_SUFFIXES
+    return bool(requested) and offered == requested
 
 
 async def fetch_steam_store_search(query: str, page_size: int = 20) -> list[dict[str, Any]]:
