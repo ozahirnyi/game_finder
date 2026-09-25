@@ -11,7 +11,7 @@ test("guest home renders fixture data without live API calls", async ({ page, ap
         expect.objectContaining({
           method: "GET",
           path: "/catalog/trending-games",
-          query: "page_size=12",
+          query: "page_size=12&country=US",
         }),
         expect.objectContaining({
           method: "GET",
