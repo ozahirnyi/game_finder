@@ -153,8 +153,23 @@ def test_search_uses_igdb_catalog_results(monkeypatch):
             "steam_appid": 1145360,
         }]}
 
+    async def fake_steam_detail(appid: int, country: str = "US"):
+        assert appid == 1145360
+        assert country == "US"
+        return {
+            "current": {
+                "shop": "Steam",
+                "price": {"amount": 19.99, "currency": "USD"},
+                "regular": {"amount": 24.99, "currency": "USD"},
+                "cut": 20,
+                "url": "https://store.steampowered.com/app/1145360/",
+            },
+            "is_free": False,
+        }
+
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_igdb_games", fake_igdb)
+    monkeypatch.setattr(main, "fetch_steam_store_game_detail", fake_steam_detail)
 
     response = client.get("/search/games?q=Hades")
 
@@ -165,6 +180,14 @@ def test_search_uses_igdb_catalog_results(monkeypatch):
         "released": "2020-09-17",
         "background_image": "https://cdn.example/hades.jpg",
         "steam_appid": 1145360,
+        "current": {
+            "shop": "Steam",
+            "price": {"amount": 19.99, "currency": "USD"},
+            "regular": {"amount": 24.99, "currency": "USD"},
+            "cut": 20,
+            "url": "https://store.steampowered.com/app/1145360/",
+        },
+        "is_free": False,
     }]}
 
 
@@ -622,17 +645,28 @@ def test_trending_games_returns_igdb_results(monkeypatch):
                     "name": "Trending Game",
                     "released": "2026-07-01",
                     "background_image": "https://example.com/trending.jpg",
+                    "steam_appid": 620,
                 }
             ]
         }
 
+    async def fake_steam_detail(appid: int, country: str = "US"):
+        assert appid == 620
+        assert country == "US"
+        return {
+            "current": {"shop": "Steam", "price": {"amount": 9.99, "currency": "USD"}},
+            "is_free": False,
+        }
+
     monkeypatch.setattr(main, "get_json_cached", fake_cache)
     monkeypatch.setattr(main, "fetch_igdb_trending_games", fake_fetch_igdb_trending_games)
+    monkeypatch.setattr(main, "fetch_steam_store_game_detail", fake_steam_detail)
 
     response = client.get("/catalog/trending-games?page_size=4")
 
     assert response.status_code == 200
     assert response.json()["results"][0]["name"] == "Trending Game"
+    assert response.json()["results"][0]["current"]["price"] == {"amount": 9.99, "currency": "USD"}
 
 
 def test_game_price_history_returns_normalized_prices(monkeypatch):

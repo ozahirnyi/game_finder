@@ -5,6 +5,7 @@ import contextlib
 import re
 import hashlib
 import json
+import logging
 import unicodedata
 import time
 from dataclasses import dataclass
@@ -192,6 +193,8 @@ app.add_middleware(
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 CACHE_TTL = 3600
+CATALOG_PRICE_CACHE_TTL = 3600
+logger = logging.getLogger(__name__)
 DEAL_IGDB_ENRICHMENT_TIMEOUT_SECONDS = 1.5
 PUBLIC_LIBRARY_PAGE_SIZE = 12
 PUBLIC_LIBRARY_SNAPSHOT_TTL_SECONDS = 60
@@ -3763,6 +3766,41 @@ def _is_current_deal(deal: dict) -> bool:
     return isinstance(current, dict) and isinstance(current.get("cut"), (int, float)) and current["cut"] > 0
 
 
+async def _enrich_catalog_game_prices(payload: dict, country: str) -> dict:
+    results = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(results, list):
+        return payload
+
+    semaphore = asyncio.Semaphore(6)
+
+    async def enrich(game: dict) -> dict:
+        if not isinstance(game, dict) or game.get("current"):
+            return game
+        steam_appid = game.get("steam_appid")
+        if not isinstance(steam_appid, int) or isinstance(steam_appid, bool) or steam_appid < 1:
+            return game
+
+        key = build_cache_key("catalog_steam_price_v1", steam_appid=steam_appid, country=country)
+
+        async def fetch():
+            async with semaphore:
+                return await fetch_steam_store_game_detail(steam_appid, country=country)
+
+        try:
+            detail = await get_json_cached(key, CATALOG_PRICE_CACHE_TTL, fetch)
+        except Exception:
+            logger.warning("Catalog price lookup failed appid=%s country=%s", steam_appid, country)
+            return game
+
+        return {
+            **game,
+            "current": detail.get("current"),
+            "is_free": bool(detail.get("is_free")),
+        }
+
+    return {**payload, "results": await asyncio.gather(*(enrich(game) for game in results))}
+
+
 async def _fetch_sale_catalog_games(query: str, filters: CatalogSearchFilters, country: str) -> list[dict]:
     deals = await fetch_steam_store_deals(country=country, page_size=20)
 
@@ -3822,9 +3860,11 @@ async def search(
     async def fetch():
         if on_sale:
             results = await _fetch_sale_catalog_games(catalog_query, filters, normalized_country)
-            return {"results": _rank_search_results(q, results) if q else results}
+            payload = {"results": _rank_search_results(q, results) if q else results}
+            return await _enrich_catalog_game_prices(payload, normalized_country)
         payload = await fetch_igdb_games(catalog_query, page=page, filters=filters)
-        return {**payload, "results": _rank_search_results(q, payload.get("results", [])) if q else payload.get("results", [])}
+        payload = {**payload, "results": _rank_search_results(q, payload.get("results", [])) if q else payload.get("results", [])}
+        return await _enrich_catalog_game_prices(payload, normalized_country)
 
     try:
         return JSONResponse(content=await get_json_cached(key, CACHE_TTL, fetch))
@@ -3911,15 +3951,23 @@ async def upcoming_games(request: Request, page: int = 1, page_size: int = 8):
 
 @app.get("/catalog/trending-games", response_model=GameSearchResponse, response_model_exclude_unset=True)
 @limiter.limit("30/minute")
-async def trending_games(request: Request, page: int = 1, page_size: int = 8):
+async def trending_games(
+    request: Request,
+    page: int = 1,
+    page_size: int = 8,
+    country: str = "US",
+    current_user: User | None = Depends(get_optional_current_user),
+):
     if page < 1:
         raise HTTPException(status_code=400, detail="page must be >= 1")
     if page_size < 1 or page_size > 20:
         raise HTTPException(status_code=400, detail="page_size must be between 1 and 20")
-    key = build_cache_key("trending_games_v2", page=page, page_size=page_size)
+    normalized_country = effective_price_country(current_user, country)
+    key = build_cache_key("trending_games_v3", page=page, page_size=page_size, country=normalized_country)
 
     async def fetch():
-        return await fetch_igdb_trending_games(page=page, page_size=page_size)
+        payload = await fetch_igdb_trending_games(page=page, page_size=page_size)
+        return await _enrich_catalog_game_prices(payload, normalized_country)
 
     try:
         return await get_json_cached(key, CACHE_TTL, fetch)

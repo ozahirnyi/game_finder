@@ -31,6 +31,7 @@ function Home() {
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
   const [query, setQuery] = useState("");
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile, enabled: signedIn });
+  const region = normalizePriceCountry(profileQuery.data?.price_country_code);
   const libraryQuery = useQuery({
     queryKey: ["library-overview"],
     queryFn: getLibraryOverview,
@@ -48,8 +49,8 @@ function Home() {
     enabled: signedIn,
   });
   const trendingQuery = useQuery({
-    queryKey: ["trending-games"],
-    queryFn: getTrendingGames,
+    queryKey: ["trending-games", region],
+    queryFn: () => getTrendingGames(region),
     enabled: !signedIn,
   });
   const searchQuery = useQuery({
@@ -57,7 +58,6 @@ function Home() {
     queryFn: () => searchGames({ query }),
     enabled: query.trim().length >= 2,
   });
-  const region = normalizePriceCountry(profileQuery.data?.price_country_code);
   const dealsQuery = useQuery({
     queryKey: ["deals", region, "home"],
     queryFn: () => getDeals(region, 13),
@@ -287,6 +287,12 @@ function Home() {
                   heroHeight: game.hero_height,
                   screenshotWidth: game.screenshot_width,
                   screenshotHeight: game.screenshot_height,
+                  price: game.current?.price?.amount ?? null,
+                  originalPrice: game.current?.regular?.amount ?? null,
+                  discount: game.current?.cut,
+                  currency: game.current?.price?.currency,
+                  store: game.current?.shop ?? undefined,
+                  isFree: game.is_free,
                   coverFrom: "#c75f28",
                   coverTo: "#22243a",
                 }}

@@ -336,6 +336,12 @@ function SearchPage() {
                       heroHeight: game.hero_height,
                       screenshotWidth: game.screenshot_width,
                       screenshotHeight: game.screenshot_height,
+                      price: game.current?.price?.amount ?? null,
+                      originalPrice: game.current?.regular?.amount ?? null,
+                      discount: game.current?.cut,
+                      currency: game.current?.price?.currency,
+                      store: game.current?.shop ?? undefined,
+                      isFree: game.is_free,
                       genres: game.genres,
                       platforms: game.platforms,
                     }}

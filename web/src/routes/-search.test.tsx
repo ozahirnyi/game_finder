@@ -9,10 +9,21 @@ vi.mock("@/components/GameCard", () => ({
   GameCard: ({
     game,
   }: {
-    game: { gameId?: string; title: string; description?: string; returnTo?: string };
+    game: {
+      gameId?: string;
+      title: string;
+      description?: string;
+      returnTo?: string;
+      price?: number | null;
+      currency?: string;
+      store?: string;
+    };
   }) => (
     <a
       aria-label={game.title}
+      data-price={game.price}
+      data-currency={game.currency}
+      data-store={game.store}
       href={`/games/${game.gameId}${game.returnTo ? `?returnTo=${encodeURIComponent(game.returnTo)}` : ""}`}
     >
       {game.title}
@@ -39,6 +50,39 @@ describe("SearchPage", () => {
     vi.unstubAllGlobals();
     window.localStorage.removeItem("game_finder_token");
     window.history.replaceState({}, "", "/search");
+  });
+
+  it("passes catalog Steam prices to the visible game cards", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              results: [
+                {
+                  id: 3498,
+                  name: "Hades",
+                  current: {
+                    shop: "Steam",
+                    price: { amount: 19.99, currency: "USD" },
+                    regular: { amount: 24.99, currency: "USD" },
+                    cut: 20,
+                  },
+                },
+              ],
+            }),
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    renderSearch();
+
+    expect(await screen.findByRole("link", { name: "Hades" })).toHaveAttribute("data-price", "19.99");
+    expect(screen.getByRole("link", { name: "Hades" })).toHaveAttribute("data-currency", "USD");
+    expect(screen.getByRole("link", { name: "Hades" })).toHaveAttribute("data-store", "Steam");
   });
 
   it("shows search progress instead of an empty result while catalog search is pending", async () => {

@@ -36,6 +36,7 @@ export type GameCardData = {
   discount?: number | null;
   currency?: string;
   store?: string;
+  isFree?: boolean;
 };
 
 /** Canonical game card. It never guesses an internal game identity. */
@@ -115,6 +116,7 @@ export function GameCard({
               discount={game.discount ?? null}
               currency={game.currency}
               store={game.store}
+              isFree={game.isFree}
               size="sm"
               align="left"
             />

@@ -217,6 +217,11 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     cached = AsyncMock(side_effect=run_cached)
     monkeypatch.setattr(app_main, "fetch_igdb_games", fetch_igdb)
     monkeypatch.setattr(app_main, "get_json_cached", cached)
+    monkeypatch.setattr(
+        app_main,
+        "fetch_steam_store_game_detail",
+        AsyncMock(return_value={"current": None, "is_free": False}),
+    )
 
     response = api_client.get("/search/games", params={"q": "  HADES  ", "page": 2})
 
@@ -225,8 +230,10 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     assert response.json()["results"][0]["id"] == 999
     assert "source" not in response.json()["results"][0]
     fetch_igdb.assert_awaited_once_with("hades", page=2, filters=app_main.CatalogSearchFilters())
-    assert cached.await_count == 1
-    assert "igdb_search_v6" in cached.await_args.args[0]
+    cache_keys = [call.args[0] for call in cached.await_args_list]
+    assert len(cache_keys) == 2
+    assert any("igdb_search_v6" in key for key in cache_keys)
+    assert any("catalog_steam_price_v1" in key for key in cache_keys)
 
 
 @pytest.mark.parametrize("params", [{"q": "hades", "page": 0}, {"platform": "unsupported"}])

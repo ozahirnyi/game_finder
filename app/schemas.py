@@ -372,6 +372,7 @@ class GameSearchItem(BaseModel):
     genres: list[str] = Field(default_factory=list)
     platforms: list[str] = Field(default_factory=list)
     current: dict | None = None
+    is_free: bool = False
 
 
 class GameSearchResponse(BaseModel):

@@ -227,6 +227,7 @@ export function PriceBlock({
   size = "md",
   align = "right",
   unavailable = false,
+  isFree = false,
 }: {
   price?: number | null;
   originalPrice?: number | null;
@@ -236,8 +237,18 @@ export function PriceBlock({
   size?: "sm" | "md" | "lg";
   align?: "left" | "right";
   unavailable?: boolean;
+  isFree?: boolean;
 }) {
   const alignment = align === "right" ? "items-end text-right" : "items-start text-left";
+
+  if (isFree) {
+    return (
+      <div className={`flex flex-col ${alignment}`}>
+        <span className="label-mono font-bold text-primary">Free</span>
+        {store && <span className="label-mono mt-1 text-muted-foreground/70">{store}</span>}
+      </div>
+    );
+  }
 
   if (unavailable || price == null) {
     return (

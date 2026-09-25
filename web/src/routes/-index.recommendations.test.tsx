@@ -232,11 +232,25 @@ describe("Home recommendations", () => {
 
   it("renders real trending catalog games for a guest", async () => {
     api.getAuthSnapshot.mockReturnValue(false);
-    api.getTrendingGames.mockResolvedValue({ results: [{ id: 44, name: "Hades" }] });
+    api.getTrendingGames.mockResolvedValue({
+      results: [
+        {
+          id: 44,
+          name: "Hades",
+          current: { shop: "Steam", price: { amount: 19.99, currency: "USD" } },
+        },
+      ],
+    });
 
     renderHome();
 
-    expect(await screen.findByText("Hades")).toHaveAttribute("data-game-id", "44");
+    const card = await screen.findByText("Hades");
+    expect(card).toHaveAttribute("data-game-id", "44");
+    expect(JSON.parse(card.getAttribute("data-media")!)).toMatchObject({
+      price: 19.99,
+      currency: "USD",
+      store: "Steam",
+    });
   });
 
   it("shows loading while guest trending games are pending", async () => {

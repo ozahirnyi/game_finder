@@ -45,6 +45,8 @@ export type CatalogGame = {
   source?: "steam";
   steam_appid?: number;
   url?: string;
+  current?: Deal["current"] | null;
+  is_free?: boolean;
 };
 
 export type Deal = {
@@ -710,8 +712,10 @@ export function getRecommendationQuota() {
   return apiRequest<RecommendationQuota>("/recommendations/quota", { auth: true });
 }
 
-export function getTrendingGames() {
-  return apiRequest<{ results: CatalogGame[] }>("/catalog/trending-games?page_size=12");
+export function getTrendingGames(country = "US") {
+  return apiRequest<{ results: CatalogGame[] }>(
+    `/catalog/trending-games?page_size=12&country=${encodeURIComponent(country)}`,
+  );
 }
 
 export function getDashboard() {
