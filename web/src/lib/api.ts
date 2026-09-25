@@ -670,6 +670,7 @@ export type CatalogSearchOptions = {
   features?: CatalogFeature[];
   genres?: CatalogGenre[];
   onSale?: boolean;
+  country?: string;
 };
 
 export function searchGames(options: CatalogSearchOptions) {
@@ -679,6 +680,7 @@ export function searchGames(options: CatalogSearchOptions) {
   options.features?.forEach((value) => params.append("feature", value));
   options.genres?.forEach((value) => params.append("genre", value));
   if (options.onSale) params.set("on_sale", "true");
+  params.set("country", options.country ?? "US");
   return apiRequest<{ results: CatalogGame[] }>(`/search/games?${params.toString()}`);
 }
 

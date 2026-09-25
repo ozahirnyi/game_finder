@@ -1,20 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   ApiError,
+  getAuthSnapshot,
+  getProfile,
   getRecommendationQuota,
   getRecommendations,
   searchGames,
+  subscribeToAuthChanges,
   type CatalogFeature,
   type CatalogGenre,
   type CatalogPlatform,
   type RecommendationResponse,
 } from "@/lib/api";
 import { gameDetailTarget } from "@/lib/gameRoute";
+import { normalizePriceCountry } from "@/lib/priceRegion";
 import { Search, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/search")({ component: SearchPage });
@@ -105,11 +109,27 @@ function SearchPage() {
     return new URLSearchParams(window.location.search).get("mode") === "ai" ? "ai" : "catalog";
   });
   const queryClient = useQueryClient();
+  const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: getProfile,
+    enabled: signedIn,
+    staleTime: 60_000,
+  });
+  const regionReady = !signedIn || profileQuery.isFetched;
+  const region = normalizePriceCountry(profileQuery.data?.price_country_code);
   const searchQuery = useQuery({
-    queryKey: ["search", debouncedQuery, platforms, features, genres, onSale],
+    queryKey: ["search", debouncedQuery, platforms, features, genres, onSale, region],
     queryFn: () =>
-      searchGames({ query: debouncedQuery.trim(), platforms, features, genres, onSale }),
-    enabled: mode === "catalog",
+      searchGames({
+        query: debouncedQuery.trim(),
+        platforms,
+        features,
+        genres,
+        onSale,
+        country: region,
+      }),
+    enabled: mode === "catalog" && regionReady,
     placeholderData: keepPreviousData,
   });
   const aiRecommendationQuery = useQuery<RecommendationResponse>({
@@ -131,7 +151,7 @@ function SearchPage() {
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["recommendation-quota"] }),
   });
-  const results = searchQuery.data?.results ?? [];
+  const results = regionReady ? (searchQuery.data?.results ?? []) : [];
   const recommendations = aiRecommendationQuery.data;
   const aiSearchError = recommendationMutation.isError
     ? getAiSearchError(recommendationMutation.error)
@@ -299,14 +319,14 @@ function SearchPage() {
               );
             })}
           </div>
-          {searchQuery.isPending && (
+          {(!regionReady || searchQuery.isPending) && (
             <EmptyState
               icon={<Search className="size-5 animate-pulse" />}
               title="Searching games…"
               description="Checking the catalog and Steam."
             />
           )}
-          {!searchQuery.isPending && results.length === 0 && (
+          {regionReady && !searchQuery.isPending && results.length === 0 && (
             <EmptyState
               icon={<Search className="size-5" />}
               title="No games match your search"

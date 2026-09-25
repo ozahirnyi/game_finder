@@ -52,6 +52,32 @@ describe("SearchPage", () => {
     window.history.replaceState({}, "", "/search");
   });
 
+  it("requests catalog prices in the signed-in user's selected region", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(url.includes("/profile") ? { price_country_code: "UA" } : { results: [] }),
+          { status: 200 },
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.localStorage.setItem("game_finder_token", "test-token");
+
+    renderSearch();
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("country=UA"),
+        expect.anything(),
+      ),
+    );
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("country=US"))).toBe(
+      false,
+    );
+  });
+
   it("passes catalog Steam prices to the visible game cards", async () => {
     vi.stubGlobal(
       "fetch",
@@ -80,7 +106,10 @@ describe("SearchPage", () => {
 
     renderSearch();
 
-    expect(await screen.findByRole("link", { name: "Hades" })).toHaveAttribute("data-price", "19.99");
+    expect(await screen.findByRole("link", { name: "Hades" })).toHaveAttribute(
+      "data-price",
+      "19.99",
+    );
     expect(screen.getByRole("link", { name: "Hades" })).toHaveAttribute("data-currency", "USD");
     expect(screen.getByRole("link", { name: "Hades" })).toHaveAttribute("data-store", "Steam");
   });
