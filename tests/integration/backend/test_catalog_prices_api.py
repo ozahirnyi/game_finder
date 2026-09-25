@@ -232,7 +232,7 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     fetch_igdb.assert_awaited_once_with("hades", page=2, filters=app_main.CatalogSearchFilters())
     cache_keys = [call.args[0] for call in cached.await_args_list]
     assert len(cache_keys) == 2
-    assert any("igdb_search_v7" in key for key in cache_keys)
+    assert any("igdb_search_v8" in key for key in cache_keys)
     assert any("catalog_steam_price_v1" in key for key in cache_keys)
 
 
