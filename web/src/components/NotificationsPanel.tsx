@@ -42,6 +42,7 @@ function notificationMessage(type: string, payload: Record<string, unknown>) {
 
 export function NotificationsPanel({ className = "" }: { className?: string }) {
   const [unavailableId, setUnavailableId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const notificationsQuery = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
@@ -83,8 +84,9 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
           description="Invites, price drops and friend activity will show up here."
         />
       ) : (
-        <div className="stagger space-y-2">
-          {notifications.map((n) => {
+        <>
+          <div className="stagger space-y-2">
+          {(showAll ? notifications : notifications.slice(0, 5)).map((n) => {
             const Icon = iconFor[n.type as keyof typeof iconFor] ?? Bell;
             const isUnread = !n.read_at;
             return (
@@ -132,7 +134,18 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
               </div>
             );
           })}
-        </div>
+          </div>
+          {notifications.length > 5 && (
+            <button
+              type="button"
+              aria-expanded={showAll}
+              onClick={() => setShowAll((value) => !value)}
+              className="mt-3 rounded-lg border border-border px-3 py-2 text-sm font-bold text-muted-foreground transition hover:text-foreground"
+            >
+              {showAll ? "Show fewer notifications" : "Show all notifications"}
+            </button>
+          )}
+        </>
       )}
     </Panel>
   );

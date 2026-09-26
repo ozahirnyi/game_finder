@@ -79,4 +79,30 @@ describe("NotificationsPanel", () => {
     ).toBeInTheDocument();
     await waitFor(() => expect(api.markNotificationRead).not.toHaveBeenCalled());
   });
+
+  it("shows five notifications until the rest are expanded", async () => {
+    api.getNotifications.mockResolvedValue(
+      Array.from({ length: 7 }, (_, index) => ({
+        id: `notification-${index + 1}`,
+        type: "system",
+        payload: { message: `Notice ${index + 1}` },
+        created_at: "2026-07-30T12:00:00Z",
+      })),
+    );
+    renderPanel();
+
+    expect(await screen.findByText("Notice 5")).toBeInTheDocument();
+    expect(screen.queryByText("Notice 6")).not.toBeInTheDocument();
+    const expand = screen.getByRole("button", { name: "Show all notifications" });
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(expand);
+
+    expect(screen.getByText("Notice 6")).toBeInTheDocument();
+    expect(screen.getByText("Notice 7")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show fewer notifications" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
 });
