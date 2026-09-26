@@ -140,19 +140,20 @@ it("links the active chat participant to their profile and shows their avatar", 
   expect(onSelect).not.toHaveBeenCalled();
 });
 
-it("links the conversation list participant to their profile", async () => {
-  mount(undefined);
+it("selects the conversation from its list row without linking to the profile", async () => {
+  const { onSelect } = mount(undefined);
 
   const chats = screen.getByRole("heading", { name: "Chats" }).parentElement;
   expect(chats).not.toBeNull();
-  expect(await within(chats!).findByRole("link", { name: "Alex" })).toHaveAttribute(
-    "href",
-    "/users/alex-public",
-  );
+  await within(chats!).findByText("Alex");
+  expect(within(chats!).queryByRole("link", { name: "Alex" })).not.toBeInTheDocument();
   expect(within(chats!).getByAltText("Alex")).toHaveAttribute(
     "src",
     "https://avatar.test/alex.png",
   );
+
+  fireEvent.click(within(chats!).getByRole("button", { name: "Open conversation with Alex" }));
+  expect(onSelect).toHaveBeenCalledWith("chat");
 });
 
 it("renders a pending game invite card and lets its recipient accept it", async () => {

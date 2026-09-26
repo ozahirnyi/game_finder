@@ -101,12 +101,7 @@ export function MessagesScreen({
                     imageAlt={name}
                     className="size-9 shrink-0 rounded-full"
                   />
-                  <UserProfileLink
-                    publicId={participant.public_id}
-                    className="min-w-0 flex-1 truncate font-bold hover:text-primary"
-                  >
-                    {name}
-                  </UserProfileLink>
+                  <span className="min-w-0 flex-1 truncate font-bold">{name}</span>
                   {!!conversation.unread_count && (
                     <span
                       className="shrink-0 rounded-full bg-primary px-2 text-xs text-primary-foreground"
