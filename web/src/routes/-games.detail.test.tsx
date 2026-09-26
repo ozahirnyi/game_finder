@@ -170,6 +170,7 @@ describe("game detail presentation", () => {
       "href",
       "/search?mode=ai&q=roguelike",
     );
+    expect(screen.getByRole("link", { name: /back to search/i })).toHaveClass("min-h-11", "text-sm");
   });
 
   it("uses formatted rating and release date consistently in the hero and details", async () => {
