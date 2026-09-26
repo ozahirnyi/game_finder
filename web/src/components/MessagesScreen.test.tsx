@@ -58,6 +58,19 @@ it("shows a conversation and preserves the draft after failed sending", async ()
   await waitFor(() => expect(api.createMessage).toHaveBeenCalledTimes(2));
   expect(api.createMessage.mock.calls[1][2]).toBe(attempt);
 });
+it("sends on Enter and leaves Shift+Enter available for a new line", async () => {
+  mount();
+  await screen.findByText("Hello");
+  const composer = screen.getByLabelText("Message text");
+  fireEvent.change(composer, { target: { value: "Hi Alex" } });
+
+  expect(fireEvent.keyDown(composer, { key: "Enter", code: "Enter" })).toBe(false);
+  await waitFor(() => expect(api.createMessage).toHaveBeenCalledWith("chat", "Hi Alex", expect.any(String)));
+
+  api.createMessage.mockClear();
+  expect(fireEvent.keyDown(composer, { key: "Enter", code: "Enter", shiftKey: true })).toBe(true);
+  expect(api.createMessage).not.toHaveBeenCalled();
+});
 it("updates the open conversation without reloading the page", async () => {
   mount();
   await screen.findByText("Hello");

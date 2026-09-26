@@ -435,6 +435,12 @@ function ConversationThread({
               id={`message-${id}`}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
               maxLength={2000}
               rows={3}
               placeholder="Write a message…"
