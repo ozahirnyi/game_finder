@@ -166,6 +166,20 @@ describe("GameDetail actions", () => {
     );
   });
 
+  it("keeps the friend picker and invite actions within the detail card", async () => {
+    renderGame();
+    const inviteButton = await screen.findByRole("button", { name: "Invite" });
+    await waitFor(() => expect(inviteButton).not.toBeDisabled());
+    fireEvent.click(inviteButton);
+
+    const form = screen.getByRole("button", { name: "Send invite" }).closest("form");
+    expect(form).toHaveClass("min-w-0", "max-w-full");
+    expect(screen.getByLabelText("Friend")).toHaveClass("w-full", "max-w-full");
+    expect(screen.getByRole("button", { name: "Send invite" }).parentElement).toHaveClass(
+      "flex-wrap",
+    );
+  });
+
   it("copies the game link when native sharing is unavailable", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "share", { configurable: true, value: undefined });

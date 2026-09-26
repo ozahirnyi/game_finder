@@ -274,7 +274,7 @@ function GameNotFound() {
         </p>
         <SearchBackLink
           returnTo={returnTo}
-          className="mt-6 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+          className="mt-6 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-3 text-sm font-bold text-primary-foreground"
         />
       </div>
     </AppShell>
@@ -486,7 +486,7 @@ function GameDetail() {
     <AppShell>
       <SearchBackLink
         returnTo={returnTo}
-        className="mb-6 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+        className="mb-6 inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 py-3 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary"
       />
 
       <section
@@ -879,18 +879,18 @@ function GameDetail() {
             )}
             {showInviteForm && (
               <form
-                className="mt-4 space-y-3 border-t border-border pt-4"
+                className="mt-4 min-w-0 max-w-full space-y-3 border-t border-border pt-4"
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (recipientId) inviteMutation.mutate(recipientId);
                 }}
               >
-                <label className="grid gap-1 text-xs font-bold">
+                <label className="grid min-w-0 gap-1 text-xs font-bold">
                   Friend
                   <select
                     value={recipientId}
                     onChange={(event) => setRecipientId(event.target.value)}
-                    className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    className="min-w-0 w-full max-w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                   >
                     {friendsQuery.data?.map((friend) => (
                       <option key={friend.user.id} value={friend.user.id}>
@@ -899,7 +899,7 @@ function GameDetail() {
                     ))}
                   </select>
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="submit"
                     disabled={inviteMutation.isPending}
