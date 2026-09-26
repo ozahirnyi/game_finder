@@ -86,54 +86,54 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
       ) : (
         <>
           <div className="stagger space-y-2">
-          {(showAll ? notifications : notifications.slice(0, 5)).map((n) => {
-            const Icon = iconFor[n.type as keyof typeof iconFor] ?? Bell;
-            const isUnread = !n.read_at;
-            return (
-              <div
-                key={n.id}
-                onClick={() => {
-                  const destination = notificationDestination(n);
-                  if (!destination) {
-                    setUnavailableId(n.id);
-                    return;
-                  }
-                  void navigate(destination);
-                  if (isUnread && destination.to !== "/friends") markRead.mutate(n.id);
-                }}
-                className={`flex items-start gap-3 rounded-xl border p-3 transition ${
-                  isUnread ? "border-primary/30 bg-primary/5" : "border-border bg-surface-2"
-                }`}
-              >
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-muted-foreground">
-                  <Icon className="size-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-bold">
-                      {titleFor[n.type] ?? "Notification"}
+            {(showAll ? notifications : notifications.slice(0, 5)).map((n) => {
+              const Icon = iconFor[n.type as keyof typeof iconFor] ?? Bell;
+              const isUnread = !n.read_at;
+              return (
+                <div
+                  key={n.id}
+                  onClick={() => {
+                    const destination = notificationDestination(n);
+                    if (!destination) {
+                      setUnavailableId(n.id);
+                      return;
+                    }
+                    void navigate(destination);
+                    if (isUnread && destination.to !== "/friends") markRead.mutate(n.id);
+                  }}
+                  className={`flex items-start gap-3 rounded-xl border p-3 transition ${
+                    isUnread ? "border-primary/30 bg-primary/5" : "border-border bg-surface-2"
+                  }`}
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-muted-foreground">
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-bold">
+                        {titleFor[n.type] ?? "Notification"}
+                      </p>
+                      {isUnread && <Chip tone="primary">New</Chip>}
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {notificationMessage(n.type, n.payload)}
                     </p>
-                    {isUnread && <Chip tone="primary">New</Chip>}
+                    {unavailableId === n.id && (
+                      <p
+                        role="status"
+                        aria-live="polite"
+                        className="mt-1 text-xs text-muted-foreground"
+                      >
+                        This notification action is no longer available.
+                      </p>
+                    )}
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {notificationMessage(n.type, n.payload)}
-                  </p>
-                  {unavailableId === n.id && (
-                    <p
-                      role="status"
-                      aria-live="polite"
-                      className="mt-1 text-xs text-muted-foreground"
-                    >
-                      This notification action is no longer available.
-                    </p>
-                  )}
+                  <span className="label-mono shrink-0 text-muted-foreground">
+                    {new Date(n.created_at).toLocaleDateString()}
+                  </span>
                 </div>
-                <span className="label-mono shrink-0 text-muted-foreground">
-                  {new Date(n.created_at).toLocaleDateString()}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
           </div>
           {notifications.length > 5 && (
             <button

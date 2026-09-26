@@ -13,13 +13,9 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual("@/lib/api")), ...api }));
 vi.mock("@/components/UserProfileLink", () => ({
-  UserProfileLink: ({
-    publicId,
-    children,
-  }: {
-    publicId: string;
-    children: React.ReactNode;
-  }) => <a href={`/users/${publicId}`}>{children}</a>,
+  UserProfileLink: ({ publicId, children }: { publicId: string; children: React.ReactNode }) => (
+    <a href={`/users/${publicId}`}>{children}</a>
+  ),
 }));
 import { MessagesScreen } from "./MessagesScreen";
 const conversation = {
@@ -83,7 +79,9 @@ it("sends on Enter and leaves Shift+Enter available for a new line", async () =>
   fireEvent.change(composer, { target: { value: "Hi Alex" } });
 
   expect(fireEvent.keyDown(composer, { key: "Enter", code: "Enter" })).toBe(false);
-  await waitFor(() => expect(api.createMessage).toHaveBeenCalledWith("chat", "Hi Alex", expect.any(String)));
+  await waitFor(() =>
+    expect(api.createMessage).toHaveBeenCalledWith("chat", "Hi Alex", expect.any(String)),
+  );
 
   api.createMessage.mockClear();
   expect(fireEvent.keyDown(composer, { key: "Enter", code: "Enter", shiftKey: true })).toBe(true);
@@ -151,7 +149,10 @@ it("links the conversation list participant to their profile", async () => {
     "href",
     "/users/alex-public",
   );
-  expect(within(chats!).getByAltText("Alex")).toHaveAttribute("src", "https://avatar.test/alex.png");
+  expect(within(chats!).getByAltText("Alex")).toHaveAttribute(
+    "src",
+    "https://avatar.test/alex.png",
+  );
 });
 
 it("renders a pending game invite card and lets its recipient accept it", async () => {

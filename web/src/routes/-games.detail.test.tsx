@@ -170,7 +170,10 @@ describe("game detail presentation", () => {
       "href",
       "/search?mode=ai&q=roguelike",
     );
-    expect(screen.getByRole("link", { name: /back to search/i })).toHaveClass("min-h-11", "text-sm");
+    expect(screen.getByRole("link", { name: /back to search/i })).toHaveClass(
+      "min-h-11",
+      "text-sm",
+    );
   });
 
   it("uses formatted rating and release date consistently in the hero and details", async () => {
@@ -219,16 +222,16 @@ describe("game detail presentation", () => {
     await waitFor(() => expect(api.getPriceHistory).toHaveBeenLastCalledWith("274755", "US", "2y"));
   });
 
-    it("offers the restored three price-history periods", async () => {
-      renderDetail();
+  it("offers the restored three price-history periods", async () => {
+    renderDetail();
 
-      await screen.findByRole("heading", { name: "Steam price history" });
+    await screen.findByRole("heading", { name: "Steam price history" });
 
-      expect(screen.queryByRole("button", { name: "1 month" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "6 months" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "1 year" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "2 years" })).toBeInTheDocument();
-    });
+    expect(screen.queryByRole("button", { name: "1 month" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "6 months" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 year" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2 years" })).toBeInTheDocument();
+  });
 
   it("hides price history for free games", async () => {
     api.getPriceHistory.mockResolvedValue({ is_free: true, current: undefined, history: [] });

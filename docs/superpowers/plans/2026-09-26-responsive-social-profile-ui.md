@@ -20,17 +20,17 @@
 ### Task 1: Make the game invitation card responsive
 
 **Files:**
-- Inspect and modify `web/src/components/ProfileView.tsx` where the game detail's invite composer is rendered (confirm actual game detail component and picker ownership before editing).
-- Update/add the nearest existing game detail component test under `web/src/components/**`.
+- Modify `web/src/routes/games.$gameId.tsx` where the invite composer is rendered.
+- Modify `web/src/routes/-games.actions.test.tsx`.
 
 **Interfaces:**
 - Preserve existing invitation selection and send/cancel behavior.
 
-- [ ] **Step 1: Add a failing narrow-layout semantics test** asserting the picker/form is constrained to its card and action controls can wrap (use stable classes or accessible structure consistent with the component).
-- [ ] **Step 2: Run the focused Vitest file** with `cd web; npm.cmd test -- <test-file>` and confirm the new assertion fails for the current markup.
-- [ ] **Step 3: Apply responsive width constraints** (`min-w-0`, `w-full`, `max-w-full`) to the actual overflowing picker and allow action controls to wrap on narrow widths; keep desktop layout unchanged.
-- [ ] **Step 4: Re-run the focused Vitest file** and confirm it passes.
-- [ ] **Step 5: Commit** as `fix: keep game invite controls within card`.
+- [x] **Step 1: Add a failing narrow-layout semantics test** asserting the friend select spans no wider than the invite panel and action controls can wrap (use stable classes or accessible structure consistent with the component).
+- [x] **Step 2: Run the focused Vitest file** with `cd web; npm.cmd test -- src/routes/-games.actions.test.tsx` and confirm the new assertion fails for the current markup.
+- [x] **Step 3: Apply responsive width constraints** (`min-w-0`, `w-full`, `max-w-full`) to the actual overflowing picker and allow action controls to wrap on narrow widths; keep desktop layout unchanged.
+- [x] **Step 4: Re-run the focused Vitest file** and confirm it passes.
+- [x] **Step 5: Commit** as `fix: keep game invite controls within card`.
 
 ### Task 2: Collapse profile notifications after five
 
@@ -41,12 +41,12 @@
 **Interfaces:**
 - Keep `NotificationsPanel({ className? })` and current notification navigation/read mutations unchanged.
 
-- [ ] **Step 1: Add a test** with more than five notifications asserting only the first five render initially and a “Show all” button reports collapsed state.
-- [ ] **Step 2: Add a test** clicking the control reveals all notifications and toggles its accessible expanded state and label.
-- [ ] **Step 3: Run** `cd web; npm.cmd test -- src/components/NotificationsPanel.test.tsx` and confirm the new tests fail before implementation.
-- [ ] **Step 4: Implement** a local expanded state; slice to five while collapsed and render an accessible button only when there are more than five.
-- [ ] **Step 5: Re-run** the same focused test command and confirm existing read/navigation tests still pass.
-- [ ] **Step 6: Commit** as `feat: collapse profile notifications`.
+- [x] **Step 1: Add a test** with more than five notifications asserting only the first five render initially and a “Show all” button reports collapsed state.
+- [x] **Step 2: Add a test** clicking the control reveals all notifications and toggles its accessible expanded state and label.
+- [x] **Step 3: Run** `cd web; npm.cmd test -- src/components/NotificationsPanel.test.tsx` and confirm the new tests fail before implementation.
+- [x] **Step 4: Implement** a local expanded state; slice to five while collapsed and render an accessible button only when there are more than five.
+- [x] **Step 5: Re-run** the same focused test command and confirm existing read/navigation tests still pass.
+- [x] **Step 6: Commit** as `feat: collapse profile notifications`.
 
 ### Task 3: Add participant profile links and avatars to chats
 
@@ -59,32 +59,32 @@
 - Use the participant's existing `public_id` and `avatar` fields if supplied by the conversation API type; do not change the API contract.
 - Preserve conversation selection and messaging behavior.
 
-- [ ] **Step 1: Add tests** asserting the participant's display name links to their public profile and their avatar is rendered in the conversation list and active chat header.
-- [ ] **Step 2: Run** `cd web; npm.cmd test -- src/components/MessagesScreen.test.tsx` and confirm the new assertions fail before implementation.
-- [ ] **Step 3: Implement** avatar rendering with the existing `Avatar` component and profile navigation with `UserProfileLink`; ensure clicks on the profile link do not select a conversation.
-- [ ] **Step 4: Re-run** the same focused test command and confirm existing messaging behaviors still pass.
-- [ ] **Step 5: Commit** as `feat: link chat participants to profiles`.
+- [x] **Step 1: Add tests** asserting the participant's display name links to their public profile and their avatar is rendered in the conversation list and active chat header.
+- [x] **Step 2: Run** `cd web; npm.cmd test -- src/components/MessagesScreen.test.tsx` and confirm the new assertions fail before implementation.
+- [x] **Step 3: Implement** avatar rendering with the existing `Avatar` component and profile navigation with `UserProfileLink`; ensure clicks on the profile link do not select a conversation.
+- [x] **Step 4: Re-run** the same focused test command and confirm existing messaging behaviors still pass.
+- [x] **Step 5: Commit** as `feat: link chat participants to profiles`.
 
 ### Task 4: Make “Back to search” more visible
 
 **Files:**
-- Locate and modify the game detail page component containing the existing “Back to search” link (find with `rtk rg -n "Back to search" web/src`).
-- Update/add its focused test under `web/src/**`.
+- Modify the existing “Back to search” link in `web/src/routes/games.$gameId.tsx`.
+- Update `web/src/routes/-games.detail.test.tsx`.
 
 **Interfaces:**
 - Keep the existing link destination and search parameters intact.
 
-- [ ] **Step 1: Add/update a test** asserting the back link remains a link with its current destination and receives the intended prominent visual/target classes.
-- [ ] **Step 2: Run** the relevant focused Vitest file and confirm the new expectation fails before implementation.
-- [ ] **Step 3: Increase** text size, spacing, contrast or button treatment, and hit area using the existing design tokens while retaining the same route/search state.
-- [ ] **Step 4: Re-run** the focused test and confirm it passes.
-- [ ] **Step 5: Commit** as `style: emphasize game search return link`.
+- [x] **Step 1: Add/update a test** asserting the back link remains a link with its current destination and receives the intended prominent visual/target classes.
+- [x] **Step 2: Run** `cd web; npm.cmd test -- src/routes/-games.detail.test.tsx` and confirm the new expectation fails before implementation.
+- [x] **Step 3: Increase** text size, spacing, contrast or button treatment, and hit area using the existing design tokens while retaining the same route/search state.
+- [x] **Step 4: Re-run** the focused test and confirm it passes.
+- [x] **Step 5: Commit** as `style: emphasize game search return link`.
 
 ### Task 5: Verify the combined frontend change
 
 **Files:**
 - No additional files unless verification reveals an implementation defect.
 
-- [ ] **Step 1: Run focused tests** for all changed component test files with `cd web; npm.cmd test -- <test-files>`.
-- [ ] **Step 2: Run frontend type/build verification** using the scripts in `web/package.json` (`npm.cmd run build` and the configured type-check script if separate).
-- [ ] **Step 3: Review** `rtk git diff --check` and `rtk git status --short`; fix whitespace or type errors and preserve the intended task branch changes.
+- [x] **Step 1: Run focused tests** for all changed component test files with `cd web; npm.cmd test -- <test-files>`.
+- [x] **Step 2: Run frontend type/build verification** using the scripts in `web/package.json` (`npm.cmd run build` and the configured type-check script if separate).
+- [x] **Step 3: Review** `rtk git diff --check` and `rtk git status --short`; fix whitespace or type errors and preserve the intended task branch changes.

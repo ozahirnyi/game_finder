@@ -520,7 +520,11 @@ function GameDetail() {
           }
         />
         <div
-          className={hasHero ? "absolute inset-x-0 bottom-0 min-w-0 p-6 text-white [text-shadow:0_2px_5px_rgb(0_0_0/90%)] sm:p-8" : "min-w-0"}
+          className={
+            hasHero
+              ? "absolute inset-x-0 bottom-0 min-w-0 p-6 text-white [text-shadow:0_2px_5px_rgb(0_0_0/90%)] sm:p-8"
+              : "min-w-0"
+          }
         >
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {game.coop && <Chip tone="primary">Co-op</Chip>}
@@ -532,7 +536,11 @@ function GameDetail() {
             ))}
           </div>
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">{game.title}</h1>
-          <p className={`mt-2 max-w-2xl text-sm ${hasHero ? "text-white/90" : "text-muted-foreground"}`}>{heroMetadata.join(" · ")}</p>
+          <p
+            className={`mt-2 max-w-2xl text-sm ${hasHero ? "text-white/90" : "text-muted-foreground"}`}
+          >
+            {heroMetadata.join(" · ")}
+          </p>
         </div>
       </section>
 
