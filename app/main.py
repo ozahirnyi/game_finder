@@ -3458,7 +3458,13 @@ def telegram_webhook(secret: str, update: dict, db: Session = Depends(get_db)):
     if expected_secret and secret != expected_secret:
         raise HTTPException(status_code=403, detail="Invalid Telegram webhook secret")
 
-    link_token, chat_id, username = parse_start_token(update)
+    try:
+        link_token, chat_id, username = parse_start_token(update)
+    except HTTPException as exc:
+        # parse_start_token uses fixed, non-sensitive details; never log the
+        # Telegram update because it contains the user's one-time link token.
+        logger.warning("Telegram webhook rejected update: %s", exc.detail)
+        raise
     user = db.query(User).filter(User.telegram_link_token == link_token).first()
     if not user:
         raise HTTPException(status_code=404, detail="Telegram link token not found")
