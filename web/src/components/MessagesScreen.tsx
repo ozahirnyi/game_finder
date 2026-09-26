@@ -11,6 +11,8 @@ import {
   respondToGameInvite,
   type ConversationMessage,
 } from "@/lib/api";
+import { Avatar } from "@/components/GameCover";
+import { UserProfileLink } from "@/components/UserProfileLink";
 import { friendDisplayName } from "@/lib/friendIdentity";
 
 const button = "rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-50";
@@ -82,27 +84,50 @@ export function MessagesScreen({
           </p>
         )}
         <div className="space-y-2">
-          {conversations.data?.map((conversation) => (
-            <button
-              key={conversation.id}
-              onClick={() => onSelect(conversation.id)}
-              aria-current={conversation.id === conversationId ? "page" : undefined}
-              className={`block w-full rounded-xl p-3 text-left ${conversation.id === conversationId ? "bg-primary/15" : "bg-surface-2"}`}
-            >
-              <span className="font-bold">{friendDisplayName(conversation.participant)}</span>
-              {!!conversation.unread_count && (
-                <span
-                  className="ml-2 rounded-full bg-primary px-2 text-xs text-primary-foreground"
-                  aria-label={`${conversation.unread_count} unread messages`}
+          {conversations.data?.map((conversation) => {
+            const participant = conversation.participant;
+            const name = friendDisplayName(participant);
+            return (
+              <div
+                key={conversation.id}
+                className={`rounded-xl p-3 ${conversation.id === conversationId ? "bg-primary/15" : "bg-surface-2"}`}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <Avatar
+                    from="#7c3aed"
+                    to="#111827"
+                    name={name}
+                    image={participant.avatar ?? undefined}
+                    imageAlt={name}
+                    className="size-9 shrink-0 rounded-full"
+                  />
+                  <UserProfileLink
+                    publicId={participant.public_id}
+                    className="min-w-0 flex-1 truncate font-bold hover:text-primary"
+                  >
+                    {name}
+                  </UserProfileLink>
+                  {!!conversation.unread_count && (
+                    <span
+                      className="shrink-0 rounded-full bg-primary px-2 text-xs text-primary-foreground"
+                      aria-label={`${conversation.unread_count} unread messages`}
+                    >
+                      {conversation.unread_count}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onSelect(conversation.id)}
+                  aria-current={conversation.id === conversationId ? "page" : undefined}
+                  aria-label={`Open conversation with ${name}`}
+                  className="mt-1 block w-full truncate text-left text-sm text-muted-foreground hover:text-foreground"
                 >
-                  {conversation.unread_count}
-                </span>
-              )}
-              <span className="mt-1 block truncate text-sm text-muted-foreground">
-                {conversation.last_message ?? "Start a conversation"}
-              </span>
-            </button>
-          ))}
+                  {conversation.last_message ?? "Start a conversation"}
+                </button>
+              </div>
+            );
+          })}
         </div>
         {conversations.data && conversations.data.length >= limit && (
           <button className={`${button} mt-3`} onClick={() => setLimit((value) => value + 20)}>
@@ -277,7 +302,25 @@ function ConversationThread({
         <button className={`${button} md:hidden`} onClick={onBack}>
           Back
         </button>
-        <h2 className="text-xl font-bold">
+        {conversation.data && (
+          <>
+            <Avatar
+              from="#7c3aed"
+              to="#111827"
+              name={friendDisplayName(conversation.data.participant)}
+              image={conversation.data.participant.avatar ?? undefined}
+              imageAlt={friendDisplayName(conversation.data.participant)}
+              className="size-10 shrink-0 rounded-full"
+            />
+            <UserProfileLink
+              publicId={conversation.data.participant.public_id}
+              className="min-w-0 truncate text-xl font-bold hover:text-primary"
+            >
+              {friendDisplayName(conversation.data.participant)}
+            </UserProfileLink>
+          </>
+        )}
+        <h2 className="sr-only">
           {conversation.data ? friendDisplayName(conversation.data.participant) : "Loading chat…"}
         </h2>
       </header>

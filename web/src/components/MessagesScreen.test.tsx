@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({
@@ -12,24 +12,42 @@ const api = vi.hoisted(() => ({
   getAuthSnapshot: vi.fn(),
 }));
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual("@/lib/api")), ...api }));
+vi.mock("@/components/UserProfileLink", () => ({
+  UserProfileLink: ({
+    publicId,
+    children,
+  }: {
+    publicId: string;
+    children: React.ReactNode;
+  }) => <a href={`/users/${publicId}`}>{children}</a>,
+}));
 import { MessagesScreen } from "./MessagesScreen";
 const conversation = {
   id: "chat",
-  participant: { id: "friend", display_name: "76561198000000001", steam_persona_name: "Alex" },
+  participant: {
+    id: "friend",
+    public_id: "alex-public",
+    display_name: "76561198000000001",
+    steam_persona_name: "Alex",
+    avatar: "https://avatar.test/alex.png",
+  },
   can_message: true,
   updated_at: "2026-09-01",
 };
 const first = { id: "m1", sender_id: "friend", body: "Hello", created_at: "2026-09-01T12:00:00Z" };
 function mount(
+  conversationId: string | undefined = "chat",
   client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   }),
 ) {
-  return render(
+  const onSelect = vi.fn();
+  const rendered = render(
     <QueryClientProvider client={client}>
-      <MessagesScreen conversationId="chat" onSelect={vi.fn()} />
+      <MessagesScreen conversationId={conversationId} onSelect={onSelect} />
     </QueryClientProvider>,
   );
+  return { ...rendered, onSelect };
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -90,7 +108,7 @@ it("can load older history after revisiting a cached conversation", async () => 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["conversation-has-older", "chat"], true);
   client.setQueryData(["conversation-messages", "chat"], [first]);
-  mount(client);
+  mount("chat", client);
   expect(await screen.findByRole("button", { name: "Older messages" })).toBeInTheDocument();
 });
 
@@ -104,8 +122,36 @@ it("keeps a short conversation stretched to the full chat viewport", async () =>
 
 it("uses the Steam persona name throughout the conversation UI", async () => {
   mount();
-  expect(await screen.findByText("Alex")).toBeInTheDocument();
+  expect(await screen.findAllByText("Alex")).not.toHaveLength(0);
   expect(screen.queryByText("76561198000000001")).not.toBeInTheDocument();
+});
+
+it("links the active chat participant to their profile and shows their avatar", async () => {
+  const { onSelect } = mount();
+
+  const heading = await screen.findByText("Alex", { selector: "h2" });
+  const header = heading.parentElement;
+  expect(header).not.toBeNull();
+  const profile = within(header!).getByRole("link", { name: "Alex" });
+  expect(profile).toHaveAttribute("href", "/users/alex-public");
+  expect(within(header!).getByAltText("Alex")).toHaveAttribute(
+    "src",
+    "https://avatar.test/alex.png",
+  );
+  fireEvent.click(profile);
+  expect(onSelect).not.toHaveBeenCalled();
+});
+
+it("links the conversation list participant to their profile", async () => {
+  mount(undefined);
+
+  const chats = screen.getByRole("heading", { name: "Chats" }).parentElement;
+  expect(chats).not.toBeNull();
+  expect(await within(chats!).findByRole("link", { name: "Alex" })).toHaveAttribute(
+    "href",
+    "/users/alex-public",
+  );
+  expect(within(chats!).getByAltText("Alex")).toHaveAttribute("src", "https://avatar.test/alex.png");
 });
 
 it("renders a pending game invite card and lets its recipient accept it", async () => {
