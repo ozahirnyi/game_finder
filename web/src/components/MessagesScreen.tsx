@@ -88,9 +88,13 @@ export function MessagesScreen({
             const participant = conversation.participant;
             const name = friendDisplayName(participant);
             return (
-              <div
+              <button
                 key={conversation.id}
-                className={`rounded-xl p-3 ${conversation.id === conversationId ? "bg-primary/15" : "bg-surface-2"}`}
+                type="button"
+                onClick={() => onSelect(conversation.id)}
+                aria-current={conversation.id === conversationId ? "page" : undefined}
+                aria-label={`Open conversation with ${name}`}
+                className={`block w-full rounded-xl p-3 text-left transition hover:bg-foreground/5 ${conversation.id === conversationId ? "bg-primary/15" : "bg-surface-2"}`}
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <Avatar
@@ -111,16 +115,10 @@ export function MessagesScreen({
                     </span>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onSelect(conversation.id)}
-                  aria-current={conversation.id === conversationId ? "page" : undefined}
-                  aria-label={`Open conversation with ${name}`}
-                  className="mt-1 block w-full truncate text-left text-sm text-muted-foreground hover:text-foreground"
-                >
+                <span className="mt-1 block w-full truncate text-sm text-muted-foreground">
                   {conversation.last_message ?? "Start a conversation"}
-                </button>
-              </div>
+                </span>
+              </button>
             );
           })}
         </div>
@@ -298,22 +296,22 @@ function ConversationThread({
           Back
         </button>
         {conversation.data && (
-          <>
+          <UserProfileLink
+            publicId={conversation.data.participant.public_id}
+            className="flex min-w-0 items-center gap-3 text-xl font-bold hover:text-primary"
+          >
             <Avatar
               from="#7c3aed"
               to="#111827"
               name={friendDisplayName(conversation.data.participant)}
               image={conversation.data.participant.avatar ?? undefined}
-              imageAlt={friendDisplayName(conversation.data.participant)}
+              imageAlt=""
               className="size-10 shrink-0 rounded-full"
             />
-            <UserProfileLink
-              publicId={conversation.data.participant.public_id}
-              className="min-w-0 truncate text-xl font-bold hover:text-primary"
-            >
+            <span className="min-w-0 truncate">
               {friendDisplayName(conversation.data.participant)}
-            </UserProfileLink>
-          </>
+            </span>
+          </UserProfileLink>
         )}
         <h2 className="sr-only">
           {conversation.data ? friendDisplayName(conversation.data.participant) : "Loading chat…"}

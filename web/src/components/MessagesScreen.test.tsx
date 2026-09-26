@@ -132,10 +132,9 @@ it("links the active chat participant to their profile and shows their avatar", 
   expect(header).not.toBeNull();
   const profile = within(header!).getByRole("link", { name: "Alex" });
   expect(profile).toHaveAttribute("href", "/users/alex-public");
-  expect(within(header!).getByAltText("Alex")).toHaveAttribute(
-    "src",
-    "https://avatar.test/alex.png",
-  );
+  const avatar = header!.querySelector("img");
+  expect(avatar).toHaveAttribute("src", "https://avatar.test/alex.png");
+  expect(avatar?.closest("a")).toBe(profile);
   fireEvent.click(profile);
   expect(onSelect).not.toHaveBeenCalled();
 });
@@ -152,7 +151,14 @@ it("selects the conversation from its list row without linking to the profile", 
     "https://avatar.test/alex.png",
   );
 
-  fireEvent.click(within(chats!).getByRole("button", { name: "Open conversation with Alex" }));
+  const conversationCard = within(chats!).getByRole("button", {
+    name: "Open conversation with Alex",
+  });
+  fireEvent.click(within(conversationCard).getByAltText("Alex"));
+  expect(onSelect).toHaveBeenCalledWith("chat");
+
+  onSelect.mockClear();
+  fireEvent.click(within(conversationCard).getByText("Alex"));
   expect(onSelect).toHaveBeenCalledWith("chat");
 });
 
