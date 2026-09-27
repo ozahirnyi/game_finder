@@ -131,35 +131,33 @@ async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult)
             )
             deal = price_data.get("current")
             alert_key = build_price_alert_key(deal) if deal else None
-            if not deal or not alert_key or not alert_matches(alert, deal) or alert.last_notification_key == alert_key:
+            if not deal or not alert_key or not alert_matches(alert, deal):
                 continue
 
-            delivered = False
-            if "telegram" in channels:
-                message = format_price_alert_message(item.title, price_data)
-                if user.telegram_chat_id and message:
-                    if send_telegram_message(user.telegram_chat_id, message):
-                        result.alerts_sent += 1
-                        delivered = True
-                    else:
-                        result.errors += 1
-                else:
-                    result.errors += 1
-
-            if "in_app" in channels:
+            if "in_app" in channels and alert.last_notification_key != alert_key:
                 create_notification(
                     db,
                     alert.user_id,
                     "price_alert",
                     price_alert_payload(catalog_game_id=item.catalog_game_id),
                 )
-                result.in_app_notifications_created += 1
-                delivered = True
-
-            if delivered:
                 alert.last_notification_key = alert_key
                 alert.last_delivered_at = datetime.now(timezone.utc)
+                result.in_app_notifications_created += 1
                 db.commit()
+
+            if "telegram" in channels and alert.telegram_last_notification_key != alert_key:
+                message = format_price_alert_message(item.title, price_data)
+                if user.telegram_chat_id and message:
+                    if send_telegram_message(user.telegram_chat_id, message):
+                        alert.telegram_last_notification_key = alert_key
+                        alert.last_delivered_at = datetime.now(timezone.utc)
+                        result.alerts_sent += 1
+                        db.commit()
+                    else:
+                        result.errors += 1
+                else:
+                    result.errors += 1
         except HTTPException:
             result.errors += 1
             db.rollback()
