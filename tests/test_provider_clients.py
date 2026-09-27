@@ -375,7 +375,7 @@ def test_telegram_link_and_send(monkeypatch):
     monkeypatch.setenv("TELEGRAM_BOT_USERNAME", "@playfinder_bot")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "secret")
     token = telegram.create_telegram_link_token()
-    assert token and telegram.build_telegram_link_url(token) == f"tg://resolve?domain=playfinder_bot&start={token}"
+    assert token and telegram.build_telegram_link_url(token) == f"https://t.me/playfinder_bot?start={token}"
     calls = []
     monkeypatch.setattr(telegram.httpx, "post", lambda *args, **kwargs: calls.append((args, kwargs)) or FakeResponse(status_code=200))
     assert telegram.send_telegram_message("42", "hello") is True
