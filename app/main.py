@@ -3458,26 +3458,50 @@ def telegram_webhook(secret: str, update: dict, db: Session = Depends(get_db)):
     if expected_secret and secret != expected_secret:
         raise HTTPException(status_code=403, detail="Invalid Telegram webhook secret")
 
+    message = update.get("message") or update.get("edited_message") or {}
+    chat = message.get("chat") or {}
+    chat_id = chat.get("id")
+
+    def send_webhook_reply(text: str) -> None:
+        if chat_id is None:
+            return
+        try:
+            if not send_telegram_message(str(chat_id), text):
+                logger.warning("Telegram webhook reply was not accepted")
+        except Exception:
+            logger.warning("Telegram webhook reply failed")
+
     try:
         link_token, chat_id, username = parse_start_token(update)
     except HTTPException as exc:
-        # parse_start_token uses fixed, non-sensitive details; never log the
-        # Telegram update because it contains the user's one-time link token.
         logger.warning("Telegram webhook rejected update: %s", exc.detail)
-        raise
+        if exc.detail == "Open Telegram from the PlayFinder profile link":
+            send_webhook_reply(
+                "To connect Telegram, open PlayFinder, go to your profile, and tap Connect Telegram. "
+                "Then press Start from the link that opens."
+            )
+            return {"status": "link_required"}
+        return {"status": "ignored"}
+
     user = db.query(User).filter(User.telegram_link_token == link_token).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Telegram link token not found")
+        send_webhook_reply(
+            "This PlayFinder link could not be matched. Return to your profile and tap Connect Telegram again."
+        )
+        return {"status": "link_not_found"}
 
     linked_user = db.query(User).filter(User.telegram_chat_id == chat_id, User.id != user.id).first()
     if linked_user:
-        raise HTTPException(status_code=409, detail="This Telegram chat is already linked")
+        send_webhook_reply(
+            "This Telegram chat is already connected to another PlayFinder account. Disconnect it there first."
+        )
+        return {"status": "chat_already_linked"}
 
     user.telegram_chat_id = chat_id
     user.telegram_username = username
     user.telegram_linked_at = telegram_linked_at()
     db.commit()
-    send_telegram_message(chat_id, "Telegram alerts are connected to your PlayFinder account.")
+    send_webhook_reply("Telegram alerts are connected to your PlayFinder account.")
     return {"status": "linked"}
 
 

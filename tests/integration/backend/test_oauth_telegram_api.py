@@ -158,3 +158,35 @@ def test_telegram_webhook_links_user_and_persists_fields(api_client, app_main, d
     assert user.telegram_chat_id == "42"
     assert user.telegram_username == "telegram_player"
     assert user.telegram_linked_at == linked_at.replace(tzinfo=None)
+
+
+def test_telegram_webhook_acknowledges_start_without_link_payload(api_client, app_main, monkeypatch):
+    sent = []
+    monkeypatch.setattr(app_main, "get_telegram_webhook_secret", lambda: "webhook-secret")
+    monkeypatch.setattr(app_main, "send_telegram_message", lambda chat_id, text: sent.append((chat_id, text)) or True)
+
+    response = api_client.post(
+        "/telegram/webhook/webhook-secret",
+        json={"message": {"text": "/start", "chat": {"id": 42}}},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "link_required"}
+    assert sent[0][0] == "42"
+    assert "Connect Telegram" in sent[0][1]
+
+
+def test_telegram_webhook_acknowledges_unknown_link_token(api_client, app_main, monkeypatch):
+    sent = []
+    monkeypatch.setattr(app_main, "get_telegram_webhook_secret", lambda: "webhook-secret")
+    monkeypatch.setattr(app_main, "send_telegram_message", lambda chat_id, text: sent.append((chat_id, text)) or True)
+
+    response = api_client.post(
+        "/telegram/webhook/webhook-secret",
+        json={"message": {"text": "/start stale-token", "chat": {"id": 42}}},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "link_not_found"}
+    assert sent[0][0] == "42"
+    assert "Connect Telegram" in sent[0][1]
