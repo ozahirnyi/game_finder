@@ -190,8 +190,9 @@ Telegram alerts MVP uses a Telegram bot. Create a bot with BotFather, set `TELEG
 https://example.com/api/telegram/webhook/your-webhook-secret
 ```
 
-The profile page can then open `https://t.me/<bot>?start=<link-token>`. After the user presses Start,
-the backend stores the Telegram chat and can send test alerts plus saved-game confirmation messages.
+The profile page opens the bot with a Telegram deep link carrying the user's one-time start token. After
+the user presses Start, the backend stores the Telegram chat and can send test alerts plus saved-game
+confirmation messages.
 
 Daily price alerts use the saved games table, Telegram, and IsThereAnyDeal. Set
 `PRICE_ALERT_WATCHER_ENABLED=true` on the backend service to run the watcher inside the API process.

@@ -34,7 +34,7 @@ def build_telegram_link_url(link_token: str) -> str:
     username = get_telegram_bot_username()
     if not username:
         raise HTTPException(status_code=503, detail="Telegram bot username is not configured")
-    return f"https://t.me/{username}?start={link_token}"
+    return f"tg://resolve?domain={username}&start={link_token}"
 
 
 def parse_start_token(update: dict[str, Any]) -> tuple[str, str, str | None]:
