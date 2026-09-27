@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import UUID
 
 import pytest
@@ -237,6 +237,66 @@ def test_in_app_price_alert_notification_is_owner_scoped_and_deduplicated(
         {"country": "UA"},
         {"country": "UA"},
     ]
+
+
+def test_telegram_price_alert_sends_and_deduplicates_wishlist_deal(
+    db_session, user_factory, monkeypatch
+):
+    user = user_factory(
+        email="telegram-price-alert@example.com",
+        telegram_chat_id="telegram-chat-123",
+        price_country_code="UA",
+    )
+    item = WishlistItem(
+        user_id=user.id,
+        catalog_game_id=909,
+        title="Disco Elysium",
+        source="steam",
+        external_id="632360",
+    )
+    db_session.add(item)
+    db_session.flush()
+    alert = PriceAlert(
+        user_id=user.id,
+        wishlist_item_id=item.id,
+        target_price=10,
+        target_discount=50,
+        delivery_channels=["telegram"],
+    )
+    db_session.add(alert)
+    db_session.commit()
+
+    monkeypatch.setattr(
+        runner,
+        "fetch_steam_store_game_detail",
+        AsyncMock(
+            return_value={
+                "current": {
+                    "shop": "Steam",
+                    "price": {"amount": 9.99, "currency": "UAH"},
+                    "regular": {"amount": 24.99},
+                    "cut": 60,
+                    "url": "https://store.example/disco",
+                }
+            }
+        ),
+    )
+    send_telegram = Mock(return_value=True)
+    monkeypatch.setattr(runner, "send_telegram_message", send_telegram)
+
+    first = asyncio.run(runner.check_price_alerts(db_session))
+    second = asyncio.run(runner.check_price_alerts(db_session))
+
+    assert first.alerts_sent == 1
+    assert second.alerts_sent == 0
+    send_telegram.assert_called_once_with(
+        "telegram-chat-123",
+        "Disco Elysium is on sale.\n"
+        "Now: 9.99 UAH at Steam (60% off).\n"
+        "Regular: 24.99 UAH.\n"
+        "https://store.example/disco",
+    )
+    assert db_session.query(Notification).filter_by(user_id=user.id).count() == 0
 
 
 def test_telegram_delivery_requires_linked_chat_without_persisting_or_updating(
