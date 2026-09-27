@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { Avatar } from "@/components/GameCover";
 import { Chip, InlineError, Panel, SectionHeader } from "@/components/ui-bits";
@@ -20,6 +21,7 @@ import {
   unlinkGoogleAccount,
 } from "@/lib/api";
 import { Check, Gamepad2, Loader2, RefreshCw, Unlink, Upload } from "lucide-react";
+import { openTelegramLink } from "@/lib/telegram";
 
 function ServiceRow({
   icon,
@@ -75,6 +77,7 @@ const btnPrimary =
 
 export function ConnectedServices() {
   const client = useQueryClient();
+  const telegramLinkWindow = useRef<Window | null>(null);
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
   const onboardingQuery = useQuery({
     queryKey: ["onboarding-summary"],
@@ -109,8 +112,17 @@ export function ConnectedServices() {
   const telegramAction = useMutation<TelegramLink | TelegramAccount, Error, "link" | "unlink">({
     mutationFn: (kind) => (kind === "link" ? getTelegramLinkUrl() : unlinkTelegramAccount()),
     onSuccess: (result) => {
-      if ("url" in result && result.url) window.location.assign(result.url);
+      if ("url" in result && result.url) {
+        openTelegramLink(result.url, telegramLinkWindow.current);
+      } else {
+        telegramLinkWindow.current?.close();
+      }
+      telegramLinkWindow.current = null;
       client.invalidateQueries({ queryKey: ["telegram-account"] });
+    },
+    onError: () => {
+      telegramLinkWindow.current?.close();
+      telegramLinkWindow.current = null;
     },
   });
   const steam = steamQuery.data;
@@ -223,7 +235,12 @@ export function ConnectedServices() {
             <button
               className={btnPrimary}
               disabled={!telegram?.configured || telegramAction.isPending}
-              onClick={() => telegramAction.mutate("link")}
+              onClick={() => {
+                const popup = window.open("about:blank", "_blank");
+                if (popup) popup.opener = null;
+                telegramLinkWindow.current = popup;
+                telegramAction.mutate("link");
+              }}
             >
               Connect Telegram
             </button>

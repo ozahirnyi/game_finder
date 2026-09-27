@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({
@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({
   getOnboardingSummary: vi.fn(),
   getSteamAccount: vi.fn(),
   getTelegramAccount: vi.fn(),
+  getTelegramLinkUrl: vi.fn(),
   unlinkGoogleAccount: vi.fn(),
 }));
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual("@/lib/api")), ...api }));
@@ -51,4 +52,36 @@ it("shows a Steam linking error returned by the callback", async () => {
     </QueryClientProvider>,
   );
   expect(await screen.findByText("This Steam account is already linked")).toBeInTheDocument();
+});
+
+it("opens Telegram from a click-activated tab after requesting the link", async () => {
+  api.getProfile.mockResolvedValue({ google_linked: false });
+  api.getOnboardingSummary.mockResolvedValue({ psn_library_games: 0 });
+  api.getSteamAccount.mockResolvedValue({ linked: false });
+  api.getTelegramAccount.mockResolvedValue({ configured: true, linked: false });
+  const telegramTab = Object.assign(new EventTarget(), {
+    location: { href: "about:blank" },
+    closed: false,
+  }) as unknown as Window;
+  const open = vi.spyOn(window, "open").mockReturnValue(telegramTab);
+  api.getTelegramLinkUrl.mockImplementation(() => {
+    expect(open).toHaveBeenCalledWith("about:blank", "_blank");
+    return Promise.resolve({
+      configured: true,
+      url: "https://t.me/playfinder_alerts_bot?start=one-time-token",
+    });
+  });
+
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ConnectedServices />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Connect Telegram" }));
+
+  await waitFor(() => {
+    expect(telegramTab.location.href).toBe(
+      "tg://resolve?domain=playfinder_alerts_bot&start=one-time-token",
+    );
+  });
 });
