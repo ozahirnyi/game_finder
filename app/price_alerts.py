@@ -114,7 +114,8 @@ def alert_matches(alert: PriceAlert, deal: dict[str, Any]) -> bool:
 async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult) -> None:
     alerts = db.query(PriceAlert).all()
     for alert in alerts:
-        if "in_app" not in (alert.delivery_channels or []):
+        channels = set(alert.delivery_channels or [])
+        if not channels:
             continue
         item = db.query(WishlistItem).filter(
             WishlistItem.id == alert.wishlist_item_id,
@@ -130,18 +131,33 @@ async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult)
             )
             deal = price_data.get("current")
             alert_key = build_price_alert_key(deal) if deal else None
-            if not deal or not alert_key or not alert_matches(alert, deal) or alert.last_notification_key == alert_key:
+            if not deal or not alert_key or not alert_matches(alert, deal):
                 continue
-            create_notification(
-                db,
-                alert.user_id,
-                "price_alert",
-                price_alert_payload(catalog_game_id=item.catalog_game_id),
-            )
-            alert.last_notification_key = alert_key
-            alert.last_delivered_at = datetime.now(timezone.utc)
-            result.in_app_notifications_created += 1
-            db.commit()
+
+            if "in_app" in channels and alert.last_notification_key != alert_key:
+                create_notification(
+                    db,
+                    alert.user_id,
+                    "price_alert",
+                    price_alert_payload(catalog_game_id=item.catalog_game_id),
+                )
+                alert.last_notification_key = alert_key
+                alert.last_delivered_at = datetime.now(timezone.utc)
+                result.in_app_notifications_created += 1
+                db.commit()
+
+            if "telegram" in channels and alert.telegram_last_notification_key != alert_key:
+                message = format_price_alert_message(item.title, price_data)
+                if user.telegram_chat_id and message:
+                    if send_telegram_message(user.telegram_chat_id, message):
+                        alert.telegram_last_notification_key = alert_key
+                        alert.last_delivered_at = datetime.now(timezone.utc)
+                        result.alerts_sent += 1
+                        db.commit()
+                    else:
+                        result.errors += 1
+                else:
+                    result.errors += 1
         except HTTPException:
             result.errors += 1
             db.rollback()

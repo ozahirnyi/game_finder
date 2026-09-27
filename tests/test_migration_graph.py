@@ -6,8 +6,29 @@ import pytest
 def test_alembic_has_a_single_upgrade_head():
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["c6d8e0f2a4b6"]
-    assert script.get_revision("c6d8e0f2a4b6").down_revision == "e5f6a7b8c9d0"
+    assert script.get_heads() == ["a4b6c8d0e2f4"]
+    assert script.get_revision("a4b6c8d0e2f4").down_revision == "c6d8e0f2a4b6"
+
+
+def test_telegram_price_alert_deduplication_migration_round_trip(monkeypatch):
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import Column, Integer, MetaData, Table, create_engine, inspect
+
+    engine = create_engine("sqlite://")
+    metadata = MetaData()
+    Table("price_alerts", metadata, Column("id", Integer, primary_key=True))
+    metadata.create_all(engine)
+    migration = ScriptDirectory.from_config(Config("alembic.ini")).get_revision("a4b6c8d0e2f4").module
+    with engine.begin() as connection:
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade()
+        columns = {column["name"] for column in inspect(connection).get_columns("price_alerts")}
+        assert "telegram_last_notification_key" in columns
+        migration.downgrade()
+        columns = {column["name"] for column in inspect(connection).get_columns("price_alerts")}
+        assert "telegram_last_notification_key" not in columns
+    engine.dispose()
 
 
 def test_typed_invite_message_migration_preserves_existing_messages(monkeypatch):
