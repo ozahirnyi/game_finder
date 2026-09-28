@@ -3841,7 +3841,7 @@ def _rank_search_results(query: str, results: list[dict]) -> list[dict]:
         rating_count = game.get("rating_count")
         if isinstance(rating_count, (int, float)) and not isinstance(rating_count, bool) and rating_count > 0:
             quality += min(15, math.log10(rating_count + 1) * 3)
-        quality = min(20, quality)
+        quality = min(30, quality)
         return -(relevance + quality), -quality, index
 
     return [game for _index, game in sorted(enumerate(results), key=lambda item: rank(item[1], item[0]))]
@@ -3997,7 +3997,7 @@ async def search(
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v10", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
+    key = build_cache_key("igdb_search_v11", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
         if on_sale:
