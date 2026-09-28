@@ -216,7 +216,7 @@ export function InlineError({ children }: { children: ReactNode }) {
 
 /**
  * Canonical price block: regular price, current price, discount, currency, store.
- * Renders a neutral "price unavailable" state when there is no price.
+ * Renders nothing when no price is available.
  */
 export function PriceBlock({
   price,
@@ -226,7 +226,6 @@ export function PriceBlock({
   store,
   size = "md",
   align = "right",
-  unavailable = false,
   isFree = false,
 }: {
   price?: number | null;
@@ -236,7 +235,6 @@ export function PriceBlock({
   store?: string;
   size?: "sm" | "md" | "lg";
   align?: "left" | "right";
-  unavailable?: boolean;
   isFree?: boolean;
 }) {
   const alignment = align === "right" ? "items-end text-right" : "items-start text-left";
@@ -250,14 +248,7 @@ export function PriceBlock({
     );
   }
 
-  if (unavailable || price == null) {
-    return (
-      <div className={`flex flex-col ${alignment}`}>
-        <span className="label-mono text-muted-foreground">Price unavailable</span>
-        {store && <span className="label-mono mt-1 text-muted-foreground/70">{store}</span>}
-      </div>
-    );
-  }
+  if (price == null) return null;
 
   const priceClass =
     size === "lg"

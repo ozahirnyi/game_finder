@@ -109,7 +109,7 @@ export function GameCard({
             )}
           </div>
         )}
-        {showPrice && (
+        {showPrice && (game.price != null || game.isFree) && (
           <div className="mt-auto pt-4">
             <PriceBlock
               price={game.price ?? null}

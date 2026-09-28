@@ -115,6 +115,7 @@ def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
             "cover": {"url": "//images.igdb.com/igdb/image/upload/t_thumb/cover.jpg"},
             "genres": [{"name": "RPG"}],
             "platforms": [{"name": "PC (Microsoft Windows)"}],
+            "total_rating_count": 1234,
             "game_type": {"type": 0},
             "external_games": [{"category": 1, "uid": "1145350"}],
         }
@@ -126,6 +127,7 @@ def test_normalize_igdb_game_uses_igdb_identity_and_steam_external_id():
     assert result["steam_appid"] == 1145350
     assert result["genres"] == ["RPG"]
     assert result["game_type"] == 0
+    assert result["rating_count"] == 1234
 
 
 def test_normalize_igdb_game_keeps_provider_alternative_names():

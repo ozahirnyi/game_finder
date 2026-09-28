@@ -6,6 +6,7 @@ import re
 import hashlib
 import json
 import logging
+import math
 import unicodedata
 import time
 from dataclasses import dataclass
@@ -3812,14 +3813,38 @@ def _search_title_key(value: str) -> str:
 
 def _rank_search_results(query: str, results: list[dict]) -> list[dict]:
     query_key = _search_title_key(query)
+    query_words = set(query_key.split())
 
-    def rank(game: dict) -> tuple[int, float]:
+    def rank(game: dict, index: int) -> tuple[float, float, int]:
         title_key = _search_title_key(str(game.get("name") or ""))
-        match_rank = 0 if title_key == query_key else 1 if title_key.startswith(query_key) else 2
-        rating = game.get("rating")
-        return match_rank, -float(rating) if isinstance(rating, (int, float)) else 0.0
+        title_words = set(title_key.split())
+        if title_key == query_key:
+            relevance = 70
+        elif title_key.startswith(query_key):
+            relevance = 60
+        elif query_words and query_words.issubset(title_words):
+            relevance = 45
+        else:
+            overlap = len(query_words.intersection(title_words))
+            relevance = 35 * overlap / max(len(query_words), 1)
 
-    return sorted(results, key=rank)
+        quality = 0.0
+        quality += 10 if game.get("cover_image") or game.get("background_image") else 0
+        quality += 5 if str(game.get("description_raw") or "").strip() else 0
+        quality += 2 if game.get("released") else 0
+        quality += 6 if game.get("platforms") else 0
+        quality += 2 if game.get("genres") else 0
+        quality += 6 if game.get("steam_appid") else 0
+        rating = game.get("rating")
+        if isinstance(rating, (int, float)) and not isinstance(rating, bool):
+            quality += min(10, max(0, float(rating)) / 10)
+        rating_count = game.get("rating_count")
+        if isinstance(rating_count, (int, float)) and not isinstance(rating_count, bool) and rating_count > 0:
+            quality += min(15, math.log10(rating_count + 1) * 3)
+        quality = min(20, quality)
+        return -(relevance + quality), -quality, index
+
+    return [game for _index, game in sorted(enumerate(results), key=lambda item: rank(item[1], item[0]))]
 
 
 _PLATFORM_LABELS = {
@@ -3972,7 +3997,7 @@ async def search(
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v9", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
+    key = build_cache_key("igdb_search_v10", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
         if on_sale:

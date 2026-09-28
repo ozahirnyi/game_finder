@@ -176,6 +176,7 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
         "cover_image": cover, "background_image": cover, "hero_image": hero_image,
         "description_raw": game.get("summary"),
         "rating": game.get("rating") if game.get("rating") is not None else game.get("total_rating"), "genres": [x["name"] for x in game.get("genres", []) if x.get("name")],
+        "rating_count": game.get("total_rating_count") if isinstance(game.get("total_rating_count"), int) and not isinstance(game.get("total_rating_count"), bool) else None,
         "platforms": [x.get("name") or (x.get("platform") or {}).get("name") for x in game.get("platforms", []) if x.get("name") or (x.get("platform") or {}).get("name")],
         "game_type": (game.get("game_type") or {}).get("type") if isinstance(game.get("game_type"), dict) else game.get("game_type"),
         "game_modes": [x["name"] for x in game.get("game_modes", []) if x.get("name")],
@@ -196,7 +197,7 @@ def normalize_igdb_game(game: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-_FIELDS = "fields id,name,alternative_names.name,first_release_date,summary,rating,total_rating,cover.url,cover.width,cover.height,artworks.url,artworks.width,artworks.height,screenshots.url,screenshots.width,screenshots.height,genres.name,platforms.name,game_type.type,game_modes.name,keywords.name,external_games.category,external_games.uid;"
+_FIELDS = "fields id,name,alternative_names.name,first_release_date,summary,rating,total_rating,total_rating_count,cover.url,cover.width,cover.height,artworks.url,artworks.width,artworks.height,screenshots.url,screenshots.width,screenshots.height,genres.name,platforms.name,game_type.type,game_modes.name,keywords.name,external_games.category,external_games.uid;"
 
 
 async def fetch_igdb_games(

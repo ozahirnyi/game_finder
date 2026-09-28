@@ -49,6 +49,20 @@ describe("GameCard", () => {
     ).toBeInTheDocument();
   });
 
+  it("omits the price block when no price is available", () => {
+    const { container } = render(
+      <GameCard
+        game={{
+          title: "UFC",
+          coverFrom: "#111111",
+          coverTo: "#222222",
+        }}
+      />,
+    );
+
+    expect(container).not.toHaveTextContent("Price unavailable");
+  });
+
   it("keeps ordinary cards as posters even when wide artwork is available", () => {
     const { container } = render(
       <GameCard

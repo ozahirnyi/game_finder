@@ -276,9 +276,11 @@ function WishlistPage() {
                 </Link>
                 <p className="mt-1 text-xs text-muted-foreground">Saved game</p>
               </div>
-              <p className="text-right text-xs font-bold text-muted-foreground">
-                {wishlistPriceLabel(priceQueries[index]?.data?.current?.price)}
-              </p>
+              {wishlistPriceLabel(priceQueries[index]?.data?.current?.price) && (
+                <p className="text-right text-xs font-bold text-muted-foreground">
+                  {wishlistPriceLabel(priceQueries[index]?.data?.current?.price)}
+                </p>
+              )}
               <div className="flex items-center justify-end gap-2">
                 <Link
                   to="/games/$gameId"
