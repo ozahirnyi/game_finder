@@ -10,5 +10,5 @@ export function libraryPlaytime(minutes: number | null | undefined) {
 }
 
 export function wishlistPriceLabel(price?: { amount: number; currency: string } | null) {
-  return price ? `${price.amount.toFixed(2)} ${price.currency}` : "Price unavailable";
+  return price ? `${price.amount.toFixed(2)} ${price.currency}` : null;
 }

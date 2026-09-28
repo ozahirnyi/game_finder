@@ -14,8 +14,8 @@ describe("collection presentation", () => {
     expect(libraryPlaytime(null)).toBe("—");
   });
 
-  it("formats a current wishlist price and keeps the unavailable state for missing data", () => {
+  it("formats a current wishlist price and omits a label when price data is missing", () => {
     expect(wishlistPriceLabel({ amount: 19.99, currency: "USD" })).toBe("19.99 USD");
-    expect(wishlistPriceLabel()).toBe("Price unavailable");
+    expect(wishlistPriceLabel()).toBeNull();
   });
 });

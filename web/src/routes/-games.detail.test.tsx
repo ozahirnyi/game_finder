@@ -264,7 +264,7 @@ describe("game detail presentation", () => {
     expect(screen.getByRole("button", { name: "Retry price history" })).toBeInTheDocument();
   });
 
-  it("keeps the historical chart visible when the current price is unavailable", async () => {
+  it("keeps the historical chart visible without an unavailable current-price label", async () => {
     api.getPriceHistory.mockResolvedValue({
       current: undefined,
       history: [
@@ -274,8 +274,8 @@ describe("game detail presentation", () => {
     });
     renderDetail();
 
-    expect(await screen.findByText("Price unavailable")).toBeInTheDocument();
     expect(await screen.findByLabelText("Price history chart")).toBeInTheDocument();
+    expect(screen.queryByText("Price unavailable")).not.toBeInTheDocument();
     expect(screen.getByText("Historical low")).toBeInTheDocument();
   });
 

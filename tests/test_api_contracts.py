@@ -191,6 +191,23 @@ def test_search_uses_igdb_catalog_results(monkeypatch):
     }]}
 
 
+def test_search_ranks_complete_popular_matches_above_metadata_empty_exact_title():
+    results = main._rank_search_results("UFC", [
+        {"id": 1, "name": "UFC"},
+        {
+            "id": 2,
+            "name": "UFC 5",
+            "cover_image": "https://images.example/ufc.jpg",
+            "description_raw": "Mixed martial arts game",
+            "platforms": ["PlayStation 4", "Xbox One"],
+            "genres": ["Sport"],
+            "rating_count": 5000,
+        },
+    ])
+
+    assert [game["id"] for game in results] == [2, 1]
+
+
 class CatalogGameDb:
     def __init__(self):
         self.games = []

@@ -370,6 +370,7 @@ class GameSearchItem(BaseModel):
     steam_price_title: str | None = None
     url: str | None = None
     rating: float | None = None
+    rating_count: int | None = Field(default=None, ge=0)
     genres: list[str] = Field(default_factory=list)
     platforms: list[str] = Field(default_factory=list)
     current: dict | None = None

@@ -462,7 +462,6 @@ function GameDetail() {
     online: boolean;
     activity?: string;
   }> = [];
-  const priceUnavailable = game.price == null && !priceQuery.data?.is_free;
   const platformSummary = summarizePlatforms(game.platforms);
   const rating = formatCatalogRating(game.rating);
   const releaseDate = formatCatalogReleaseDate(game.releaseDate);
@@ -756,7 +755,6 @@ function GameDetail() {
                 store={game.store}
                 size="lg"
                 align="left"
-                unavailable={priceUnavailable}
               />
             )}
             {!priceQuery.data?.history_available && priceQuery.data?.provider_message && (
