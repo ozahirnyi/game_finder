@@ -161,7 +161,7 @@ class PublicProfileRead(BaseModel):
     nickname: str
     avatar: str | None = None
     relationship: str
-    library: PublicDataBlock
+    library: PublicLibraryPageRead
     favorites: PublicDataBlock
     wishlist: PublicDataBlock
     steam: PublicDataBlock

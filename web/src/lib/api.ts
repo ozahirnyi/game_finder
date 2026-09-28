@@ -166,7 +166,7 @@ export type PublicProfile = {
   nickname: string;
   avatar?: string | null;
   relationship: "none" | "self" | "friends" | "outgoing_pending" | "incoming_pending";
-  library: PublicDataBlock<PublicLibraryGame[]>;
+  library: FriendProfile["library"];
   favorites: PublicDataBlock<CollectionGame[]>;
   wishlist: PublicDataBlock<CollectionGame[]>;
   steam: PublicDataBlock<PublicSteamAccount | null>;
@@ -878,8 +878,12 @@ export function removeFavorite(catalogGameId: number) {
   return apiRequest<void>(`/favorites/${catalogGameId}`, { auth: true, method: "DELETE" });
 }
 
-export function getPublicProfile(publicId: string) {
-  return apiRequest<PublicProfile>(`/users/${encodeURIComponent(publicId)}`, {
+export function getPublicProfile(publicId: string, page = 1, query = "") {
+  const search = new URLSearchParams();
+  if (page > 1) search.set("page", String(page));
+  if (query.trim()) search.set("q", query.trim());
+  const suffix = search.size ? `?${search}` : "";
+  return apiRequest<PublicProfile>(`/users/${encodeURIComponent(publicId)}${suffix}`, {
     includeToken: true,
   });
 }

@@ -1764,6 +1764,8 @@ async def recent_steam_game_players(
 @app.get("/users/{public_id}", response_model=PublicProfileRead)
 async def get_public_profile(
     public_id: str,
+    page: int = Query(default=1, ge=1),
+    q: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
@@ -1773,14 +1775,7 @@ async def get_public_profile(
 
     relationship = "none" if current_user is None else social_relationship(db, current_user.id, owner.id)
     library_snapshot = await build_visible_library_snapshot(db, current_user, owner)
-    if library_snapshot is None:
-        library = hidden_public_block()
-    else:
-        library = PublicDataBlock(
-            status=library_snapshot.status,
-            data=library_snapshot.items,
-            message=library_snapshot.message,
-        )
+    library = page_visible_library(library_snapshot, page, q)
 
     if can_view_section(owner, current_user, owner.favorites_visibility, db):
         favorites = db.query(Favorite).filter(Favorite.user_id == owner.id).order_by(Favorite.created_at.desc()).all()
