@@ -32,19 +32,22 @@ def _start_background_refresh(key: str, ttl: int, fetch_func):
         _refresh_tasks[key] = asyncio.create_task(_refresh_cache(key, ttl, fetch_func))
 
 
-async def get_json_cached(key: str, ttl: int, fetch_func):
+async def get_json_cached(
+    key: str, ttl: int, fetch_func, *, stale_while_revalidate: bool = False,
+):
     cached = await cache_get(key)
     if cached is not None:
         return cached
     stale_key = f"{key}:stale"
     stale = await cache_get(stale_key)
-    if stale is not None:
+    if stale is not None and stale_while_revalidate:
         _start_background_refresh(key, ttl, fetch_func)
         return stale
     try:
         data = await fetch_func()
     except Exception:
-        stale = await cache_get(stale_key)
+        if stale is None:
+            stale = await cache_get(stale_key)
         if stale is not None:
             return stale
         raise

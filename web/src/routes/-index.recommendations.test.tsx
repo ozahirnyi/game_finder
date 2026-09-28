@@ -8,7 +8,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -301,6 +301,27 @@ describe("Home recommendations", () => {
     expect(await screen.findByText("Deal 11")).toBeInTheDocument();
     expect(screen.queryByText("Twelfth deal")).not.toBeInTheDocument();
     await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("US", 13));
+  });
+
+  it("waits for a signed-in profile before loading home deals for its region", async () => {
+    api.getAuthSnapshot.mockReturnValue(true);
+    api.getDeals.mockClear();
+    let resolveProfile!: (profile: { display_name: string; price_country_code: string }) => void;
+    api.getProfile.mockReturnValue(
+      new Promise((resolve) => {
+        resolveProfile = resolve;
+      }),
+    );
+
+    renderHome();
+
+    await waitFor(() => expect(api.getProfile).toHaveBeenCalled());
+    expect(api.getDeals).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveProfile({ display_name: "Region tester", price_country_code: "UA" });
+    });
+    await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("UA", 13));
   });
 
   it("uses high-density Steam posters for unmatched standard deals and retains trending media fallbacks", async () => {

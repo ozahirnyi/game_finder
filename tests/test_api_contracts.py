@@ -138,7 +138,7 @@ def test_steam_detail_keeps_steam_metadata_when_igdb_is_unavailable(monkeypatch)
 
 
 def test_search_uses_igdb_catalog_results(monkeypatch):
-    async def fake_cache(_key, _ttl, fetch):
+    async def fake_cache(_key, _ttl, fetch, **_kwargs):
         return await fetch()
 
     async def fake_igdb(query, *, page, filters):
@@ -654,7 +654,10 @@ def test_upcoming_games_returns_igdb_results(monkeypatch):
 
 
 def test_trending_games_returns_igdb_results(monkeypatch):
-    async def fake_cache(_key, _ttl, fetch):
+    cache_options = []
+
+    async def fake_cache(_key, _ttl, fetch, **_kwargs):
+        cache_options.append(_kwargs)
         return await fetch()
 
     async def fake_fetch_igdb_trending_games(page: int, page_size: int):
@@ -689,6 +692,10 @@ def test_trending_games_returns_igdb_results(monkeypatch):
     assert response.status_code == 200
     assert response.json()["results"][0]["name"] == "Trending Game"
     assert response.json()["results"][0]["current"]["price"] == {"amount": 9.99, "currency": "USD"}
+    assert cache_options == [
+        {"stale_while_revalidate": True},
+        {"stale_while_revalidate": True},
+    ]
 
 
 def test_game_price_history_returns_normalized_prices(monkeypatch):
@@ -836,7 +843,10 @@ def test_game_price_history_uses_steam_when_itad_is_unavailable(monkeypatch):
 
 
 def test_homepage_deals_returns_steam_store_deals(monkeypatch):
-    async def fake_cache(_key, _ttl, fetch):
+    cache_options = []
+
+    async def fake_cache(_key, _ttl, fetch, **kwargs):
+        cache_options.append(kwargs)
         return await fetch()
 
     async def fake_fetch_steam_store_deals(country: str, page_size: int):
@@ -882,13 +892,14 @@ def test_homepage_deals_returns_steam_store_deals(monkeypatch):
     assert payload["results"][0]["name"] == "Palworld"
     assert payload["results"][0]["current"]["cut"] == 30
     assert payload["results"][0]["background_image"].startswith("https://shared.akamai.steamstatic.com/")
+    assert cache_options == [{"stale_while_revalidate": True}]
 
 
 def test_homepage_deals_exposes_a_stable_cache_creation_time(monkeypatch):
     cache = {}
     calls = 0
 
-    async def fake_cache(key, _ttl, fetch):
+    async def fake_cache(key, _ttl, fetch, **_kwargs):
         if key not in cache:
             cache[key] = await fetch()
         return cache[key]
@@ -915,7 +926,7 @@ def test_homepage_deals_exposes_a_stable_cache_creation_time(monkeypatch):
 
 
 def test_homepage_deals_does_not_attach_a_different_igdb_game(monkeypatch):
-    async def fake_cache(_key, _ttl, fetch):
+    async def fake_cache(_key, _ttl, fetch, **_kwargs):
         return await fetch()
 
     async def fake_fetch_steam_store_deals(**_kwargs):
@@ -936,7 +947,7 @@ def test_homepage_deals_does_not_attach_a_different_igdb_game(monkeypatch):
 
 
 def test_homepage_deals_returns_steam_results_when_igdb_enrichment_is_slow(monkeypatch):
-    async def fake_cache(_key, _ttl, fetch):
+    async def fake_cache(_key, _ttl, fetch, **_kwargs):
         return await fetch()
 
     async def fake_fetch_steam_store_deals(**_kwargs):

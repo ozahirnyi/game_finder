@@ -3953,7 +3953,12 @@ async def _enrich_catalog_game_prices(payload: dict, country: str) -> dict:
                     )
 
         try:
-            detail = await get_json_cached(key, CATALOG_PRICE_CACHE_TTL, fetch)
+            detail = await get_json_cached(
+                key,
+                CATALOG_PRICE_CACHE_TTL,
+                fetch,
+                stale_while_revalidate=True,
+            )
         except Exception:
             logger.warning("Catalog price lookup failed appid=%s country=%s", steam_appid, country)
             return game
@@ -4142,7 +4147,12 @@ async def trending_games(
         return await _enrich_catalog_game_prices(payload, normalized_country)
 
     try:
-        return await get_json_cached(key, CACHE_TTL, fetch)
+        return await get_json_cached(
+            key,
+            CACHE_TTL,
+            fetch,
+            stale_while_revalidate=True,
+        )
     except IGDBError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
@@ -4412,7 +4422,12 @@ async def homepage_deals(
             "cached_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    return await get_json_cached(key, CACHE_TTL, fetch)
+    return await get_json_cached(
+        key,
+        CACHE_TTL,
+        fetch,
+        stale_while_revalidate=True,
+    )
 
 
 @app.get("/prices/genre-deals", response_model=GenreDealResponse)

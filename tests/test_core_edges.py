@@ -83,6 +83,42 @@ def test_cache_hit_miss_and_redis_failure_paths(monkeypatch):
     asyncio.run(scenario())
 
 
+def test_stale_cache_hit_remains_synchronous_by_default(monkeypatch):
+    async def scenario():
+        provider_started = asyncio.Event()
+        release_provider = asyncio.Event()
+        writes = []
+
+        async def get_cached(key):
+            if key.endswith(":stale"):
+                return {"stale": True}
+            return None
+
+        async def fetch():
+            provider_started.set()
+            await release_provider.wait()
+            return {"fresh": True}
+
+        async def set_cached(key, data, ttl):
+            writes.append((key, data, ttl))
+
+        monkeypatch.setattr(cache, "cache_get", get_cached)
+        monkeypatch.setattr(cache, "cache_set", set_cached)
+
+        request = asyncio.create_task(cache.get_json_cached("k", 10, fetch))
+        await asyncio.wait_for(provider_started.wait(), timeout=1)
+        assert not request.done()
+
+        release_provider.set()
+        assert await asyncio.wait_for(request, timeout=1) == {"fresh": True}
+        assert writes == [
+            ("k", {"fresh": True}, 10),
+            ("k:stale", {"fresh": True}, 86400),
+        ]
+
+    asyncio.run(scenario())
+
+
 def test_stale_cache_returns_while_one_background_refresh_updates_both_copies(monkeypatch):
     async def scenario():
         provider_started = asyncio.Event()
@@ -111,9 +147,13 @@ def test_stale_cache_returns_while_one_background_refresh_updates_both_copies(mo
         monkeypatch.setattr(cache, "cache_get", get_cached)
         monkeypatch.setattr(cache, "cache_set", set_cached)
 
-        assert await asyncio.wait_for(cache.get_json_cached("k", 10, fetch), timeout=1) == {"stale": True}
+        assert await asyncio.wait_for(
+            cache.get_json_cached("k", 10, fetch, stale_while_revalidate=True), timeout=1,
+        ) == {"stale": True}
         await asyncio.wait_for(provider_started.wait(), timeout=1)
-        assert await asyncio.wait_for(cache.get_json_cached("k", 10, fetch), timeout=1) == {"stale": True}
+        assert await asyncio.wait_for(
+            cache.get_json_cached("k", 10, fetch, stale_while_revalidate=True), timeout=1,
+        ) == {"stale": True}
         assert fetch_calls == 1
 
         release_provider.set()
@@ -147,7 +187,9 @@ def test_failed_background_refresh_is_logged_without_replacing_stale(monkeypatch
         monkeypatch.setattr(cache, "cache_set", set_cached)
 
         with caplog.at_level(logging.ERROR, logger=cache.__name__):
-            assert await cache.get_json_cached("k", 10, fetch) == {"stale": True}
+            assert await cache.get_json_cached(
+                "k", 10, fetch, stale_while_revalidate=True,
+            ) == {"stale": True}
             await asyncio.wait_for(refresh_attempted.wait(), timeout=1)
 
         assert writes == []
