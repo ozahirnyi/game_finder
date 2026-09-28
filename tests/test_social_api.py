@@ -363,7 +363,10 @@ def test_public_profile_library_visibility_does_not_leak_hidden_data(social_db, 
         assert library["status"] == "ready"
         assert library["data"][0]["title"] == "Secret game"
     else:
-        assert library == {"status": "hidden", "data": [], "message": "This section is private."}
+        assert library["status"] == "hidden"
+        assert library["data"] == []
+        assert library["message"] == "This section is private."
+        assert library["total"] == 0
         assert "Secret game" not in response.text
 
 
@@ -387,6 +390,28 @@ def test_public_profile_returns_owned_library_and_collection_covers(social_db):
     assert [game["title"] for game in payload["library"]["data"]] == ["Astro", "Baldur", "Zelda"]
     assert payload["favorites"]["data"][0]["cover_url"] == "https://cover/favorite"
     assert payload["wishlist"]["data"][0]["cover_url"] == "https://cover/wishlist"
+
+
+def test_public_profile_library_supports_search_and_pagination(social_db):
+    viewer, owner, *_ = create_users(social_db)
+    social_db.add_all(
+        [
+            Game(owner_id=owner.id, title=f"Game {index:02d}", source="manual")
+            for index in range(13)
+        ]
+    )
+    social_db.commit()
+    main.app.dependency_overrides[main.get_db] = lambda: social_db
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: viewer
+
+    response = client.get(f"/users/{owner.public_id}?page=2&q=game")
+
+    assert response.status_code == 200
+    library = response.json()["library"]
+    assert library["page"] == 2
+    assert library["page_size"] == 12
+    assert library["total"] == 13
+    assert [game["title"] for game in library["data"]] == ["Game 12"]
 
 
 def test_public_profile_includes_live_steam_library_for_linked_account(monkeypatch, social_db):

@@ -8,7 +8,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -34,7 +34,11 @@ vi.mock("@/components/ProfileView", () => ({
       name: string;
       hours: string | number;
       games: { title: string }[];
-      libraryPagination?: { query: string; onQueryChange: (query: string) => void };
+      libraryPagination?: {
+        query: string;
+        total: number;
+        onQueryChange: (query: string) => void;
+      };
     };
     isSelf: boolean;
     initialComposer?: string;
@@ -53,6 +57,7 @@ vi.mock("@/components/ProfileView", () => ({
       {profile.games.map((game) => (
         <p key={game.title}>{game.title}</p>
       ))}
+      <p>Visible games: {profile.games.length}</p>
       <p>{initialComposer ?? "none"}</p>
       {isSelf && <button>Settings</button>}
       {viewer?.canMessage && <button>Message</button>}
@@ -96,7 +101,15 @@ const publicProfile = (relationship: string) => ({
   public_id: "owner",
   nickname: "Owner",
   relationship,
-  library: { status: "empty", data: [], message: "No saved games yet." },
+  library: {
+    status: "empty",
+    data: [],
+    message: "No saved games yet.",
+    page: 1,
+    page_size: 12,
+    total: 0,
+    summary: { total_games: 0, total_playtime: 0, platform_counts: {} },
+  },
   favorites: { status: "empty", data: [], message: "No favorites yet." },
   wishlist: { status: "empty", data: [], message: "No wishlist yet." },
   steam: { status: "empty", data: [], message: "Steam is not linked." },
@@ -177,8 +190,37 @@ describe("PublicProfilePage", () => {
   });
 
   it("keeps anonymous strangers on ProfileView without friend actions", async () => {
+    const allGames = Array.from({ length: 12 }, (_, index) => ({
+      id: `game-${index}`,
+      title: index === 0 ? "Hades" : `Public game ${index}`,
+      source: "manual",
+    }));
+    api.getPublicProfile.mockImplementation((_publicId, page = 1, query = "") =>
+      Promise.resolve({
+        ...publicProfile("none"),
+        library: {
+          status: "ready",
+          data: query ? [allGames[0]] : allGames,
+          page,
+          page_size: 12,
+          total: query ? 1 : 13,
+          summary: { total_games: 13, total_playtime: 0, platform_counts: { manual: 13 } },
+        },
+      }),
+    );
     renderProfile();
     expect(await screen.findByRole("heading", { name: "Owner" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Search library" })).toBeInTheDocument();
+    expect(await screen.findByText("Visible games: 12")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Search library" }), {
+      target: { value: "Hades" },
+    });
+    await waitFor(() => expect(api.getPublicProfile).toHaveBeenLastCalledWith("owner", 1, "Hades"));
+    expect(await screen.findByText("Visible games: 1")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Search library" }), {
+      target: { value: "" },
+    });
+    expect(await screen.findByText("Visible games: 12")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Message" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Invite" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add friend" })).not.toBeInTheDocument();

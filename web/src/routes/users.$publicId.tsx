@@ -42,6 +42,18 @@ function PublicProfilePage() {
     queryFn: () => getPublicProfile(publicId),
   });
   const publicProfile = publicQuery.data;
+  const shouldQueryPublicLibrary = Boolean(
+    publicProfile &&
+      publicProfile.relationship !== "friends" &&
+      publicProfile.relationship !== "self" &&
+      (libraryPage > 1 || debouncedLibrarySearch),
+  );
+  const publicLibraryQuery = useQuery({
+    queryKey: ["public-profile-library", publicId, libraryPage, debouncedLibrarySearch],
+    queryFn: () => getPublicProfile(publicId, libraryPage, debouncedLibrarySearch),
+    enabled: shouldQueryPublicLibrary,
+    placeholderData: keepPreviousData,
+  });
   const friendQuery = useQuery({
     queryKey: ["friend-profile", publicId, libraryPage, debouncedLibrarySearch],
     queryFn: () => getFriendProfileByPublicId(publicId, libraryPage, debouncedLibrarySearch),
@@ -82,7 +94,10 @@ function PublicProfilePage() {
     );
 
   const friend = friendQuery.data?.user;
-  const library = friendQuery.data?.library ?? publicProfile.library;
+  const library =
+    friendQuery.data?.library ??
+    (shouldQueryPublicLibrary ? publicLibraryQuery.data?.library : undefined) ??
+    publicProfile.library;
   const games = profileLibraryGames(library.data);
   if (compose === "message" && friend)
     return <Navigate to="/messages" search={{ friend: friend.id }} replace />;
@@ -96,23 +111,23 @@ function PublicProfilePage() {
     avatarUrl: friend?.avatar ?? publicProfile.avatar ?? undefined,
     bio: friend?.bio ?? undefined,
     region: "Global",
-    hours: friendQuery.data?.library.summary
-      ? formatWholeHours(friendQuery.data.library.summary.total_playtime)
+    hours: library.summary
+      ? formatWholeHours(library.summary.total_playtime)
       : profileLibraryHours(library.data),
     libraryMessage: friendQuery.isError
       ? "Could not load this library. Please retry."
       : (library.message ?? undefined),
     libraryPagination:
-      friendQuery.data || publicProfile.relationship === "friends"
+      friendQuery.data || publicProfile.relationship !== "self"
         ? {
-            page: friendQuery.data?.library.page ?? libraryPage,
-            pageSize: friendQuery.data?.library.page_size ?? 12,
-            total: friendQuery.data?.library.total ?? library.data.length,
-            summary: friendQuery.data?.library.summary
+            page: library.page,
+            pageSize: library.page_size,
+            total: library.total,
+            summary: library.summary
               ? {
-                  totalGames: friendQuery.data.library.summary.total_games,
-                  totalPlaytime: friendQuery.data.library.summary.total_playtime,
-                  platformCounts: friendQuery.data.library.summary.platform_counts,
+                  totalGames: library.summary.total_games,
+                  totalPlaytime: library.summary.total_playtime,
+                  platformCounts: library.summary.platform_counts,
                 }
               : undefined,
             query: librarySearch,
@@ -120,8 +135,18 @@ function PublicProfilePage() {
               setLibrarySearch(query);
             },
             onPageChange: setLibraryPage,
-            onRetry: () => void friendQuery.refetch(),
-            isFetching: friendQuery.isFetching,
+            onRetry: () =>
+              void (publicProfile.relationship === "friends"
+                ? friendQuery.refetch()
+                : shouldQueryPublicLibrary
+                  ? publicLibraryQuery.refetch()
+                  : publicQuery.refetch()),
+            isFetching:
+              publicProfile.relationship === "friends"
+                ? friendQuery.isFetching
+                : shouldQueryPublicLibrary
+                  ? publicLibraryQuery.isFetching
+                  : publicQuery.isFetching,
           }
         : undefined,
     games,
