@@ -100,6 +100,7 @@ from app.recommendation_quota import (
     reserve_quota,
 )
 from app.background_jobs import dispatch_job, enqueue_or_get_job
+from app.steam_library import persist_steam_library_snapshot
 from app.recommendations import enrich_recommendations
 from app.steam import (
     build_steam_login_url,
@@ -209,7 +210,7 @@ class PublicLibrarySnapshot:
     message: str | None = None
 
 
-_public_library_snapshots: dict[tuple[uuid.UUID, uuid.UUID, str], tuple[float, PublicLibrarySnapshot]] = {}
+_public_library_snapshots: dict[tuple[uuid.UUID | None, uuid.UUID, str], tuple[float, PublicLibrarySnapshot]] = {}
 
 
 def get_optional_current_user(request: Request, db: Session = Depends(get_db)) -> User | None:
@@ -459,12 +460,12 @@ def public_library_game_response(game: Game) -> PublicLibraryGameRead:
 
 
 async def build_visible_library_snapshot(
-    db: Session, viewer: User, owner: User
+    db: Session, viewer: User | None, owner: User
 ) -> PublicLibrarySnapshot | None:
     if not can_view_section(owner, viewer, owner.library_visibility, db):
         return None
 
-    cache_key = (viewer.id, owner.id, owner.steam_visibility)
+    cache_key = (viewer.id if viewer else None, owner.id, owner.steam_visibility)
     cached = _public_library_snapshots.get(cache_key)
     if cached is not None and cached[0] > time.monotonic():
         return cached[1]
@@ -480,13 +481,31 @@ async def build_visible_library_snapshot(
         .all()
     )
     library_items = [public_library_game_response(game).model_dump(mode="json") for game in games]
+    can_view_steam = can_view_section(owner, viewer, owner.steam_visibility, db)
+    if can_view_steam:
+        saved_steam_games = (
+            db.query(Game)
+            .filter(Game.owner_id == owner.id, Game.source == "steam")
+            .order_by(func.lower(Game.title))
+            .all()
+        )
+        library_items.extend(
+            public_library_game_response(game).model_dump(mode="json")
+            for game in saved_steam_games
+        )
     steam_error = None
-    if owner.steam_id and can_view_section(owner, viewer, owner.steam_visibility, db):
+    if owner.steam_id and can_view_steam:
         try:
             steam_games = await fetch_owned_games(owner.steam_id)
         except HTTPException:
             steam_games = []
             steam_error = "Steam library is unavailable. Please retry later."
+        live_steam_appids = {str(game["appid"]) for game in steam_games}
+        library_items = [
+            item
+            for item in library_items
+            if item["source"] != "steam" or item["detail_game_id"] not in live_steam_appids
+        ]
         library_items.extend(
             PublicLibraryGameRead(
                 id=uuid.uuid5(uuid.NAMESPACE_URL, f"steam:{game['appid']}"),
@@ -499,6 +518,7 @@ async def build_visible_library_snapshot(
             ).model_dump(mode="json")
             for game in steam_games
         )
+    library_items.sort(key=lambda item: item["title"].casefold())
     summary = PublicLibrarySummaryRead(
         total_games=len(library_items),
         total_playtime=sum(int(item.get("playtime_forever") or 0) for item in library_items),
@@ -611,6 +631,26 @@ def notify_saved_game(user: User, game_title: str) -> None:
 
 def steam_frontend_redirect(**params: str) -> RedirectResponse:
     return RedirectResponse(f"{get_frontend_url()}/account?{urlencode(params)}", status_code=303)
+
+
+async def enqueue_steam_library_sync(db: Session, user: User) -> None:
+    try:
+        job = enqueue_or_get_job(
+            db,
+            user.id,
+            "steam_library_sync",
+            f"steam:{user.steam_id}",
+            {"steam_id": user.steam_id},
+        )
+    except Exception:
+        logger.warning("Could not queue the initial Steam library sync for user %s", user.id, exc_info=True)
+        return
+    if job.status == "queued":
+        try:
+            await dispatch_job(job)
+        except Exception:
+            # The durable queued job is redelivered by the worker after Redis recovers.
+            logger.warning("Could not dispatch the Steam library sync for user %s", user.id, exc_info=True)
 
 
 @app.get("/", include_in_schema=False)
@@ -1722,7 +1762,7 @@ async def recent_steam_game_players(
 
 
 @app.get("/users/{public_id}", response_model=PublicProfileRead)
-def get_public_profile(
+async def get_public_profile(
     public_id: str,
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
@@ -1732,15 +1772,15 @@ def get_public_profile(
         raise HTTPException(status_code=404, detail="Profile not found")
 
     relationship = "none" if current_user is None else social_relationship(db, current_user.id, owner.id)
-    if can_view_section(owner, current_user, owner.library_visibility, db):
-        games = db.query(Game).filter(Game.owner_id == owner.id, or_(Game.link_state.is_(None), Game.link_state != "quarantined")).order_by(func.lower(Game.title)).all()
-        library = PublicDataBlock(
-            status="ready" if games else "empty",
-            data=[public_library_game_response(game).model_dump(mode="json") for game in games],
-            message=None if games else "No library games have been saved yet.",
-        )
-    else:
+    library_snapshot = await build_visible_library_snapshot(db, current_user, owner)
+    if library_snapshot is None:
         library = hidden_public_block()
+    else:
+        library = PublicDataBlock(
+            status=library_snapshot.status,
+            data=library_snapshot.items,
+            message=library_snapshot.message,
+        )
 
     if can_view_section(owner, current_user, owner.favorites_visibility, db):
         favorites = db.query(Favorite).filter(Favorite.user_id == owner.id).order_by(Favorite.created_at.desc()).all()
@@ -3397,6 +3437,7 @@ async def steam_sign_in_callback(request: Request, state: str | None = None, db:
             exchange_code=exchange_code, result_user_id=user.id, expires_at=utcnow() + timedelta(seconds=60),
         ))
         db.commit()
+        await enqueue_steam_library_sync(db, user)
         await sync_steam_friends_after_auth(db, user)
         return google_frontend_redirect(provider="steam", exchange_code=exchange_code)
     except Exception:
@@ -3539,6 +3580,7 @@ async def steam_callback(request: Request, state: str, db: Session = Depends(get
     except Exception:
         db.rollback()
         return steam_frontend_redirect(steam_error="Could not link Steam account")
+    await enqueue_steam_library_sync(db, user)
     await sync_steam_friends_after_auth(db, user)
     return steam_frontend_redirect(linked="1")
 
@@ -3627,20 +3669,13 @@ async def get_steam_library(current_user: User = Depends(get_current_user)):
 
 @app.post("/steam/library/sync", response_model=SteamLibrarySyncRead)
 async def sync_steam_library(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Refresh Steam-only data and remove legacy Steam imports from saved games."""
+    """Refresh and persist the user's Steam library snapshot."""
     if not current_user.steam_id:
         raise HTTPException(status_code=409, detail="Connect Steam first")
 
-    # Fetch first: a private library or Steam outage must never erase the last successful import.
     steam_games = await fetch_owned_games(current_user.steam_id)
-    legacy_imports = (
-        db.query(Game)
-        .filter(Game.owner_id == current_user.id, Game.source == "steam")
-        .all()
-    )
     try:
-        for imported_game in legacy_imports:
-            db.delete(imported_game)
+        counts = persist_steam_library_snapshot(db, current_user.id, steam_games)
         db.commit()
     except Exception:
         db.rollback()
@@ -3649,7 +3684,7 @@ async def sync_steam_library(db: Session = Depends(get_db), current_user: User =
     return SteamLibrarySyncRead(
         steam=steam_account_response(current_user),
         games=steam_games,
-        removed=len(legacy_imports),
+        **counts,
         synced_at=datetime.now(timezone.utc),
     )
 

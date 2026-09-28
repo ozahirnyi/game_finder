@@ -80,6 +80,7 @@ export type ProfileData = {
     isFetching?: boolean;
   };
   steamProfileUrl?: string;
+  steamConnected?: boolean;
   settings?: {
     displayName: string;
     bio: string;
@@ -187,6 +188,7 @@ export function ProfileView({
     },
   });
   const steam = profile.stores.find((s) => s.name === "Steam")?.count ?? 0;
+  const steamConnected = profile.steamConnected ?? steam > 0;
   const psn = profile.stores.find((s) => s.name === "PlayStation")?.count ?? 0;
   const canMessage = viewer?.canMessage ?? Boolean(profile.friendId);
   const canInvite = viewer?.canInvite ?? Boolean(profile.friendId);
@@ -225,8 +227,8 @@ export function ProfileView({
             )}
             {!isSelf && (
               <>
-                <Chip tone={steam > 0 ? "primary" : "outline"}>
-                  Steam {steam > 0 ? "connected" : "not connected"}
+                <Chip tone={steamConnected ? "primary" : "outline"}>
+                  Steam {steamConnected ? "connected" : "not connected"}
                 </Chip>
                 <Chip tone={psn > 0 ? "primary" : "outline"}>
                   PSN {psn > 0 ? "connected" : "not connected"}

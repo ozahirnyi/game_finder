@@ -133,6 +133,8 @@ function PublicProfilePage() {
       publicProfile.steam?.status === "ready"
         ? (publicProfile.steam.data?.profile_url ?? undefined)
         : undefined,
+    steamConnected:
+      publicProfile.steam?.status === "ready" && publicProfile.steam.data?.linked === true,
     favorites: isSelf ? publicProfile.favorites.data : undefined,
     stores: [
       {

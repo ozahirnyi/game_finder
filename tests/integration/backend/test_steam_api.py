@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import asyncio
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -37,6 +39,51 @@ def steam_games():
             "img_icon_url": None,
         },
     ]
+
+
+def test_background_steam_sync_saves_owned_games_without_an_open_library_page(
+    db_session, user_factory, monkeypatch
+):
+    from app import worker
+
+    user = linked_user(user_factory, "background-sync@example.com")
+    db_session.add(Game(owner_id=user.id, title="No longer owned", source="steam", external_id="99"))
+    db_session.commit()
+
+    async def fetch(steam_id):
+        assert steam_id == user.steam_id
+        return steam_games()
+
+    monkeypatch.setattr(worker, "fetch_owned_games", fetch, raising=False)
+    job = SimpleNamespace(operation="steam_library_sync", owner_id=user.id, payload={})
+
+    result = asyncio.run(worker.execute_background_operation(db_session, job))
+
+    assert result == {"created": 2, "updated": 0, "removed": 1, "total": 2}
+    stored = db_session.query(Game).filter(Game.owner_id == user.id, Game.source == "steam").all()
+    assert {(game.external_id, game.title) for game in stored} == {("10", "Portal"), ("20", "Hades")}
+
+
+def test_background_steam_sync_preserves_last_snapshot_when_steam_is_unavailable(
+    db_session, user_factory, monkeypatch
+):
+    from app import worker
+
+    user = linked_user(user_factory, "background-sync-error@example.com")
+    db_session.add(Game(owner_id=user.id, title="Saved Portal", source="steam", external_id="10"))
+    db_session.commit()
+
+    async def unavailable(_steam_id):
+        raise HTTPException(status_code=502, detail="Steam unavailable")
+
+    monkeypatch.setattr(worker, "fetch_owned_games", unavailable, raising=False)
+    job = SimpleNamespace(operation="steam_library_sync", owner_id=user.id, payload={})
+
+    with pytest.raises(HTTPException):
+        asyncio.run(worker.execute_background_operation(db_session, job))
+
+    saved = db_session.query(Game).filter_by(owner_id=user.id, source="steam", external_id="10").one()
+    assert saved.title == "Saved Portal"
 
 
 def test_steam_me_returns_unlinked_account(api_client, user_factory, auth_as):
@@ -211,7 +258,7 @@ def test_resolve_steam_library_game_returns_igdb_mapping(
     assert response.json() == {"game_id": 42}
 
 
-def test_steam_library_sync_removes_legacy_imports_and_keeps_response_games(
+def test_steam_library_sync_persists_owned_games_and_removes_unowned_legacy_imports(
     api_client, app_main, db_session, user_factory, auth_as, monkeypatch
 ):
     user = linked_user(user_factory, "sync@example.com")
@@ -219,6 +266,7 @@ def test_steam_library_sync_removes_legacy_imports_and_keeps_response_games(
         [
             Game(owner_id=user.id, title="Legacy one", source="steam", external_id="10"),
             Game(owner_id=user.id, title="Legacy two", source="steam", external_id="20"),
+            Game(owner_id=user.id, title="No longer owned", source="steam", external_id="99"),
             Game(owner_id=user.id, title="Keep me", source="manual"),
         ]
     )
@@ -234,10 +282,11 @@ def test_steam_library_sync_removes_legacy_imports_and_keeps_response_games(
     response = api_client.post("/steam/library/sync")
 
     assert response.status_code == 200
-    assert response.json()["removed"] == 2
+    assert response.json()["removed"] == 1
     assert response.json()["created"] == 0
+    assert response.json()["updated"] == 2
     assert [game["appid"] for game in response.json()["games"]] == [10, 20]
-    assert db_session.query(Game).filter(Game.owner_id == user.id, Game.source == "steam").count() == 0
+    assert db_session.query(Game).filter(Game.owner_id == user.id, Game.source == "steam").count() == 2
     assert db_session.query(Game).filter(Game.owner_id == user.id, Game.source == "manual").count() == 1
 
 

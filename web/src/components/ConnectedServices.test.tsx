@@ -5,6 +5,7 @@ const api = vi.hoisted(() => ({
   getProfile: vi.fn(),
   getOnboardingSummary: vi.fn(),
   getSteamAccount: vi.fn(),
+  syncSteamLibrary: vi.fn(),
   getTelegramAccount: vi.fn(),
   getTelegramLinkUrl: vi.fn(),
   unlinkGoogleAccount: vi.fn(),
@@ -52,6 +53,27 @@ it("shows a Steam linking error returned by the callback", async () => {
     </QueryClientProvider>,
   );
   expect(await screen.findByText("This Steam account is already linked")).toBeInTheDocument();
+});
+
+it("refreshes the cached library pages after Sync now", async () => {
+  api.getProfile.mockResolvedValue({ google_linked: false });
+  api.getOnboardingSummary.mockResolvedValue({ psn_library_games: 0 });
+  api.getSteamAccount.mockResolvedValue({ linked: true });
+  api.getTelegramAccount.mockResolvedValue({ configured: true, linked: false });
+  api.syncSteamLibrary.mockResolvedValue({ games: [], removed: 0 });
+  const client = new QueryClient();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+
+  render(
+    <QueryClientProvider client={client}>
+      <ConnectedServices />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: /sync now/i }));
+
+  await waitFor(() =>
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["library-overview-page"] }),
+  );
 });
 
 it("opens Telegram from a click-activated tab after requesting the link", async () => {

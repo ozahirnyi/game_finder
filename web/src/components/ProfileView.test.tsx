@@ -148,6 +148,15 @@ describe("ProfileView library visibility", () => {
     renderProfile(false);
     expect(screen.getByText("Their library")).toBeInTheDocument();
   });
+  it("shows Steam as connected even when the public library has no games", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView profile={{ ...profile, games: [], steamConnected: true }} isSelf={false} />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Steam connected")).toBeInTheDocument();
+  });
   it("opens editable profile settings for the profile owner", () => {
     renderProfile(true);
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
