@@ -185,12 +185,21 @@ def test_public_profile_hides_every_private_section_without_sensitive_data(
 
     assert response.status_code == 200
     payload = response.json()
-    for section in ("library", "favorites", "wishlist", "steam"):
+    for section in ("favorites", "wishlist", "steam"):
         assert payload[section] == {
             "status": "hidden",
             "data": [],
             "message": "This section is private.",
         }
+    assert payload["library"] == {
+        "status": "hidden",
+        "data": [],
+        "message": "This section is private.",
+        "page": 1,
+        "page_size": 12,
+        "total": 0,
+        "summary": None,
+    }
     for sensitive_value in (
         "Secret Library",
         "Secret Favorite",
