@@ -9,12 +9,14 @@ from arq.connections import RedisSettings
 from arq import cron
 from fastapi.encoders import jsonable_encoder
 from app.openai_client import get_recommendation
-from app.database import BackgroundJob, SessionLocal
+from app.database import BackgroundJob, SessionLocal, User
 from app.integrations.igdb import fetch_igdb_games, fetch_igdb_games_batch
 from app.recommendations import enrich_recommendations
 from app.background_jobs import dispatch_job_id
 from app.psn_catalog_service import PsnCatalogUnavailable
 from app.psn_library_enrichment import enrich_pending_psn_catalog_batch
+from app.steam import fetch_owned_games
+from app.steam_library import persist_steam_library_snapshot
 
 LEASE_DURATION = timedelta(minutes=15)
 LEASE_HEARTBEAT_SECONDS = 30
@@ -37,7 +39,28 @@ async def execute_background_operation(_db, job) -> dict:
         return {"recommendations": enriched}
     if job.operation == "psn_catalog_enrichment":
         return await _enrich_psn_catalog_job(_db, job)
+    if job.operation == "steam_library_sync":
+        return await _sync_steam_library_job(_db, job)
     raise BackgroundJobOperationError("Unsupported background operation")
+
+
+async def _sync_steam_library_job(db, job) -> dict:
+    owner = db.query(User).filter(User.id == job.owner_id).first()
+    steam_id = owner.steam_id if owner else None
+    if not steam_id:
+        return {"created": 0, "updated": 0, "removed": 0, "total": 0, "skipped": True}
+
+    steam_games = await fetch_owned_games(steam_id)
+    owner = db.query(User).filter(User.id == job.owner_id, User.steam_id == steam_id).first()
+    if owner is None:
+        return {"created": 0, "updated": 0, "removed": 0, "total": 0, "skipped": True}
+
+    try:
+        result = persist_steam_library_snapshot(db, owner.id, steam_games)
+    except Exception:
+        db.rollback()
+        raise
+    return {**result, "total": len(steam_games)}
 
 
 async def _enrich_psn_catalog_job(db, job) -> dict:

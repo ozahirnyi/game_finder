@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.database import Favorite, OAuthAuthorizationTransaction, OAuthIdentity, User
+from app.database import BackgroundJob, Favorite, OAuthAuthorizationTransaction, OAuthIdentity, User
 
 
 pytestmark = pytest.mark.integration
@@ -206,6 +206,11 @@ def test_steam_sign_in_callback_creates_user_and_exchange_result(api_client, app
     assert user.display_name == "steam-player"
     assert user.steam_persona_name == "Steam Player"
     assert db_session.query(OAuthAuthorizationTransaction).filter_by(exchange_code="steam-result", result_user_id=user.id).count() == 1
+    job = db_session.query(BackgroundJob).filter_by(
+        owner_id=user.id, operation="steam_library_sync", idempotency_key=f"steam:{user.steam_id}"
+    ).one()
+    assert job.status == "queued"
+    app_main.dispatch_job.assert_awaited_once_with(job)
 
 
 def test_steam_sign_in_callback_provider_failure_returns_redirect(api_client, app_main, db_session, monkeypatch):
@@ -239,10 +244,15 @@ def test_authenticated_steam_callback_links_profile(api_client, app_main, db_ses
     monkeypatch.setattr(app_main, "verify_steam_openid", verify)
     monkeypatch.setattr(app_main, "fetch_steam_profile", profile)
     response = api_client.get("/steam/callback?state=valid", follow_redirects=False)
-    assert response.status_code == 303 and "linked=1" in location(response)
+    assert response.status_code == 303
+    assert "/account?linked=1" in location(response)
     db_session.refresh(user)
     assert user.steam_id == "76561198000000002"
     assert user.steam_persona_name == "Linked"
+    job = db_session.query(BackgroundJob).filter_by(
+        owner_id=user.id, operation="steam_library_sync", idempotency_key=f"steam:{user.steam_id}"
+    ).one()
+    app_main.dispatch_job.assert_awaited_once_with(job)
 
 
 def test_authenticated_steam_callback_redirects_decode_error(api_client, app_main, user_factory, auth_as, monkeypatch):

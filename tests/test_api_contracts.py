@@ -1988,7 +1988,7 @@ def test_dashboard_passes_favorites_and_wishlist_to_personalized_recommendations
     assert response.json()["recommendations"]["data"]["recommendations"][0]["title"] == "Hades"
 
 
-def test_steam_library_sync_removes_legacy_imports_without_saving_steam_games(monkeypatch):
+def test_steam_library_sync_updates_owned_game_rows(monkeypatch):
     owner_id = uuid.uuid4()
     linked_at = datetime.now(timezone.utc)
     user = SimpleNamespace(
@@ -2025,6 +2025,9 @@ def test_steam_library_sync_removes_legacy_imports_without_saving_steam_games(mo
         def commit(self):
             self.committed = True
 
+        def flush(self):
+            pass
+
         def rollback(self):
             raise AssertionError("sync should not roll back")
 
@@ -2044,9 +2047,10 @@ def test_steam_library_sync_removes_legacy_imports_without_saving_steam_games(mo
 
     assert response.status_code == 200
     assert response.json()["created"] == 0
-    assert response.json()["updated"] == 0
-    assert response.json()["removed"] == 1
+    assert response.json()["updated"] == 1
+    assert response.json()["removed"] == 0
     assert response.json()["games"][0]["appid"] == 10
     assert db.committed is True
     assert db.added == []
-    assert db.deleted == [legacy_import]
+    assert db.deleted == []
+    assert legacy_import.title == "Portal"

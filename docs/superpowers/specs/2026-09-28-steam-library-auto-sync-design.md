@@ -1,42 +1,39 @@
-# Steam library visibility and refresh design
+# Steam library background sync design
 
 ## Goal
 
-When a user signs in with Steam or connects Steam to an existing Playfinder account, their owned Steam games should be available in their Playfinder library and visible on their profile according to their privacy settings. The user should not need to save or import each game manually.
+After Steam sign-in or linking, fetch the user's owned games in a durable background job and save them to the PlayFinder library. Users must not have to open or stay on the Library page to start or finish the initial sync. Public profiles show the saved/live library according to existing privacy settings.
 
-`Sync Now` remains an explicit manual refresh for users who want to request a fresh Steam library response immediately.
+`Sync Now` remains an explicit request to fetch and reconcile the latest Steam library immediately.
 
 ## Current behavior
 
-- Steam authentication creates or links the Playfinder account and stores the Steam ID.
-- The signed-in user's library endpoint can fetch owned Steam games directly from Steam.
-- The public profile endpoint builds its library from saved `games` rows only, so it omits live Steam-owned games.
-- The profile's Steam status chip is inferred from the count of Steam games, so an empty profile can incorrectly say Steam is not connected.
-- Steam-owned games are not stored as ordinary saved-game rows; keep this live-data model and avoid duplicating the library in the database.
+- Steam authentication creates or links the account and stores its Steam ID.
+- The Library endpoint fetches owned games only when a user opens the Library page.
+- The Steam callback does not queue a game-library sync.
+- The public profile endpoint originally read saved games only, and the Steam badge inferred connection from game count.
 
 ## Proposed behavior
 
-1. Keep Steam authentication and account linking as the source of the connected state.
-2. Include the live Steam library in public profile library data when the owner's existing library and Steam visibility settings allow the viewer to see it. Reuse the existing visible-library snapshot/fetch path where practical.
-3. Keep manually saved and PlayStation games in the same profile library result, with duplicate Steam app IDs removed.
-4. Show `Steam connected` from the account link state even when the Steam API returns zero games. If the API is temporarily unavailable, retain the connected status and report the library as unavailable rather than disconnected.
-5. Keep `Sync Now` as a manual fresh fetch. Normal library/profile reads continue to load the current Steam library automatically; no scheduled background polling is added.
-6. Honor existing library and Steam visibility rules for public profiles and friend views.
+1. Queue a durable `steam_library_sync` job keyed to the linked Steam ID after successful Steam sign-in and after linking Steam to an existing account.
+2. The worker fetches owned games and reconciles the existing owner-scoped `games` rows: create new app IDs, update current metadata/playtime, and remove IDs no longer owned.
+3. If Steam fails or the library is private, leave the last successful saved snapshot and account link intact.
+4. Use the same reconciliation for `Sync Now`; invalidate the actual Library page queries after it completes.
+5. Public profile library reads merge saved Steam, PSN, and manual games with live Steam data while removing duplicate Steam app IDs and honoring library/Steam visibility.
+6. Show `Steam connected` based on the link itself, even when no owned games are returned.
 
 ## Alternatives considered
 
-- **Persist Steam snapshots in `games`:** rejected because the current library path deliberately treats Steam games as live data and cleans legacy Steam rows; persistence adds duplicate and stale-data behavior.
-- **Remove `Sync Now`:** rejected because it is a useful explicit refresh even when normal views already fetch current data.
-- **Only correct the connected badge:** rejected because it leaves Steam games absent from public profiles.
+- **Start fetching only when Library opens:** rejected because users should not need to stay on that page for sync to run.
+- **Use only the live Steam response:** rejected because no server-side work would continue if the user navigates away, and the last successful library would not be available during Steam outages.
+- **Remove `Sync Now`:** rejected because it remains useful for an immediate refresh after a recent Steam purchase.
+
+## Storage and migrations
+
+Use the existing `games` table for owner-scoped Steam rows and existing `background_jobs` table for durable work. No schema migration or separate snapshot table is needed.
 
 ## Testing
 
-- Backend contract tests verify that a visible public profile includes Steam games returned by the Steam client, merges saved games without duplicate Steam app IDs, and hides Steam data when visibility disallows it.
-- Frontend tests verify that the profile shows a connected Steam state independently of game count and renders the returned library games.
-- Existing `Sync Now` behavior remains covered as an explicit refresh action.
-
-## Constraints
-
-- No migration or Steam-game snapshot table is planned.
-- Failed Steam API calls must not undo account creation or Steam linking.
-- Tests mock the Steam provider; no live Steam API call or key is needed.
+- Backend tests verify callbacks enqueue sync, the worker reconciles the stored snapshot without an open Library request, and failed Steam fetches preserve existing data.
+- Public profile tests verify live data merges with saved games and respects visibility.
+- Frontend tests verify the Steam connection badge and that Sync Now invalidates Library queries.

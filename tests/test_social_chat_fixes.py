@@ -147,7 +147,8 @@ def test_friend_library_reports_failure_and_provider_detail_identity(social, mon
     async def owned(*args):
         return [{"appid": 400, "name": "Portal", "playtime_forever": 121}]
     monkeypatch.setattr(main, "fetch_owned_games", owned)
-    item = client.get(f"/friends/{bob.id}/profile").json()["library"]["data"][1]
+    items = client.get(f"/friends/{bob.id}/profile").json()["library"]["data"]
+    item = next(game for game in items if game["detail_game_id"] == "400")
     assert (item["detail_game_id"], item["detail_source"], item["playtime_forever"]) == ("400", "steam", 121)
 
 

@@ -389,6 +389,49 @@ def test_public_profile_returns_owned_library_and_collection_covers(social_db):
     assert payload["wishlist"]["data"][0]["cover_url"] == "https://cover/wishlist"
 
 
+def test_public_profile_includes_live_steam_library_for_linked_account(monkeypatch, social_db):
+    _alice, bob, *_ = create_users(social_db)
+    bob.steam_id = "76561198000000001"
+    social_db.commit()
+
+    async def fake_owned_games(steam_id):
+        assert steam_id == bob.steam_id
+        return [{"appid": 620, "name": "Portal 2", "playtime_forever": 120, "img_icon_url": "icon"}]
+
+    monkeypatch.setattr(main, "fetch_owned_games", fake_owned_games)
+    main.app.dependency_overrides[main.get_db] = lambda: social_db
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: None
+
+    response = client.get(f"/users/{bob.public_id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [game["title"] for game in payload["library"]["data"]] == ["Portal 2"]
+    assert payload["library"]["data"][0]["source"] == "steam"
+    assert payload["steam"]["data"]["linked"] is True
+
+
+def test_public_profile_does_not_leak_saved_steam_games_when_steam_visibility_is_private(
+    monkeypatch, social_db
+):
+    _alice, bob, *_ = create_users(social_db)
+    bob.steam_id = "76561198000000002"
+    bob.steam_visibility = "private"
+    social_db.add(Game(owner_id=bob.id, title="Private Steam game", source="steam", external_id="620"))
+    social_db.commit()
+    main.app.dependency_overrides[main.get_db] = lambda: social_db
+    main.app.dependency_overrides[main.get_optional_current_user] = lambda: None
+
+    async def unexpected_steam_fetch(_steam_id):
+        raise AssertionError("private Steam data must not be fetched")
+
+    monkeypatch.setattr(main, "fetch_owned_games", unexpected_steam_fetch)
+    response = client.get(f"/users/{bob.public_id}")
+
+    assert response.status_code == 200
+    assert "Private Steam game" not in response.text
+
+
 def test_friend_profile_returns_friend_bio_avatar_and_library(monkeypatch, social_db):
     alice, bob, charlie, _ = create_users(social_db)
     bob.bio = "Steam collector"

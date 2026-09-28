@@ -106,7 +106,7 @@ export function ConnectedServices() {
       client.invalidateQueries({ queryKey: ["steam-account"] });
       client.invalidateQueries({ queryKey: ["profile"] });
       client.invalidateQueries({ queryKey: ["library"] });
-      client.invalidateQueries({ queryKey: ["library-overview"] });
+      client.invalidateQueries({ queryKey: ["library-overview-page"] });
     },
   });
   const telegramAction = useMutation<TelegramLink | TelegramAccount, Error, "link" | "unlink">({
