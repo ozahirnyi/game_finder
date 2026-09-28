@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 import importlib
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -65,9 +66,10 @@ def test_cache_hit_miss_and_redis_failure_paths(monkeypatch):
         assert await cache.get_json_cached("k", 10, fetch) == {"fresh": True}
         set_.assert_any_await("k", {"fresh": True}, 10)
         set_.assert_any_await("k:stale", {"fresh": True}, 86400)
-        monkeypatch.setattr(cache, "cache_get", AsyncMock(side_effect=[None, {"stale": True}]))
+        monkeypatch.setattr(cache, "cache_get", AsyncMock(side_effect=[None, None, {"stale": True}]))
         unavailable = AsyncMock(side_effect=RuntimeError("provider unavailable"))
         assert await cache.get_json_cached("k", 10, unavailable) == {"stale": True}
+        unavailable.assert_awaited_once()
         redis_client.redis_client = None
         assert await redis_client.cache_get("k") is None
         await redis_client.cache_set("k", {"x": 1}, 2)
@@ -78,6 +80,79 @@ def test_cache_hit_miss_and_redis_failure_paths(monkeypatch):
         assert await redis_client.cache_get("k") is None
         await redis_client.cache_set("k", {"x": 1}, 2)
         redis_client.redis_client = None
+    asyncio.run(scenario())
+
+
+def test_stale_cache_returns_while_one_background_refresh_updates_both_copies(monkeypatch):
+    async def scenario():
+        provider_started = asyncio.Event()
+        release_provider = asyncio.Event()
+        refresh_finished = asyncio.Event()
+        fetch_calls = 0
+        writes = []
+
+        async def get_cached(key):
+            if key.endswith(":stale"):
+                return {"stale": True}
+            return None
+
+        async def set_cached(key, data, ttl):
+            writes.append((key, data, ttl))
+            if len(writes) == 2:
+                refresh_finished.set()
+
+        async def fetch():
+            nonlocal fetch_calls
+            fetch_calls += 1
+            provider_started.set()
+            await release_provider.wait()
+            return {"fresh": True}
+
+        monkeypatch.setattr(cache, "cache_get", get_cached)
+        monkeypatch.setattr(cache, "cache_set", set_cached)
+
+        assert await asyncio.wait_for(cache.get_json_cached("k", 10, fetch), timeout=1) == {"stale": True}
+        await asyncio.wait_for(provider_started.wait(), timeout=1)
+        assert await asyncio.wait_for(cache.get_json_cached("k", 10, fetch), timeout=1) == {"stale": True}
+        assert fetch_calls == 1
+
+        release_provider.set()
+        await asyncio.wait_for(refresh_finished.wait(), timeout=1)
+        assert writes == [
+            ("k", {"fresh": True}, 10),
+            ("k:stale", {"fresh": True}, 86400),
+        ]
+
+    asyncio.run(scenario())
+
+
+def test_failed_background_refresh_is_logged_without_replacing_stale(monkeypatch, caplog):
+    async def scenario():
+        refresh_attempted = asyncio.Event()
+        writes = []
+
+        async def get_cached(key):
+            if key.endswith(":stale"):
+                return {"stale": True}
+            return None
+
+        async def fetch():
+            refresh_attempted.set()
+            raise RuntimeError("provider unavailable")
+
+        async def set_cached(key, data, ttl):
+            writes.append((key, data, ttl))
+
+        monkeypatch.setattr(cache, "cache_get", get_cached)
+        monkeypatch.setattr(cache, "cache_set", set_cached)
+
+        with caplog.at_level(logging.ERROR, logger=cache.__name__):
+            assert await cache.get_json_cached("k", 10, fetch) == {"stale": True}
+            await asyncio.wait_for(refresh_attempted.wait(), timeout=1)
+
+        assert writes == []
+        assert "Background cache refresh failed for key k" in caplog.text
+
     asyncio.run(scenario())
 
 
