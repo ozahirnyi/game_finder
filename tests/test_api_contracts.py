@@ -193,15 +193,17 @@ def test_search_uses_igdb_catalog_results(monkeypatch):
 
 def test_search_ranks_complete_popular_matches_above_metadata_empty_exact_title():
     results = main._rank_search_results("UFC", [
-        {"id": 1, "name": "UFC"},
+        {"id": 1, "name": "UFC", "rating": 88.33333333333333, "rating_count": 2},
         {
             "id": 2,
-            "name": "UFC 5",
+            "name": "UFC Undisputed 2010",
             "cover_image": "https://images.example/ufc.jpg",
             "description_raw": "Mixed martial arts game",
+            "released": "2010-05-25",
+            "rating": 74.3931846665767,
             "platforms": ["PlayStation 4", "Xbox One"],
             "genres": ["Sport"],
-            "rating_count": 5000,
+            "rating_count": 22,
         },
     ])
 
@@ -607,8 +609,8 @@ def test_media_cache_versions_do_not_reuse_payloads_without_media_dimensions():
     assert main.build_cache_key("catalog_game_v3", igdb_id=274755) != main.build_cache_key(
         "catalog_game_v2", igdb_id=274755
     )
-    assert main.build_cache_key("igdb_search_v9", q="hades", page=1) != main.build_cache_key(
-        "igdb_search_v8", q="hades", page=1
+    assert main.build_cache_key("igdb_search_v11", q="hades", page=1) != main.build_cache_key(
+        "igdb_search_v10", q="hades", page=1
     )
     assert main.build_cache_key("trending_games_v6", page=1, page_size=8, country="US") != main.build_cache_key(
         "trending_games_v5", page=1, page_size=8, country="US"
