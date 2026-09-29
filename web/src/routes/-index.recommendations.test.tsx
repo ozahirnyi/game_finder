@@ -58,7 +58,7 @@ vi.mock("@/components/GameCard", () => ({
 import { Route } from "./index";
 import { getGameMediaCandidates } from "@/lib/gameMedia";
 
-function renderHome() {
+function renderHome(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const root = createRootRoute({ component: Outlet });
   const route = createRoute({
     getParentRoute: () => root,
@@ -70,9 +70,7 @@ function renderHome() {
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
   render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
+    <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
@@ -322,6 +320,33 @@ describe("Home recommendations", () => {
       resolveProfile({ display_name: "Region tester", price_country_code: "UA" });
     });
     await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("UA", 13));
+  });
+
+  it("waits for a background profile refresh before loading home deals", async () => {
+    api.getAuthSnapshot.mockReturnValue(true);
+    api.getDeals.mockClear();
+    let resolveProfile!: (profile: { display_name: string; price_country_code: string }) => void;
+    api.getProfile.mockReturnValue(
+      new Promise((resolve) => {
+        resolveProfile = resolve;
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(["profile"], {
+      display_name: "Cached profile",
+      price_country_code: "US",
+    });
+
+    renderHome(queryClient);
+
+    await waitFor(() => expect(api.getProfile).toHaveBeenCalled());
+    expect(api.getDeals).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveProfile({ display_name: "Updated profile", price_country_code: "UA" });
+    });
+    await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("UA", 13));
+    expect(api.getDeals).not.toHaveBeenCalledWith("US", 13);
   });
 
   it("uses high-density Steam posters for unmatched standard deals and retains trending media fallbacks", async () => {
