@@ -55,7 +55,7 @@ export const Route = createFileRoute("/games/$gameId")({
   ): { title?: string; source?: "steam"; returnTo?: string } => ({
     ...(typeof search.title === "string" ? { title: search.title } : {}),
     ...(search.source === "steam" ? { source: "steam" } : {}),
-    ...(typeof search.returnTo === "string" && search.returnTo.startsWith("/search?")
+    ...(typeof search.returnTo === "string" && search.returnTo.startsWith("/") && !search.returnTo.startsWith("//")
       ? { returnTo: search.returnTo }
       : {}),
   }),
@@ -246,18 +246,11 @@ export const Route = createFileRoute("/games/$gameId")({
   notFoundComponent: GameNotFound,
 });
 
-function searchBackParams(returnTo?: string) {
-  if (!returnTo) return {};
-  const params = new URLSearchParams(returnTo.slice("/search?".length));
-  const query = params.get("q")?.trim();
-  return params.get("mode") === "ai" && query ? { mode: "ai", q: query } : {};
-}
-
 function SearchBackLink({ returnTo, className }: { returnTo?: string; className: string }) {
   return (
-    <Link to="/search" search={searchBackParams(returnTo)} className={className}>
-      <ArrowLeft className="size-3.5" /> Back to search
-    </Link>
+    <a href={returnTo ?? "/search"} className={className}>
+      <ArrowLeft className="size-3.5" /> Back
+    </a>
   );
 }
 

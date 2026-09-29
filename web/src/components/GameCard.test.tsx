@@ -126,7 +126,7 @@ describe("GameCard", () => {
 
     expect(await screen.findByRole("link", { name: /live game/i })).toHaveAttribute(
       "href",
-      "/games/42?title=Live+game",
+      "/games/42?title=Live+game&returnTo=%2F",
     );
   });
 
@@ -161,7 +161,7 @@ describe("GameCard", () => {
 
     expect(await screen.findByRole("link", { name: /hades/i })).toHaveAttribute(
       "href",
-      "/games/1145360?title=Hades&source=steam",
+      "/games/1145360?title=Hades&source=steam&returnTo=%2F",
     );
   });
 

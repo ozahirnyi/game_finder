@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { GameDetailLink } from "@/components/GameDetailLink";
 import { GameCover } from "@/components/GameCover";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import { type Deal, getGenreDeals } from "@/lib/api";
@@ -33,12 +34,14 @@ function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
   return (
     <div className="relative">
       {link && (
-        <Link
-          to="/games/$gameId"
-          {...link}
+        <GameDetailLink
+          gameId={link.params.gameId}
+          search={link.search}
           aria-label={`Open ${deal.name} on Playfinder`}
           className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        />
+        >
+          <span className="sr-only">Open {deal.name} on Playfinder</span>
+        </GameDetailLink>
       )}
       <div
         className={`group flex h-full ${large ? "flex-col" : "items-center"} gap-4 rounded-2xl border border-border bg-surface p-4 transition-colors hover:border-primary/40`}

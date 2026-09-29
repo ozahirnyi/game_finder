@@ -92,7 +92,7 @@ describe("WishlistPage", () => {
 
     expect(await screen.findByRole("link", { name: "View game" })).toHaveAttribute(
       "href",
-      "/games/274755",
+      "/games/274755?returnTo=%2F",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Remove Hades II from wishlist" }));

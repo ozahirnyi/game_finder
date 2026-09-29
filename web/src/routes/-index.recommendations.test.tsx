@@ -130,7 +130,7 @@ describe("Home recommendations", () => {
     renderHome();
 
     expect((await screen.findByRole("link", { name: /Eligible/i })).getAttribute("href")).toBe(
-      "/games/123?title=Eligible",
+      "/games/123?title=Eligible&returnTo=%2F",
     );
   });
 

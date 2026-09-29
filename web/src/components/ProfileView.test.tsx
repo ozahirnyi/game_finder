@@ -26,6 +26,8 @@ vi.mock("@/lib/api", async () => ({
   getGameInvites: api.getGameInvites,
 }));
 vi.mock("@tanstack/react-router", () => ({
+  useRouterState: ({ select }: { select: (state: { location: { href: string } }) => unknown }) =>
+    select({ location: { href: "/" } }),
   Link: ({
     children,
     to,

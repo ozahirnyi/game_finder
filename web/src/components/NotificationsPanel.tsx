@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel, SectionHeader, EmptyState, Chip } from "@/components/ui-bits";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/api";
@@ -44,6 +44,7 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
   const [unavailableId, setUnavailableId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const navigate = useNavigate();
+  const returnTo = useRouterState({ select: (state) => state.location.href });
   const queryClient = useQueryClient();
   const notificationsQuery = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
   const markRead = useMutation({
@@ -98,7 +99,11 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                       setUnavailableId(n.id);
                       return;
                     }
-                    void navigate(destination);
+                    void navigate(
+                      destination.to === "/games/$gameId"
+                        ? { ...destination, search: { returnTo } }
+                        : destination,
+                    );
                     if (isUnread && destination.to !== "/friends") markRead.mutate(n.id);
                   }}
                   className={`flex items-start gap-3 rounded-xl border p-3 transition ${

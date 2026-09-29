@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
+import { GameDetailLink } from "@/components/GameDetailLink";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
   applyPsnLibraryRepair,
@@ -314,14 +315,13 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
     "hover-lift group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-xl border border-border bg-surface p-4 hover:border-primary/40 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]";
   const gameId = game.source === "steam" ? game.external_id : game.detail_game_id;
   const card = gameId ? (
-    <Link
-      to="/games/$gameId"
-      params={{ gameId }}
+    <GameDetailLink
+      gameId={gameId}
       search={{ title: game.title, source: game.source === "steam" ? "steam" : undefined }}
       className={className}
     >
       {contents}
-    </Link>
+    </GameDetailLink>
   ) : (
     <div className={className}>{contents}</div>
   );
