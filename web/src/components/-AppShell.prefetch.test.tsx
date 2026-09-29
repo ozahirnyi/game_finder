@@ -29,8 +29,7 @@ vi.mock("@/components/ThemeSelector", () => ({ ThemeSelector: () => null }));
 vi.mock("@/components/GameCover", () => ({ Avatar: () => null }));
 vi.mock("@/lib/api", () => api);
 
-function renderShell() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderShell(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const prefetchQuery = vi.spyOn(queryClient, "prefetchQuery");
   render(
     <QueryClientProvider client={queryClient}>
@@ -98,6 +97,43 @@ describe("AppShell navigation prefetching", () => {
       resolveProfile({ display_name: "Region tester", price_country_code: "UA" });
     });
     await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("UA"));
+  });
+
+  it("waits for a background profile refresh before loading sidebar deals", async () => {
+    api.getAuthSnapshot = () => true;
+    api.getDeals.mockClear();
+    let resolveProfile!: (profile: { display_name: string; price_country_code: string }) => void;
+    api.getProfile.mockReturnValue(
+      new Promise((resolve) => {
+        resolveProfile = resolve;
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(["profile"], {
+      display_name: "Cached profile",
+      price_country_code: "US",
+    });
+    const idleCallbacks: Array<() => void> = [];
+    vi.stubGlobal(
+      "requestIdleCallback",
+      vi.fn((callback: () => void) => {
+        idleCallbacks.push(callback);
+        return idleCallbacks.length;
+      }),
+    );
+    vi.stubGlobal("cancelIdleCallback", vi.fn());
+
+    renderShell(queryClient);
+    await waitFor(() => expect(api.getProfile).toHaveBeenCalled());
+    act(() => idleCallbacks.forEach((callback) => callback()));
+
+    expect(api.getDeals).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveProfile({ display_name: "Updated profile", price_country_code: "UA" });
+    });
+    await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("UA"));
+    expect(api.getDeals).not.toHaveBeenCalledWith("US");
   });
 
   it("labels the messages destination Chats and shows the aggregate unread count", async () => {

@@ -60,6 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     queryFn: getProfile,
     enabled: signedIn,
   });
+  const profileReady = !profileQuery.isPending && profileQuery.fetchStatus === "idle";
   const unreadChatsQuery = useQuery({
     queryKey: ["conversation-unread-count"],
     queryFn: getConversationUnreadCount,
@@ -103,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const dealsQuery = useQuery({
     queryKey: ["deals", priceCountry, "sidebar"],
     queryFn: () => getDeals(priceCountry),
-    enabled: sidebarDealsReady && (!signedIn || !profileQuery.isPending),
+    enabled: sidebarDealsReady && (!signedIn || profileReady),
   });
   const deals = dealsQuery.data?.results ?? [];
   const dealsAge = relativeDealsAge(dealsQuery.data?.cached_at);

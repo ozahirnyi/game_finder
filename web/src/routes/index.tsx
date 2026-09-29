@@ -31,6 +31,7 @@ function Home() {
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
   const [query, setQuery] = useState("");
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile, enabled: signedIn });
+  const profileReady = !profileQuery.isPending && profileQuery.fetchStatus === "idle";
   const region = normalizePriceCountry(profileQuery.data?.price_country_code);
   const libraryQuery = useQuery({
     queryKey: ["library-overview"],
@@ -61,7 +62,7 @@ function Home() {
   const dealsQuery = useQuery({
     queryKey: ["deals", region, "home"],
     queryFn: () => getDeals(region, 13),
-    enabled: !signedIn || !profileQuery.isPending,
+    enabled: !signedIn || profileReady,
   });
   const deals = dealsQuery.data?.results ?? [];
   const results = searchQuery.data?.results ?? [];
