@@ -136,15 +136,14 @@ export const Route = createFileRoute("/games/$gameId")({
         id: string | number,
       ): Promise<CatalogGame & { id: number }> => {
         const catalog = await getCatalogGame(id);
-        if (!hasCatalogId(catalog)) throw new Error("Catalog game has no route-safe ID");
+        if (!hasCatalogId(catalog) || catalog.id !== Number(id)) {
+          throw new Error("Catalog game ID does not match the requested route ID");
+        }
         return catalog;
       };
       let catalog: CatalogGame & { id: number };
       try {
         catalog = await loadCatalogGame(params.gameId);
-        if (deps.title && !exactCatalogMatch([catalog], deps.title)) {
-          throw new Error("Catalog ID does not match library title");
-        }
       } catch {
         if (!deps.title) throw new Error("Catalog title unavailable");
         const results = (await searchGames({ query: deps.title })).results.filter(hasCatalogId);
