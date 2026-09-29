@@ -6,7 +6,7 @@ from fastapi import HTTPException
 pytestmark = pytest.mark.integration
 
 
-async def run_cached(_key, _ttl, fetch):
+async def run_cached(_key, _ttl, fetch, **_kwargs):
     return await fetch()
 
 

@@ -103,7 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const dealsQuery = useQuery({
     queryKey: ["deals", priceCountry, "sidebar"],
     queryFn: () => getDeals(priceCountry),
-    enabled: sidebarDealsReady,
+    enabled: sidebarDealsReady && (!signedIn || !profileQuery.isPending),
   });
   const deals = dealsQuery.data?.results ?? [];
   const dealsAge = relativeDealsAge(dealsQuery.data?.cached_at);

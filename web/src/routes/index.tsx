@@ -61,6 +61,7 @@ function Home() {
   const dealsQuery = useQuery({
     queryKey: ["deals", region, "home"],
     queryFn: () => getDeals(region, 13),
+    enabled: !signedIn || !profileQuery.isPending,
   });
   const deals = dealsQuery.data?.results ?? [];
   const results = searchQuery.data?.results ?? [];

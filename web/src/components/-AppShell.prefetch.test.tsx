@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
@@ -43,7 +43,10 @@ function renderShell() {
 }
 
 describe("AppShell navigation prefetching", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it("prefetches Library data when its navigation link receives focus", async () => {
     const { prefetchQuery } = renderShell();
@@ -64,6 +67,37 @@ describe("AppShell navigation prefetching", () => {
     expect(
       await screen.findByText("12 price drops tracked · refreshed 7m ago"),
     ).toBeInTheDocument();
+  });
+
+  it("waits for a signed-in profile before loading sidebar deals for its region", async () => {
+    api.getAuthSnapshot = () => true;
+    api.getDeals.mockClear();
+    let resolveProfile!: (profile: { display_name: string; price_country_code: string }) => void;
+    api.getProfile.mockReturnValue(
+      new Promise((resolve) => {
+        resolveProfile = resolve;
+      }),
+    );
+    const idleCallbacks: Array<() => void> = [];
+    vi.stubGlobal(
+      "requestIdleCallback",
+      vi.fn((callback: () => void) => {
+        idleCallbacks.push(callback);
+        return idleCallbacks.length;
+      }),
+    );
+    vi.stubGlobal("cancelIdleCallback", vi.fn());
+
+    renderShell();
+    await waitFor(() => expect(api.getProfile).toHaveBeenCalled());
+    act(() => idleCallbacks.forEach((callback) => callback()));
+
+    expect(api.getDeals).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveProfile({ display_name: "Region tester", price_country_code: "UA" });
+    });
+    await waitFor(() => expect(api.getDeals).toHaveBeenCalledWith("UA"));
   });
 
   it("labels the messages destination Chats and shows the aggregate unread count", async () => {
