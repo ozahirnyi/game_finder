@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, GameCover } from "@/components/GameCover";
+import { GameDetailLink } from "@/components/GameDetailLink";
 import { Chip, EmptyState, Panel, PresenceDot, SectionHeader } from "@/components/ui-bits";
 import { ConnectedServices } from "@/components/ConnectedServices";
 import { FriendActions } from "@/components/FriendActions";
@@ -579,14 +580,13 @@ export function ProfileView({
             {profile.favorites?.length ? (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {profile.favorites.map((favorite) => (
-                  <Link
+                  <GameDetailLink
                     key={favorite.catalog_game_id}
-                    to="/games/$gameId"
-                    params={{ gameId: String(favorite.catalog_game_id) }}
+                    gameId={String(favorite.catalog_game_id)}
                     className="rounded-xl border border-border bg-surface-2 p-3 text-sm font-bold hover:border-primary/40"
                   >
                     {favorite.title}
-                  </Link>
+                  </GameDetailLink>
                 ))}
               </div>
             ) : (
@@ -748,10 +748,9 @@ export function ProfileView({
                     </>
                   );
                   return g.detail ? (
-                    <Link
+                    <GameDetailLink
                       key={g.id}
-                      to="/games/$gameId"
-                      params={{ gameId: g.detail.gameId }}
+                      gameId={g.detail.gameId}
                       search={{
                         title: g.title,
                         ...(g.detail.source ? { source: g.detail.source } : {}),
@@ -759,7 +758,7 @@ export function ProfileView({
                       className="hover-lift overflow-hidden rounded-xl border border-border bg-surface-2 hover:border-primary/40"
                     >
                       {content}
-                    </Link>
+                    </GameDetailLink>
                   ) : (
                     <article
                       key={g.id}

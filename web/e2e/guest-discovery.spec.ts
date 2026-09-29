@@ -27,11 +27,11 @@ test("guest discovery links catalog and Steam search results to their truthful d
 
   await expect(page.getByRole("link", { name: /Celeste/ })).toHaveAttribute(
     "href",
-    "/games/101?title=Celeste",
+    "/games/101?title=Celeste&returnTo=%2Fsearch%3Fq%3Dteam",
   );
   await expect(page.getByRole("link", { name: /Team Fortress 2/ })).toHaveAttribute(
     "href",
-    "/games/440?title=Team+Fortress+2&source=steam",
+    "/games/440?title=Team+Fortress+2&source=steam&returnTo=%2Fsearch%3Fq%3Dteam",
   );
 });
 

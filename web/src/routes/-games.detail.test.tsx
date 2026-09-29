@@ -166,13 +166,22 @@ describe("game detail presentation", () => {
   it("returns an AI result to the original AI search", async () => {
     renderDetail("/games/274755?returnTo=%2Fsearch%3Fmode%3Dai%26q%3Droguelike");
 
-    expect(await screen.findByRole("link", { name: /back to search/i })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: /^back$/i })).toHaveAttribute(
       "href",
       "/search?mode=ai&q=roguelike",
     );
-    expect(screen.getByRole("link", { name: /back to search/i })).toHaveClass(
+    expect(screen.getByRole("link", { name: /^back$/i })).toHaveClass(
       "min-h-11",
       "text-sm",
+    );
+  });
+
+  it("returns to the originating page with its query parameters", async () => {
+    renderDetail("/games/274755?returnTo=%2Flibrary%3Fplatform%3Dsteam%26sort%3Drecent");
+
+    expect(await screen.findByRole("link", { name: /^back$/i })).toHaveAttribute(
+      "href",
+      "/library?platform=steam&sort=recent",
     );
   });
 
@@ -293,7 +302,7 @@ describe("game detail presentation", () => {
     renderDetail();
 
     expect((await screen.findByRole("link", { name: /Related 1/i })).getAttribute("href")).toBe(
-      "/games/1?title=Related+1",
+      "/games/1?title=Related+1&returnTo=%2Fgames%2F274755",
     );
     expect(screen.getAllByRole("link", { name: /Related/i })).toHaveLength(4);
     expect(screen.queryByRole("link", { name: /^Hades$/ })).not.toBeInTheDocument();

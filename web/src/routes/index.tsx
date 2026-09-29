@@ -4,6 +4,7 @@ import { ArrowRight, Search, Tag, Users } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
+import { GameDetailLink } from "@/components/GameDetailLink";
 import { GameCover } from "@/components/GameCover";
 import { OnboardingGuidance } from "@/components/OnboardingGuidance";
 import { Chip, EmptyState, Panel, PriceBlock, SectionHeader } from "@/components/ui-bits";
@@ -137,10 +138,9 @@ function Home() {
               results.map((game) => {
                 const target = gameDetailTarget(game.id, game.steam_appid);
                 return target ? (
-                  <Link
+                  <GameDetailLink
                     key={game.id ?? game.steam_appid}
-                    to="/games/$gameId"
-                    params={{ gameId: target.gameId }}
+                    gameId={target.gameId}
                     search={{
                       title: game.name,
                       ...(target.source ? { source: target.source } : {}),
@@ -149,7 +149,7 @@ function Home() {
                   >
                     {game.name}
                     <span className="ml-auto label-mono text-muted-foreground">View details</span>
-                  </Link>
+                  </GameDetailLink>
                 ) : null;
               })
             )}
@@ -339,9 +339,8 @@ function Home() {
         <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">
           <div className="animate-reveal group lg:col-span-6">
             {bestTarget ? (
-              <Link
-                to="/games/$gameId"
-                params={{ gameId: bestTarget.gameId }}
+              <GameDetailLink
+                gameId={bestTarget.gameId}
                 search={{
                   title: best.name,
                   ...(bestTarget.source ? { source: bestTarget.source } : {}),
@@ -349,7 +348,7 @@ function Home() {
                 className="block h-full"
               >
                 <FeaturedDeal deal={best} />
-              </Link>
+              </GameDetailLink>
             ) : (
               <FeaturedDeal deal={best} />
             )}
@@ -462,14 +461,13 @@ function RecommendationCard({ recommendation }: { recommendation: DashboardRecom
 
   if (hasVerifiedCatalogId) {
     return (
-      <Link
-        to="/games/$gameId"
-        params={{ gameId: String(recommendation.igdb_id) }}
+      <GameDetailLink
+        gameId={String(recommendation.igdb_id)}
         search={{ title: recommendation.title }}
         className="block h-full"
       >
         {content}
-      </Link>
+      </GameDetailLink>
     );
   }
 

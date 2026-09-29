@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   useInfiniteQuery,
   useMutation,
@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCover } from "@/components/GameCover";
+import { GameDetailLink } from "@/components/GameDetailLink";
 import { PriceAlertForm } from "@/components/PriceAlertForm";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
 import {
@@ -51,6 +52,7 @@ export const Route = createFileRoute("/wishlist")({
 function WishlistPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const returnTo = useRouterState({ select: (state) => state.location.href });
   const [showAlerts, setShowAlerts] = useState(false);
   const [catalogGameId, setCatalogGameId] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -233,7 +235,10 @@ function WishlistPage() {
                 navigate({
                   to: "/games/$gameId",
                   params: { gameId: String(g.catalog_game_id) },
-                  search: g.source === "steam" ? { source: "steam", title: g.title } : {},
+                  search: {
+                    ...(g.source === "steam" ? { source: "steam" as const, title: g.title } : {}),
+                    returnTo,
+                  },
                 })
               }
               onKeyDown={(event) => {
@@ -242,15 +247,17 @@ function WishlistPage() {
                   navigate({
                     to: "/games/$gameId",
                     params: { gameId: String(g.catalog_game_id) },
-                    search: g.source === "steam" ? { source: "steam", title: g.title } : {},
+                    search: {
+                      ...(g.source === "steam" ? { source: "steam" as const, title: g.title } : {}),
+                      returnTo,
+                    },
                   });
                 }
               }}
               className="hover-lift grid cursor-pointer grid-cols-1 gap-6 rounded-2xl border border-border bg-surface p-5 hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center"
             >
-              <Link
-                to="/games/$gameId"
-                params={{ gameId: String(g.catalog_game_id) }}
+              <GameDetailLink
+                gameId={String(g.catalog_game_id)}
                 search={g.source === "steam" ? { source: "steam", title: g.title } : {}}
               >
                 <GameCover
@@ -264,16 +271,15 @@ function WishlistPage() {
                   fit="contain"
                   className="h-[84px] w-14 rounded-lg"
                 />
-              </Link>
+              </GameDetailLink>
               <div className="min-w-0">
-                <Link
-                  to="/games/$gameId"
-                  params={{ gameId: String(g.catalog_game_id) }}
+                <GameDetailLink
+                  gameId={String(g.catalog_game_id)}
                   search={g.source === "steam" ? { source: "steam", title: g.title } : {}}
                   className="truncate text-lg font-bold transition-colors hover:text-primary"
                 >
                   {g.title}
-                </Link>
+                </GameDetailLink>
                 <p className="mt-1 text-xs text-muted-foreground">Saved game</p>
               </div>
               {wishlistPriceLabel(priceQueries[index]?.data?.current?.price) && (
@@ -282,14 +288,13 @@ function WishlistPage() {
                 </p>
               )}
               <div className="flex items-center justify-end gap-2">
-                <Link
-                  to="/games/$gameId"
-                  params={{ gameId: String(g.catalog_game_id) }}
+                <GameDetailLink
+                  gameId={String(g.catalog_game_id)}
                   search={g.source === "steam" ? { source: "steam", title: g.title } : {}}
                   className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
                 >
                   View game
-                </Link>
+                </GameDetailLink>
                 <button
                   aria-label={`Remove ${g.title} from wishlist`}
                   onClick={(event) => {

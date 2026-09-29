@@ -13,6 +13,8 @@ vi.mock("@tanstack/react-router", async () => {
     await vi.importActual<typeof import("@tanstack/react-router")>("@tanstack/react-router");
   return {
     ...actual,
+    useRouterState: ({ select }: { select: (state: { location: { href: string } }) => unknown }) =>
+      select({ location: { href: "/deals" } }),
     Link: ({
       children,
       params,
@@ -20,10 +22,10 @@ vi.mock("@tanstack/react-router", async () => {
       ...props
     }: React.ComponentPropsWithoutRef<"a"> & {
       params: { gameId: string };
-      search?: { source?: string; title?: string };
+      search?: { source?: string; title?: string; returnTo?: string };
     }) => (
       <a
-        href={`/games/${params.gameId}${search?.source ? `?source=${search.source}&title=${search.title}` : search?.title ? `?title=${search.title}` : ""}`}
+        href={`/games/${params.gameId}${search ? `?${new URLSearchParams(search)}` : ""}`}
         {...props}
       >
         {children}
@@ -79,7 +81,7 @@ describe("DealsPage genre deals", () => {
       expect(screen.getByRole("button", { name: genre })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open action game on playfinder/i })).toHaveAttribute(
       "href",
-      "/games/10?title=Action game",
+      "/games/10?title=Action+game&returnTo=%2Fdeals",
     );
   });
 
@@ -141,7 +143,10 @@ describe("DealsPage genre deals", () => {
 
     expect(
       await screen.findByRole("link", { name: /open steam fallback on playfinder/i }),
-    ).toHaveAttribute("href", "/games/620?source=steam&title=Steam fallback");
+    ).toHaveAttribute(
+      "href",
+      "/games/620?source=steam&title=Steam+fallback&returnTo=%2Fdeals",
+    );
     expect(screen.getByTestId("selected-genre-deals")).not.toHaveClass("xl:grid-cols-5");
   });
 

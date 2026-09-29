@@ -1,5 +1,5 @@
-import { Link } from "@tanstack/react-router";
 import { GameCover } from "@/components/GameCover";
+import { GameDetailLink } from "@/components/GameDetailLink";
 import { Chip, PriceBlock } from "@/components/ui-bits";
 import { gameDetailSearch } from "@/lib/gameCardPresentation";
 import { getGameMediaCandidates } from "@/lib/gameMedia";
@@ -150,13 +150,8 @@ export function GameCard({
   }
 
   return (
-    <Link
-      to="/games/$gameId"
-      params={{ gameId: game.gameId }}
-      search={gameDetailSearch(game)}
-      className={className}
-    >
+    <GameDetailLink gameId={game.gameId} search={gameDetailSearch(game)} className={className}>
       {inner}
-    </Link>
+    </GameDetailLink>
   );
 }
