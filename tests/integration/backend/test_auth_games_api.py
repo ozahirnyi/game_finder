@@ -49,6 +49,95 @@ def test_email_registrations_get_unique_public_profiles_and_are_searchable(api_c
         assert profile.json()["nickname"] == user.public_nickname
 
 
+def test_friend_search_finds_a_changed_public_nickname(api_client, user_factory, auth_as):
+    viewer = user_factory(email="search-viewer@example.com", public_nickname="Viewer")
+    target = user_factory(
+        email="search-target@example.com",
+        display_name="old-display",
+        public_nickname="OldAlias",
+    )
+    user_factory(
+        email="search-no-profile@example.com",
+        display_name="newalias-shadow",
+        public_nickname=None,
+    )
+    auth_as(target)
+    assert api_client.patch("/social/me", json={"nickname": "NewAlias"}).status_code == 200
+    auth_as(viewer)
+
+    response = api_client.get("/users/search", params={"q": "newalias"})
+
+    assert response.status_code == 200
+    assert [user["public_id"] for user in response.json()] == [target.public_id]
+
+
+def test_registration_retries_when_another_user_takes_the_generated_identity(
+    api_client, db_session, monkeypatch
+):
+    real_commit = db_session.commit
+    race_inserted = False
+
+    def commit_after_competing_registration():
+        nonlocal race_inserted
+        if not race_inserted:
+            race_inserted = True
+            pending = next(user for user in db_session.new if isinstance(user, User))
+            db_session.expunge(pending)
+            db_session.add(
+                User(
+                    email="competitor@example.com",
+                    display_name=pending.display_name,
+                    public_nickname=pending.public_nickname,
+                )
+            )
+            real_commit()
+            db_session.add(pending)
+        return real_commit()
+
+    monkeypatch.setattr(db_session, "commit", commit_after_competing_registration)
+    response = api_client.post(
+        "/auth/register", json={"email": "race@example.com", "password": "strong-password"}
+    )
+
+    assert response.status_code == 200
+    competitor = db_session.query(User).filter_by(email="competitor@example.com").one()
+    registered = db_session.query(User).filter_by(email="race@example.com").one()
+    assert registered.display_name != competitor.display_name
+    assert registered.public_nickname.lower() != competitor.public_nickname.lower()
+
+
+def test_registration_returns_conflict_when_email_is_claimed_during_commit(
+    api_client, db_session, monkeypatch
+):
+    real_commit = db_session.commit
+    race_inserted = False
+
+    def commit_after_same_email_registration():
+        nonlocal race_inserted
+        if not race_inserted:
+            race_inserted = True
+            pending = next(user for user in db_session.new if isinstance(user, User))
+            db_session.expunge(pending)
+            db_session.add(
+                User(
+                    email=pending.email,
+                    display_name=pending.display_name,
+                    public_nickname=pending.public_nickname,
+                )
+            )
+            real_commit()
+            db_session.add(pending)
+        return real_commit()
+
+    monkeypatch.setattr(db_session, "commit", commit_after_same_email_registration)
+    response = api_client.post(
+        "/auth/register", json={"email": "same@example.com", "password": "strong-password"}
+    )
+
+    assert response.status_code == 409
+    assert db_session.query(User).filter_by(email="same@example.com").count() == 1
+
+
 def test_duplicate_register_returns_conflict_without_creating_second_user(
     api_client, db_session
 ):

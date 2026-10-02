@@ -1327,7 +1327,13 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Password hashing failed")
-    new_user = create_user(db, email, hashed_password)
+    try:
+        new_user = create_user(db, email, hashed_password)
+    except IntegrityError:
+        db.rollback()
+        if get_user_by_email(db, email):
+            raise HTTPException(status_code=409, detail="User already exists")
+        raise HTTPException(status_code=500, detail="Registration failed")
     return user_response(new_user, google_linked=False)
 
 
@@ -2072,9 +2078,16 @@ def search_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    pattern = f"%{q.strip()}%"
     users = (
         db.query(User)
-        .filter(User.id != current_user.id, User.e2e_fixture_hidden.is_(False), social_policy.visible_user_filter(current_user.id), User.display_name.ilike(f"%{q.strip()}%"))
+        .filter(
+            User.id != current_user.id,
+            User.public_nickname.is_not(None),
+            User.e2e_fixture_hidden.is_(False),
+            social_policy.visible_user_filter(current_user.id),
+            or_(User.display_name.ilike(pattern), User.public_nickname.ilike(pattern)),
+        )
         .order_by(User.display_name.asc())
         .limit(limit)
         .all()
