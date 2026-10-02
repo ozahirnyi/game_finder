@@ -4,6 +4,7 @@ fastapi==0.135.3
 httpx==0.28.1
 psycopg2-binary==2.9.12
 pydantic==2.13.0
+email-validator==2.3.0
 python-dotenv==1.2.2
 SQLAlchemy==2.0.49
 uvicorn==0.44.0

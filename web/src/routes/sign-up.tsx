@@ -38,9 +38,33 @@ function SignUpPage() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setError("Email is required");
+      return;
+    }
+    if (
+      normalizedEmail.length > 255 ||
+      !/^[^\s@.]+(?:\.[^\s@.]+)*@[^\s@.]+(?:\.[^\s@.]+)+$/.test(normalizedEmail)
+    ) {
+      setError("Enter a valid email address");
+      return;
+    }
+    if (!password.trim()) {
+      setError("Password is required");
+      return;
+    }
+    if (Array.from(password).length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (new TextEncoder().encode(password).length > 72) {
+      setError("Password must be at most 72 bytes");
+      return;
+    }
     setIsPending(true);
     try {
-      await registerUser(email, password);
+      await registerUser(normalizedEmail, password);
       setIsCreated(true);
     } catch (reason) {
       setError(
@@ -62,13 +86,15 @@ function SignUpPage() {
 
         <Panel className="mt-8 p-6">
           <SocialAuthButtons mode="sign-up" />
-          <form className="mt-5 space-y-4" onSubmit={submit}>
+          <form className="mt-5 space-y-4" onSubmit={submit} noValidate>
             <label className="block">
               <span className="label-mono mb-2 block text-muted-foreground">Email</span>
               <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3">
                 <Mail className="size-4 text-muted-foreground" />
                 <input
                   type="email"
+                  required
+                  maxLength={255}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
@@ -82,6 +108,8 @@ function SignUpPage() {
                 <Lock className="size-4 text-muted-foreground" />
                 <input
                   type="password"
+                  required
+                  minLength={8}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="At least 8 characters"

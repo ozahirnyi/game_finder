@@ -24,6 +24,40 @@ def test_register_persists_user_without_exposing_password_hash(api_client, db_se
     assert user.password_hash != "strong-password"
 
 
+@pytest.mark.parametrize(
+    "email,password",
+    [
+        ("", "strong-password"),
+        ("   ", "strong-password"),
+        ("not-an-email", "strong-password"),
+        ("player@", "strong-password"),
+        ("player@example.com" + "x" * 240, "strong-password"),
+        ("player@example.com", ""),
+        ("player@example.com", "        "),
+        ("player@example.com", "short"),
+        ("player@example.com", "é" * 37),
+    ],
+)
+def test_register_rejects_invalid_credentials_without_creating_user(
+    api_client, db_session, email, password
+):
+    response = api_client.post("/auth/register", json={"email": email, "password": password})
+
+    assert response.status_code == 422
+    assert db_session.query(User).count() == 0
+
+
+def test_register_trims_email_before_persisting(api_client, db_session):
+    response = api_client.post(
+        "/auth/register",
+        json={"email": "  Player@Proton.me  ", "password": "strong-password"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "player@proton.me"
+    assert db_session.query(User).filter_by(email="player@proton.me").count() == 1
+
+
 def test_email_registrations_get_unique_public_profiles_and_are_searchable(api_client, db_session, user_factory, auth_as):
     auth_as(user_factory(email="viewer@example.com", public_nickname="alex"))
     registrations = [

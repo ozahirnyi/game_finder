@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 from datetime import datetime
 from typing import Any, Literal, Optional
 import uuid
@@ -63,8 +63,22 @@ class GameUpdate(BaseModel):
 
 
 class UserCreate(BaseModel):
-    email: str
-    password: str
+    email: EmailStr = Field(max_length=255)
+    password: str = Field(min_length=8)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def trim_email(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Password is required")
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 bytes")
+        return value
 
 
 class UserRead(BaseModel):

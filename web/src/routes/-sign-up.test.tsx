@@ -48,4 +48,28 @@ describe("SignUpPage", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Email already registered");
   });
+
+  it.each([
+    ["", "password123", /email is required/i],
+    ["   ", "password123", /email is required/i],
+    ["not-an-email", "password123", /valid email/i],
+    ["name@", "password123", /valid email/i],
+    ["a..b@example.com", "password123", /valid email/i],
+    ["a@example..com", "password123", /valid email/i],
+    ["me@example.com", "", /password is required/i],
+    ["me@example.com", "        ", /password is required/i],
+    ["me@example.com", "short", /at least 8 characters/i],
+    ["me@example.com", "😀".repeat(4), /at least 8 characters/i],
+    ["me@example.com", "é".repeat(37), /72 bytes/i],
+  ])("blocks invalid registration input %#", async (email, password, message) => {
+    const SignUpPage = Route.options.component!;
+    render(<SignUpPage />);
+
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: email } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: password } });
+    fireEvent.submit(screen.getByRole("button", { name: /create account/i }).closest("form")!);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(api.registerUser).not.toHaveBeenCalled();
+  });
 });
