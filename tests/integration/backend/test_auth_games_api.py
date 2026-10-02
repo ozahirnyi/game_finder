@@ -24,6 +24,31 @@ def test_register_persists_user_without_exposing_password_hash(api_client, db_se
     assert user.password_hash != "strong-password"
 
 
+def test_email_registrations_get_unique_public_profiles_and_are_searchable(api_client, db_session, user_factory, auth_as):
+    auth_as(user_factory(email="viewer@example.com", public_nickname="alex"))
+    registrations = [
+        api_client.post("/auth/register", json={"email": email, "password": "strong-password"})
+        for email in ("alex@one.example", "alex@two.example")
+    ]
+
+    assert [response.status_code for response in registrations] == [200, 200]
+    users = [db_session.query(User).filter_by(email=email).one() for email in ("alex@one.example", "alex@two.example")]
+    nicknames = [user.public_nickname for user in users]
+    assert all(nicknames)
+    assert len({nickname.lower() for nickname in nicknames}) == 2
+    assert "alex" not in {nickname.lower() for nickname in nicknames}
+    assert [response.json()["public_nickname"] for response in registrations] == nicknames
+
+    search = api_client.get("/users/search", params={"q": "alex"})
+    assert search.status_code == 200
+    assert {item["public_id"] for item in search.json()} >= {user.public_id for user in users}
+    for user in users:
+        profile = api_client.get(f"/users/{user.public_id}")
+        assert profile.status_code == 200
+        assert profile.json()["public_id"] == user.public_id
+        assert profile.json()["nickname"] == user.public_nickname
+
+
 def test_duplicate_register_returns_conflict_without_creating_second_user(
     api_client, db_session
 ):

@@ -77,10 +77,13 @@ def build_public_nickname(db, preferred_name: str) -> str:
 
 def create_user(db, email: str, password_hash: str | None, **extra):
     normalized_email = email.strip().lower()
+    display_name = extra.pop("display_name", None) or build_display_name(db, normalized_email)
+    public_nickname = extra.pop("public_nickname", None) or build_public_nickname(db, display_name)
     user = User(
         email=normalized_email,
         password_hash=password_hash,
-        display_name=extra.pop("display_name", None) or build_display_name(db, normalized_email),
+        display_name=display_name,
+        public_nickname=public_nickname,
         **extra,
     )
     db.add(user)
