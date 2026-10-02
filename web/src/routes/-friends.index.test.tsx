@@ -68,6 +68,11 @@ function renderFriends(prefetchedSteamSocial?: unknown, initialEntry = "/") {
         path: "/messages/$conversationId",
         component: () => <p>Dedicated chat</p>,
       }),
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/users/$publicId",
+        component: () => <p>Public profile</p>,
+      }),
     ]),
     history: createMemoryHistory({ initialEntries: [initialEntry] }),
   });
@@ -78,11 +83,11 @@ function renderFriends(prefetchedSteamSocial?: unknown, initialEntry = "/") {
       pageParams: [0],
     });
   }
-  return render(
+  return { ...render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
-  );
+  ), router };
 }
 
 describe("FriendsPage", () => {
@@ -315,6 +320,21 @@ describe("FriendsPage", () => {
 
     expect(await screen.findByRole("link", { name: "Open chat" })).toBeEnabled();
     expect(screen.getAllByRole("button", { name: "Invite to play" })[0]).toBeEnabled();
+  });
+
+  it("opens the selected friend's public profile in invite mode", async () => {
+    api.getFriends.mockResolvedValue([
+      { user: { id: "player-1", public_id: "sam-public", display_name: "Sam" } },
+    ]);
+    const { router } = renderFriends();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Select Sam" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Invite to play" })[0]);
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/users/sam-public");
+      expect(router.state.location.search).toEqual({ compose: "invite" });
+    });
   });
 
   it("does not present unavailable social metrics as statistics", async () => {

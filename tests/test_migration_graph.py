@@ -6,7 +6,8 @@ import pytest
 def test_alembic_has_a_single_upgrade_head():
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["a4b6c8d0e2f4"]
+    assert script.get_heads() == ["f1a2b3c4d5e6"]
+    assert script.get_revision("f1a2b3c4d5e6").down_revision == "a4b6c8d0e2f4"
     assert script.get_revision("a4b6c8d0e2f4").down_revision == "c6d8e0f2a4b6"
 
 

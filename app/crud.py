@@ -1,5 +1,6 @@
 import uuid
 import re
+from sqlalchemy.exc import IntegrityError
 from app.database import Game, User
 
 
@@ -77,13 +78,25 @@ def build_public_nickname(db, preferred_name: str) -> str:
 
 def create_user(db, email: str, password_hash: str | None, **extra):
     normalized_email = email.strip().lower()
-    user = User(
-        email=normalized_email,
-        password_hash=password_hash,
-        display_name=extra.pop("display_name", None) or build_display_name(db, normalized_email),
-        **extra,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+    requested_display_name = extra.pop("display_name", None)
+    requested_public_nickname = extra.pop("public_nickname", None)
+    for attempt in range(5):
+        display_name = requested_display_name or build_display_name(db, normalized_email)
+        public_nickname = requested_public_nickname or build_public_nickname(db, display_name)
+        user = User(
+            email=normalized_email,
+            password_hash=password_hash,
+            display_name=display_name,
+            public_nickname=public_nickname,
+            **extra,
+        )
+        db.add(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            if attempt == 4 or get_user_by_email(db, normalized_email):
+                raise
+            continue
+        db.refresh(user)
+        return user
