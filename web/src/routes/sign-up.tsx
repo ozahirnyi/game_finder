@@ -1,9 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Panel } from "@/components/ui-bits";
 import { SocialAuthButtons } from "@/components/SocialAuthButtons";
-import { registerUser } from "@/lib/api";
+import { loginUser, registerUser, setToken } from "@/lib/api";
 
 import { Mail, Lock, ArrowRight } from "lucide-react";
 
@@ -29,6 +29,7 @@ export const Route = createFileRoute("/sign-up")({
 });
 
 function SignUpPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -63,13 +64,22 @@ function SignUpPage() {
       return;
     }
     setIsPending(true);
+    let accountCreated = false;
     try {
       await registerUser(normalizedEmail, password);
-      setIsCreated(true);
+      accountCreated = true;
+      const { access_token } = await loginUser(normalizedEmail, password);
+      setToken(access_token);
+      await navigate({ to: "/account" });
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Account creation failed. Please try again.",
-      );
+      if (accountCreated) {
+        setIsCreated(true);
+        setError("Account created, but automatic sign-in failed. Please sign in to continue.");
+      } else {
+        setError(
+          reason instanceof Error ? reason.message : "Account creation failed. Please try again.",
+        );
+      }
     } finally {
       setIsPending(false);
     }
@@ -120,11 +130,6 @@ function SignUpPage() {
             {error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}
-              </p>
-            )}
-            {isCreated && (
-              <p role="status" className="text-sm text-primary">
-                Account created. Please sign in to continue.
               </p>
             )}
             <button
