@@ -135,6 +135,7 @@ export function ProfileView({
   );
   const [inviteOpen, setInviteOpen] = useState(initialComposer === "invite");
   const [selectedGameKey, setSelectedGameKey] = useState("");
+  const [inviteNote, setInviteNote] = useState("");
   const queryClient = useQueryClient();
   useEffect(() => {
     if (!profile.settings) return;
@@ -178,10 +179,12 @@ export function ProfileView({
         game_name: game.title,
         source: game.source,
         external_id: game.external_id,
+        ...(inviteNote.trim() ? { note: inviteNote.trim() } : {}),
       });
     },
     onSuccess: () => {
       setSelectedGameKey("");
+      setInviteNote("");
       setInviteOpen(false);
       queryClient.invalidateQueries({ queryKey: ["game-invites"] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
@@ -284,6 +287,7 @@ export function ProfileView({
                         ? `${profile.sharedLibrary.data[0].source}:${profile.sharedLibrary.data[0].external_id}`
                         : "",
                     );
+                    setInviteNote("");
                     setInviteOpen(true);
                   }}
                   className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
@@ -476,6 +480,17 @@ export function ProfileView({
                   ))}
                 </select>
               </label>
+              <label className="mt-4 grid gap-2 text-sm font-semibold">
+                Note (optional)
+                <textarea
+                  value={inviteNote}
+                  onChange={(event) => setInviteNote(event.target.value)}
+                  maxLength={280}
+                  rows={3}
+                  placeholder="Add a message to your invite"
+                  className="resize-y rounded-lg border border-border bg-surface-2 p-3"
+                />
+              </label>
               {!profile.sharedLibrary?.data.length && (
                 <p className="mt-2 text-sm text-muted-foreground">
                   A shared saved game is required before you can send an invite.
@@ -489,7 +504,10 @@ export function ProfileView({
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setInviteOpen(false)}
+                  onClick={() => {
+                    setInviteNote("");
+                    setInviteOpen(false);
+                  }}
                   className="rounded-lg px-3 py-2 text-sm font-bold"
                 >
                   Cancel

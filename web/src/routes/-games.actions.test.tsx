@@ -153,6 +153,9 @@ describe("GameDetail actions", () => {
     const inviteButton = await screen.findByRole("button", { name: "Invite" });
     await waitFor(() => expect(inviteButton).not.toBeDisabled());
     fireEvent.click(inviteButton);
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "  Tonight?  " },
+    });
     fireEvent.click(await screen.findByRole("button", { name: "Send invite" }));
 
     await waitFor(() =>
@@ -162,6 +165,7 @@ describe("GameDetail actions", () => {
         game_id: 274755,
         source: "igdb",
         external_id: "274755",
+        note: "Tonight?",
       }),
     );
   });

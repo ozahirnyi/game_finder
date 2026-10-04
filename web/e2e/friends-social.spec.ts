@@ -68,6 +68,7 @@ test("friend profile message and invite mutations use the canonical friend id an
   await page.goto("/users/sam-player?compose=invite");
   await waitForHydration(page);
   await expect(page.getByRole("button", { name: "Send invite" })).toBeEnabled();
+  await page.getByLabel("Note (optional)").fill("Tonight?");
   await page.getByRole("button", { name: "Send invite" }).click();
   await expect
     .poll(
@@ -81,6 +82,7 @@ test("friend profile message and invite mutations use the canonical friend id an
       game_name: "Celeste",
       source: "steam",
       external_id: "101",
+      note: "Tonight?",
     });
 
   api.state.statusByPath["/conversations"] = 500;

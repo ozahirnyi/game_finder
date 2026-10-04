@@ -340,6 +340,7 @@ function GameDetail() {
   const [showAllPlatforms, setShowAllPlatforms] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [recipientId, setRecipientId] = useState("");
+  const [inviteNote, setInviteNote] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [wishlistAdded, setWishlistAdded] = useState(false);
   const [favoriteAdded, setFavoriteAdded] = useState(false);
@@ -410,8 +411,10 @@ function GameDetail() {
         game_id: Number(catalogGame.id),
         source: catalogGame.isSteamLibrary ? "steam" : "igdb",
         external_id: String(catalogGame.id),
+        ...(inviteNote.trim() ? { note: inviteNote.trim() } : {}),
       }),
     onSuccess: () => {
+      setInviteNote("");
       setShowInviteForm(false);
       setActionMessage("Invite sent");
     },
@@ -822,6 +825,7 @@ function GameDetail() {
               <button
                 onClick={() => {
                   setRecipientId(friendsQuery.data?.[0]?.user.id ?? "");
+                  setInviteNote("");
                   setShowInviteForm(true);
                 }}
                 disabled={friendsQuery.isLoading || !friendsQuery.data?.length}
@@ -897,6 +901,17 @@ function GameDetail() {
                     ))}
                   </select>
                 </label>
+                <label className="grid min-w-0 gap-1 text-xs font-bold">
+                  Note (optional)
+                  <textarea
+                    value={inviteNote}
+                    onChange={(event) => setInviteNote(event.target.value)}
+                    maxLength={280}
+                    rows={3}
+                    placeholder="Add a message to your invite"
+                    className="min-w-0 w-full max-w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </label>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="submit"
@@ -907,7 +922,10 @@ function GameDetail() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowInviteForm(false)}
+                    onClick={() => {
+                      setInviteNote("");
+                      setShowInviteForm(false);
+                    }}
                     className="rounded-md border border-border px-3 py-2 text-xs font-bold"
                   >
                     Cancel

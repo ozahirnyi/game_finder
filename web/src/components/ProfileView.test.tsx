@@ -403,6 +403,9 @@ describe("ProfileView library visibility", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Invite to play" }));
     fireEvent.change(screen.getByLabelText("Game"), { target: { value: "steam:620" } });
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "  Tonight?  " },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Send invite" }));
 
     await waitFor(() =>
@@ -411,6 +414,7 @@ describe("ProfileView library visibility", () => {
         game_name: "Portal 2",
         source: "steam",
         external_id: "620",
+        note: "Tonight?",
       }),
     );
   });
