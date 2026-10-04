@@ -2,6 +2,7 @@ import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-ro
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { FriendActions } from "@/components/FriendActions";
 import { FriendsSync } from "@/components/FriendsSync";
 import { Avatar } from "@/components/GameCover";
@@ -48,8 +49,16 @@ export const Route = createFileRoute("/friends/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: FriendsPage,
+  component: FriendsRoute,
 });
+
+function FriendsRoute() {
+  return (
+    <PersonalSectionGate section="friends">
+      <FriendsPage />
+    </PersonalSectionGate>
+  );
+}
 
 function FriendsPage() {
   const navigate = useNavigate();

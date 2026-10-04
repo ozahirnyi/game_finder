@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { useEffect, useState } from "react";
 import { Gamepad2, Library as LibraryIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { GameCover } from "@/components/GameCover";
 import { GameDetailLink } from "@/components/GameDetailLink";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
@@ -37,8 +38,16 @@ export const Route = createFileRoute("/library")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: LibraryPage,
+  component: LibraryRoute,
 });
+
+function LibraryRoute() {
+  return (
+    <PersonalSectionGate section="library">
+      <LibraryPage />
+    </PersonalSectionGate>
+  );
+}
 
 const tabs = ["All games", "Steam", "PlayStation"] as const;
 type Tab = (typeof tabs)[number];

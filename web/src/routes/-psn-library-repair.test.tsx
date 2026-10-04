@@ -11,9 +11,11 @@ import {
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { previewPsnLibraryRepair, deletePsnLibrary } = vi.hoisted(() => ({
+const { previewPsnLibraryRepair, deletePsnLibrary, getAuthSnapshot, subscribeToAuthChanges } = vi.hoisted(() => ({
   previewPsnLibraryRepair: vi.fn(),
   deletePsnLibrary: vi.fn(),
+  getAuthSnapshot: vi.fn(() => true),
+  subscribeToAuthChanges: vi.fn(() => () => {}),
 }));
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -22,6 +24,8 @@ vi.mock("@/lib/api", () => ({
   previewPsnLibraryRepair,
   deletePsnLibrary,
   applyPsnLibraryRepair: vi.fn(),
+  getAuthSnapshot,
+  subscribeToAuthChanges,
 }));
 import { Route } from "./psn-library-repair";
 

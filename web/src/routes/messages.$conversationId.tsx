@@ -1,11 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { MessagesScreen } from "@/components/MessagesScreen";
+import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 export const Route = createFileRoute("/messages/$conversationId")({
   head: () => ({ meta: [{ title: "Messages — Playfinder" }] }),
   component: ConversationPage,
 });
 function ConversationPage() {
+  return (
+    <PersonalSectionGate section="chats">
+      <SignedInConversationPage />
+    </PersonalSectionGate>
+  );
+}
+
+function SignedInConversationPage() {
   const { conversationId } = Route.useParams();
   const navigate = useNavigate();
   return (

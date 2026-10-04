@@ -12,6 +12,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
+  getAuthSnapshot: vi.fn(() => true),
+  subscribeToAuthChanges: vi.fn(() => () => {}),
   ApiError: class ApiError extends Error {
     constructor(
       message: string,

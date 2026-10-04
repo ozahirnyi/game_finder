@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { Avatar } from "@/components/GameCover";
 import { EmptyState, Panel, SectionHeader } from "@/components/ui-bits";
 import { createFriendRequest, getPublicUsers } from "@/lib/api";
@@ -10,8 +11,16 @@ export const Route = createFileRoute("/users/")({
   validateSearch: (search: Record<string, unknown>) => ({
     page: typeof search.page === "number" && search.page > 0 ? Math.floor(search.page) : 1,
   }),
-  component: UsersPage,
+  component: UsersGatePage,
 });
+
+function UsersGatePage() {
+  return (
+    <PersonalSectionGate section="players">
+      <UsersPage />
+    </PersonalSectionGate>
+  );
+}
 
 export function directoryAction(
   relationship: "none" | "friends" | "outgoing_pending" | "incoming_pending",

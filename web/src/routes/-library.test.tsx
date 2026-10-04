@@ -11,6 +11,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
+  getAuthSnapshot: vi.fn(() => true),
+  subscribeToAuthChanges: vi.fn(() => () => {}),
   getLibraryOverview: vi.fn(),
   getLibraryOverviewPage: vi.fn(),
   searchGames: vi.fn(),

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { OnboardingGuidance } from "@/components/OnboardingGuidance";
 import { ProfileView } from "@/components/ProfileView";
+import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { BlockedUsers } from "@/components/FriendsSync";
 import {
   getFavorites,
@@ -35,6 +36,14 @@ export const Route = createFileRoute("/account")({
 });
 
 export function AccountPage() {
+  return (
+    <PersonalSectionGate section="account">
+      <AccountContent />
+    </PersonalSectionGate>
+  );
+}
+
+function AccountContent() {
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
   const libraryQuery = useQuery({ queryKey: ["library-overview"], queryFn: getLibraryOverview });
   const favoritesQuery = useQuery({ queryKey: ["favorites"], queryFn: getFavorites });

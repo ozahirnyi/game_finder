@@ -3,8 +3,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { getProfile, getLibraryOverview, getFavorites, getOnboardingSummary, getSteamLinkUrl, profileView } =
+const { getAuthSnapshot, subscribeToAuthChanges, getProfile, getLibraryOverview, getFavorites, getOnboardingSummary, getSteamLinkUrl, profileView } =
   vi.hoisted(() => ({
+    getAuthSnapshot: vi.fn(() => true),
+    subscribeToAuthChanges: vi.fn(() => () => {}),
     getProfile: vi.fn().mockResolvedValue({ display_name: "test1" }),
     getLibraryOverview: vi.fn().mockResolvedValue({
       steam_available: true,
@@ -46,6 +48,8 @@ const { getProfile, getLibraryOverview, getFavorites, getOnboardingSummary, getS
   }));
 
 vi.mock("@/lib/api", () => ({
+  getAuthSnapshot,
+  subscribeToAuthChanges,
   getProfile,
   getLibraryOverview,
   getFavorites,

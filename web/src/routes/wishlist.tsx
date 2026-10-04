@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { GameCover } from "@/components/GameCover";
 import { GameDetailLink } from "@/components/GameDetailLink";
 import { PriceAlertForm } from "@/components/PriceAlertForm";
@@ -46,8 +47,16 @@ export const Route = createFileRoute("/wishlist")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: WishlistPage,
+  component: WishlistRoute,
 });
+
+function WishlistRoute() {
+  return (
+    <PersonalSectionGate section="wishlist">
+      <WishlistPage />
+    </PersonalSectionGate>
+  );
+}
 
 function WishlistPage() {
   const queryClient = useQueryClient();

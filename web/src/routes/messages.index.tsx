@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { MessagesScreen } from "@/components/MessagesScreen";
+import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { createConversation } from "@/lib/api";
 
 export const Route = createFileRoute("/messages/")({
@@ -11,6 +12,14 @@ export const Route = createFileRoute("/messages/")({
   component: MessagesPage,
 });
 function MessagesPage() {
+  return (
+    <PersonalSectionGate section="chats">
+      <SignedInMessagesPage />
+    </PersonalSectionGate>
+  );
+}
+
+function SignedInMessagesPage() {
   const { friend } = Route.useSearch();
   const navigate = useNavigate();
   const requested = useRef("");

@@ -2,9 +2,18 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
+import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { applyPsnLibraryRepair, deletePsnLibrary, previewPsnLibraryRepair } from "@/lib/api";
 
-export const Route = createFileRoute("/psn-library-repair")({ component: PsnLibraryRepairPage });
+export const Route = createFileRoute("/psn-library-repair")({ component: PsnLibraryRepairGatePage });
+
+function PsnLibraryRepairGatePage() {
+  return (
+    <PersonalSectionGate section="psnRepair">
+      <PsnLibraryRepairPage />
+    </PersonalSectionGate>
+  );
+}
 
 function PsnLibraryRepairPage() {
   const client = useQueryClient();

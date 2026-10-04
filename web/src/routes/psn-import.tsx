@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Check, FileUp, Loader2, RotateCcw } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { Chip, InlineError, Panel, SectionHeader } from "@/components/ui-bits";
 import {
   confirmPsnImport,
@@ -12,7 +13,15 @@ import {
   type PsnImportSelection,
 } from "@/lib/api";
 
-export const Route = createFileRoute("/psn-import")({ component: PsnImportPage });
+export const Route = createFileRoute("/psn-import")({ component: PsnImportGatePage });
+
+function PsnImportGatePage() {
+  return (
+    <PersonalSectionGate section="psnImport">
+      <PsnImportPage />
+    </PersonalSectionGate>
+  );
+}
 
 type Step = "upload" | "preview" | "confirm" | "result";
 type Row = PsnImportPreviewItem & {
