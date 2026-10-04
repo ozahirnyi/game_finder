@@ -3,49 +3,57 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { getAuthSnapshot, subscribeToAuthChanges, getProfile, getLibraryOverview, getFavorites, getOnboardingSummary, getSteamLinkUrl, profileView } =
-  vi.hoisted(() => ({
-    getAuthSnapshot: vi.fn(() => true),
-    subscribeToAuthChanges: vi.fn(() => () => {}),
-    getProfile: vi.fn().mockResolvedValue({ display_name: "test1" }),
-    getLibraryOverview: vi.fn().mockResolvedValue({
-      steam_available: true,
-      steam_error: null,
-      games: [
-        {
-          id: "steam:620",
-          source: "steam",
-          external_id: "620",
-          detail_game_id: null,
-          title: "Portal 2",
-          cover_url: null,
-          playtime_forever: 180,
-        },
-        {
-          id: "manual:1",
-          source: "manual",
-          external_id: null,
-          detail_game_id: "manual:1",
-          title: "Hades",
-          cover_url: null,
-          playtime_forever: 60,
-        },
-      ],
-    }),
-    getFavorites: vi.fn().mockResolvedValue([
+const {
+  getAuthSnapshot,
+  subscribeToAuthChanges,
+  getProfile,
+  getLibraryOverview,
+  getFavorites,
+  getOnboardingSummary,
+  getSteamLinkUrl,
+  profileView,
+} = vi.hoisted(() => ({
+  getAuthSnapshot: vi.fn(() => true),
+  subscribeToAuthChanges: vi.fn(() => () => {}),
+  getProfile: vi.fn().mockResolvedValue({ display_name: "test1" }),
+  getLibraryOverview: vi.fn().mockResolvedValue({
+    steam_available: true,
+    steam_error: null,
+    games: [
       {
-        id: "favorite-1",
-        catalog_game_id: 274755,
-        source: "igdb",
-        external_id: "274755",
-        title: "Hades II",
+        id: "steam:620",
+        source: "steam",
+        external_id: "620",
+        detail_game_id: null,
+        title: "Portal 2",
         cover_url: null,
+        playtime_forever: 180,
       },
-    ]),
-    getOnboardingSummary: vi.fn(() => new Promise(() => {})),
-    getSteamLinkUrl: vi.fn().mockResolvedValue({ url: "https://steam.example/connect" }),
-    profileView: vi.fn((_props: unknown) => null),
-  }));
+      {
+        id: "manual:1",
+        source: "manual",
+        external_id: null,
+        detail_game_id: "manual:1",
+        title: "Hades",
+        cover_url: null,
+        playtime_forever: 60,
+      },
+    ],
+  }),
+  getFavorites: vi.fn().mockResolvedValue([
+    {
+      id: "favorite-1",
+      catalog_game_id: 274755,
+      source: "igdb",
+      external_id: "274755",
+      title: "Hades II",
+      cover_url: null,
+    },
+  ]),
+  getOnboardingSummary: vi.fn(() => new Promise(() => {})),
+  getSteamLinkUrl: vi.fn().mockResolvedValue({ url: "https://steam.example/connect" }),
+  profileView: vi.fn((_props: unknown) => null),
+}));
 
 vi.mock("@/lib/api", () => ({
   getAuthSnapshot,
@@ -75,6 +83,45 @@ afterEach(() => {
 });
 
 describe("AccountPage", () => {
+  it("shows the saved price region on the owner profile", async () => {
+    getProfile.mockResolvedValueOnce({ display_name: "test1", price_country_code: "UA" });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <AccountPage />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(profileView).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          profile: expect.objectContaining({
+            region: "UA",
+            settings: expect.objectContaining({ priceCountryCode: "UA" }),
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("shows the saved bio on the owner profile", async () => {
+    getProfile.mockResolvedValueOnce({ display_name: "test1", bio: "Co-op and strategy games" });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <AccountPage />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(profileView).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          profile: expect.objectContaining({ bio: "Co-op and strategy games" }),
+        }),
+      ),
+    );
+  });
+
   it("uses the unified overview for Steam counts and playtime", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(

@@ -32,6 +32,9 @@ vi.mock("@/components/ProfileView", () => ({
   }: {
     profile: {
       name: string;
+      bio?: string;
+      region: string;
+      settings?: { priceCountryCode?: string };
       hours: string | number;
       games: { title: string }[];
       libraryPagination?: {
@@ -46,6 +49,9 @@ vi.mock("@/components/ProfileView", () => ({
   }) => (
     <div>
       <h1>{profile.name}</h1>
+      {profile.bio && <p>{profile.bio}</p>}
+      <p>Region: {profile.region}</p>
+      {isSelf && <p>Selected price region: {profile.settings?.priceCountryCode}</p>}
       <p>Hours: {profile.hours}</p>
       {profile.libraryPagination && (
         <input
@@ -239,5 +245,35 @@ describe("PublicProfilePage", () => {
     api.getPublicProfile.mockResolvedValue(publicProfile("self"));
     renderProfile();
     expect(await screen.findByRole("button", { name: "Settings" })).toBeInTheDocument();
+  });
+
+  it("shows the saved bio on the owner's public profile", async () => {
+    api.getPublicProfile.mockResolvedValue(publicProfile("self"));
+    api.getProfile.mockResolvedValue({
+      display_name: "Owner",
+      bio: "Co-op and strategy games",
+      platforms: [],
+      favorite_genres: [],
+    });
+
+    renderProfile();
+
+    expect(await screen.findByText("Co-op and strategy games")).toBeInTheDocument();
+  });
+
+  it("uses the owner's selected price region on their public profile and in settings", async () => {
+    api.getPublicProfile.mockResolvedValue(publicProfile("self"));
+    api.getProfile.mockResolvedValue({
+      display_name: "Owner",
+      bio: "",
+      price_country_code: "UA",
+      platforms: [],
+      favorite_genres: [],
+    });
+
+    renderProfile();
+
+    expect(await screen.findByText("Region: UA")).toBeInTheDocument();
+    expect(screen.getByText("Selected price region: UA")).toBeInTheDocument();
   });
 });

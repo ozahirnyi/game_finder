@@ -12,12 +12,12 @@ export function ThemeSelector({ compact = false }: { compact?: boolean }) {
         <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
           Theme
         </p>
-        <div className="flex items-center rounded-md border border-border bg-background p-0.5">
+        <div className="flex items-center rounded-full border border-border bg-background p-px">
           <button
             onClick={() => setMode("dark")}
             aria-label="Dark mode"
             aria-pressed={mode === "dark"}
-            className={`grid size-6 place-items-center rounded transition ${
+            className={`grid size-6 place-items-center rounded-full transition ${
               mode === "dark" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
             }`}
           >
@@ -27,7 +27,7 @@ export function ThemeSelector({ compact = false }: { compact?: boolean }) {
             onClick={() => setMode("light")}
             aria-label="Light mode"
             aria-pressed={mode === "light"}
-            className={`grid size-6 place-items-center rounded transition ${
+            className={`grid size-6 place-items-center rounded-full transition ${
               mode === "light" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
             }`}
           >

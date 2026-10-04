@@ -108,7 +108,7 @@ class UserProfileRead(UserRead):
 class UserProfileUpdate(BaseModel):
     price_country_code: str | None = Field(default=None, min_length=2, max_length=2)
     display_name: str | None = Field(default=None, min_length=3, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9 _-]*$")
-    bio: str | None = Field(default=None, max_length=1000)
+    bio: str | None = Field(default=None, max_length=160)
     platforms: list[str] | None = Field(default=None, max_length=20)
     favorite_genres: list[str] | None = Field(default=None, max_length=20)
     library_visibility: Visibility | None = None

@@ -28,6 +28,7 @@ const GENRE_OPTIONS = [
   "Horror",
 ];
 const PLATFORM_OPTIONS = ["PC", "PlayStation", "Xbox", "Nintendo Switch", "Mobile"];
+const BIO_MAX_LENGTH = 160;
 
 function toggle(values: string[], value: string) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
@@ -197,6 +198,10 @@ export function ProfileView({
   const canMessage = viewer?.canMessage ?? Boolean(profile.friendId);
   const canInvite = viewer?.canInvite ?? Boolean(profile.friendId);
   const canAddFriend = viewer?.canAddFriend ?? false;
+  const savedBio = (profile.settings?.bio ?? profile.bio ?? "").trim() || null;
+  const nextBio = bio.trim() || null;
+  const bioTooLong = nextBio !== savedBio && Array.from(bio).length > BIO_MAX_LENGTH;
+  const bioPreview = profile.bio ? Array.from(profile.bio) : [];
 
   return (
     <>
@@ -218,6 +223,13 @@ export function ProfileView({
         <div className="relative min-w-0 flex-1">
           <h1 className="truncate text-2xl font-bold tracking-[-0.02em]">{profile.name}</h1>
           <p className="truncate text-sm text-muted-foreground">@{profile.handle}</p>
+          {profile.bio && (
+            <p className="mt-3 max-w-2xl whitespace-pre-line break-words text-sm leading-relaxed text-muted-foreground">
+              {bioPreview.length > BIO_MAX_LENGTH
+                ? `${bioPreview.slice(0, BIO_MAX_LENGTH).join("")}…`
+                : profile.bio}
+            </p>
+          )}
           <div className="mt-3 flex flex-wrap gap-2">
             <Chip tone="primary">Region · {profile.region}</Chip>
             {!isSelf && (
@@ -319,9 +331,10 @@ export function ProfileView({
           <form
             onSubmit={(event) => {
               event.preventDefault();
+              if (bioTooLong) return;
               saveSettings.mutate({
                 display_name: displayName.trim(),
-                bio: bio.trim() || null,
+                ...(nextBio !== savedBio ? { bio: nextBio } : {}),
                 library_visibility: libraryVisibility,
                 favorites_visibility: favoritesVisibility,
                 wishlist_visibility: wishlistVisibility,
@@ -348,11 +361,25 @@ export function ProfileView({
               Bio
               <textarea
                 value={bio}
-                onChange={(event) => setBio(event.target.value)}
-                maxLength={1000}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  const nextCharacters = Array.from(nextValue);
+                  setBio(
+                    Array.from(bio).length > BIO_MAX_LENGTH
+                      ? nextValue
+                      : nextCharacters.slice(0, BIO_MAX_LENGTH).join(""),
+                  );
+                }}
+                aria-describedby="bio-character-count"
                 className="mt-2 min-h-24 w-full rounded-lg border border-border bg-surface-2 px-3 py-2"
               />
             </label>
+            <p id="bio-character-count" className="mt-1 text-right text-xs text-muted-foreground">
+              {Array.from(bio).length} / {BIO_MAX_LENGTH}
+            </p>
+            {bioTooLong && (
+              <p className="mt-1 text-xs text-destructive">Shorten your bio to save changes.</p>
+            )}
             <PreferenceChips
               label="Favourite genres"
               options={GENRE_OPTIONS}
@@ -434,7 +461,7 @@ export function ProfileView({
               </button>
               <button
                 type="submit"
-                disabled={saveSettings.isPending}
+                disabled={saveSettings.isPending || bioTooLong}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
               >
                 {saveSettings.isPending ? "Saving…" : "Save"}
@@ -553,9 +580,6 @@ export function ProfileView({
             <p className="font-mono text-lg font-bold leading-tight">{s.v}</p>
           </div>
         ))}
-        {profile.bio && (
-          <p className="min-w-[200px] flex-1 text-sm text-muted-foreground">{profile.bio}</p>
-        )}
       </div>
 
       <div className="stagger grid grid-cols-1 gap-5 lg:grid-cols-12">

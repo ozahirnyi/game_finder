@@ -44,9 +44,9 @@ function PublicProfilePage() {
   const publicProfile = publicQuery.data;
   const shouldQueryPublicLibrary = Boolean(
     publicProfile &&
-      publicProfile.relationship !== "friends" &&
-      publicProfile.relationship !== "self" &&
-      (libraryPage > 1 || debouncedLibrarySearch),
+    publicProfile.relationship !== "friends" &&
+    publicProfile.relationship !== "self" &&
+    (libraryPage > 1 || debouncedLibrarySearch),
   );
   const publicLibraryQuery = useQuery({
     queryKey: ["public-profile-library", publicId, libraryPage, debouncedLibrarySearch],
@@ -109,8 +109,8 @@ function PublicProfilePage() {
     avatarFrom: "#7c3aed",
     avatarTo: "#111827",
     avatarUrl: friend?.avatar ?? publicProfile.avatar ?? undefined,
-    bio: friend?.bio ?? undefined,
-    region: "Global",
+    bio: isSelf ? (ownerQuery.data?.bio ?? undefined) : (friend?.bio ?? undefined),
+    region: isSelf ? (ownerQuery.data?.price_country_code ?? "US") : "Global",
     hours: library.summary
       ? formatWholeHours(library.summary.total_playtime)
       : profileLibraryHours(library.data),
@@ -183,6 +183,7 @@ function PublicProfilePage() {
         ? {
             displayName: ownerQuery.data.display_name,
             bio: ownerQuery.data.bio ?? "",
+            priceCountryCode: ownerQuery.data.price_country_code ?? "US",
             libraryVisibility: ownerQuery.data.library_visibility ?? "public",
             favoritesVisibility: ownerQuery.data.favorites_visibility ?? "public",
             wishlistVisibility: ownerQuery.data.wishlist_visibility ?? "public",

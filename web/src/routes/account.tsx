@@ -77,9 +77,10 @@ function AccountContent() {
         profile={{
           name: profile?.display_name ?? "Your profile",
           handle: profile?.display_name ?? "profile",
+          bio: profile?.bio ?? undefined,
           avatarFrom: "#7c3aed",
           avatarTo: "#111827",
-          region: "US",
+          region: profile?.price_country_code ?? "US",
           settings: profile
             ? {
                 displayName: profile.display_name,

@@ -87,6 +87,41 @@ const renderProfile = (isSelf: boolean) =>
   );
 
 describe("ProfileView library visibility", () => {
+  it("places the bio under the name in the profile header", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView profile={{ ...profile, bio: "Co-op and strategy games" }} isSelf />
+      </QueryClientProvider>,
+    );
+
+    const heading = screen.getByRole("heading", { name: "Player" });
+    const bio = screen.getByText("Co-op and strategy games");
+    expect(bio.parentElement).toBe(heading.parentElement);
+    expect(bio.compareDocumentPosition(screen.getByText("Region · US"))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+  it("shortens a legacy bio in the profile header without changing its saved text", () => {
+    const longBio = "a".repeat(200);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView profile={{ ...profile, bio: longBio }} isSelf />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText(`${"a".repeat(160)}…`)).toBeInTheDocument();
+    expect(screen.queryByText(longBio)).not.toBeInTheDocument();
+  });
+  it("keeps an emoji intact at the 160-character preview boundary", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView profile={{ ...profile, bio: `${"a".repeat(159)}😀😀` }} isSelf />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText(`${"a".repeat(159)}😀…`)).toBeInTheDocument();
+  });
+
   it("links a friend's connected Steam profile", () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
@@ -189,6 +224,78 @@ describe("ProfileView library visibility", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
     expect(screen.getByLabelText("Price region")).toHaveValue("UA");
+  });
+  it("limits a new bio to 160 characters and shows the remaining count", async () => {
+    renderProfile(true);
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+
+    const bio = screen.getByLabelText("Bio");
+    expect(screen.getByText("0 / 160")).toBeInTheDocument();
+
+    fireEvent.change(bio, { target: { value: "a".repeat(161) } });
+    expect(bio).toHaveValue("a".repeat(160));
+    expect(screen.getByText("160 / 160")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() =>
+      expect(api.updateProfile.mock.calls[0]?.[0]).toEqual(
+        expect.objectContaining({ bio: "a".repeat(160) }),
+      ),
+    );
+  });
+  it("counts emoji as one character at the input limit", async () => {
+    renderProfile(true);
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    const bio = screen.getByLabelText("Bio");
+    fireEvent.change(bio, { target: { value: `${"a".repeat(159)}😀x` } });
+
+    expect(bio).toHaveValue(`${"a".repeat(159)}😀`);
+    expect(screen.getByText("160 / 160")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() =>
+      expect(api.updateProfile.mock.calls[0]?.[0]).toEqual(
+        expect.objectContaining({ bio: `${"a".repeat(159)}😀` }),
+      ),
+    );
+  });
+  it("keeps an unchanged legacy bio when saving other settings", async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView
+          profile={{
+            ...profile,
+            settings: {
+              displayName: "Player",
+              bio: "a".repeat(200),
+              libraryVisibility: "public",
+              favoritesVisibility: "public",
+              wishlistVisibility: "public",
+              steamVisibility: "public",
+              platforms: [],
+              favoriteGenres: [],
+            },
+          }}
+          isSelf
+        />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(api.updateProfile).toHaveBeenCalledOnce());
+    expect(api.updateProfile.mock.calls[0][0]).not.toHaveProperty("bio");
+  });
+  it("lets a legacy bio be shortened gradually without silently truncating it", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProfileView profile={{ ...profile, bio: "a".repeat(200) }} isSelf />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    fireEvent.change(screen.getByLabelText("Bio"), { target: { value: "a".repeat(199) } });
+
+    expect(screen.getByLabelText("Bio")).toHaveValue("a".repeat(199));
+    expect(screen.getByText("199 / 160")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
   });
   it("shows the owner's favorites separately from the library", () => {
     render(
