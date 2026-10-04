@@ -154,6 +154,28 @@ describe("apiRequest", () => {
     );
   });
 
+  it("turns FastAPI field errors into a readable message", async () => {
+    const detail = [
+      { loc: ["body", "username"], msg: "Field required", type: "missing" },
+      { loc: ["body", "password"], msg: "Field required", type: "missing" },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail }), {
+          status: 422,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(loginUser("", "")).rejects.toMatchObject({
+      message: "Email: Field required; Password: Field required",
+      status: 422,
+      detail,
+    });
+  });
+
   it("uses the authenticated integration endpoints", async () => {
     setToken("token");
     const fetchMock = vi.fn().mockImplementation(() =>

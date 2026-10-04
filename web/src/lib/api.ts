@@ -512,12 +512,26 @@ export function getAuthSnapshot() {
 
 async function toApiError(response: Response, authenticated: boolean) {
   const payload = await response.json().catch(() => null);
-  const message =
-    typeof payload?.detail === "object" && typeof payload.detail?.message === "string"
-      ? payload.detail.message
-      : (payload?.detail ?? `Request failed with status ${response.status}`);
+  const detail = payload?.detail;
+  let message = `Request failed with status ${response.status}`;
+  if (typeof detail === "string") {
+    message = detail;
+  } else if (Array.isArray(detail)) {
+    const errors = detail.flatMap((item: unknown) => {
+      if (!item || typeof item !== "object" || !("msg" in item) || typeof item.msg !== "string") {
+        return [];
+      }
+      const location = "loc" in item && Array.isArray(item.loc) ? item.loc.at(-1) : null;
+      const field =
+        location === "username" ? "Email" : location === "password" ? "Password" : location;
+      return [typeof field === "string" ? `${field}: ${item.msg}` : item.msg];
+    });
+    if (errors.length) message = errors.join("; ");
+  } else if (detail && typeof detail === "object" && typeof detail.message === "string") {
+    message = detail.message;
+  }
   if (authenticated && response.status === 401) clearToken();
-  return new ApiError(message, response.status, payload?.detail ?? null);
+  return new ApiError(message, response.status, detail ?? null);
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {

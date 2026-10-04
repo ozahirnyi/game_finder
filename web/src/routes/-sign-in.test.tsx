@@ -32,10 +32,11 @@ describe("SignInPage", () => {
     render(<SignInPage />);
 
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "me@example.com" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "old" } });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => expect(api.setToken).toHaveBeenCalledWith("token"));
+    expect(api.loginUser).toHaveBeenCalledWith("me@example.com", "old");
     expect(navigate).toHaveBeenCalledWith({ to: "/account" });
   });
 
@@ -51,5 +52,44 @@ describe("SignInPage", () => {
     expect(screen.getByRole("button", { name: /signing in/i })).toBeDisabled();
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid credentials");
     expect(screen.getByRole("button", { name: /sign in/i })).not.toBeDisabled();
+  });
+
+  it("asks for an email before submitting an empty form", async () => {
+    const SignInPage = Route.options.component!;
+    render(<SignInPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Email is required");
+    expect(api.loginUser).not.toHaveBeenCalled();
+  });
+
+  it("asks for a password without changing nonempty sign-in credentials", async () => {
+    const SignInPage = Route.options.component!;
+    render(<SignInPage />);
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "old-account@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Password is required");
+    expect(api.loginUser).not.toHaveBeenCalled();
+  });
+
+  it("submits an existing password made of spaces unchanged", async () => {
+    api.loginUser.mockResolvedValue({ access_token: "token" });
+    const SignInPage = Route.options.component!;
+    render(<SignInPage />);
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "old-account@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() =>
+      expect(api.loginUser).toHaveBeenCalledWith("old-account@example.com", "   "),
+    );
   });
 });

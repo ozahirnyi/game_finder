@@ -38,6 +38,14 @@ function SignInPage() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (!email.trim()) {
+      setError("Email is required");
+      return;
+    }
+    if (!password) {
+      setError("Password is required");
+      return;
+    }
     setIsPending(true);
     try {
       const { access_token } = await loginUser(email, password);
