@@ -2708,6 +2708,25 @@ def list_game_invites(
     return [game_invite_response(db, invite) for invite in invites]
 
 
+@app.get("/game-invites/{invite_id}", response_model=GameInviteRead)
+def get_game_invite(
+    invite_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    invite = db.query(GameInvite).filter(
+        GameInvite.id == invite_id,
+        (GameInvite.sender_id == current_user.id) | (GameInvite.recipient_id == current_user.id),
+    ).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Game invite not found")
+    other_id = invite.recipient_id if invite.sender_id == current_user.id else invite.sender_id
+    other = db.query(User).filter(User.id == other_id).first()
+    if other is None or not social_target_visible(db, current_user, other):
+        raise HTTPException(status_code=404, detail="Game invite not found")
+    return game_invite_response(db, invite)
+
+
 @app.post("/game-invites", status_code=201, response_model=GameInviteRead)
 def create_game_invite(
     data: GameInviteCreate,

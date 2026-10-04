@@ -237,6 +237,7 @@ def test_game_invite_response_adds_one_system_message_and_notifies_sender(social
     response = client.post(f"/game-invites/{invite['id']}/response", json={"status": status})
     assert response.status_code == 200
     assert response.json()["status"] == status
+    assert client.get(f"/game-invites/{invite['id']}").json()["status"] == status
     assert db.query(Message).count() == 2
     event = db.query(Message).filter(Message.kind == "system").one()
     assert event.body == f"Bob {status} the invitation to Portal."
@@ -244,10 +245,13 @@ def test_game_invite_response_adds_one_system_message_and_notifies_sender(social
     assert db.query(Message).count() == 2
     main.app.dependency_overrides[main.get_current_user] = lambda: alice
     main.app.dependency_overrides[main.get_optional_current_user] = lambda: alice
+    assert client.get(f"/game-invites/{invite['id']}").json()["status"] == status
     notification = client.get("/notifications").json()[0]
     assert notification["type"] == "game_invite_response"
     assert notification["payload"]["conversation_id"] == invite["conversation_id"]
     assert client.get(f"/conversations/{invite['conversation_id']}").json()["unread_count"] == 1
+    main.app.dependency_overrides[main.get_current_user] = lambda: _
+    assert client.get(f"/game-invites/{invite['id']}").status_code == 404
 
 
 def test_manual_reconnect_and_sync_failure_do_not_erase_suppression(social, monkeypatch):

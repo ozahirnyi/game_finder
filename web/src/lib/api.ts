@@ -434,7 +434,13 @@ export type PsnImportPreviewItem = {
 export type PsnImportSelection =
   | { candidate_token: string; action: "catalog"; catalog_id: number }
   | { candidate_token: string; action: "raw" };
-export type PsnImportResult = { created: number; updated: number; skipped: number; total: number; catalog_job?: BackgroundJob | null };
+export type PsnImportResult = {
+  created: number;
+  updated: number;
+  skipped: number;
+  total: number;
+  catalog_job?: BackgroundJob | null;
+};
 export type PsnLibraryRepairItem = {
   game_id: string;
   title: string;
@@ -657,7 +663,10 @@ export function getBackgroundJob(jobId: string) {
 }
 
 export function findPsnCatalogTitles(title: string) {
-  return apiRequest<{ suggestions: string[] }>(`/psn/catalog-title-suggestions?q=${encodeURIComponent(title)}`, { auth: true });
+  return apiRequest<{ suggestions: string[] }>(
+    `/psn/catalog-title-suggestions?q=${encodeURIComponent(title)}`,
+    { auth: true },
+  );
 }
 
 export function getCurrentPsnCatalogEnrichment() {
@@ -1064,6 +1073,10 @@ export function createGameInvite(data: GameInviteCreate) {
 
 export function getGameInvites(direction: "incoming" | "outgoing" | "all" = "all") {
   return apiRequest<GameInvite[]>(`/game-invites?direction=${direction}`, { auth: true });
+}
+
+export function getGameInvite(id: string) {
+  return apiRequest<GameInvite>(`/game-invites/${id}`, { auth: true });
 }
 
 export function respondToGameInvite(id: string, status: "accepted" | "declined") {

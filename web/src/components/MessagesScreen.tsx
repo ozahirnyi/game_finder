@@ -5,6 +5,7 @@ import {
   getConversation,
   getConversationMessages,
   getConversations,
+  getGameInvite,
   getAuthSnapshot,
   getProfile,
   markConversationRead,
@@ -173,6 +174,7 @@ function ConversationThread({
   const atBottom = useRef(true);
   const lastRead = useRef("");
   const retryAttempt = useRef<{ body: string; id: string } | null>(null);
+  const pendingStatusRefresh = useRef(new Set<string>());
   const conversation = useQuery({
     queryKey: ["conversation", id],
     queryFn: () => getConversation(id),
@@ -196,6 +198,46 @@ function ConversationThread({
         if (initial && page === 0) rememberOlder(incoming.length === 50);
         const previousLast = accumulated.at(-1)?.id;
         accumulated = mergeMessages(accumulated, incoming);
+        if (incoming.some((message) => message.kind === "system")) {
+          for (const message of accumulated) {
+            if (message.game_invite?.status === "pending") {
+              pendingStatusRefresh.current.add(message.game_invite.id);
+            }
+          }
+        }
+        if (pendingStatusRefresh.current.size > 0) {
+          const pendingIds = [
+            ...new Set(
+              accumulated
+                .filter(
+                  (message) =>
+                    message.game_invite?.status === "pending" &&
+                    pendingStatusRefresh.current.has(message.game_invite.id),
+                )
+                .map((message) => message.game_invite!.id),
+            ),
+          ];
+          const refreshed = await Promise.allSettled(
+            pendingIds.map((inviteId) => getGameInvite(inviteId)),
+          );
+          const statuses = new Map<
+            string,
+            NonNullable<ConversationMessage["game_invite"]>["status"]
+          >();
+          refreshed.forEach((result, index) => {
+            if (result.status !== "fulfilled") return;
+            statuses.set(pendingIds[index], result.value.status);
+            if (result.value.status !== "pending") {
+              pendingStatusRefresh.current.delete(pendingIds[index]);
+            }
+          });
+          accumulated = accumulated.map((message) => {
+            const status = message.game_invite && statuses.get(message.game_invite.id);
+            return status
+              ? { ...message, game_invite: { ...message.game_invite!, status } }
+              : message;
+          });
+        }
         if (initial || incoming.length < 50 || previousLast === accumulated.at(-1)?.id) break;
       }
       return mergeMessages(
@@ -238,7 +280,14 @@ function ConversationThread({
   const respond = useMutation({
     mutationFn: ({ inviteId, status }: { inviteId: string; status: "accepted" | "declined" }) =>
       respondToGameInvite(inviteId, status),
-    onSuccess: () => {
+    onSuccess: (invite) => {
+      client.setQueryData<ConversationMessage[]>(key, (current = []) =>
+        current.map((message) =>
+          message.game_invite?.id === invite.id
+            ? { ...message, game_invite: { ...message.game_invite, status: invite.status } }
+            : message,
+        ),
+      );
       void client.invalidateQueries({ queryKey: ["conversation-messages", id] });
       void client.invalidateQueries({ queryKey: ["conversation", id] });
       void client.invalidateQueries({ queryKey: ["conversations"] });
@@ -359,11 +408,12 @@ function ConversationThread({
           const invite = message.kind === "game_invite" ? message.game_invite : null;
           if (invite) {
             const isRecipient = invite.recipient_id === me.data?.id;
+            const isSender = invite.sender_id === me.data?.id;
             const isPending = invite.status === "pending";
             return (
               <article
                 key={message.id}
-                className="w-full max-w-md self-center rounded-2xl border border-primary/30 bg-surface p-4 shadow-sm"
+                className={`w-[92%] max-w-md rounded-2xl border border-primary/30 bg-surface p-4 shadow-sm ${isSender ? "ml-auto" : "mr-auto"}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>

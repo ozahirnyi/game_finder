@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   createMessage: vi.fn(),
   markConversationRead: vi.fn(),
   respondToGameInvite: vi.fn(),
+  getGameInvite: vi.fn(),
   getProfile: vi.fn(),
   getAuthSnapshot: vi.fn(),
 }));
@@ -189,12 +190,47 @@ it("renders a pending game invite card and lets its recipient accept it", async 
   );
   mount();
   expect(await screen.findByText("Game invite")).toBeInTheDocument();
+  expect(screen.getByText("Game invite").closest("article")).toHaveClass("mr-auto");
   expect(screen.getByText("Portal")).toBeInTheDocument();
   expect(screen.getByText("Tonight?")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Accept" }));
   await waitFor(() => expect(api.respondToGameInvite).toHaveBeenCalledWith("invite-1", "accepted"));
   expect(screen.getByRole("button", { name: "Decline" })).toBeDisabled();
   finishResponse();
+});
+
+it.each([
+  ["accepted", "Accepted"],
+  ["declined", "Declined"],
+] as const)("updates a game invite card immediately after it is %s", async (status, label) => {
+  const pending = {
+    id: "invite-message",
+    sender_id: "friend",
+    body: "Game invitation: Portal",
+    kind: "game_invite" as const,
+    created_at: "2026-09-01T12:00:00Z",
+    game_invite: {
+      id: "invite-1",
+      game_name: "Portal",
+      status: "pending" as const,
+      sender_id: "friend",
+      sender_name: "Alex",
+      recipient_id: "me",
+      recipient_name: "Me",
+    },
+  };
+  api.getConversationMessages.mockResolvedValueOnce([pending]).mockResolvedValue([]);
+  api.respondToGameInvite.mockResolvedValue({ id: "invite-1", status });
+  mount();
+
+  fireEvent.click(
+    await screen.findByRole("button", { name: status === "accepted" ? "Accept" : "Decline" }),
+  );
+
+  expect(await screen.findByText(label)).toBeInTheDocument();
+  expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
 });
 
 it("shows invite outcome and system response message after a response", async () => {
@@ -231,6 +267,89 @@ it("shows invite outcome and system response message after a response", async ()
   expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
 });
 
+it("updates the sender's invite card when a response arrives in the open chat", async () => {
+  const pending = {
+    id: "invite-message",
+    sender_id: "me",
+    body: "Game invitation: Portal",
+    kind: "game_invite" as const,
+    created_at: "2026-09-01T12:00:00Z",
+    game_invite: {
+      id: "invite-1",
+      game_name: "Portal",
+      status: "pending" as const,
+      sender_id: "me",
+      sender_name: "Me",
+      recipient_id: "friend",
+      recipient_name: "Alex",
+    },
+  };
+  const response = {
+    id: "response-message",
+    sender_id: "friend",
+    body: "Alex accepted the invitation to Portal.",
+    kind: "system" as const,
+    created_at: "2026-09-01T12:01:00Z",
+  };
+  api.getConversationMessages.mockResolvedValueOnce([pending]).mockResolvedValue([response]);
+  api.getGameInvite.mockResolvedValue({ id: "invite-1", status: "accepted" });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  mount("chat", client);
+  expect(await screen.findByText("Pending")).toBeInTheDocument();
+
+  await client.invalidateQueries({ queryKey: ["conversation-messages", "chat"] });
+
+  expect(await screen.findByText("Alex accepted the invitation to Portal.")).toBeInTheDocument();
+  expect(await screen.findByText("Accepted")).toBeInTheDocument();
+  expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+  expect(api.getGameInvite).toHaveBeenCalledWith("invite-1");
+});
+
+it("keeps the response message visible and retries a failed invite status lookup", async () => {
+  const pending = {
+    id: "invite-message",
+    sender_id: "me",
+    body: "Game invitation: Portal",
+    kind: "game_invite" as const,
+    created_at: "2026-09-01T12:00:00Z",
+    game_invite: {
+      id: "invite-1",
+      game_name: "Portal",
+      status: "pending" as const,
+      sender_id: "me",
+      sender_name: "Me",
+      recipient_id: "friend",
+      recipient_name: "Alex",
+    },
+  };
+  const response = {
+    id: "response-message",
+    sender_id: "friend",
+    body: "Alex accepted the invitation to Portal.",
+    kind: "system" as const,
+    created_at: "2026-09-01T12:01:00Z",
+  };
+  api.getConversationMessages
+    .mockResolvedValueOnce([pending])
+    .mockResolvedValueOnce([response])
+    .mockResolvedValue([]);
+  api.getGameInvite.mockRejectedValueOnce(new Error("Temporary failure")).mockResolvedValue({
+    id: "invite-1",
+    status: "accepted",
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  mount("chat", client);
+  expect(await screen.findByText("Pending")).toBeInTheDocument();
+
+  await client.invalidateQueries({ queryKey: ["conversation-messages", "chat"] });
+  expect(await screen.findByText("Alex accepted the invitation to Portal.")).toBeInTheDocument();
+  expect(screen.getByText("Pending")).toBeInTheDocument();
+
+  await client.invalidateQueries({ queryKey: ["conversation-messages", "chat"] });
+  expect(await screen.findByText("Accepted")).toBeInTheDocument();
+  expect(api.getGameInvite).toHaveBeenCalledTimes(2);
+});
+
 it("does not show response buttons to the sender or for a completed invite", async () => {
   const card = {
     id: "invite-message",
@@ -251,6 +370,7 @@ it("does not show response buttons to the sender or for a completed invite", asy
   api.getConversationMessages.mockResolvedValue([card]);
   mount();
   expect(await screen.findByText("Pending")).toBeInTheDocument();
+  expect(screen.getByText("Game invite").closest("article")).toHaveClass("ml-auto");
   expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
   cleanup();
 

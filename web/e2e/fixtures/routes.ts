@@ -247,7 +247,10 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
     }
     const conversationMessages = path.match(/^\/conversations\/([^/]+)\/messages$/);
     if (conversationMessages && request.method() === "GET") {
-      await route.fulfill({ json: state.messages[conversationMessages[1]] ?? [] });
+      const messages = state.messages[conversationMessages[1]] ?? [];
+      const afterId = url.searchParams.get("after_id");
+      const afterIndex = afterId ? messages.findIndex((message) => message.id === afterId) : -1;
+      await route.fulfill({ json: afterId ? messages.slice(afterIndex + 1) : messages });
       return;
     }
     if (conversationMessages && request.method() === "POST") {
@@ -266,6 +269,14 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
     }
     if (request.method() === "GET" && path === "/game-invites") {
       await route.fulfill({ json: state.gameInvites });
+      return;
+    }
+    const gameInvite = path.match(/^\/game-invites\/([^/]+)$/);
+    if (request.method() === "GET" && gameInvite) {
+      const invite = state.gameInvites.find((item) => item.id === gameInvite[1]);
+      await route.fulfill(
+        invite ? { json: invite } : { status: 404, json: { detail: "Not found" } },
+      );
       return;
     }
     if (request.method() === "POST" && path === "/game-invites") {
