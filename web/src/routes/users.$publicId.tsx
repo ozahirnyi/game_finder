@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ProfileView, type ProfileData } from "@/components/ProfileView";
@@ -25,6 +25,7 @@ export const Route = createFileRoute("/users/$publicId")({
 });
 
 function PublicProfilePage() {
+  const queryClient = useQueryClient();
   const { publicId } = Route.useParams();
   const { compose } = Route.useSearch();
   const [libraryPage, setLibraryPage] = useState(1);
@@ -70,7 +71,16 @@ function PublicProfilePage() {
     queryFn: getProfile,
     enabled: publicProfile?.relationship === "self",
   });
-  const addFriend = useMutation({ mutationFn: () => createSocialFriendRequest(publicId) });
+  const addFriend = useMutation({
+    mutationFn: () => createSocialFriendRequest(publicId),
+    onSuccess: () => {
+      queryClient.setQueryData<Awaited<ReturnType<typeof getPublicProfile>>>(
+        ["public-profile", publicId],
+        (current) => (current ? { ...current, relationship: "outgoing_pending" } : current),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["public-users"] });
+    },
+  });
   if (publicQuery.isLoading)
     return (
       <AppShell>
@@ -203,6 +213,8 @@ function PublicProfilePage() {
           canMessage: publicProfile.relationship === "friends",
           canInvite: publicProfile.relationship === "friends",
           canAddFriend: publicProfile.relationship === "none" && getAuthSnapshot(),
+          friendRequestPending: addFriend.isPending,
+          friendRequestSent: publicProfile.relationship === "outgoing_pending",
           onAddFriend: () => addFriend.mutate(),
         }}
       />

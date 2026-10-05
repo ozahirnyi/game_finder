@@ -142,6 +142,26 @@ describe("apiRequest", () => {
     expect(getToken()).toBeNull();
   });
 
+  it("does not sign out B when an old request from A returns 401", async () => {
+    setToken("account-a");
+    let finish!: (response: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve;
+          }),
+      ),
+    );
+    const pending = apiRequest("/games", { auth: true });
+    setToken("account-b");
+    finish(new Response(JSON.stringify({ detail: "expired" }), { status: 401 }));
+
+    await expect(pending).rejects.toMatchObject({ status: 401 });
+    expect(getToken()).toBe("account-b");
+  });
+
   it("passes the signed-in token to price history so the API can apply the profile region", async () => {
     setToken("token");
     const fetchMock = vi.fn().mockResolvedValue(

@@ -100,6 +100,8 @@ type ProfileViewer = {
   canMessage: boolean;
   canInvite: boolean;
   canAddFriend: boolean;
+  friendRequestPending?: boolean;
+  friendRequestSent?: boolean;
   onAddFriend?: () => void;
 };
 
@@ -286,9 +288,18 @@ export function ProfileView({
               {canAddFriend && (
                 <button
                   onClick={viewer?.onAddFriend}
+                  disabled={viewer?.friendRequestPending}
                   className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
                 >
                   <UserPlus className="size-4" /> Add friend
+                </button>
+              )}
+              {viewer?.friendRequestSent && (
+                <button
+                  disabled
+                  className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground"
+                >
+                  Request sent
                 </button>
               )}
               {canInvite && profile.friendId && (

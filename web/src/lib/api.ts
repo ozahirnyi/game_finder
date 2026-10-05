@@ -516,7 +516,7 @@ export function getAuthSnapshot() {
   return Boolean(getToken());
 }
 
-async function toApiError(response: Response, authenticated: boolean) {
+async function toApiError(response: Response, authenticatedToken: string | null) {
   const payload = await response.json().catch(() => null);
   const detail = payload?.detail;
   let message = `Request failed with status ${response.status}`;
@@ -536,7 +536,8 @@ async function toApiError(response: Response, authenticated: boolean) {
   } else if (detail && typeof detail === "object" && typeof detail.message === "string") {
     message = detail.message;
   }
-  if (authenticated && response.status === 401) clearToken();
+  if (authenticatedToken && response.status === 401 && getToken() === authenticatedToken)
+    clearToken();
   return new ApiError(message, response.status, detail ?? null);
 }
 
@@ -562,7 +563,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
       options.formBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
     signal: options.signal,
   });
-  if (!response.ok) throw await toApiError(response, options.auth === true);
+  if (!response.ok) throw await toApiError(response, options.auth ? token : null);
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
 }
 

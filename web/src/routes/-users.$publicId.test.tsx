@@ -45,7 +45,14 @@ vi.mock("@/components/ProfileView", () => ({
     };
     isSelf: boolean;
     initialComposer?: string;
-    viewer?: { canMessage: boolean; canInvite: boolean; canAddFriend: boolean };
+    viewer?: {
+      canMessage: boolean;
+      canInvite: boolean;
+      canAddFriend: boolean;
+      onAddFriend?: () => void;
+      friendRequestPending?: boolean;
+      friendRequestSent?: boolean;
+    };
   }) => (
     <div>
       <h1>{profile.name}</h1>
@@ -68,7 +75,12 @@ vi.mock("@/components/ProfileView", () => ({
       {isSelf && <button>Settings</button>}
       {viewer?.canMessage && <button>Message</button>}
       {viewer?.canInvite && <button>Invite</button>}
-      {viewer?.canAddFriend && <button>Add friend</button>}
+      {viewer?.canAddFriend && (
+        <button disabled={viewer.friendRequestPending} onClick={viewer.onAddFriend}>
+          Add friend
+        </button>
+      )}
+      {viewer?.friendRequestSent && <button disabled>Request sent</button>}
     </div>
   ),
 }));
@@ -245,6 +257,18 @@ describe("PublicProfilePage", () => {
     api.getPublicProfile.mockResolvedValue(publicProfile("self"));
     renderProfile();
     expect(await screen.findByRole("button", { name: "Settings" })).toBeInTheDocument();
+  });
+
+  it("replaces Add friend with Request sent after a successful request", async () => {
+    api.getAuthSnapshot.mockReturnValue(true);
+    api.createSocialFriendRequest.mockResolvedValue({ id: "request-1" });
+    renderProfile();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add friend" }));
+
+    expect(await screen.findByRole("button", { name: "Request sent" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Add friend" })).not.toBeInTheDocument();
+    expect(api.createSocialFriendRequest).toHaveBeenCalledTimes(1);
   });
 
   it("shows the saved bio on the owner's public profile", async () => {

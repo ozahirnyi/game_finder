@@ -18,6 +18,58 @@ test("friend requests post their selected player identity", async ({ page, api }
   );
 });
 
+test("switching accounts in one tab does not show the previous player's requests", async ({
+  page,
+  api,
+}) => {
+  api.state.incomingFriendRequests = [
+    {
+      id: "a-request",
+      sender: sam,
+      recipient: { id: "user-a", public_id: "player-a", display_name: "Player A" },
+      created_at: "2026-08-21T00:00:00Z",
+    },
+  ];
+  await signIn(page, { sub: "user-a" });
+  await page.goto("/friends");
+  await waitForHydration(page);
+  await expect(page.getByRole("button", { name: "Accept Sam" })).toBeVisible();
+
+  await page.getByRole("link", { name: /Manage profile/ }).click();
+  await page.getByRole("link", { name: "Sign out" }).click();
+  api.state.incomingFriendRequests = [];
+  api.state.profile = { ...api.state.profile, id: "user-b", display_name: "Player B" };
+  await page.getByRole("textbox", { name: "Email" }).fill("b@example.com");
+  await page.getByLabel("Password").fill("password");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Friends", exact: true }).first().click();
+
+  await expect(page.getByRole("button", { name: "Accept Sam" })).toHaveCount(0);
+  await expect(page.getByText("Player B").first()).toBeVisible();
+});
+
+test("sending a public-profile friend request updates the button", async ({ page, api }) => {
+  api.state.publicProfiles["sam-player"] = {
+    public_id: "sam-player",
+    nickname: "Sam",
+    relationship: "none",
+    library: { status: "empty", data: [] },
+    favorites: { status: "empty", data: [] },
+    wishlist: { status: "empty", data: [] },
+    steam: { status: "empty", data: null },
+  };
+  await signIn(page);
+  await page.goto("/users/sam-player");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Add friend" }).click();
+
+  await expect(page.getByRole("button", { name: "Request sent" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Add friend" })).toHaveCount(0);
+  expect(api.requests.filter((request) => request.path === "/social/friend-requests")).toHaveLength(
+    1,
+  );
+});
+
 test("friend profile message and invite mutations use the canonical friend id and show errors", async ({
   page,
   api,
