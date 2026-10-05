@@ -5,7 +5,7 @@ import { AppShell } from "./AppShell";
 import { libraryOverviewQueryOptions } from "@/lib/navigationQueries";
 
 const api = vi.hoisted(() => ({
-  getAuthSnapshot: () => false,
+  getAuthSnapshot: (): boolean => false,
   getConversationUnreadCount: vi.fn().mockResolvedValue({ unread_count: 0 }),
   getDeals: vi.fn().mockResolvedValue({ results: [] }),
   getFriends: vi.fn().mockResolvedValue([]),

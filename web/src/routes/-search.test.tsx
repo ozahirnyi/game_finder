@@ -121,7 +121,9 @@ describe("SearchPage", () => {
   });
 
   it("does not search in the default region when the signed-in user's profile fails to load", async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(new Response("{}", { status: 500 })));
+    const fetchMock = vi.fn((_input: RequestInfo | URL) =>
+      Promise.resolve(new Response("{}", { status: 500 })),
+    );
     vi.stubGlobal("fetch", fetchMock);
     window.localStorage.setItem("game_finder_token", "test-token");
 
