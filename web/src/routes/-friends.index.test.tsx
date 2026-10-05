@@ -132,6 +132,21 @@ describe("FriendsPage", () => {
     api.acceptFriendRequest.mockResolvedValue({ user: { id: "player-1", display_name: "Sam" } });
   });
 
+  it.each([
+    [0, "0 friends"],
+    [1, "1 friend"],
+    [2, "2 friends"],
+  ])("shows the correct friend count when count is %i", async (count, label) => {
+    api.getFriends.mockResolvedValue(
+      Array.from({ length: count }, (_, index) => ({
+        user: { id: `player-${index}`, display_name: `Player ${index}` },
+      })),
+    );
+    renderFriends();
+
+    expect(await screen.findByText(label)).toBeInTheDocument();
+  });
+
   it("searches for a player and sends a friend request", async () => {
     renderFriends();
 

@@ -200,7 +200,7 @@ function FriendsPage() {
           <div>
             <SectionHeader
               title="Friends"
-              hint={`${friends.length} friends`}
+              hint={`${friends.length} ${friends.length === 1 ? "friend" : "friends"}`}
               action={
                 <div className="flex items-center gap-2">
                   <button
