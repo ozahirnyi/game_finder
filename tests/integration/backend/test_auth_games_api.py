@@ -58,6 +58,30 @@ def test_register_trims_email_before_persisting(api_client, db_session):
     assert db_session.query(User).filter_by(email="player@proton.me").count() == 1
 
 
+@pytest.mark.parametrize(
+    "error,status_code,detail",
+    [
+        (ValueError("Password cannot be hashed"), 400, "Password cannot be hashed"),
+        (RuntimeError("hashing backend unavailable"), 500, "Password hashing failed"),
+    ],
+)
+def test_register_reports_hashing_failure_without_creating_user(
+    api_client, db_session, app_main, monkeypatch, error, status_code, detail
+):
+    def fail_hashing(_password):
+        raise error
+
+    monkeypatch.setattr(app_main, "hash_password", fail_hashing)
+
+    response = api_client.post(
+        "/auth/register", json={"email": "hash-failure@example.com", "password": "strong-password"}
+    )
+
+    assert response.status_code == status_code
+    assert response.json()["detail"] == detail
+    assert db_session.query(User).count() == 0
+
+
 def test_email_registrations_get_unique_public_profiles_and_are_searchable(api_client, db_session, user_factory, auth_as):
     auth_as(user_factory(email="viewer@example.com", public_nickname="alex"))
     registrations = [

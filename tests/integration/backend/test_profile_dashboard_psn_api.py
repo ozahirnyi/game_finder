@@ -1483,6 +1483,58 @@ def test_library_overview_uses_matcher_version_for_psn_catalog_lookup_progress(
     }
 
 
+def test_library_overview_merges_live_steam_games_without_duplicating_saved_games(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory(email="steam-library-owner@example.com", steam_id="steam-owner"))
+    other = user_factory(email="steam-library-other@example.com")
+    db_session.add_all([
+        Game(owner_id=owner.id, source="steam", external_id="10", title="Saved Steam game"),
+        Game(owner_id=owner.id, source="manual", title="Manual game"),
+        Game(owner_id=other.id, source="manual", title="Another user's game"),
+    ])
+    db_session.commit()
+    fetch_owned = AsyncMock(return_value=[
+        {"appid": 10, "name": "Saved Steam game"},
+        {"appid": 20, "name": "Live Steam game", "playtime_forever": 42},
+        {"appid": 20, "name": "Duplicate Steam game"},
+        {"name": "Game without appid"},
+    ])
+    monkeypatch.setattr(app_main, "fetch_owned_games", fetch_owned)
+
+    response = api_client.get("/library/overview")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["steam_available"] is True
+    assert payload["steam_error"] is None
+    assert [(game["source"], game["title"]) for game in payload["games"]] == [
+        ("steam", "Live Steam game"),
+        ("manual", "Manual game"),
+        ("steam", "Saved Steam game"),
+    ]
+    assert next(game for game in payload["games"] if game["external_id"] == "20")["playtime_forever"] == 42
+    fetch_owned.assert_awaited_once_with("steam-owner")
+
+
+def test_library_overview_keeps_saved_games_when_steam_is_unavailable(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory(email="steam-library-offline@example.com", steam_id="steam-offline"))
+    db_session.add(Game(owner_id=owner.id, source="manual", title="Saved game"))
+    db_session.commit()
+    fetch_owned = AsyncMock(side_effect=RuntimeError("Steam request failed"))
+    monkeypatch.setattr(app_main, "fetch_owned_games", fetch_owned)
+
+    response = api_client.get("/library/overview")
+
+    assert response.status_code == 200
+    assert response.json()["steam_available"] is False
+    assert response.json()["steam_error"] == "Steam library is temporarily unavailable."
+    assert [game["title"] for game in response.json()["games"]] == ["Saved game"]
+    fetch_owned.assert_awaited_once_with("steam-offline")
+
+
 def test_library_overview_page_filters_sorts_and_paginates_titles(
     api_client, db_session, user_factory, auth_as
 ):

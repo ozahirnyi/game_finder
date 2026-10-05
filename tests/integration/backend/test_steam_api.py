@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import HTTPException
@@ -114,6 +115,24 @@ def test_steam_me_returns_linked_account(api_client, user_factory, auth_as):
     assert payload["linked"] is True
     assert payload["steam_id"] == user.steam_id
     assert payload["persona_name"] == "Steam Player"
+
+
+def test_steam_me_saves_missing_country_from_linked_profile(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    user = auth_as(linked_user(user_factory, "missing-country@example.com"))
+    user.steam_country_code = None
+    db_session.commit()
+    fetch_profile = AsyncMock(return_value={"country_code": "PL"})
+    monkeypatch.setattr(app_main, "fetch_steam_profile", fetch_profile)
+
+    response = api_client.get("/steam/me")
+
+    assert response.status_code == 200
+    assert response.json()["country_code"] == "PL"
+    db_session.refresh(user)
+    assert user.steam_country_code == "PL"
+    fetch_profile.assert_awaited_once_with(user.steam_id)
 
 
 def test_delete_steam_me_clears_account_and_owned_rows(
