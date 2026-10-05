@@ -78,6 +78,47 @@ describe("apiRequest", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/background-jobs/job-1", expect.any(Object));
   });
 
+  it("ignores a completed recommendation job with a malformed result list", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "job-1", status: "queued" })))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "job-1",
+            status: "succeeded",
+            result: { recommendations: {} },
+          }),
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    setToken("token");
+
+    await expect(getRecommendations("something calm")).resolves.toEqual({ recommendations: [] });
+  });
+
+  it("drops malformed recommendation entries before search renders them", async () => {
+    const valid = { title: "Hades", reason: "Fast-paced", tags: ["action"] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "job-1", status: "queued" })))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "job-1",
+            status: "succeeded",
+            result: { recommendations: [null, { title: "Bad", reason: 3, tags: [] }, valid] },
+          }),
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    setToken("token");
+
+    await expect(getRecommendations("something calm")).resolves.toEqual({
+      recommendations: [valid],
+    });
+  });
+
   it("sends the JWT and clears it after an authenticated 401", async () => {
     setToken("token");
     const fetchMock = vi.fn().mockResolvedValue(

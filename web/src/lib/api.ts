@@ -76,7 +76,7 @@ export type Deal = {
 export type GenreDealResponse = { popular: Deal[]; sections: { genre: string; results: Deal[] }[] };
 
 export type Money = { amount: number; currency: string };
-export type PriceHistoryPeriod = "6m" | "1y" | "2y";
+export type PriceHistoryPeriod = "1m" | "6m" | "1y" | "2y";
 
 export type LibraryGame = {
   id: string;
@@ -726,6 +726,21 @@ function sleep(milliseconds: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
+function isRecommendationItem(value: unknown): value is RecommendationItem {
+  if (!value || typeof value !== "object") return false;
+  if (!("title" in value) || typeof value.title !== "string") return false;
+  if (!("reason" in value) || typeof value.reason !== "string") return false;
+  if (!("tags" in value) || !Array.isArray(value.tags)) return false;
+  if (!value.tags.every((tag) => typeof tag === "string")) return false;
+  if ("game" in value && value.game != null) {
+    const game = value.game;
+    if (!game || typeof game !== "object") return false;
+    if (!("id" in game) || !Number.isInteger(game.id)) return false;
+    if (!("name" in game) || typeof game.name !== "string") return false;
+  }
+  return true;
+}
+
 export async function getRecommendations(prompt: string): Promise<RecommendationResponse> {
   const job = await apiRequest<BackgroundJob>("/recommendations", {
     method: "POST",
@@ -736,7 +751,12 @@ export async function getRecommendations(prompt: string): Promise<Recommendation
   for (let attempt = 0; attempt < BACKGROUND_JOB_MAX_POLLS; attempt += 1) {
     const current = await apiRequest<BackgroundJob>(`/background-jobs/${job.id}`, { auth: true });
     if (current.status === "succeeded") {
-      return { recommendations: current.result?.recommendations ?? [] };
+      const recommendations = current.result?.recommendations;
+      return {
+        recommendations: Array.isArray(recommendations)
+          ? recommendations.filter(isRecommendationItem)
+          : [],
+      };
     }
     if (current.status === "failed") {
       throw new ApiError(current.error ?? "AI search could not be completed.", 502);
