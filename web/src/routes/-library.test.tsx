@@ -116,9 +116,7 @@ describe("Library", () => {
     await screen.findByText("Library");
     expect(screen.queryByRole("button", { name: "Delete all PlayStation games" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "PlayStation" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Delete all PlayStation games" }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Delete all PlayStation games" }));
 
     await waitFor(() => expect(api.deletePsnLibrary).toHaveBeenCalledOnce());
   });
@@ -172,7 +170,9 @@ describe("Library", () => {
       pending_catalog_count: 3,
     });
     renderLibrary();
-    expect(await screen.findByText(/Catalog matching continues in the background/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Catalog matching continues in the background/),
+    ).toBeInTheDocument();
   });
 
   it("does not expose a browser retry when catalog matching is pending", async () => {
@@ -185,17 +185,26 @@ describe("Library", () => {
       pending_catalog_count: 1,
     });
     renderLibrary();
-    expect(await screen.findByText(/Catalog matching continues in the background/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Retry catalog matching" })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/Catalog matching continues in the background/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Retry catalog matching" }),
+    ).not.toBeInTheDocument();
   });
 
   it("polls and displays durable PlayStation catalog progress", async () => {
     api.getLibraryOverview.mockResolvedValue({
-      games: [], steam_available: false, steam_error: null,
-      raw_count: 10, quarantined_count: 0, pending_catalog_count: 6,
+      games: [],
+      steam_available: false,
+      steam_error: null,
+      raw_count: 10,
+      quarantined_count: 0,
+      pending_catalog_count: 6,
     });
     api.getCurrentPsnCatalogEnrichment.mockResolvedValue({
-      id: "job", status: "running",
+      id: "job",
+      status: "running",
       result: { total: 10, attempted: 3, linked: 2, review: 1, quarantined: 0, remaining: 6 },
     });
 
@@ -207,11 +216,16 @@ describe("Library", () => {
 
   it("shows zero completed titles before the first durable catalog batch", async () => {
     api.getLibraryOverview.mockResolvedValue({
-      games: [], steam_available: false, steam_error: null,
-      raw_count: 10, quarantined_count: 0, pending_catalog_count: 10,
+      games: [],
+      steam_available: false,
+      steam_error: null,
+      raw_count: 10,
+      quarantined_count: 0,
+      pending_catalog_count: 10,
     });
     api.getCurrentPsnCatalogEnrichment.mockResolvedValue({
-      id: "job", status: "queued",
+      id: "job",
+      status: "queued",
       result: { total: 10, attempted: 0, linked: 0, review: 0, quarantined: 0, remaining: 10 },
     });
 
@@ -306,8 +320,18 @@ describe("Library", () => {
 
   it("uses a catalog-backed title and immediately searches it", async () => {
     api.getLibraryOverview.mockResolvedValue({
-      games: [{ id: "raw", source: "psn", title: "Ведьмак 3", link_state: "raw", catalog_search_query: "Ведьмак 3" }],
-      raw_count: 1, quarantined_count: 0, pending_catalog_count: 0,
+      games: [
+        {
+          id: "raw",
+          source: "psn",
+          title: "Ведьмак 3",
+          link_state: "raw",
+          catalog_search_query: "Ведьмак 3",
+        },
+      ],
+      raw_count: 1,
+      quarantined_count: 0,
+      pending_catalog_count: 0,
     });
     api.findPsnCatalogTitles.mockResolvedValue({ suggestions: ["The Witcher 3: Wild Hunt"] });
     api.searchGames.mockResolvedValue({ results: [] });
@@ -316,9 +340,13 @@ describe("Library", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
     fireEvent.click(screen.getByRole("button", { name: "Find catalog title" }));
 
-    expect(await screen.findByRole("button", { name: "Use The Witcher 3: Wild Hunt" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Use The Witcher 3: Wild Hunt" }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Use The Witcher 3: Wild Hunt" }));
-    await waitFor(() => expect(api.searchGames).toHaveBeenCalledWith({ query: "The Witcher 3: Wild Hunt" }));
+    await waitFor(() =>
+      expect(api.searchGames).toHaveBeenCalledWith({ query: "The Witcher 3: Wild Hunt" }),
+    );
   });
 
   it("does not reprocess a stale review row in the browser", async () => {
@@ -344,6 +372,8 @@ describe("Library", () => {
       pending_catalog_count: 1,
     });
     renderLibrary();
-    expect(await screen.findByText(/Catalog matching continues in the background/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Catalog matching continues in the background/),
+    ).toBeInTheDocument();
   });
 });

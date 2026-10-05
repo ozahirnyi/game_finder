@@ -143,10 +143,7 @@ describe("DealsPage genre deals", () => {
 
     expect(
       await screen.findByRole("link", { name: /open steam fallback on playfinder/i }),
-    ).toHaveAttribute(
-      "href",
-      "/games/620?source=steam&title=Steam+fallback&returnTo=%2Fdeals",
-    );
+    ).toHaveAttribute("href", "/games/620?source=steam&title=Steam+fallback&returnTo=%2Fdeals");
     expect(screen.getByTestId("selected-genre-deals")).not.toHaveClass("xl:grid-cols-5");
   });
 

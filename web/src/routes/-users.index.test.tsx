@@ -106,8 +106,13 @@ describe("All users directory", () => {
     expect(await screen.findByRole("button", { name: "Friends" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Request sent" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Respond to request" })).toBeDisabled();
-    expect(screen.getByRole("link", { name: "Open Ada profile" })).toHaveAttribute("href", "/users/ada");
+    expect(screen.getByRole("link", { name: "Open Ada profile" })).toHaveAttribute(
+      "href",
+      "/users/ada",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Add friend" }));
-    await waitFor(() => expect(api.createFriendRequest).toHaveBeenCalledWith({ recipient_id: "stranger" }));
+    await waitFor(() =>
+      expect(api.createFriendRequest).toHaveBeenCalledWith({ recipient_id: "stranger" }),
+    );
   });
 });

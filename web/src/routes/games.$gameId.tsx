@@ -55,7 +55,9 @@ export const Route = createFileRoute("/games/$gameId")({
   ): { title?: string; source?: "steam"; returnTo?: string } => ({
     ...(typeof search.title === "string" ? { title: search.title } : {}),
     ...(search.source === "steam" ? { source: "steam" } : {}),
-    ...(typeof search.returnTo === "string" && search.returnTo.startsWith("/") && !search.returnTo.startsWith("//")
+    ...(typeof search.returnTo === "string" &&
+    search.returnTo.startsWith("/") &&
+    !search.returnTo.startsWith("//")
       ? { returnTo: search.returnTo }
       : {}),
   }),

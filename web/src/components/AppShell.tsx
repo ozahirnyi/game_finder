@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Home, Search, Library, Heart, Tag, Users, MessageCircle, Palette } from "lucide-react";
 import { ThemeSelector } from "./ThemeSelector";
@@ -80,15 +80,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       </span>
     ) : null;
   const priceCountry = profileQuery.data?.price_country_code ?? "US";
-  const prefetchDestination = (to: (typeof nav)[number]["to"]) => {
-    if (to === "/library") {
-      void queryClient.prefetchQuery(libraryOverviewQueryOptions());
-    }
-    if (to === "/friends") {
-      void queryClient.prefetchQuery(friendsQueryOptions());
-      void queryClient.prefetchQuery(incomingFriendRequestsQueryOptions());
-    }
-  };
+  const prefetchDestination = useCallback(
+    (to: (typeof nav)[number]["to"]) => {
+      if (to === "/library") {
+        void queryClient.prefetchQuery(libraryOverviewQueryOptions());
+      }
+      if (to === "/friends") {
+        void queryClient.prefetchQuery(friendsQueryOptions());
+        void queryClient.prefetchQuery(incomingFriendRequestsQueryOptions());
+      }
+    },
+    [queryClient],
+  );
 
   useEffect(() => {
     if (!signedIn) return;
@@ -98,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       prefetchDestination("/friends");
     };
     return scheduleIdle(prefetch);
-  }, [queryClient, signedIn]);
+  }, [prefetchDestination, signedIn]);
 
   useEffect(() => scheduleIdle(() => setSidebarDealsReady(true)), []);
   const dealsQuery = useQuery({

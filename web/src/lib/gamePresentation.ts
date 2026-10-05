@@ -66,15 +66,18 @@ export function presentPriceHistory(
         Number.isFinite(price) &&
         price >= 0 &&
         item.timestamp
-        ? [{
-            date: item.timestamp,
-            price,
-            currency: item.price?.currency ?? undefined,
-            regular: typeof item.regular?.amount === "number" && Number.isFinite(item.regular.amount)
-              ? item.regular.amount
-              : undefined,
-            cut: typeof item.cut === "number" && Number.isFinite(item.cut) ? item.cut : undefined,
-          }]
+        ? [
+            {
+              date: item.timestamp,
+              price,
+              currency: item.price?.currency ?? undefined,
+              regular:
+                typeof item.regular?.amount === "number" && Number.isFinite(item.regular.amount)
+                  ? item.regular.amount
+                  : undefined,
+              cut: typeof item.cut === "number" && Number.isFinite(item.cut) ? item.cut : undefined,
+            },
+          ]
         : [];
     })
     .sort((a, b) => a.date.localeCompare(b.date));

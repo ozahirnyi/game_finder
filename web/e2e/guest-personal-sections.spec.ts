@@ -9,7 +9,10 @@ test("guest chats align with the other personal sections at each page width", as
     await expect(libraryTitle).toBeVisible();
     await libraryTitle.evaluate(async (element) => {
       await Promise.all(
-        element.closest(".animate-reveal")?.getAnimations().map((animation) => animation.finished) ?? [],
+        element
+          .closest(".animate-reveal")
+          ?.getAnimations()
+          .map((animation) => animation.finished) ?? [],
       );
     });
     const libraryTop = (await libraryTitle.boundingBox())?.y;
@@ -19,7 +22,10 @@ test("guest chats align with the other personal sections at each page width", as
     await expect(chatsTitle).toBeVisible();
     await chatsTitle.evaluate(async (element) => {
       await Promise.all(
-        element.closest(".animate-reveal")?.getAnimations().map((animation) => animation.finished) ?? [],
+        element
+          .closest(".animate-reveal")
+          ?.getAnimations()
+          .map((animation) => animation.finished) ?? [],
       );
     });
     const chatsTop = (await chatsTitle.boundingBox())?.y;

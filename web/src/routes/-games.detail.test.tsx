@@ -170,10 +170,7 @@ describe("game detail presentation", () => {
       "href",
       "/search?mode=ai&q=roguelike",
     );
-    expect(screen.getByRole("link", { name: /^back$/i })).toHaveClass(
-      "min-h-11",
-      "text-sm",
-    );
+    expect(screen.getByRole("link", { name: /^back$/i })).toHaveClass("min-h-11", "text-sm");
   });
 
   it("returns to the originating page with its query parameters", async () => {

@@ -85,11 +85,14 @@ function renderFriends(prefetchedSteamSocial?: unknown, initialEntry = "/") {
       pageParams: [0],
     });
   }
-  return { ...render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  ), router };
+  return {
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    ),
+    router,
+  };
 }
 
 describe("FriendsPage", () => {

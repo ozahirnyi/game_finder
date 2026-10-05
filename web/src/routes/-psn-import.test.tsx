@@ -11,16 +11,23 @@ import {
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { previewPsnImport, confirmPsnImport, getAuthSnapshot, subscribeToAuthChanges } = vi.hoisted(() => ({
-  previewPsnImport: vi.fn(),
-  confirmPsnImport: vi.fn(),
-  getAuthSnapshot: vi.fn(() => true),
-  subscribeToAuthChanges: vi.fn(() => () => {}),
-}));
+const { previewPsnImport, confirmPsnImport, getAuthSnapshot, subscribeToAuthChanges } = vi.hoisted(
+  () => ({
+    previewPsnImport: vi.fn(),
+    confirmPsnImport: vi.fn(),
+    getAuthSnapshot: vi.fn(() => true),
+    subscribeToAuthChanges: vi.fn(() => () => {}),
+  }),
+);
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock("@/lib/api", () => ({ previewPsnImport, confirmPsnImport, getAuthSnapshot, subscribeToAuthChanges }));
+vi.mock("@/lib/api", () => ({
+  previewPsnImport,
+  confirmPsnImport,
+  getAuthSnapshot,
+  subscribeToAuthChanges,
+}));
 import { Route } from "./psn-import";
 
 const previewItems = [

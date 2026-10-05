@@ -6,7 +6,17 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  {
+    ignores: [
+      "dist",
+      ".output",
+      ".vinxi",
+      ".tanstack",
+      ".wrangler",
+      "playwright-report",
+      "test-results",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -32,7 +42,27 @@ export default tseslint.config(
           ],
         },
       ],
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      "react-refresh/only-export-components": [
+        "warn",
+        {
+          allowConstantExport: true,
+          // These named helpers are intentional public APIs shared with other modules.
+          allowExportNames: [
+            "badgeVariants",
+            "buttonVariants",
+            "useFormField",
+            "navigationMenuTriggerStyle",
+            "useSidebar",
+            "toggleVariants",
+            "accents",
+            "useTheme",
+            "mergeGamePrice",
+            "recommendedDecision",
+            "mergePreviewRows",
+            "directoryAction",
+          ],
+        },
+      ],
       "@typescript-eslint/no-unused-vars": "off",
     },
   },

@@ -5,7 +5,9 @@ import { AppShell } from "@/components/AppShell";
 import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { applyPsnLibraryRepair, deletePsnLibrary, previewPsnLibraryRepair } from "@/lib/api";
 
-export const Route = createFileRoute("/psn-library-repair")({ component: PsnLibraryRepairGatePage });
+export const Route = createFileRoute("/psn-library-repair")({
+  component: PsnLibraryRepairGatePage,
+});
 
 function PsnLibraryRepairGatePage() {
   return (

@@ -51,12 +51,20 @@ describe("GameRecentPlayers", () => {
     );
     expect(screen.getByText("Loading recent players…")).toBeInTheDocument();
 
-    rerender(<GameRecentPlayers players={[]} status="ready" isPending={false} isError onRetry={onRetry} />);
+    rerender(
+      <GameRecentPlayers players={[]} status="ready" isPending={false} isError onRetry={onRetry} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Retry activity" }));
     expect(onRetry).toHaveBeenCalledOnce();
 
     rerender(
-      <GameRecentPlayers players={[]} status="ready" isPending={false} isError={false} onRetry={onRetry} />,
+      <GameRecentPlayers
+        players={[]}
+        status="ready"
+        isPending={false}
+        isError={false}
+        onRetry={onRetry}
+      />,
     );
     expect(
       screen.getByText("No public players logged time in the last two weeks."),

@@ -79,11 +79,19 @@ function LibraryPage() {
     queryFn: getCurrentPsnCatalogEnrichment,
     retry: false,
     refetchInterval: (query) =>
-      query.state.data?.status === "queued" || query.state.data?.status === "running" ? 1500 : false,
+      query.state.data?.status === "queued" || query.state.data?.status === "running"
+        ? 1500
+        : false,
   });
-  const psnCatalogProgress = psnCatalogJob.data?.result as {
-    total?: number; attempted?: number; linked?: number; review?: number; remaining?: number;
-  } | undefined;
+  const psnCatalogProgress = psnCatalogJob.data?.result as
+    | {
+        total?: number;
+        attempted?: number;
+        linked?: number;
+        review?: number;
+        remaining?: number;
+      }
+    | undefined;
   useEffect(() => {
     if (psnCatalogJob.data?.status === "succeeded") {
       void queryClient.invalidateQueries({ queryKey: ["library-overview-page"] });
@@ -147,7 +155,8 @@ function LibraryPage() {
         <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
           <p className="font-bold">Improve PlayStation details</p>
           <p className="mt-1 text-muted-foreground">
-            Catalog matching continues in the background. Exact matches will appear automatically; uncertain titles can be chosen below.
+            Catalog matching continues in the background. Exact matches will appear automatically;
+            uncertain titles can be chosen below.
           </p>
           {psnCatalogProgress ? (
             <p className="mt-1 text-muted-foreground">
@@ -195,7 +204,11 @@ function LibraryPage() {
                 ? "Deleting PlayStation games…"
                 : "Delete all PlayStation games"}
             </button>
-            {deleteMessage && <span role="status" className="text-xs text-muted-foreground">{deleteMessage}</span>}
+            {deleteMessage && (
+              <span role="status" className="text-xs text-muted-foreground">
+                {deleteMessage}
+              </span>
+            )}
           </div>
         )}
         <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
@@ -407,12 +420,31 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
           >
             {search.isPending ? "Searching…" : "Search catalog"}
           </button>
-          <button type="button" disabled={titleSuggestions.isPending || !query.trim()} onClick={() => titleSuggestions.mutate()} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-50">
+          <button
+            type="button"
+            disabled={titleSuggestions.isPending || !query.trim()}
+            onClick={() => titleSuggestions.mutate()}
+            className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-50"
+          >
             {titleSuggestions.isPending ? "Finding catalog title…" : "Find catalog title"}
           </button>
-          {titleSuggestions.isError ? <p className="text-sm text-muted-foreground">Catalog title lookup is temporarily unavailable. Try editing the search title.</p> : null}
+          {titleSuggestions.isError ? (
+            <p className="text-sm text-muted-foreground">
+              Catalog title lookup is temporarily unavailable. Try editing the search title.
+            </p>
+          ) : null}
           {titleSuggestions.data?.suggestions.map((suggestion) => (
-            <button key={suggestion} type="button" onClick={() => { setQuery(suggestion); search.mutate(suggestion); }} className="mr-2 rounded-lg border border-border px-2 py-1 text-xs">Use {suggestion}</button>
+            <button
+              key={suggestion}
+              type="button"
+              onClick={() => {
+                setQuery(suggestion);
+                search.mutate(suggestion);
+              }}
+              className="mr-2 rounded-lg border border-border px-2 py-1 text-xs"
+            >
+              Use {suggestion}
+            </button>
           ))}
           {search.isError ? (
             <p role="alert" className="text-sm text-red-600">

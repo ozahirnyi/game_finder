@@ -58,7 +58,9 @@ vi.mock("@/components/GameCard", () => ({
 import { Route } from "./index";
 import { getGameMediaCandidates } from "@/lib/gameMedia";
 
-function renderHome(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+function renderHome(
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const root = createRootRoute({ component: Outlet });
   const route = createRoute({
     getParentRoute: () => root,

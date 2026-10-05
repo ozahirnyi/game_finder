@@ -50,13 +50,21 @@ describe("apiRequest", () => {
     const signal = new AbortController().signal;
     const timeout = vi.fn(() => signal);
     vi.stubGlobal("AbortSignal", { timeout });
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "job-1", status: "queued" }), {
-        headers: { "content-type": "application/json" },
-      }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "job-1", status: "succeeded", result: { recommendations: [] } }), {
-        headers: { "content-type": "application/json" },
-      }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: "job-1", status: "queued" }), {
+          headers: { "content-type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ id: "job-1", status: "succeeded", result: { recommendations: [] } }),
+          {
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      );
     vi.stubGlobal("fetch", fetchMock);
     setToken("token");
 
@@ -67,10 +75,7 @@ describe("apiRequest", () => {
       "/api/recommendations",
       expect.objectContaining({ signal }),
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/background-jobs/job-1",
-      expect.any(Object),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/background-jobs/job-1", expect.any(Object));
   });
 
   it("sends the JWT and clears it after an authenticated 401", async () => {

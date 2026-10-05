@@ -5,21 +5,39 @@ import { expect, test } from "./fixtures/test";
 const POSTER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="264" height="374" viewBox="0 0 264 374"><rect width="264" height="374" fill="#2157a5"/><rect x="12" y="12" width="240" height="350" fill="none" stroke="#f8c44f" stroke-width="8"/><circle cx="132" cy="187" r="70" fill="#e75d3f"/><text x="132" y="195" text-anchor="middle" fill="white" font-family="sans-serif" font-size="24">POSTER</text><text x="18" y="42" fill="white" font-size="18">TL</text><text x="212" y="350" fill="white" font-size="18">BR</text></svg>`;
 const WIDE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080"><rect width="1920" height="1080" fill="#253349"/><rect x="30" y="30" width="1860" height="1020" fill="none" stroke="#f8c44f" stroke-width="24"/><path d="M0 1080L960 180 1920 1080" fill="#e75d3f"/><text x="960" y="560" text-anchor="middle" fill="white" font-family="sans-serif" font-size="120">WIDE ART</text><text x="80" y="140" fill="white" font-size="72">TOP LEFT</text><text x="1480" y="980" fill="white" font-size="72">BOTTOM RIGHT</text></svg>`;
 
-test("a real store capsule survives missing guessed Steam artwork on home and deals", async ({ page }) => {
-  const capsule = "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4358690/hash/capsule_616x353.jpg";
-  const deal = { name: "Graveyard Keeper 2", steam_appid: 4358690, cover_image: null, background_image: capsule };
-  await page.route("**/api/prices/deals**", route => route.fulfill({ json: { results: [deal] } }));
-  await page.route("**/api/prices/genre-deals**", route => route.fulfill({ json: { popular: [deal], sections: [] } }));
-  await page.route("https://cdn.cloudflare.steamstatic.com/**", route => route.fulfill({ status: 404 }));
-  await page.route(capsule, route => route.fulfill({ contentType: "image/svg+xml", body: WIDE_SVG }));
+test("a real store capsule survives missing guessed Steam artwork on home and deals", async ({
+  page,
+}) => {
+  const capsule =
+    "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4358690/hash/capsule_616x353.jpg";
+  const deal = {
+    name: "Graveyard Keeper 2",
+    steam_appid: 4358690,
+    cover_image: null,
+    background_image: capsule,
+  };
+  await page.route("**/api/prices/deals**", (route) =>
+    route.fulfill({ json: { results: [deal] } }),
+  );
+  await page.route("**/api/prices/genre-deals**", (route) =>
+    route.fulfill({ json: { popular: [deal], sections: [] } }),
+  );
+  await page.route("https://cdn.cloudflare.steamstatic.com/**", (route) =>
+    route.fulfill({ status: 404 }),
+  );
+  await page.route(capsule, (route) =>
+    route.fulfill({ contentType: "image/svg+xml", body: WIDE_SVG }),
+  );
   for (const path of ["/", "/deals"]) {
     await page.goto(path);
-    await page.getByRole("heading", { name: "Graveyard Keeper 2", exact: true }).scrollIntoViewIfNeeded();
+    await page
+      .getByRole("heading", { name: "Graveyard Keeper 2", exact: true })
+      .scrollIntoViewIfNeeded();
     const img = page.getByRole("img", { name: "Graveyard Keeper 2", exact: true });
     await expect(img).toHaveAttribute("src", capsule);
     await expect(img).toHaveCSS("opacity", "1");
     await expect(img).toHaveCSS("object-fit", "cover");
-    expect(await img.evaluate(el => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    expect(await img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   }
 });
 
@@ -154,9 +172,14 @@ test("game detail places its heading on the artwork without a separate dark stri
     const heroBox = await hero.boundingBox();
     const headingBox = await heading.boundingBox();
     expect(headingBox?.y).toBeGreaterThanOrEqual(heroBox?.y ?? 0);
-    expect((headingBox?.y ?? 0) + (headingBox?.height ?? 0)).toBeLessThanOrEqual((heroBox?.y ?? 0) + (heroBox?.height ?? 0));
+    expect((headingBox?.y ?? 0) + (headingBox?.height ?? 0)).toBeLessThanOrEqual(
+      (heroBox?.y ?? 0) + (heroBox?.height ?? 0),
+    );
     await expect(heading.locator("..")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await page.screenshot({ path: testInfo.outputPath(`detail-wide-${width}.png`), fullPage: true });
+    await page.screenshot({
+      path: testInfo.outputPath(`detail-wide-${width}.png`),
+      fullPage: true,
+    });
   }
 });
 

@@ -29,7 +29,9 @@ vi.mock("@/components/ThemeSelector", () => ({ ThemeSelector: () => null }));
 vi.mock("@/components/GameCover", () => ({ Avatar: () => null }));
 vi.mock("@/lib/api", () => api);
 
-function renderShell(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+function renderShell(
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const prefetchQuery = vi.spyOn(queryClient, "prefetchQuery");
   render(
     <QueryClientProvider client={queryClient}>

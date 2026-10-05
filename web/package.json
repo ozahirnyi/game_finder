@@ -13,7 +13,7 @@
     "test:ui:headed": "playwright test --headed",
     "test:e2e:business": "playwright test --config=playwright.business.config.ts",
     "test:all": "npm run test && npm run test:ui",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "format": "prettier --write ."
   },
   "dependencies": {

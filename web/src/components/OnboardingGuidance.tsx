@@ -3,7 +3,8 @@ import { Panel } from "@/components/ui-bits";
 import type { OnboardingSummary } from "@/lib/api";
 
 type GuidanceTarget = "/account" | "/psn-import" | "/search" | "/wishlist" | "/friends";
-type GuidanceAction = { label: string; to: GuidanceTarget } | { label: string; onClick: () => void };
+type GuidanceAction =
+  { label: string; to: GuidanceTarget } | { label: string; onClick: () => void };
 
 type GuidanceCardProps = {
   title: string;
@@ -17,7 +18,7 @@ function GuidanceCard({ title, description, actions }: GuidanceCardProps) {
       <h3 className="text-sm font-bold">{title}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {actions.map((action) => (
+        {actions.map((action) =>
           "onClick" in action ? (
             <button
               key={action.label}
@@ -35,8 +36,8 @@ function GuidanceCard({ title, description, actions }: GuidanceCardProps) {
             >
               {action.label}
             </Link>
-          )
-        ))}
+          ),
+        )}
       </div>
     </div>
   );

@@ -28,7 +28,8 @@ export function directoryAction(
 ) {
   if (relationship === "friends") return { label: "Friends", enabled: false };
   if (relationship === "incoming_pending") return { label: "Respond to request", enabled: false };
-  if (relationship === "outgoing_pending" || locallyRequested) return { label: "Request sent", enabled: false };
+  if (relationship === "outgoing_pending" || locallyRequested)
+    return { label: "Request sent", enabled: false };
   return { label: "Add friend", enabled: true };
 }
 

@@ -123,7 +123,9 @@ function PsnImportPage() {
     enabled: Boolean(catalogJobId),
     retry: false,
     refetchInterval: (query) =>
-      query.state.data?.status === "queued" || query.state.data?.status === "running" ? 1500 : false,
+      query.state.data?.status === "queued" || query.state.data?.status === "running"
+        ? 1500
+        : false,
   });
   useEffect(() => {
     if (catalogJob.data?.status === "succeeded" && !refreshedCatalog.current) {
@@ -465,10 +467,25 @@ function PsnImportPage() {
             <p className="mt-2 text-sm text-muted-foreground">
               Your selected PlayStation games are now in your library.
             </p>
-            {catalogJob.data?.status === "queued" && <p className="mt-2 text-sm text-muted-foreground">Your games are imported. Catalog matching is queued.</p>}
-            {catalogJob.data?.status === "running" && <p className="mt-2 text-sm text-muted-foreground">Matching imported PlayStation games to the catalog…</p>}
-            {catalogJob.data?.status === "succeeded" && <p className="mt-2 text-sm text-muted-foreground">Catalog matching is complete.</p>}
-            {catalogJob.data?.status === "failed" && <p className="mt-2 text-sm text-muted-foreground">Catalog matching could not be completed. You can still find games manually in your library.</p>}
+            {catalogJob.data?.status === "queued" && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Your games are imported. Catalog matching is queued.
+              </p>
+            )}
+            {catalogJob.data?.status === "running" && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Matching imported PlayStation games to the catalog…
+              </p>
+            )}
+            {catalogJob.data?.status === "succeeded" && (
+              <p className="mt-2 text-sm text-muted-foreground">Catalog matching is complete.</p>
+            )}
+            {catalogJob.data?.status === "failed" && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Catalog matching could not be completed. You can still find games manually in your
+                library.
+              </p>
+            )}
             <div className="mt-6 flex justify-center gap-2">
               <Link
                 to="/library"

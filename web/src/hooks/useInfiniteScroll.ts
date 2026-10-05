@@ -13,9 +13,12 @@ export function useInfiniteScroll({
   useEffect(() => {
     const node = ref.current;
     if (!node || !hasNextPage || isFetchingNextPage) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry?.isIntersecting) fetchNextPage();
-    }, { rootMargin: "200px" });
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) fetchNextPage();
+      },
+      { rootMargin: "200px" },
+    );
     observer.observe(node);
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);

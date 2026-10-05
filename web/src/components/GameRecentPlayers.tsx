@@ -38,9 +38,9 @@ export function GameRecentPlayers({ players, status, isPending, isError, onRetry
                 Some Steam activity is temporarily unavailable.
               </p>
             )}
-          <p className="px-4 py-3 text-sm text-muted-foreground">
-            No public players logged time in the last two weeks.
-          </p>
+            <p className="px-4 py-3 text-sm text-muted-foreground">
+              No public players logged time in the last two weeks.
+            </p>
           </>
         ) : (
           <>
@@ -50,29 +50,29 @@ export function GameRecentPlayers({ players, status, isPending, isError, onRetry
               </p>
             )}
             {ranked.map((player) => (
-            <div
-              key={player.id}
-              data-testid="recent-player-row"
-              className="flex items-center gap-3 px-4 py-3"
-            >
-              <Avatar
-                from="#7c3aed"
-                to="#111827"
-                name={player.display_name}
-                image={player.avatar ?? undefined}
-                imageAlt={player.display_name}
-                className="size-9 shrink-0 rounded-full"
-              />
-              <UserProfileLink
-                publicId={player.public_id}
-                className="min-w-0 flex-1 truncate text-sm font-bold hover:text-primary"
+              <div
+                key={player.id}
+                data-testid="recent-player-row"
+                className="flex items-center gap-3 px-4 py-3"
               >
-                {player.display_name}
-              </UserProfileLink>
-              <p className="shrink-0 text-xs text-muted-foreground">
-                {(player.playtime_2weeks / 60).toFixed(1)} h
-              </p>
-            </div>
+                <Avatar
+                  from="#7c3aed"
+                  to="#111827"
+                  name={player.display_name}
+                  image={player.avatar ?? undefined}
+                  imageAlt={player.display_name}
+                  className="size-9 shrink-0 rounded-full"
+                />
+                <UserProfileLink
+                  publicId={player.public_id}
+                  className="min-w-0 flex-1 truncate text-sm font-bold hover:text-primary"
+                >
+                  {player.display_name}
+                </UserProfileLink>
+                <p className="shrink-0 text-xs text-muted-foreground">
+                  {(player.playtime_2weeks / 60).toFixed(1)} h
+                </p>
+              </div>
             ))}
           </>
         )}

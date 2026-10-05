@@ -93,7 +93,10 @@ describe("PriceHistoryChart", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Sale price history")).toHaveAttribute("d", expect.stringContaining("H"));
+    expect(screen.getByLabelText("Sale price history")).toHaveAttribute(
+      "d",
+      expect.stringContaining("H"),
+    );
     expect(screen.getByLabelText("Regular price history")).toBeInTheDocument();
     const firstPoint = screen.getByRole("button", { name: /1 Aug.*sale/i });
     fireEvent.mouseEnter(firstPoint);
@@ -187,13 +190,16 @@ describe("PriceHistoryChart", () => {
 
   it("matches its viewBox to the rendered chart without distorting text", () => {
     let onResize: (() => void) | undefined;
-    vi.stubGlobal("ResizeObserver", class {
-      constructor(callback: () => void) {
-        onResize = callback;
-      }
-      observe() {}
-      disconnect() {}
-    });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          onResize = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
 
     render(
       <PriceHistoryChart
