@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
 import { EmptyState, SectionHeader } from "@/components/ui-bits";
@@ -136,6 +136,7 @@ function SearchPage() {
   });
   const aiRecommendationQuery = useQuery<RecommendationResponse>({
     queryKey: ["ai-recommendations", query.trim()],
+    queryFn: skipToken,
     enabled: false,
     staleTime: Infinity,
     gcTime: 1000 * 60 * 60 * 24,

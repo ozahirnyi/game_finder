@@ -1,4 +1,20 @@
-import { expect, test } from "./fixtures/test";
+import { expect, test, waitForHydration } from "./fixtures/test";
+
+test("search uses fixture API without a missing queryFn warning", async ({ page, api }) => {
+  const queryFnWarnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.text().includes("No queryFn was passed")) {
+      queryFnWarnings.push(message.text());
+    }
+  });
+
+  await page.goto("/search");
+  await waitForHydration(page);
+  await expect
+    .poll(() => api.requests.some((request) => request.path === "/search/games"))
+    .toBe(true);
+  expect(queryFnWarnings).toEqual([]);
+});
 
 test("guest discovery links catalog and Steam search results to their truthful detail targets", async ({
   page,
