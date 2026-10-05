@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 export default defineConfig({
+  envDir: false,
   server: {
     fs: {
       allow: [path.resolve(import.meta.dirname)],
