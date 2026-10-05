@@ -52,6 +52,24 @@ describe("SearchPage", () => {
     window.history.replaceState({}, "", "/search");
   });
 
+  it("does not log a missing queryFn for the disabled AI recommendation query", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] }))),
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      renderSearch();
+
+      expect(consoleError).not.toHaveBeenCalledWith(
+        expect.stringContaining("No queryFn was passed"),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("requests catalog prices in the signed-in user's selected region", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
