@@ -80,7 +80,7 @@ assert created.json()['source'] == 'steam'
 
 **Interfaces:** Consume `GET /library/membership`, provider-aware `CollectionGame.id`, and Task 2's UUID alert contract. `PriceAlertForm` emits target thresholds and channels; its parent adds the selected `wishlist_item_id`. An owned state renders a library link and no wishlist or alert controls. Query errors render an explicit unavailable membership state instead of asserting that the game is unowned.
 
-- [ ] **Step 1: Add failing Vitest cases.** Test owned Steam, linked PSN, and linked manual records; unowned catalog and Steam-only records; a membership API failure; and a Steam-only alert that first calls `/wishlist/steam-games/<appid>` then posts that response's UUID to `/price-alerts`. Test that equal numeric Steam and catalog IDs do not make the UI select the other provider's wishlist entry. Assert a permanently free game with no paid offer has no alert action.
+- [ ] **Step 1: Add failing Vitest cases.** Test owned Steam, linked PSN, and linked manual records; unowned catalog and Steam-only records; a membership API failure; and a Steam-only alert that first calls `/wishlist/steam-games/<appid>` then posts that response's UUID to `/price-alerts`. Test that equal numeric Steam and catalog IDs do not make the UI select the other provider's wishlist entry.
 
 ```tsx
 expect(screen.getByText('In your library')).toBeInTheDocument();
@@ -89,7 +89,7 @@ expect(api.createPriceAlert).toHaveBeenCalledWith(expect.objectContaining({ wish
 ```
 
 - [ ] **Step 2: Run** `rtk proxy npm.cmd run test -- src/routes/-games.actions.test.tsx src/routes/-wishlist.test.tsx` from `web`; expect the new assertions to fail.
-- [ ] **Step 3: Add `getGameMembership` to the API client and key its query by both IDs and account.** Derive `catalog_game_id` from the resolved catalog detail and `steam_appid` from the verified Steam detail. Show the owned source and Library link. Reuse existing provider-specific wishlist endpoints. For a saved item, use `item.id` to create an alert. Hide alert action only when the price response positively identifies the game as permanently free without a paid offer. Update the wishlist alert selector to use UUID values rather than numeric IDs; show paused status rather than treating it as active.
+- [ ] **Step 3: Add `getGameMembership` to the API client and key its query by both IDs and account.** Derive `catalog_game_id` from the resolved catalog detail and `steam_appid` from the verified Steam detail. Show the owned source and Library link. Reuse existing provider-specific wishlist endpoints. For a saved item, use `item.id` to create an alert. Update the wishlist alert selector to use UUID values rather than numeric IDs; show paused status rather than treating it as active.
 - [ ] **Step 4: Run** the four focused Vitest files and `rtk proxy npm.cmd run build` from `web`; expect exit zero. Confirm the build type-checks the changed API contract.
 - [ ] **Step 5: Commit** the task files with `rtk git commit -m "feat: align game actions with ownership and Steam alerts"`.
 

@@ -36,7 +36,7 @@ The detail-page action area has three states:
 | Wishlisted, not owned | “In wishlist”; alert can be created or its current state inspected; store link remains available |
 | Neither, not owned | Add to wishlist, set alert, and open store when a verified store link exists |
 
-Setting an alert may save the game to the wishlist first, but the mutation must use the provider-specific wishlist endpoint and then the returned wishlist UUID. It must not infer the target from `catalog_game_id`. A failed wishlist save cannot create an alert. A free game with no meaningful paid offer does not show an alert action; a future paid offer can make it eligible again.
+Setting an alert may save the game to the wishlist first, but the mutation must use the provider-specific wishlist endpoint and then the returned wishlist UUID. It must not infer the target from `catalog_game_id`. A failed wishlist save cannot create an alert.
 
 ## Search and recommendation routes
 
