@@ -47,4 +47,20 @@ describe("notificationDestination", () => {
     expect(notificationDestination(notification("game_invite", {}))).toBeNull();
     expect(notificationDestination(notification("price_alert", { catalog_game_id: 0 }))).toBeNull();
   });
+
+  it("routes a Steam offer to its Steam game page and saved offer", () => {
+    expect(
+      notificationDestination(
+        notification("price_alert", {
+          source: "steam",
+          external_id: "730",
+          offer: { shop: "Steam" },
+        }),
+      ),
+    ).toEqual({
+      to: "/games/$gameId",
+      params: { gameId: "730" },
+      search: { source: "steam", offer: "n" },
+    });
+  });
 });

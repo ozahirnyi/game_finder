@@ -25,7 +25,11 @@ test("wishlist alert saves the Any discount payload and refreshes visible alerts
           (request) => request.path === "/price-alerts" && request.method === "POST",
         )?.jsonBody,
     )
-    .toEqual({ wishlist_catalog_game_id: 101, target_discount: 1, delivery_channels: ["in_app"] });
+    .toEqual({
+      wishlist_item_id: "wishlist-101",
+      target_discount: 1,
+      delivery_channels: ["in_app"],
+    });
   await expect(page.getByText("Celeste: any discount")).toBeVisible();
 });
 
@@ -52,7 +56,11 @@ test("wishlist alert sends exact target price and target discount payloads", asy
           .filter((request) => request.path === "/price-alerts" && request.method === "POST")
           .at(-1)?.jsonBody,
     )
-    .toEqual({ wishlist_catalog_game_id: 101, target_price: 19.99, delivery_channels: ["in_app"] });
+    .toEqual({
+      wishlist_item_id: "wishlist-101",
+      target_price: 19.99,
+      delivery_channels: ["in_app"],
+    });
 
   await page.getByRole("radio", { name: "Target discount" }).check();
   await page.getByRole("spinbutton", { name: "Discount" }).fill("35");
@@ -64,7 +72,11 @@ test("wishlist alert sends exact target price and target discount payloads", asy
           .filter((request) => request.path === "/price-alerts" && request.method === "POST")
           .at(-1)?.jsonBody,
     )
-    .toEqual({ wishlist_catalog_game_id: 101, target_discount: 35, delivery_channels: ["in_app"] });
+    .toEqual({
+      wishlist_item_id: "wishlist-101",
+      target_discount: 35,
+      delivery_channels: ["in_app"],
+    });
   await expect(page.getByText("Celeste: alert below 19.99")).toBeVisible();
   await expect(page.getByText("Celeste: alert at 35% off")).toBeVisible();
 });

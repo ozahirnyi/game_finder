@@ -132,7 +132,7 @@ describe("WishlistPage", () => {
 
     await waitFor(() =>
       expect(api.createPriceAlert).toHaveBeenCalledWith({
-        wishlist_catalog_game_id: 274755,
+        wishlist_item_id: wishlistRecordId,
         target_discount: 1,
         delivery_channels: ["in_app"],
       }),
@@ -166,6 +166,7 @@ describe("WishlistPage", () => {
     api.getPriceAlerts.mockResolvedValue([
       {
         id: "alert-1",
+        wishlist_item_id: wishlistRecordId,
         wishlist_catalog_game_id: 274755,
         target_discount: 1,
         delivery_channels: ["in_app"],

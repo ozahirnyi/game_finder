@@ -106,6 +106,26 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
       await route.fulfill({ json: state.library });
       return;
     }
+    if (request.method() === "GET" && path === "/library/membership") {
+      const steamAppId = url.searchParams.get("steam_appid");
+      const catalogGameId = Number(url.searchParams.get("catalog_game_id"));
+      const matches = state.library.games.filter(
+        (game) =>
+          (steamAppId && game.source === "steam" && game.external_id === steamAppId) ||
+          (catalogGameId > 0 &&
+            game.source !== "steam" &&
+            ((game.source === "catalog" && game.external_id === `igdb:${catalogGameId}`) ||
+              (game.catalog_game_id === catalogGameId &&
+                (game.source !== "psn" || game.link_state === "linked")))),
+      );
+      await route.fulfill({
+        json: {
+          owned: matches.length > 0,
+          matches: matches.map(({ id, source }) => ({ id, source })),
+        },
+      });
+      return;
+    }
     if (request.method() === "GET" && path === "/favorites") {
       await route.fulfill({ json: [] });
       return;
@@ -146,15 +166,15 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
       return;
     }
     if (request.method() === "POST" && path === "/wishlist/steam-games/440") {
-      await route.fulfill({
-        json: {
-          id: "wishlist-440",
-          catalog_game_id: 440,
-          source: "steam",
-          external_id: "440",
-          title: "Team Fortress 2",
-        },
-      });
+      const item = {
+        id: "wishlist-440",
+        catalog_game_id: 440,
+        source: "steam",
+        external_id: "440",
+        title: "Team Fortress 2",
+      };
+      if (!state.wishlist.some((saved) => saved.id === item.id)) state.wishlist.push(item);
+      await route.fulfill({ json: item });
       return;
     }
     if (request.method() === "GET" && path === "/telegram/me") {
@@ -166,13 +186,23 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
       return;
     }
     if (request.method() === "POST" && path === "/price-alerts") {
-      const body = requestRecord.jsonBody as Omit<
-        import("../../src/lib/api").PriceAlert,
-        "id" | "created_at" | "updated_at"
-      >;
+      const body = requestRecord.jsonBody as import("../../src/lib/api").PriceAlertCreate;
+      const item = state.wishlist.find(
+        (saved) =>
+          saved.id === body.wishlist_item_id ||
+          (saved.source === "catalog" && saved.catalog_game_id === body.wishlist_catalog_game_id),
+      );
+      if (!item) {
+        await route.fulfill({ status: 404, json: { detail: "Wishlist item not found" } });
+        return;
+      }
       const alert = {
         ...body,
-        id: "alert-1",
+        wishlist_item_id: item.id,
+        wishlist_catalog_game_id: item.catalog_game_id,
+        source: item.source,
+        external_id: item.external_id,
+        id: `alert-${state.alerts.length + 1}`,
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
       };
@@ -312,6 +342,15 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
     }
     if (request.method() === "GET" && path === "/notifications") {
       await route.fulfill({ json: state.notifications });
+      return;
+    }
+    if (request.method() === "GET" && /^\/notifications\/[^/]+$/.test(path)) {
+      const notification = state.notifications.find((item) => item.id === path.split("/")[2]);
+      await route.fulfill(
+        notification
+          ? { json: notification }
+          : { status: 404, json: { detail: "Notification not found" } },
+      );
       return;
     }
     if (request.method() === "POST" && /^\/notifications\/[^/]+\/read$/.test(path)) {

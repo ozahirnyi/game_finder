@@ -230,9 +230,14 @@ def test_in_app_price_alert_notification_is_owner_scoped_and_deduplicated(
     notices = db_session.query(Notification).all()
     assert first.in_app_notifications_created == 1
     assert second.in_app_notifications_created == 0
-    assert [(notice.user_id, notice.type, notice.payload) for notice in notices] == [
-        (owner.id, "price_alert", {"catalog_game_id": 707}),
-    ]
+    assert len(notices) == 1
+    assert notices[0].user_id == owner.id
+    assert notices[0].type == "price_alert"
+    assert notices[0].payload["source"] == "steam"
+    assert notices[0].payload["external_id"] == "1145350"
+    assert notices[0].payload["offer"]["price"] == 9.99
+    assert notices[0].payload["offer"]["url"] == "https://store.example/hades"
+    assert "catalog_game_id" not in notices[0].payload
     assert [call.kwargs for call in steam_detail.await_args_list] == [
         {"country": "UA"},
         {"country": "UA"},

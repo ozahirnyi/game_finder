@@ -53,6 +53,16 @@ class LibraryOverviewPageRead(LibraryOverviewRead):
     has_more: bool = False
 
 
+class LibraryMembershipMatchRead(BaseModel):
+    id: uuid.UUID
+    source: Literal["catalog", "manual", "psn", "steam"]
+
+
+class LibraryMembershipRead(BaseModel):
+    owned: bool
+    matches: list[LibraryMembershipMatchRead] = Field(default_factory=list)
+
+
 class SteamLibraryResolveRead(BaseModel):
     game_id: int
 
@@ -868,13 +878,16 @@ class CatalogCollectionPageRead(BaseModel):
 
 
 class PriceAlertCreate(BaseModel):
-    wishlist_catalog_game_id: int = Field(ge=1)
+    wishlist_item_id: uuid.UUID | None = None
+    wishlist_catalog_game_id: int | None = Field(default=None, ge=1)
     target_price: float | None = Field(default=None, gt=0)
     target_discount: int | None = Field(default=None, ge=1, le=100)
     delivery_channels: list[Literal["in_app", "telegram"]] = Field(default_factory=lambda: ["in_app"], min_length=1, max_length=2)
 
     @model_validator(mode="after")
     def require_target(self):
+        if (self.wishlist_item_id is None) == (self.wishlist_catalog_game_id is None):
+            raise ValueError("Choose one wishlist entry")
         if self.target_price is None and self.target_discount is None:
             raise ValueError("Set a target price or discount")
         return self
@@ -894,7 +907,12 @@ class PriceAlertUpdate(BaseModel):
 
 class PriceAlertRead(BaseModel):
     id: uuid.UUID
+    wishlist_item_id: uuid.UUID
     wishlist_catalog_game_id: int
+    source: str
+    external_id: str
+    paused_at: datetime | None = None
+    pause_reason: str | None = None
     target_price: float | None = None
     target_discount: int | None = None
     delivery_channels: list[str] = Field(default_factory=list)

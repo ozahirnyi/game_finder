@@ -6,7 +6,7 @@ from app.integrations.igdb import IGDBError
 from app.recommendations import enrich_recommendations, normalize_catalog_title
 
 
-def test_enrichment_resolves_at_most_ten_titles_in_one_batch_and_omits_unresolved():
+def test_enrichment_resolves_at_most_ten_titles_in_one_batch_and_keeps_unresolved():
     async def exercise():
         calls = []
 
@@ -27,12 +27,18 @@ def test_enrichment_resolves_at_most_ten_titles_in_one_batch_and_omits_unresolve
         )
 
         assert calls == [["Hades", "Unresolved", *[f"Extra {index}" for index in range(1, 9)]]]
-        assert result == [{
+        assert result[0] == {
             "title": "Hades",
             "reason": "Fast runs",
             "tags": ["Action"],
             "game": {"id": 8, "name": "Hades", "background_image": "right.jpg"},
-        }]
+            "resolution_status": "matched",
+        }
+        assert len(result) == 10
+        assert result[1] == {
+            "title": "Unresolved", "reason": "Ignored", "tags": [],
+            "game": None, "resolution_status": "unmatched",
+        }
 
     asyncio.run(exercise())
 
@@ -77,7 +83,7 @@ def test_enrichment_uses_only_exact_normalized_match():
     asyncio.run(exercise())
 
 
-def test_batch_catalog_failure_discards_all_recommendations():
+def test_batch_catalog_failure_keeps_recommendations_with_unavailable_state():
     async def exercise():
         async def batch_search(_titles):
             raise IGDBError("timeout", status_code=504)
@@ -89,7 +95,8 @@ def test_batch_catalog_failure_discards_all_recommendations():
             ], batch_search
         )
 
-        assert result == []
+        assert [item["resolution_status"] for item in result] == ["catalog_unavailable"] * 2
+        assert [item["reason"] for item in result] == ["One", "Two"]
 
     asyncio.run(exercise())
 

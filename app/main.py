@@ -82,12 +82,14 @@ from app.price_region import effective_price_country
 from app.auth import SECRET_KEY, hash_password, verify_password, create_access_token, decode_access_token, get_current_user, get_user_by_id
 from app.database import get_db, User, Game, CatalogGameCache, OAuthIdentity, OAuthAuthorizationTransaction, DirectMessage, FriendRequest, Friendship, Conversation, Message, GameInvite, Notification, Favorite, WishlistItem, PriceAlert, BackgroundJob, engine, wait_for_db
 from app.database import SocialBlock, SteamFriendSuppression
+from app.game_identity import owned_library_games
+from app.alert_ownership import item_is_owned, pause_owned_alerts
 from app import social_policy
 from app.schemas import ConversationReadUpdate
 from app.schemas import PsnCatalogTitleSuggestions
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportPreviewItem, PsnImportResult, PsnImportSelection, \
     RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
-    SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, LibraryOverviewPageRead, SteamLibraryResolveRead, \
+    SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, LibraryOverviewPageRead, LibraryMembershipRead, SteamLibraryResolveRead, \
     HomeDealResponse, GenreDealResponse, SteamStoreGameDetail, GoogleStatusRead, OAuthLoginUrl, OAuthExchangeRequest, DataBlock, DashboardRead, OnboardingSummaryRead, ProfileSummaryRead, UserProfileRead, UserProfileUpdate, \
     PublicUserRead, PublicUserDirectoryRead, PublicUserDirectoryItemRead, RecentGamePlayerRead, RecentGamePlayersRead, FriendRequestCreate, FriendRequestRead, FriendshipRead, FriendProfileRead, PublicLibraryPageRead, PublicLibrarySummaryRead, SharedGameRead, SharedLibraryRead, FriendSocialSummaryRead, FriendActivityRead, ConversationCreate, ConversationRead, ConversationUnreadCountRead, MessageCreate, MessageRead, GameInviteCreate, GameInviteRead, InviteResponseUpdate, NotificationRead, InviteLinkRead, \
     CatalogCollectionCreate, CatalogCollectionUpdate, CatalogCollectionRead, CatalogCollectionPageRead, PriceAlertCreate, PriceAlertUpdate, PriceAlertRead, \
@@ -359,7 +361,12 @@ def collection_response(item: Favorite | WishlistItem) -> CatalogCollectionRead:
 def price_alert_response(alert: PriceAlert, item: WishlistItem) -> PriceAlertRead:
     return PriceAlertRead(
         id=alert.id,
+        wishlist_item_id=item.id,
         wishlist_catalog_game_id=item.catalog_game_id,
+        source=item.source,
+        external_id=item.external_id,
+        paused_at=alert.paused_at,
+        pause_reason=alert.pause_reason,
         target_price=alert.target_price,
         target_discount=alert.target_discount,
         delivery_channels=list(alert.delivery_channels or []),
@@ -685,6 +692,24 @@ def _is_pending_psn_catalog_game(game: Game) -> bool:
     )
 
 
+@app.get("/library/membership", response_model=LibraryMembershipRead)
+def library_membership_route(
+    catalog_game_id: int | None = Query(default=None, ge=1),
+    steam_appid: int | None = Query(default=None, ge=1),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if catalog_game_id is None and steam_appid is None:
+        raise HTTPException(status_code=422, detail="A game identity is required")
+    matches = owned_library_games(
+        db, current_user.id, catalog_game_id=catalog_game_id, steam_appid=steam_appid
+    )
+    return LibraryMembershipRead(
+        owned=bool(matches),
+        matches=[{"id": game.id, "source": game.source} for game in matches],
+    )
+
+
 @app.get("/library/overview", response_model=LibraryOverviewRead)
 async def library_overview_route(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
@@ -845,8 +870,11 @@ async def save_catalog_library_game(
         info=detail.get("description_raw"),
         source="catalog",
         external_id=external_id,
+        catalog_game_id=igdb_id,
     )
     db.add(game)
+    db.flush()
+    pause_owned_alerts(db, current_user.id)
     db.commit()
     db.refresh(game)
     response.status_code = 201
@@ -1095,6 +1123,8 @@ async def apply_psn_library_repair(data: PsnLibraryRepairApplyRequest, db: Sessi
                 _link_psn_game_to_catalog(db, game, decision.catalog_id or 0, detail)
             except PsnInvalidCatalogGame as exc:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
+        db.flush()
+        pause_owned_alerts(db, current_user.id)
         db.commit()
     except Exception:
         db.rollback()
@@ -1286,6 +1316,8 @@ async def confirm_psn_import(
                     updated += 1
                 else:
                     skipped += 1
+        db.flush()
+        pause_owned_alerts(db, current_user.id)
         db.commit()
     except Exception:
         db.rollback()
@@ -2806,6 +2838,23 @@ def list_notifications(
     return [NotificationRead(id=item.id, type=item.type, payload=item.payload or {}, read_at=item.read_at, created_at=item.created_at) for item in notifications]
 
 
+@app.get("/notifications/{notification_id}", response_model=NotificationRead)
+def get_notification(
+    notification_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    notification = db.query(Notification).filter(
+        Notification.id == notification_id, Notification.user_id == current_user.id
+    ).first()
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return NotificationRead(
+        id=notification.id, type=notification.type, payload=notification.payload or {},
+        read_at=notification.read_at, created_at=notification.created_at,
+    )
+
+
 @app.post("/notifications/{notification_id}/read", response_model=NotificationRead)
 def mark_notification_read(
     notification_id: uuid.UUID,
@@ -2969,7 +3018,9 @@ def add_wishlist_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    existing = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id, WishlistItem.catalog_game_id == data.catalog_game_id).first()
+    if owned_library_games(db, current_user.id, catalog_game_id=data.catalog_game_id):
+        raise HTTPException(status_code=409, detail="Game is already in your library")
+    existing = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id, WishlistItem.source == "catalog", WishlistItem.catalog_game_id == data.catalog_game_id).first()
     if existing:
         raise HTTPException(status_code=409, detail="Game is already in wishlist")
     item = WishlistItem(
@@ -2994,10 +3045,14 @@ async def save_catalog_wishlist_game(
     if igdb_id < 1:
         raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
 
+    if owned_library_games(db, current_user.id, catalog_game_id=igdb_id):
+        raise HTTPException(status_code=409, detail="Game is already in your library")
+
     existing = (
         db.query(WishlistItem)
         .filter(
             WishlistItem.user_id == current_user.id,
+            WishlistItem.source == "catalog",
             WishlistItem.catalog_game_id == igdb_id,
         )
         .first()
@@ -3035,6 +3090,9 @@ async def save_steam_wishlist_game(
 ):
     if appid < 1:
         raise HTTPException(status_code=400, detail="appid must be >= 1")
+
+    if owned_library_games(db, current_user.id, steam_appid=appid):
+        raise HTTPException(status_code=409, detail="Game is already in your library")
 
     existing = (
         db.query(WishlistItem)
@@ -3074,7 +3132,7 @@ async def save_steam_wishlist_game(
 
 
 def get_owned_wishlist_item(db: Session, user_id: uuid.UUID, catalog_game_id: int) -> WishlistItem:
-    item = db.query(WishlistItem).filter(WishlistItem.user_id == user_id, WishlistItem.catalog_game_id == catalog_game_id).first()
+    item = db.query(WishlistItem).filter(WishlistItem.user_id == user_id, WishlistItem.source == "catalog", WishlistItem.catalog_game_id == catalog_game_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Wishlist item not found")
     return item
@@ -3126,7 +3184,17 @@ def create_price_alert(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = get_owned_wishlist_item(db, current_user.id, data.wishlist_catalog_game_id)
+    if data.wishlist_item_id is not None:
+        item = db.query(WishlistItem).filter(
+            WishlistItem.id == data.wishlist_item_id,
+            WishlistItem.user_id == current_user.id,
+        ).first()
+        if item is None:
+            raise HTTPException(status_code=404, detail="Wishlist item not found")
+    else:
+        item = get_owned_wishlist_item(db, current_user.id, data.wishlist_catalog_game_id)
+    if item_is_owned(db, current_user.id, item):
+        raise HTTPException(status_code=409, detail="Game is already in your library")
     existing = db.query(PriceAlert).filter(PriceAlert.wishlist_item_id == item.id).first()
     if existing:
         raise HTTPException(status_code=409, detail="This wishlist game already has a price alert")

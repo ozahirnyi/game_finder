@@ -8,6 +8,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import Game
+from app.alert_ownership import pause_owned_alerts
 from app.psn_catalog_matcher import PSN_CATALOG_MATCHER_VERSION, PsnCatalogEvidence
 from app.psn_catalog_service import PsnCatalogUnavailable, resolve_psn_catalog_evidence
 from app.psn_classification import psn_repair_quarantine_reason
@@ -147,6 +148,8 @@ async def enrich_pending_psn_catalog_batch(
             game.catalog_lookup_state = decision.state
             game.catalog_lookup_version = PSN_CATALOG_MATCHER_VERSION
             review += 1
+        db.flush()
+        pause_owned_alerts(db, owner_id)
         db.commit()
         remaining = _pending_psn_catalog_query(db, owner_id).count()
         return PsnCatalogEnrichmentResult(

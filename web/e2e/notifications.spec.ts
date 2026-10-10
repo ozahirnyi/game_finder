@@ -91,7 +91,7 @@ const notificationDestinations = [
   ],
   [
     "price_alert",
-    "Notification",
+    "Price alert",
     { catalog_game_id: 101, message: "Celeste is discounted" },
     "**/games/101?returnTo=%2Faccount",
   ],

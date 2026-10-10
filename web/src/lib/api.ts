@@ -173,7 +173,8 @@ export type PublicProfile = {
 };
 
 export type PriceAlertCreate = {
-  wishlist_catalog_game_id: number;
+  wishlist_item_id?: string;
+  wishlist_catalog_game_id?: number;
   target_price?: number;
   target_discount?: number;
   delivery_channels: ("in_app" | "telegram")[];
@@ -181,8 +182,19 @@ export type PriceAlertCreate = {
 
 export type PriceAlert = PriceAlertCreate & {
   id: string;
+  wishlist_item_id: string;
+  wishlist_catalog_game_id: number;
+  source: string;
+  external_id: string;
+  paused_at?: string | null;
+  pause_reason?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type GameMembership = {
+  owned: boolean;
+  matches: { id: string; source: "manual" | "psn" | "steam" | "catalog" }[];
 };
 
 export type GameInviteCreate = {
@@ -328,6 +340,7 @@ export type RecommendationItem = {
   title: string;
   reason: string;
   tags: string[];
+  resolution_status?: "matched" | "unmatched" | "catalog_unavailable";
   igdb_id?: number | null;
   cover_url?: string | null;
   game?: RecommendationGame | null;
@@ -900,6 +913,12 @@ export function getLibraryOverviewPage(options: CollectionPageOptions = {}) {
 export function getWishlist() {
   return apiRequest<CollectionGame[]>("/wishlist", { auth: true });
 }
+export function getGameMembership(identity: { catalog_game_id?: number; steam_appid?: number }) {
+  const params = new URLSearchParams();
+  if (identity.catalog_game_id) params.set("catalog_game_id", String(identity.catalog_game_id));
+  if (identity.steam_appid) params.set("steam_appid", String(identity.steam_appid));
+  return apiRequest<GameMembership>(`/library/membership?${params}`, { auth: true });
+}
 export function getWishlistPage(options: CollectionPageOptions = {}) {
   return apiRequest<CollectionPage<CollectionGame>>(
     `/wishlist/page?${collectionPageQuery(options)}`,
@@ -1122,6 +1141,9 @@ export function deletePriceAlert(id: string) {
 
 export function getNotifications() {
   return apiRequest<Notification[]>("/notifications", { auth: true });
+}
+export function getNotification(id: string) {
+  return apiRequest<Notification>(`/notifications/${id}`, { auth: true });
 }
 
 export function markNotificationRead(id: string) {

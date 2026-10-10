@@ -6,9 +6,30 @@ import pytest
 def test_alembic_has_a_single_upgrade_head():
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["f1a2b3c4d5e6"]
+    assert script.get_heads() == ["f2b0c4d6e8a1"]
+    assert script.get_revision("f2b0c4d6e8a1").down_revision == "f1a2b3c4d5e6"
     assert script.get_revision("f1a2b3c4d5e6").down_revision == "a4b6c8d0e2f4"
     assert script.get_revision("a4b6c8d0e2f4").down_revision == "c6d8e0f2a4b6"
+
+
+def test_price_alert_pause_migration_round_trip(monkeypatch):
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import Column, Integer, MetaData, Table, create_engine, inspect
+
+    engine = create_engine("sqlite://")
+    metadata = MetaData()
+    Table("price_alerts", metadata, Column("id", Integer, primary_key=True))
+    metadata.create_all(engine)
+    migration = ScriptDirectory.from_config(Config("alembic.ini")).get_revision("f2b0c4d6e8a1").module
+    with engine.begin() as connection:
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade()
+        assert {column["name"] for column in inspect(connection).get_columns("price_alerts")} == {
+            "id", "paused_at", "pause_reason",
+        }
+        migration.downgrade()
+        assert {column["name"] for column in inspect(connection).get_columns("price_alerts")} == {"id"}
 
 
 def test_telegram_price_alert_deduplication_migration_round_trip(monkeypatch):

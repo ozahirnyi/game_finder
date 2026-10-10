@@ -13,10 +13,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
   addWishlist: vi.fn(),
+  addSteamWishlist: vi.fn(),
   createGameInvite: vi.fn(),
   createPriceAlert: vi.fn(),
   getFriends: vi.fn(),
   getFavorites: vi.fn(),
+  getAuthSnapshot: vi.fn(() => true),
+  subscribeToAuthChanges: vi.fn(() => () => {}),
+  getGameMembership: vi.fn(),
   getPriceAlerts: vi.fn(),
   getTelegramAccount: vi.fn(),
   getWishlist: vi.fn(),
@@ -56,15 +60,16 @@ const game = {
   storeUrl: undefined,
   coop: false,
   isSteamLibrary: false,
+  steamAppId: null as number | null,
 };
 
-function renderGame() {
+function renderGame(override: Partial<typeof game> = {}) {
   cleanup();
   const rootRoute = createRootRoute({ component: Outlet });
   const gameRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/games/$gameId",
-    loader: async () => ({ game }),
+    loader: async () => ({ game: { ...game, ...override } }),
     component: Route.options.component,
   });
   const router = createRouter({
@@ -83,10 +88,18 @@ describe("GameDetail actions", () => {
   afterEach(cleanup);
   beforeEach(() => {
     cleanup();
+    vi.clearAllMocks();
+    api.getAuthSnapshot.mockReturnValue(true);
     api.getPriceHistory.mockResolvedValue({ deals: [] });
     api.getWishlist.mockResolvedValue([]);
     api.getFavorites.mockResolvedValue([]);
+    api.getGameMembership.mockResolvedValue({ owned: false, matches: [] });
     api.addWishlist.mockResolvedValue({ id: "wishlist-1" });
+    api.addSteamWishlist.mockResolvedValue({
+      id: "steam-wishlist-1",
+      source: "steam",
+      external_id: "730",
+    });
     api.getPriceAlerts.mockResolvedValue([]);
     api.getTelegramAccount.mockResolvedValue({ linked: false, configured: false });
     api.createPriceAlert.mockResolvedValue({ id: "alert-1" });
@@ -108,6 +121,55 @@ describe("GameDetail actions", () => {
     expect(await screen.findByRole("button", { name: "Add to favorites" })).toBeEnabled();
   });
 
+  it("shows the library state instead of wishlist and alert for an owned game", async () => {
+    api.getGameMembership.mockResolvedValueOnce({
+      owned: true,
+      matches: [{ id: "owned-1", source: "psn" }],
+    });
+    renderGame();
+
+    expect(await screen.findByText("In your library")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open library" })).toHaveAttribute("href", "/library");
+    expect(screen.queryByRole("button", { name: "Add to wishlist" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Alert" })).not.toBeInTheDocument();
+  });
+
+  it("offers sign-in instead of an unavailable library status to a guest", async () => {
+    api.getAuthSnapshot.mockReturnValue(false);
+    renderGame();
+    expect(await screen.findByRole("link", { name: "Sign in to save this game" })).toHaveAttribute(
+      "href",
+      "/sign-in",
+    );
+    expect(
+      screen.queryByText("Library status is unavailable. Try again later."),
+    ).not.toBeInTheDocument();
+    expect(api.getGameMembership).not.toHaveBeenCalled();
+  });
+
+  it("keeps Steam-only wishlist and alert on the Steam identity", async () => {
+    renderGame({ id: "730", isSteamLibrary: true, steamAppId: 730 });
+    fireEvent.click(await screen.findByRole("button", { name: "Alert" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save alert" }));
+
+    await waitFor(() => expect(api.addSteamWishlist).toHaveBeenCalledWith("730"));
+    expect(api.createPriceAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wishlist_item_id: "steam-wishlist-1",
+      }),
+    );
+    expect(api.addWishlist).not.toHaveBeenCalled();
+  });
+
+  it("shows unavailable ownership status without allowing wishlist or alert", async () => {
+    api.getGameMembership.mockRejectedValueOnce(new Error("offline"));
+    renderGame();
+    expect(
+      await screen.findByText("Library status is unavailable. Try again later."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Alert" })).not.toBeInTheDocument();
+  });
+
   it("shows a favorite mutation error", async () => {
     api.saveCatalogGameToFavorites.mockRejectedValueOnce(new Error("offline"));
     renderGame();
@@ -125,7 +187,8 @@ describe("GameDetail actions", () => {
 
     await waitFor(() =>
       expect(api.createPriceAlert).toHaveBeenCalledWith({
-        wishlist_catalog_game_id: 274755,
+        wishlist_item_id: "wishlist-1",
+        wishlist_catalog_game_id: undefined,
         target_discount: 1,
         delivery_channels: ["in_app"],
       }),

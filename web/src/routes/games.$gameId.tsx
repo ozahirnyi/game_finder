@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, GameCover } from "@/components/GameCover";
 import { GameCard } from "@/components/GameCard";
@@ -25,12 +25,14 @@ import {
 import {
   addSteamWishlist,
   addWishlist,
-  ApiError,
   createGameInvite,
   createPriceAlert,
   getCatalogGame,
   getFavorites,
   getFriends,
+  getAuthSnapshot,
+  getGameMembership,
+  getNotification,
   getPriceHistory,
   getRecentGamePlayers,
   getRecentSteamGamePlayers,
@@ -38,23 +40,27 @@ import {
   getSteamGame,
   getSteamPriceHistory,
   getWishlist,
+  subscribeToAuthChanges,
   removeFavorite,
   saveCatalogGameToFavorites,
-  searchGames,
   type CatalogGame,
   type PriceAlertCreate,
   type PriceHistoryPeriod,
 } from "@/lib/api";
-import { exactCatalogMatch, hasCatalogId } from "@/lib/catalogMatch";
+import { hasCatalogId } from "@/lib/catalogMatch";
 import { getGameMediaCandidates } from "@/lib/gameMedia";
 import { ArrowLeft, Bell, ExternalLink, Heart, Share2, Sparkles, Users } from "lucide-react";
 
 export const Route = createFileRoute("/games/$gameId")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { title?: string; source?: "steam"; returnTo?: string } => ({
+  ): { title?: string; source?: "steam"; offer?: string; returnTo?: string } => ({
     ...(typeof search.title === "string" ? { title: search.title } : {}),
     ...(search.source === "steam" ? { source: "steam" } : {}),
+    ...(typeof search.offer === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.offer)
+      ? { offer: search.offer }
+      : {}),
     ...(typeof search.returnTo === "string" &&
     search.returnTo.startsWith("/") &&
     !search.returnTo.startsWith("//")
@@ -67,8 +73,8 @@ export const Route = createFileRoute("/games/$gameId")({
       if (deps.source === "steam") {
         const steamGame = await getSteamGame(params.gameId);
         if (steamGame.catalog_game_id) {
-          const catalog = await getCatalogGame(steamGame.catalog_game_id);
-          if (hasCatalogId(catalog)) {
+          const catalog = await getCatalogGame(steamGame.catalog_game_id).catch(() => null);
+          if (catalog && hasCatalogId(catalog) && catalog.id === steamGame.catalog_game_id) {
             return {
               game: {
                 id: String(catalog.id),
@@ -143,16 +149,7 @@ export const Route = createFileRoute("/games/$gameId")({
         }
         return catalog;
       };
-      let catalog: CatalogGame & { id: number };
-      try {
-        catalog = await loadCatalogGame(params.gameId);
-      } catch {
-        if (!deps.title) throw new Error("Catalog title unavailable");
-        const results = (await searchGames({ query: deps.title })).results.filter(hasCatalogId);
-        const match = exactCatalogMatch(results, deps.title);
-        if (!match) throw new Error("Catalog game unavailable");
-        catalog = await loadCatalogGame(match.id);
-      }
+      const catalog = await loadCatalogGame(params.gameId);
       return {
         game: {
           id: String(catalog.id),
@@ -307,7 +304,13 @@ export function mergeGamePrice<
 
 function GameDetail() {
   const { game: catalogGame } = Route.useLoaderData();
-  const { returnTo } = Route.useSearch();
+  const { returnTo, offer: offerId } = Route.useSearch();
+  const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
+  const offerQuery = useQuery({
+    queryKey: ["saved-offer", offerId],
+    queryFn: () => getNotification(offerId!),
+    enabled: Boolean(offerId),
+  });
   const [historyPeriod, setHistoryPeriod] = useState<Exclude<PriceHistoryPeriod, "1m">>("6m");
   const priceQuery = useQuery({
     queryKey: [
@@ -346,6 +349,19 @@ function GameDetail() {
   const [actionMessage, setActionMessage] = useState("");
   const [wishlistAdded, setWishlistAdded] = useState(false);
   const [favoriteAdded, setFavoriteAdded] = useState(false);
+  const membershipQuery = useQuery({
+    queryKey: [
+      "game-membership",
+      catalogGame.isSteamLibrary ? null : Number(catalogGame.id),
+      catalogGame.steamAppId,
+    ],
+    queryFn: () =>
+      getGameMembership({
+        ...(catalogGame.isSteamLibrary ? {} : { catalog_game_id: Number(catalogGame.id) }),
+        ...(catalogGame.steamAppId ? { steam_appid: catalogGame.steamAppId } : {}),
+      }),
+    enabled: signedIn,
+  });
   const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist });
   const favoritesQuery = useQuery({
     queryKey: ["favorites"],
@@ -384,19 +400,25 @@ function GameDetail() {
   });
   const alertMutation = useMutation({
     mutationFn: async (alert: PriceAlertCreate) => {
-      const catalogGameId = Number(catalogGame.id);
-      if (!wishlistQuery.data?.some((item) => item.catalog_game_id === catalogGameId)) {
-        try {
-          await addWishlist({
-            id: catalogGameId,
-            name: catalogGame.title,
-            background_image: catalogGame.coverUrl ?? null,
-          });
-        } catch (error) {
-          if (!(error instanceof ApiError && error.status === 409)) throw error;
-        }
-      }
-      return createPriceAlert({ ...alert, wishlist_catalog_game_id: catalogGameId });
+      const saved = wishlistQuery.data?.find((item) =>
+        catalogGame.isSteamLibrary
+          ? item.source === "steam" && item.external_id === String(catalogGame.id)
+          : item.source === "catalog" && item.catalog_game_id === Number(catalogGame.id),
+      );
+      const item =
+        saved ??
+        (catalogGame.isSteamLibrary
+          ? await addSteamWishlist(catalogGame.id)
+          : await addWishlist({
+              id: Number(catalogGame.id),
+              name: catalogGame.title,
+              background_image: catalogGame.coverUrl ?? null,
+            }));
+      return createPriceAlert({
+        ...alert,
+        wishlist_item_id: item.id,
+        wishlist_catalog_game_id: undefined,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wishlist"] });
@@ -423,6 +445,22 @@ function GameDetail() {
   });
   const current = priceQuery.data?.current;
   const game = mergeGamePrice(catalogGame, current);
+  const savedPayload = offerQuery.data?.type === "price_alert" ? offerQuery.data.payload : null;
+  const savedOffer =
+    savedPayload?.offer && typeof savedPayload.offer === "object"
+      ? (savedPayload.offer as Record<string, unknown>)
+      : null;
+  const offerMatchesGame =
+    savedPayload?.source === "steam"
+      ? catalogGame.steamAppId != null &&
+        savedPayload.external_id === String(catalogGame.steamAppId)
+      : savedPayload?.source === "catalog"
+        ? savedPayload.external_id === `igdb:${catalogGame.id}`
+        : false;
+  const savedOfferUrl =
+    typeof savedOffer?.url === "string" && /^https?:\/\//i.test(savedOffer.url)
+      ? savedOffer.url
+      : null;
   const wideCandidates = getGameMediaCandidates(
     {
       heroUrl: game.heroUrl,
@@ -445,7 +483,7 @@ function GameDetail() {
     wishlistQuery.data?.some((item) =>
       catalogGame.isSteamLibrary
         ? item.source === "steam" && item.external_id === String(catalogGame.id)
-        : item.source !== "steam" && item.catalog_game_id === Number(catalogGame.id),
+        : item.source === "catalog" && item.catalog_game_id === Number(catalogGame.id),
     );
   const isFavorite =
     favoriteAdded ||
@@ -484,6 +522,40 @@ function GameDetail() {
         returnTo={returnTo}
         className="mb-6 inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 py-3 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary"
       />
+
+      {offerId &&
+        (offerQuery.isPending ? (
+          <p className="mb-6 text-sm text-muted-foreground">Loading saved offer…</p>
+        ) : savedOffer && offerMatchesGame ? (
+          <section
+            aria-label="Saved price offer"
+            className="mb-6 rounded-2xl border border-primary/50 bg-primary/10 p-5"
+          >
+            <h2 className="text-lg font-bold">Your price alert offer</h2>
+            <p className="mt-2 text-sm">
+              {typeof savedOffer.shop === "string" ? savedOffer.shop : "Store"}:{" "}
+              {String(savedOffer.price ?? "—")} {String(savedOffer.currency ?? "")}
+              {typeof savedOffer.discount === "number" ? ` · ${savedOffer.discount}% off` : ""}
+            </p>
+            {typeof savedOffer.observed_at === "string" && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Seen {new Date(savedOffer.observed_at).toLocaleString()}
+              </p>
+            )}
+            {savedOfferUrl && (
+              <a
+                href={savedOfferUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-block text-sm font-bold text-primary underline"
+              >
+                View offer at store
+              </a>
+            )}
+          </section>
+        ) : (
+          <p className="mb-6 text-sm text-muted-foreground">Saved offer is no longer available.</p>
+        ))}
 
       <section
         className={
@@ -762,18 +834,43 @@ function GameDetail() {
               </p>
             )}
 
-            <button
-              onClick={() => wishlistMutation.mutate()}
-              disabled={wishlistMutation.isPending || isInWishlist}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
-            >
-              <Heart className="size-4" />{" "}
-              {wishlistMutation.isPending
-                ? "Adding…"
-                : isInWishlist
-                  ? "In wishlist"
-                  : "Add to wishlist"}
-            </button>
+            {!signedIn ? (
+              <a
+                href="/sign-in"
+                className="mt-5 block rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-bold text-primary-foreground"
+              >
+                Sign in to save this game
+              </a>
+            ) : membershipQuery.data?.owned ? (
+              <div className="mt-5 rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm">
+                <p className="font-bold">In your library</p>
+                <a
+                  href="/library"
+                  className="mt-1 inline-block font-semibold text-primary underline"
+                >
+                  Open library
+                </a>
+              </div>
+            ) : membershipQuery.isPending ? (
+              <p className="mt-5 text-sm text-muted-foreground">Checking your library…</p>
+            ) : membershipQuery.isError ? (
+              <p role="alert" className="mt-5 text-sm text-muted-foreground">
+                Library status is unavailable. Try again later.
+              </p>
+            ) : (
+              <button
+                onClick={() => wishlistMutation.mutate()}
+                disabled={wishlistMutation.isPending || isInWishlist}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
+              >
+                <Heart className="size-4" />{" "}
+                {wishlistMutation.isPending
+                  ? "Adding…"
+                  : isInWishlist
+                    ? "In wishlist"
+                    : "Add to wishlist"}
+              </button>
+            )}
 
             {!catalogGame.isSteamLibrary && (
               <button
@@ -819,13 +916,17 @@ function GameDetail() {
             </div>
 
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <button
-                onClick={() => setShowAlertForm(true)}
-                disabled={catalogGame.isSteamLibrary}
-                className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Bell className="size-3.5" /> Alert
-              </button>
+              {signedIn &&
+                !membershipQuery.data?.owned &&
+                !membershipQuery.isPending &&
+                !membershipQuery.isError && (
+                  <button
+                    onClick={() => setShowAlertForm(true)}
+                    className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Bell className="size-3.5" /> Alert
+                  </button>
+                )}
               <button
                 onClick={() => {
                   setRecipientId(friendsQuery.data?.[0]?.user.id ?? "");
@@ -870,19 +971,22 @@ function GameDetail() {
                 Add a PlayFinder friend to send an invite.
               </p>
             )}
-            {showAlertForm && (
-              <div className="mt-4 border-t border-border pt-4">
-                <PriceAlertForm
-                  wishlistCatalogGameId={Number(catalogGame.id)}
-                  onSubmit={(data) => alertMutation.mutate(data)}
-                  onCancel={() => setShowAlertForm(false)}
-                  isPending={alertMutation.isPending}
-                  errorMessage={
-                    alertMutation.error instanceof Error ? alertMutation.error.message : undefined
-                  }
-                />
-              </div>
-            )}
+            {signedIn &&
+              showAlertForm &&
+              !membershipQuery.data?.owned &&
+              !membershipQuery.isError && (
+                <div className="mt-4 border-t border-border pt-4">
+                  <PriceAlertForm
+                    wishlistCatalogGameId={Number(catalogGame.id)}
+                    onSubmit={(data) => alertMutation.mutate(data)}
+                    onCancel={() => setShowAlertForm(false)}
+                    isPending={alertMutation.isPending}
+                    errorMessage={
+                      alertMutation.error instanceof Error ? alertMutation.error.message : undefined
+                    }
+                  />
+                </div>
+              )}
             {showInviteForm && (
               <form
                 className="mt-4 min-w-0 max-w-full space-y-3 border-t border-border pt-4"

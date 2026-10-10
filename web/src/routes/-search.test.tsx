@@ -537,7 +537,7 @@ describe("SearchPage", () => {
     );
   });
 
-  it("renders only resolved AI results as catalog cards", async () => {
+  it("renders matched AI results and a search path for unresolved suggestions", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string) =>
@@ -586,7 +586,11 @@ describe("SearchPage", () => {
       "href",
       expect.stringContaining("/games/30"),
     );
-    expect(screen.queryByText("Unknown Game")).not.toBeInTheDocument();
+    expect(screen.getByText("Unknown Game")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Search for this game" })).toHaveAttribute(
+      "href",
+      "/search?q=Unknown%20Game",
+    );
   });
 
   it("distinguishes an AI no-match response from provider unavailability", async () => {

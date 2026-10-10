@@ -36,8 +36,18 @@ def game_invite_response_payload(*, invite_id: UUID, conversation_id: UUID, by: 
     return {"invite_id": str(invite_id), "conversation_id": str(conversation_id), "by": by, "status": status}
 
 
-def price_alert_payload(*, catalog_game_id: int, message: str | None = None) -> dict[str, Any]:
-    payload: dict[str, Any] = {"catalog_game_id": catalog_game_id}
+def price_alert_payload(
+    *, catalog_game_id: int | None = None, source: str | None = None,
+    external_id: str | None = None, offer: dict[str, Any] | None = None,
+    message: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    if catalog_game_id is not None and source != "steam":
+        payload["catalog_game_id"] = catalog_game_id
+    if source and external_id:
+        payload.update(source=source, external_id=external_id)
+    if offer:
+        payload["offer"] = offer
     if message:
         payload["message"] = message
     return payload

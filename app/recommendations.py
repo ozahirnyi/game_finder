@@ -28,7 +28,7 @@ async def enrich_recommendations(
     try:
         catalog_by_title = await resolve_titles([str(item["title"]).strip() for item in candidates])
     except Exception:
-        return []
+        return [{**item, "game": None, "resolution_status": "catalog_unavailable"} for item in candidates]
 
     resolved: list[dict[str, Any]] = []
     for item in candidates:
@@ -43,6 +43,9 @@ async def enrich_recommendations(
             ),
             None,
         )
-        if match is not None:
-            resolved.append({**item, "game": match})
+        resolved.append({
+            **item,
+            "game": match,
+            "resolution_status": "matched" if match is not None else "unmatched",
+        })
     return resolved

@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import Game, PriceAlert, SessionLocal, User, WishlistItem
+from app.alert_ownership import item_is_owned, pause_owned_alerts
 from app.notifications import create_notification, price_alert_payload
 from app.price_region import normalize_price_country
 from app.steam_store import fetch_steam_store_game_detail, fetch_steam_store_game_price
@@ -112,7 +113,7 @@ def alert_matches(alert: PriceAlert, deal: dict[str, Any]) -> bool:
 
 
 async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult) -> None:
-    alerts = db.query(PriceAlert).all()
+    alerts = db.query(PriceAlert).filter(PriceAlert.paused_at.is_(None)).all()
     for alert in alerts:
         channels = set(alert.delivery_channels or [])
         if not channels:
@@ -123,6 +124,10 @@ async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult)
         ).first()
         user = db.query(User).filter(User.id == alert.user_id).first()
         if not item or not user:
+            continue
+        if item_is_owned(db, alert.user_id, item):
+            pause_owned_alerts(db, alert.user_id)
+            db.commit()
             continue
         country = price_alert_country(user)
         try:
@@ -139,7 +144,19 @@ async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult)
                     db,
                     alert.user_id,
                     "price_alert",
-                    price_alert_payload(catalog_game_id=item.catalog_game_id),
+                    price_alert_payload(
+                        catalog_game_id=item.catalog_game_id,
+                        source=item.source,
+                        external_id=item.external_id,
+                        offer={
+                            "shop": deal.get("shop"),
+                            "price": (deal.get("price") or {}).get("amount"),
+                            "currency": (deal.get("price") or {}).get("currency"),
+                            "discount": deal.get("cut"),
+                            "url": deal.get("url") or price_data.get("url"),
+                            "observed_at": datetime.now(timezone.utc).isoformat(),
+                        },
+                    ),
                 )
                 alert.last_notification_key = alert_key
                 alert.last_delivered_at = datetime.now(timezone.utc)

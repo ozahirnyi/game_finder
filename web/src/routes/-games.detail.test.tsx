@@ -17,7 +17,11 @@ const api = vi.hoisted(() => ({
   createGameInvite: vi.fn(),
   createPriceAlert: vi.fn(),
   getFavorites: vi.fn(),
+  getAuthSnapshot: vi.fn(() => true),
+  subscribeToAuthChanges: vi.fn(() => () => {}),
   getFriends: vi.fn(),
+  getGameMembership: vi.fn(),
+  getNotification: vi.fn(),
   getPriceHistory: vi.fn(),
   getRecentGamePlayers: vi.fn(),
   getSimilarCatalogGames: vi.fn(),
@@ -90,6 +94,7 @@ beforeEach(() => {
   api.getRecentGamePlayers.mockResolvedValue({ players: [], status: "ready" });
   api.getSimilarCatalogGames.mockResolvedValue({ results: [] });
   api.getWishlist.mockResolvedValue([]);
+  api.getGameMembership.mockResolvedValue({ owned: false, matches: [] });
 });
 
 afterEach(() => {
@@ -98,6 +103,34 @@ afterEach(() => {
 });
 
 describe("game detail presentation", () => {
+  it("shows the saved price offer after opening its notification URL", async () => {
+    const offerId = "123e4567-e89b-12d3-a456-426614174000";
+    api.getNotification.mockResolvedValue({
+      id: offerId,
+      type: "price_alert",
+      payload: {
+        source: "catalog",
+        external_id: "igdb:274755",
+        offer: {
+          shop: "Steam",
+          price: 9.99,
+          currency: "USD",
+          discount: 50,
+          url: "https://store.example/hades",
+          observed_at: "2026-10-11T12:00:00Z",
+        },
+      },
+    });
+    renderDetail(`/games/274755?offer=${offerId}`);
+    expect(await screen.findByRole("region", { name: "Saved price offer" })).toHaveTextContent(
+      "9.99 USD",
+    );
+    expect(screen.getByRole("link", { name: "View offer at store" })).toHaveAttribute(
+      "href",
+      "https://store.example/hades",
+    );
+    expect(api.getNotification).toHaveBeenCalledWith(offerId);
+  });
   it("uses the verified Steam library hero for a Steam-only social preview", async () => {
     const head = await Route.options.head?.({
       loaderData: {

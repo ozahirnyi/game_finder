@@ -6,12 +6,14 @@ type AlertMode = "any_discount" | "target_price" | "target_discount";
 
 export function PriceAlertForm({
   wishlistCatalogGameId,
+  wishlistItemId,
   onSubmit,
   onCancel,
   isPending = false,
   errorMessage,
 }: {
-  wishlistCatalogGameId: number;
+  wishlistCatalogGameId?: number;
+  wishlistItemId?: string;
   onSubmit: (data: PriceAlertCreate) => void;
   onCancel?: () => void;
   isPending?: boolean;
@@ -34,9 +36,12 @@ export function PriceAlertForm({
   function submit() {
     const delivery_channels: PriceAlertCreate["delivery_channels"] = ["in_app"];
     if (telegramAvailable && useTelegram) delivery_channels.push("telegram");
+    const identity = wishlistItemId
+      ? { wishlist_item_id: wishlistItemId }
+      : { wishlist_catalog_game_id: wishlistCatalogGameId };
     if (mode === "any_discount") {
       onSubmit({
-        wishlist_catalog_game_id: wishlistCatalogGameId,
+        ...identity,
         target_discount: 1,
         delivery_channels,
       });
@@ -47,12 +52,12 @@ export function PriceAlertForm({
     onSubmit(
       mode === "target_price"
         ? {
-            wishlist_catalog_game_id: wishlistCatalogGameId,
+            ...identity,
             target_price: value,
             delivery_channels,
           }
         : {
-            wishlist_catalog_game_id: wishlistCatalogGameId,
+            ...identity,
             target_discount: value,
             delivery_channels,
           },

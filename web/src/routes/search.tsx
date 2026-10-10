@@ -416,12 +416,32 @@ function SearchPage() {
           )}
           {recommendations?.recommendations && (
             <div className="stagger grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-5">
-              {recommendations.recommendations.flatMap((item) => {
+              {recommendations.recommendations.map((item, index) => {
                 const game = item.game;
-                if (!game || !Number.isInteger(game.id)) return [];
-                return [
+                if (!game || !Number.isInteger(game.id))
+                  return (
+                    <article
+                      key={`${item.title}-${index}`}
+                      className="rounded-2xl border border-border bg-surface p-5"
+                    >
+                      <h3 className="font-bold">{item.title}</h3>
+                      <p className="mt-2 text-sm text-muted-foreground">{item.reason}</p>
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        {item.resolution_status === "catalog_unavailable"
+                          ? "Catalog is temporarily unavailable."
+                          : "Exact catalog match not found."}
+                      </p>
+                      <a
+                        className="mt-4 inline-block text-sm font-semibold text-primary underline"
+                        href={`/search?q=${encodeURIComponent(item.title)}`}
+                      >
+                        Search for this game
+                      </a>
+                    </article>
+                  );
+                return (
                   <GameCard
-                    key={game.id}
+                    key={`${game.id}-${index}`}
                     showPrice={false}
                     game={{
                       gameId: String(game.id),
@@ -442,8 +462,8 @@ function SearchPage() {
                       screenshotHeight: game.screenshot_height,
                       platforms: game.platforms,
                     }}
-                  />,
-                ];
+                  />
+                );
               })}
             </div>
           )}

@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 
 from app.database import Game
+from app.alert_ownership import pause_owned_alerts
 
 
 def persist_steam_library_snapshot(db, owner_id, steam_games: list[dict]) -> dict[str, int]:
@@ -41,4 +42,5 @@ def persist_steam_library_snapshot(db, owner_id, steam_games: list[dict]) -> dic
         db.delete(stale_game)
 
     db.flush()
+    pause_owned_alerts(db, owner_id)
     return {"created": created, "updated": updated, "removed": len(by_appid)}

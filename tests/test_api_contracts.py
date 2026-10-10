@@ -214,8 +214,8 @@ class CatalogGameDb:
     def __init__(self):
         self.games = []
 
-    def query(self, _model):
-        return CatalogGameQuery(self)
+    def query(self, model):
+        return CatalogGameQuery(self, model)
 
     def add(self, game):
         if game.id is None:
@@ -227,6 +227,9 @@ class CatalogGameDb:
     def commit(self):
         return None
 
+    def flush(self):
+        return None
+
     def refresh(self, _game):
         return None
 
@@ -235,13 +238,31 @@ class CatalogGameDb:
 
 
 class CatalogGameQuery:
-    def __init__(self, db):
+    def __init__(self, db, model):
         self.db = db
+        self.model = model
         self.criteria = []
 
     def filter(self, *criteria):
         self.criteria.extend(criteria)
         return self
+
+    def order_by(self, *_args):
+        return self
+
+    def all(self):
+        if self.model is not main.Game:
+            return []
+        expected = {
+            criterion.left.key: criterion.right.value
+            for criterion in self.criteria
+            if hasattr(criterion, "left") and hasattr(criterion.left, "key") and hasattr(criterion.right, "value")
+        }
+        return [
+            game for game in self.db.games
+            if isinstance(game, self.model)
+            and all(getattr(game, field) == value for field, value in expected.items())
+        ]
 
     def first(self):
         expected = {
@@ -250,7 +271,7 @@ class CatalogGameQuery:
             if hasattr(criterion.left, "key") and hasattr(criterion.right, "value")
         }
         return next(
-            (game for game in self.db.games if all(getattr(game, field) == value for field, value in expected.items())),
+            (game for game in self.db.games if isinstance(game, self.model) and all(getattr(game, field) == value for field, value in expected.items())),
             None,
         )
 
@@ -2012,11 +2033,14 @@ def test_steam_library_sync_updates_owned_game_rows(monkeypatch):
     )
 
     class Query:
+        def __init__(self, items):
+            self.items = items
+
         def filter(self, *_args):
             return self
 
         def all(self):
-            return [legacy_import]
+            return self.items
 
     class Db:
         def __init__(self):
@@ -2024,8 +2048,8 @@ def test_steam_library_sync_updates_owned_game_rows(monkeypatch):
             self.deleted = []
             self.committed = False
 
-        def query(self, _model):
-            return Query()
+        def query(self, model):
+            return Query([legacy_import] if model is main.Game else [])
 
         def add(self, game):
             self.added.append(game)

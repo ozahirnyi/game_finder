@@ -19,6 +19,8 @@ const titleFor: Record<string, string> = {
   message: "New message",
   game_invite: "Game invite",
   game_invite_response: "Game invite response",
+  price_alert: "Price alert",
+  price_alert_paused: "Price alert paused",
 };
 
 function notificationMessage(type: string, payload: Record<string, unknown>) {
@@ -35,6 +37,12 @@ function notificationMessage(type: string, payload: Record<string, unknown>) {
       return `${from} invited you to play ${typeof payload.game_name === "string" ? payload.game_name : "a game"}.`;
     case "game_invite_response":
       return `${by} ${payload.status === "accepted" ? "accepted" : "declined"} your game invite.`;
+    case "price_alert":
+      return typeof payload.offer === "object" && payload.offer
+        ? `A saved offer is available${typeof payload.title === "string" ? ` for ${payload.title}` : ""}.`
+        : "A price alert matched.";
+    case "price_alert_paused":
+      return `Price alert paused because ${typeof payload.title === "string" ? payload.title : "this game"} is in your library.`;
     default:
       return typeof payload.message === "string" ? payload.message : "New Playfinder notification";
   }
@@ -101,7 +109,7 @@ export function NotificationsPanel({ className = "" }: { className?: string }) {
                     }
                     void navigate(
                       destination.to === "/games/$gameId"
-                        ? { ...destination, search: { returnTo } }
+                        ? { ...destination, search: { ...destination.search, returnTo } }
                         : destination,
                     );
                     if (isUnread && destination.to !== "/friends") markRead.mutate(n.id);

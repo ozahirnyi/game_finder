@@ -27,7 +27,16 @@ export type ApiState = GuestHomeFixtures & {
   onboardingFailureCount: number;
   onboarding: OnboardingSummary;
   profile: Profile;
-  library: { games: []; steam_available: boolean };
+  library: {
+    games: Array<{
+      id: string;
+      source: string;
+      external_id?: string | null;
+      catalog_game_id?: number | null;
+      link_state?: string | null;
+    }>;
+    steam_available: boolean;
+  };
   wishlist: CollectionGame[];
   alerts: PriceAlert[];
   friends: Friend[];

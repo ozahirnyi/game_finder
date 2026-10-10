@@ -63,7 +63,7 @@ function WishlistPage() {
   const navigate = useNavigate();
   const returnTo = useRouterState({ select: (state) => state.location.href });
   const [showAlerts, setShowAlerts] = useState(false);
-  const [catalogGameId, setCatalogGameId] = useState("");
+  const [wishlistItemId, setWishlistItemId] = useState("");
   const [searchText, setSearchText] = useState("");
   const [query, setQuery] = useState("");
   useEffect(() => {
@@ -121,7 +121,7 @@ function WishlistPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                setCatalogGameId(String(wl[0]?.catalog_game_id ?? ""));
+                setWishlistItemId(wl[0]?.id ?? "");
                 setShowAlerts(true);
               }}
               disabled={wl.length === 0}
@@ -149,15 +149,15 @@ function WishlistPage() {
         >
           <h2 className="text-lg font-bold">Price alerts</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {alertsQuery.data?.length ?? 0} active alert
-            {(alertsQuery.data?.length ?? 0) === 1 ? "" : "s"}.
+            {alertsQuery.data?.filter((alert) => !alert.paused_at).length ?? 0} active alert
+            {(alertsQuery.data?.filter((alert) => !alert.paused_at).length ?? 0) === 1 ? "" : "s"}.
           </p>
           {!!alertsQuery.data?.length && (
             <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
               {alertsQuery.data.map((alert) => {
                 const title =
-                  wl.find((game) => game.catalog_game_id === alert.wishlist_catalog_game_id)
-                    ?.title ?? `Game #${alert.wishlist_catalog_game_id}`;
+                  wl.find((game) => game.id === alert.wishlist_item_id)?.title ??
+                  `Game #${alert.wishlist_catalog_game_id}`;
                 return (
                   <li key={alert.id} className="flex items-center gap-2">
                     <span>
@@ -167,6 +167,7 @@ function WishlistPage() {
                         : alert.target_discount === 1
                           ? "any discount"
                           : `alert at ${alert.target_discount}% off`}
+                      {alert.paused_at ? " · Paused because this game is in your library" : ""}
                     </span>
                     <button
                       type="button"
@@ -186,20 +187,20 @@ function WishlistPage() {
             <label className="grid gap-1 text-sm font-semibold">
               Game
               <select
-                value={catalogGameId}
-                onChange={(event) => setCatalogGameId(event.target.value)}
+                value={wishlistItemId}
+                onChange={(event) => setWishlistItemId(event.target.value)}
                 className="rounded-lg border border-border bg-background px-3 py-2"
               >
                 {wl.map((game) => (
-                  <option key={game.id} value={game.catalog_game_id}>
+                  <option key={game.id} value={game.id}>
                     {game.title}
                   </option>
                 ))}
               </select>
             </label>
-            {catalogGameId && (
+            {wishlistItemId && (
               <PriceAlertForm
-                wishlistCatalogGameId={Number(catalogGameId)}
+                wishlistItemId={wishlistItemId}
                 onSubmit={(data) => alertMutation.mutate(data)}
                 onCancel={() => setShowAlerts(false)}
                 isPending={alertMutation.isPending}
