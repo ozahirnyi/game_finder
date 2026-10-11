@@ -133,8 +133,10 @@ describe("GameDetail actions", () => {
       name: /In your library.*Open library/i,
     });
     expect(libraryLink).toHaveAttribute("href", "/library");
-    expect(libraryLink).toHaveClass("block");
+    expect(libraryLink).toHaveClass("text-center");
     expect(libraryLink).toContainElement(screen.getByText("In your library"));
+    expect(libraryLink).toContainElement(screen.getByText("Open library"));
+    expect(screen.getByText("Open library")).not.toHaveClass("underline");
     expect(screen.queryByRole("button", { name: "Add to wishlist" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Alert" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Invite" }).parentElement).toHaveClass("grid-cols-2");

@@ -851,10 +851,10 @@ function GameDetail() {
             ) : membershipQuery.data?.owned ? (
               <a
                 href="/library"
-                className="mt-5 block rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm transition hover:border-primary hover:bg-primary/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                className="mt-5 flex min-h-[72px] flex-col items-center justify-center rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-center transition hover:border-primary hover:bg-primary/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               >
-                <span className="block font-bold">In your library</span>
-                <span className="mt-1 inline-block font-semibold text-primary underline">
+                <span className="block text-base font-bold">In your library</span>
+                <span className="mt-1 block text-sm font-semibold text-muted-foreground">
                   Open library
                 </span>
               </a>
