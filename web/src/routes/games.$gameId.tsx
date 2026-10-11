@@ -304,7 +304,7 @@ export function mergeGamePrice<
 
 function GameDetail() {
   const { game: catalogGame } = Route.useLoaderData();
-  const { returnTo, offer: offerId } = Route.useSearch();
+  const { returnTo, offer: offerId, source: routeSource } = Route.useSearch();
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
   const offerQuery = useQuery({
     queryKey: ["saved-offer", offerId],
@@ -363,6 +363,19 @@ function GameDetail() {
     enabled: signedIn,
   });
   const wishlistQuery = useQuery({ queryKey: ["wishlist"], queryFn: getWishlist });
+  const usesSteamWishlist = routeSource === "steam" || catalogGame.isSteamLibrary;
+  const steamWishlistItem = wishlistQuery.data?.find(
+    (item) =>
+      item.source === "steam" &&
+      catalogGame.steamAppId != null &&
+      item.external_id === String(catalogGame.steamAppId),
+  );
+  const catalogWishlistItem = wishlistQuery.data?.find(
+    (item) => item.source === "catalog" && item.catalog_game_id === Number(catalogGame.id),
+  );
+  const existingWishlistItem = usesSteamWishlist
+    ? (steamWishlistItem ?? catalogWishlistItem)
+    : (catalogWishlistItem ?? steamWishlistItem);
   const favoritesQuery = useQuery({
     queryKey: ["favorites"],
     queryFn: getFavorites,
@@ -371,8 +384,8 @@ function GameDetail() {
   const friendsQuery = useQuery({ queryKey: ["friends"], queryFn: getFriends });
   const wishlistMutation = useMutation({
     mutationFn: () =>
-      catalogGame.isSteamLibrary
-        ? addSteamWishlist(catalogGame.id)
+      usesSteamWishlist
+        ? addSteamWishlist(String(catalogGame.steamAppId ?? catalogGame.id))
         : addWishlist({
             id: Number(catalogGame.id),
             name: catalogGame.title,
@@ -400,15 +413,10 @@ function GameDetail() {
   });
   const alertMutation = useMutation({
     mutationFn: async (alert: PriceAlertCreate) => {
-      const saved = wishlistQuery.data?.find((item) =>
-        catalogGame.isSteamLibrary
-          ? item.source === "steam" && item.external_id === String(catalogGame.id)
-          : item.source === "catalog" && item.catalog_game_id === Number(catalogGame.id),
-      );
       const item =
-        saved ??
-        (catalogGame.isSteamLibrary
-          ? await addSteamWishlist(catalogGame.id)
+        existingWishlistItem ??
+        (usesSteamWishlist
+          ? await addSteamWishlist(String(catalogGame.steamAppId ?? catalogGame.id))
           : await addWishlist({
               id: Number(catalogGame.id),
               name: catalogGame.title,
@@ -478,13 +486,12 @@ function GameDetail() {
   const [wideExhausted, setWideExhausted] = useState(false);
   useEffect(() => setWideExhausted(false), [wideKey]);
   const hasHero = wideCandidates.length > 0 && !wideExhausted;
-  const isInWishlist =
-    wishlistAdded ||
-    wishlistQuery.data?.some((item) =>
-      catalogGame.isSteamLibrary
-        ? item.source === "steam" && item.external_id === String(catalogGame.id)
-        : item.source === "catalog" && item.catalog_game_id === Number(catalogGame.id),
-    );
+  const isInWishlist = wishlistAdded || Boolean(existingWishlistItem);
+  const showAlertAction =
+    signedIn &&
+    !membershipQuery.data?.owned &&
+    !membershipQuery.isPending &&
+    !membershipQuery.isError;
   const isFavorite =
     favoriteAdded ||
     !!favoritesQuery.data?.some((item) => item.catalog_game_id === Number(catalogGame.id));
@@ -842,15 +849,15 @@ function GameDetail() {
                 Sign in to save this game
               </a>
             ) : membershipQuery.data?.owned ? (
-              <div className="mt-5 rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm">
-                <p className="font-bold">In your library</p>
-                <a
-                  href="/library"
-                  className="mt-1 inline-block font-semibold text-primary underline"
-                >
+              <a
+                href="/library"
+                className="mt-5 block rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm transition hover:border-primary hover:bg-primary/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                <span className="block font-bold">In your library</span>
+                <span className="mt-1 inline-block font-semibold text-primary underline">
                   Open library
-                </a>
-              </div>
+                </span>
+              </a>
             ) : membershipQuery.isPending ? (
               <p className="mt-5 text-sm text-muted-foreground">Checking your library…</p>
             ) : membershipQuery.isError ? (
@@ -915,18 +922,15 @@ function GameDetail() {
               )}
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {signedIn &&
-                !membershipQuery.data?.owned &&
-                !membershipQuery.isPending &&
-                !membershipQuery.isError && (
-                  <button
-                    onClick={() => setShowAlertForm(true)}
-                    className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Bell className="size-3.5" /> Alert
-                  </button>
-                )}
+            <div className={`mt-4 grid gap-2 ${showAlertAction ? "grid-cols-3" : "grid-cols-2"}`}>
+              {showAlertAction && (
+                <button
+                  onClick={() => setShowAlertForm(true)}
+                  className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Bell className="size-3.5" /> Alert
+                </button>
+              )}
               <button
                 onClick={() => {
                   setRecipientId(friendsQuery.data?.[0]?.user.id ?? "");

@@ -63,18 +63,19 @@ const game = {
   steamAppId: null as number | null,
 };
 
-function renderGame(override: Partial<typeof game> = {}) {
+function renderGame(override: Partial<typeof game> = {}, initialUrl = "/games/274755") {
   cleanup();
   const rootRoute = createRootRoute({ component: Outlet });
   const gameRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/games/$gameId",
+    validateSearch: Route.options.validateSearch,
     loader: async () => ({ game: { ...game, ...override } }),
     component: Route.options.component,
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([gameRoute]),
-    history: createMemoryHistory({ initialEntries: ["/games/274755"] }),
+    history: createMemoryHistory({ initialEntries: [initialUrl] }),
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -128,10 +129,15 @@ describe("GameDetail actions", () => {
     });
     renderGame();
 
-    expect(await screen.findByText("In your library")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open library" })).toHaveAttribute("href", "/library");
+    const libraryLink = await screen.findByRole("link", {
+      name: /In your library.*Open library/i,
+    });
+    expect(libraryLink).toHaveAttribute("href", "/library");
+    expect(libraryLink).toHaveClass("block");
+    expect(libraryLink).toContainElement(screen.getByText("In your library"));
     expect(screen.queryByRole("button", { name: "Add to wishlist" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Alert" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Invite" }).parentElement).toHaveClass("grid-cols-2");
   });
 
   it("offers sign-in instead of an unavailable library status to a guest", async () => {
@@ -159,6 +165,28 @@ describe("GameDetail actions", () => {
       }),
     );
     expect(api.addWishlist).not.toHaveBeenCalled();
+  });
+
+  it("recognizes an existing Steam wishlist item when its game resolves to a catalog page", async () => {
+    api.getWishlist.mockResolvedValueOnce([
+      { id: "steam-wishlist-1", source: "steam", external_id: "440", catalog_game_id: 440 },
+    ]);
+    renderGame(
+      { id: "440", title: "Team Fortress 2", steamAppId: 440, isSteamLibrary: false },
+      "/games/440?source=steam",
+    );
+
+    expect(await screen.findByRole("button", { name: "In wishlist" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Add to wishlist" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Alert" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save alert" }));
+    await waitFor(() =>
+      expect(api.createPriceAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ wishlist_item_id: "steam-wishlist-1" }),
+      ),
+    );
+    expect(api.addWishlist).not.toHaveBeenCalled();
+    expect(api.addSteamWishlist).not.toHaveBeenCalled();
   });
 
   it("shows unavailable ownership status without allowing wishlist or alert", async () => {
