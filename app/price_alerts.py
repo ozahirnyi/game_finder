@@ -1,5 +1,6 @@
 import asyncio
 import os
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import Game, PriceAlert, SessionLocal, User, WishlistItem
 from app.alert_ownership import item_is_owned, pause_owned_alerts
+from app.steam import fetch_owned_games
 from app.notifications import create_notification, price_alert_payload
 from app.price_region import normalize_price_country
 from app.steam_store import fetch_steam_store_game_detail, fetch_steam_store_game_price
@@ -114,6 +116,7 @@ def alert_matches(alert: PriceAlert, deal: dict[str, Any]) -> bool:
 
 async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult) -> None:
     alerts = db.query(PriceAlert).filter(PriceAlert.paused_at.is_(None)).all()
+    live_steam_appids: dict[uuid.UUID, set[int]] = {}
     for alert in alerts:
         channels = set(alert.delivery_channels or [])
         if not channels:
@@ -129,6 +132,21 @@ async def check_persisted_price_alerts(db: Session, result: PriceAlertRunResult)
             pause_owned_alerts(db, alert.user_id)
             db.commit()
             continue
+        if item.source == "steam" and user.steam_id:
+            if user.id not in live_steam_appids:
+                try:
+                    live_steam_appids[user.id] = {
+                        int(game["appid"])
+                        for game in await fetch_owned_games(user.steam_id)
+                        if game.get("appid") is not None
+                    }
+                except HTTPException:
+                    result.errors += 1
+                    continue
+            if item.external_id and item.external_id.isdigit() and int(item.external_id) in live_steam_appids[user.id]:
+                pause_owned_alerts(db, alert.user_id, steam_owned_appids=live_steam_appids[user.id])
+                db.commit()
+                continue
         country = price_alert_country(user)
         try:
             price_data = await fetch_steam_alert_price(

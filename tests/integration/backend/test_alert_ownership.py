@@ -1,12 +1,15 @@
+import asyncio
 from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
+from fastapi import HTTPException
 
 from app.database import Game, Notification, PriceAlert, WishlistItem
 from app.steam_library import persist_steam_library_snapshot
 from app.alert_ownership import item_is_owned
 from app.game_identity import owned_library_games
+from app import price_alerts
 
 
 pytestmark = pytest.mark.integration
@@ -89,3 +92,74 @@ def test_saved_offer_notification_is_only_visible_to_its_owner(
     assert response.json()["payload"]["offer"]["price"] == 9.99
     auth_as(other)
     assert api_client.get(f"/notifications/{notice.id}").status_code == 404
+
+
+def test_watcher_pauses_alert_when_steam_owns_game_without_a_saved_snapshot(
+    db_session, user_factory, monkeypatch
+):
+    owner = user_factory(email="watcher-live-owned@example.com")
+    owner.steam_id = "76561198000000005"
+    item = WishlistItem(
+        user_id=owner.id, source="steam", external_id="730",
+        catalog_game_id=730, title="Counter-Strike 2",
+    )
+    db_session.add(item)
+    db_session.flush()
+    alert = PriceAlert(
+        user_id=owner.id, wishlist_item_id=item.id,
+        target_discount=25, delivery_channels=["in_app"],
+    )
+    db_session.add(alert)
+    db_session.commit()
+    monkeypatch.setattr(
+        price_alerts, "fetch_owned_games",
+        AsyncMock(return_value=[{"appid": 730, "name": "Counter-Strike 2"}]),
+        raising=False,
+    )
+    price_lookup = AsyncMock()
+    monkeypatch.setattr(price_alerts, "fetch_steam_alert_price", price_lookup)
+
+    asyncio.run(price_alerts.check_persisted_price_alerts(
+        db_session, price_alerts.PriceAlertRunResult()
+    ))
+
+    db_session.refresh(alert)
+    assert alert.paused_at is not None
+    assert alert.pause_reason == "owned"
+    assert db_session.query(Notification).filter_by(
+        user_id=owner.id, type="price_alert_paused"
+    ).count() == 1
+    price_lookup.assert_not_awaited()
+
+
+def test_watcher_skips_steam_alert_when_live_ownership_cannot_be_checked(
+    db_session, user_factory, monkeypatch
+):
+    owner = user_factory(email="watcher-live-unavailable@example.com")
+    owner.steam_id = "76561198000000006"
+    item = WishlistItem(
+        user_id=owner.id, source="steam", external_id="730",
+        catalog_game_id=730, title="Counter-Strike 2",
+    )
+    db_session.add(item)
+    db_session.flush()
+    alert = PriceAlert(
+        user_id=owner.id, wishlist_item_id=item.id,
+        target_discount=25, delivery_channels=["in_app"],
+    )
+    db_session.add(alert)
+    db_session.commit()
+    monkeypatch.setattr(
+        price_alerts, "fetch_owned_games",
+        AsyncMock(side_effect=HTTPException(status_code=502, detail="Steam unavailable")),
+    )
+    price_lookup = AsyncMock()
+    monkeypatch.setattr(price_alerts, "fetch_steam_alert_price", price_lookup)
+    result = price_alerts.PriceAlertRunResult()
+
+    asyncio.run(price_alerts.check_persisted_price_alerts(db_session, result))
+
+    db_session.refresh(alert)
+    assert alert.paused_at is None
+    assert result.errors == 1
+    price_lookup.assert_not_awaited()

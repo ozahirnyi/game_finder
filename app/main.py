@@ -692,8 +692,14 @@ def _is_pending_psn_catalog_game(game: Game) -> bool:
     )
 
 
+async def user_owns_live_steam_app(user: User, appid: int) -> bool:
+    if not user.steam_id:
+        return False
+    return any(game.get("appid") == appid for game in await fetch_owned_games(user.steam_id))
+
+
 @app.get("/library/membership", response_model=LibraryMembershipRead)
-def library_membership_route(
+async def library_membership_route(
     catalog_game_id: int | None = Query(default=None, ge=1),
     steam_appid: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
@@ -704,10 +710,11 @@ def library_membership_route(
     matches = owned_library_games(
         db, current_user.id, catalog_game_id=catalog_game_id, steam_appid=steam_appid
     )
-    return LibraryMembershipRead(
-        owned=bool(matches),
-        matches=[{"id": game.id, "source": game.source} for game in matches],
-    )
+    response_matches = [{"id": str(game.id), "source": game.source} for game in matches]
+    if not response_matches and steam_appid is not None:
+        if await user_owns_live_steam_app(current_user, steam_appid):
+            response_matches.append({"id": f"steam:{steam_appid}", "source": "steam"})
+    return LibraryMembershipRead(owned=bool(response_matches), matches=response_matches)
 
 
 @app.get("/library/overview", response_model=LibraryOverviewRead)
@@ -3091,7 +3098,7 @@ async def save_steam_wishlist_game(
     if appid < 1:
         raise HTTPException(status_code=400, detail="appid must be >= 1")
 
-    if owned_library_games(db, current_user.id, steam_appid=appid):
+    if owned_library_games(db, current_user.id, steam_appid=appid) or await user_owns_live_steam_app(current_user, appid):
         raise HTTPException(status_code=409, detail="Game is already in your library")
 
     existing = (
@@ -3179,7 +3186,7 @@ def list_price_alerts(
 
 
 @app.post("/price-alerts", status_code=201, response_model=PriceAlertRead)
-def create_price_alert(
+async def create_price_alert(
     data: PriceAlertCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -3193,7 +3200,14 @@ def create_price_alert(
             raise HTTPException(status_code=404, detail="Wishlist item not found")
     else:
         item = get_owned_wishlist_item(db, current_user.id, data.wishlist_catalog_game_id)
-    if item_is_owned(db, current_user.id, item):
+    steam_appid = (
+        int(item.external_id)
+        if item.source == "steam" and item.external_id and item.external_id.isdigit()
+        else None
+    )
+    if item_is_owned(db, current_user.id, item) or (
+        steam_appid is not None and await user_owns_live_steam_app(current_user, steam_appid)
+    ):
         raise HTTPException(status_code=409, detail="Game is already in your library")
     existing = db.query(PriceAlert).filter(PriceAlert.wishlist_item_id == item.id).first()
     if existing:

@@ -22,7 +22,9 @@ def item_is_owned(db: Session, user_id: uuid.UUID, item: WishlistItem) -> bool:
     return False
 
 
-def pause_owned_alerts(db: Session, user_id: uuid.UUID) -> int:
+def pause_owned_alerts(
+    db: Session, user_id: uuid.UUID, *, steam_owned_appids: set[int] | None = None
+) -> int:
     alerts = db.query(PriceAlert).filter(
         PriceAlert.user_id == user_id, PriceAlert.paused_at.is_(None)
     ).all()
@@ -31,7 +33,14 @@ def pause_owned_alerts(db: Session, user_id: uuid.UUID) -> int:
         item = db.query(WishlistItem).filter(
             WishlistItem.id == alert.wishlist_item_id, WishlistItem.user_id == user_id
         ).first()
-        if item is None or not item_is_owned(db, user_id, item):
+        live_steam_owned = (
+            item is not None
+            and item.source == "steam"
+            and item.external_id is not None
+            and item.external_id.isdigit()
+            and int(item.external_id) in (steam_owned_appids or set())
+        )
+        if item is None or not (item_is_owned(db, user_id, item) or live_steam_owned):
             continue
         alert.paused_at = datetime.now(timezone.utc)
         alert.pause_reason = "owned"

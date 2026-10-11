@@ -1,4 +1,5 @@
 import pytest
+from fastapi import HTTPException
 
 from app.database import Game
 
@@ -90,3 +91,47 @@ def test_membership_matches_catalog_and_manual_library_games(
     manual = api_client.get("/library/membership?catalog_game_id=456")
     assert manual.status_code == 200
     assert [match["source"] for match in manual.json()["matches"]] == ["manual"]
+
+
+def test_membership_includes_live_steam_library_games(
+    api_client, db_session, user_factory, auth_as, monkeypatch
+):
+    owner = user_factory(email="membership-live-steam@example.com")
+    owner.steam_id = "76561198000000001"
+    db_session.commit()
+    calls = []
+
+    async def owned_games(steam_id):
+        calls.append(steam_id)
+        return [{"appid": 730, "name": "Counter-Strike 2"}]
+
+    monkeypatch.setattr("app.main.fetch_owned_games", owned_games)
+    auth_as(owner)
+
+    owned = api_client.get("/library/membership?catalog_game_id=242408&steam_appid=730")
+    assert owned.status_code == 200
+    assert owned.json() == {
+        "owned": True,
+        "matches": [{"id": "steam:730", "source": "steam"}],
+    }
+    assert calls == [owner.steam_id]
+
+    absent = api_client.get("/library/membership?steam_appid=440")
+    assert absent.status_code == 200
+    assert absent.json() == {"owned": False, "matches": []}
+
+
+def test_membership_fails_closed_when_connected_steam_library_is_unavailable(
+    api_client, db_session, user_factory, auth_as, monkeypatch
+):
+    owner = user_factory(email="membership-live-unavailable@example.com")
+    owner.steam_id = "76561198000000002"
+    db_session.commit()
+
+    async def unavailable(_steam_id):
+        raise HTTPException(status_code=502, detail="Steam library request failed")
+
+    monkeypatch.setattr("app.main.fetch_owned_games", unavailable)
+    auth_as(owner)
+    response = api_client.get("/library/membership?steam_appid=730")
+    assert response.status_code == 502

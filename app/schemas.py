@@ -54,7 +54,7 @@ class LibraryOverviewPageRead(LibraryOverviewRead):
 
 
 class LibraryMembershipMatchRead(BaseModel):
-    id: uuid.UUID
+    id: str
     source: Literal["catalog", "manual", "psn", "steam"]
 
 

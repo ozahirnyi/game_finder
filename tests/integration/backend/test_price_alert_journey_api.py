@@ -49,3 +49,48 @@ def test_steam_only_wishlist_alert_offer_and_owner_scoped_notification(
     assert api_client.patch(f"/price-alerts/{alert_response.json()['id']}", json={
         "target_discount": 10,
     }).status_code == 404
+
+
+def test_live_owned_steam_game_cannot_be_added_to_wishlist(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = user_factory(email="journey-live-owned@example.com")
+    owner.steam_id = "76561198000000003"
+    db_session.commit()
+    auth_as(owner)
+    monkeypatch.setattr(
+        app_main,
+        "fetch_owned_games",
+        AsyncMock(return_value=[{"appid": 730, "name": "Counter-Strike 2"}]),
+    )
+    detail = AsyncMock(return_value={"name": "Counter-Strike 2"})
+    monkeypatch.setattr(app_main, "fetch_steam_store_game_detail", detail)
+
+    response = api_client.post("/wishlist/steam-games/730")
+    assert response.status_code == 409
+    detail.assert_not_awaited()
+
+
+def test_live_owned_steam_game_cannot_get_a_price_alert(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory(email="journey-live-alert@example.com"))
+    monkeypatch.setattr(
+        app_main,
+        "fetch_steam_store_game_detail",
+        AsyncMock(return_value={"name": "Counter-Strike 2"}),
+    )
+    item = api_client.post("/wishlist/steam-games/730").json()
+    owner.steam_id = "76561198000000004"
+    db_session.commit()
+    monkeypatch.setattr(
+        app_main,
+        "fetch_owned_games",
+        AsyncMock(return_value=[{"appid": 730, "name": "Counter-Strike 2"}]),
+    )
+
+    response = api_client.post("/price-alerts", json={
+        "wishlist_item_id": item["id"], "target_discount": 25,
+        "delivery_channels": ["in_app"],
+    })
+    assert response.status_code == 409
