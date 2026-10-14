@@ -169,6 +169,34 @@ describe("GameDetail actions", () => {
     expect(api.addWishlist).not.toHaveBeenCalled();
   });
 
+  it("links to an existing Steam price alert instead of offering another", async () => {
+    api.getWishlist.mockResolvedValueOnce([
+      { id: "steam-wishlist-1", source: "steam", external_id: "814380", catalog_game_id: 0 },
+    ]);
+    api.getPriceAlerts.mockResolvedValueOnce([
+      {
+        id: "alert-1",
+        wishlist_item_id: "steam-wishlist-1",
+        source: "steam",
+        external_id: "814380",
+      },
+    ]);
+    renderGame({
+      id: "814380",
+      title: "Sekiro: Shadows Die Twice",
+      isSteamLibrary: true,
+      steamAppId: 814380,
+    });
+
+    expect(await screen.findByRole("link", { name: "View price alert" })).toHaveAttribute(
+      "href",
+      "/wishlist?alert=alert-1",
+    );
+    expect(screen.queryByRole("button", { name: "Alert" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save alert" })).not.toBeInTheDocument();
+    expect(api.createPriceAlert).not.toHaveBeenCalled();
+  });
+
   it("recognizes an existing Steam wishlist item when its game resolves to a catalog page", async () => {
     api.getWishlist.mockResolvedValueOnce([
       { id: "steam-wishlist-1", source: "steam", external_id: "440", catalog_game_id: 440 },

@@ -34,6 +34,7 @@ import {
   getGameMembership,
   getNotification,
   getPriceHistory,
+  getPriceAlerts,
   getRecentGamePlayers,
   getRecentSteamGamePlayers,
   getSimilarCatalogGames,
@@ -254,7 +255,7 @@ function SearchBackLink({ returnTo, className }: { returnTo?: string; className:
 }
 
 function GameNotFound() {
-  const { returnTo } = Route.useSearch();
+  const { returnTo, title } = Route.useSearch();
   return (
     <AppShell>
       <div className="mx-auto max-w-md py-24 text-center">
@@ -267,6 +268,14 @@ function GameNotFound() {
           returnTo={returnTo}
           className="mt-6 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-3 text-sm font-bold text-primary-foreground"
         />
+        {title?.trim() && (
+          <a
+            href={`/search?q=${encodeURIComponent(title.trim())}`}
+            className="mt-3 block text-sm font-semibold text-primary underline"
+          >
+            Search for this game
+          </a>
+        )}
       </div>
     </AppShell>
   );
@@ -376,6 +385,16 @@ function GameDetail() {
   const existingWishlistItem = usesSteamWishlist
     ? (steamWishlistItem ?? catalogWishlistItem)
     : (catalogWishlistItem ?? steamWishlistItem);
+  const alertsQuery = useQuery({
+    queryKey: ["price-alerts"],
+    queryFn: getPriceAlerts,
+    enabled: signedIn && Boolean(steamWishlistItem || catalogWishlistItem),
+  });
+  const existingAlert = alertsQuery.data?.find(
+    (alert) =>
+      alert.wishlist_item_id === steamWishlistItem?.id ||
+      alert.wishlist_item_id === catalogWishlistItem?.id,
+  );
   const favoritesQuery = useQuery({
     queryKey: ["favorites"],
     queryFn: getFavorites,
@@ -491,7 +510,9 @@ function GameDetail() {
     signedIn &&
     !membershipQuery.data?.owned &&
     !membershipQuery.isPending &&
-    !membershipQuery.isError;
+    !membershipQuery.isError &&
+    wishlistQuery.isSuccess &&
+    (!(steamWishlistItem || catalogWishlistItem) || alertsQuery.isSuccess);
   const isFavorite =
     favoriteAdded ||
     !!favoritesQuery.data?.some((item) => item.catalog_game_id === Number(catalogGame.id));
@@ -923,14 +944,22 @@ function GameDetail() {
             </div>
 
             <div className={`mt-4 grid gap-2 ${showAlertAction ? "grid-cols-3" : "grid-cols-2"}`}>
-              {showAlertAction && (
-                <button
-                  onClick={() => setShowAlertForm(true)}
-                  className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Bell className="size-3.5" /> Alert
-                </button>
-              )}
+              {showAlertAction &&
+                (existingAlert ? (
+                  <a
+                    href={`/wishlist?alert=${encodeURIComponent(existingAlert.id)}`}
+                    className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5"
+                  >
+                    <Bell className="size-3.5" /> View price alert
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => setShowAlertForm(true)}
+                    className="flex items-center justify-center gap-1 rounded-md border border-border bg-secondary py-2 text-xs font-bold hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Bell className="size-3.5" /> Alert
+                  </button>
+                ))}
               <button
                 onClick={() => {
                   setRecipientId(friendsQuery.data?.[0]?.user.id ?? "");
@@ -977,6 +1006,8 @@ function GameDetail() {
             )}
             {signedIn &&
               showAlertForm &&
+              showAlertAction &&
+              !existingAlert &&
               !membershipQuery.data?.owned &&
               !membershipQuery.isError && (
                 <div className="mt-4 border-t border-border pt-4">

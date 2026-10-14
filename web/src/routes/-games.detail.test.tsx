@@ -5,6 +5,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  notFound,
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
@@ -23,6 +24,7 @@ const api = vi.hoisted(() => ({
   getGameMembership: vi.fn(),
   getNotification: vi.fn(),
   getPriceHistory: vi.fn(),
+  getPriceAlerts: vi.fn(),
   getRecentGamePlayers: vi.fn(),
   getSimilarCatalogGames: vi.fn(),
   getSteamPriceHistory: vi.fn(),
@@ -84,6 +86,28 @@ function renderDetail(initialEntry = "/games/274755") {
   );
 }
 
+function renderNotFound(initialEntry: string) {
+  const root = createRootRoute({ component: Outlet });
+  const route = createRoute({
+    getParentRoute: () => root,
+    path: "/games/$gameId",
+    validateSearch: Route.options.validateSearch,
+    loader: () => {
+      throw notFound();
+    },
+    notFoundComponent: Route.options.notFoundComponent,
+  });
+  const router = createRouter({
+    routeTree: root.addChildren([route]),
+    history: createMemoryHistory({ initialEntries: [initialEntry] }),
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
 beforeEach(() => {
   api.getFavorites.mockResolvedValue([]);
   api.getFriends.mockResolvedValue([]);
@@ -91,6 +115,7 @@ beforeEach(() => {
     current: { price: { amount: 19.99, currency: "USD" } },
     history: [],
   });
+  api.getPriceAlerts.mockResolvedValue([]);
   api.getRecentGamePlayers.mockResolvedValue({ players: [], status: "ready" });
   api.getSimilarCatalogGames.mockResolvedValue({ results: [] });
   api.getWishlist.mockResolvedValue([]);
@@ -103,6 +128,17 @@ afterEach(() => {
 });
 
 describe("game detail presentation", () => {
+  it("searches the missing game's title while retaining the return path", async () => {
+    renderNotFound("/games/999999999?title=Unknown+Audit+Game&returnTo=%2Flibrary");
+
+    expect(await screen.findByRole("heading", { name: "Game not in catalog" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Search for this game" })).toHaveAttribute(
+      "href",
+      "/search?q=Unknown%20Audit%20Game",
+    );
+    expect(screen.getByRole("link", { name: /^back$/i })).toHaveAttribute("href", "/library");
+  });
+
   it("shows the saved price offer after opening its notification URL", async () => {
     const offerId = "123e4567-e89b-12d3-a456-426614174000";
     api.getNotification.mockResolvedValue({

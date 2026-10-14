@@ -62,7 +62,8 @@ function WishlistPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const returnTo = useRouterState({ select: (state) => state.location.href });
-  const [showAlerts, setShowAlerts] = useState(false);
+  const linkedAlertId = new URL(returnTo, "http://playfinder.local").searchParams.get("alert");
+  const [showAlerts, setShowAlerts] = useState(Boolean(linkedAlertId));
   const [wishlistItemId, setWishlistItemId] = useState("");
   const [searchText, setSearchText] = useState("");
   const [query, setQuery] = useState("");
@@ -82,6 +83,13 @@ function WishlistPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
   });
   const alertsQuery = useQuery({ queryKey: ["price-alerts"], queryFn: getPriceAlerts });
+  useEffect(() => {
+    const linkedAlert = alertsQuery.data?.find((alert) => alert.id === linkedAlertId);
+    if (linkedAlert) setWishlistItemId(linkedAlert.wishlist_item_id);
+  }, [alertsQuery.data, linkedAlertId]);
+  const selectedAlert = alertsQuery.data?.find(
+    (alert) => alert.wishlist_item_id === wishlistItemId,
+  );
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
   const alertMutation = useMutation({
     mutationFn: (data: PriceAlertCreate) => createPriceAlert(data),
@@ -159,7 +167,10 @@ function WishlistPage() {
                   wl.find((game) => game.id === alert.wishlist_item_id)?.title ??
                   `Game #${alert.wishlist_catalog_game_id}`;
                 return (
-                  <li key={alert.id} className="flex items-center gap-2">
+                  <li
+                    key={alert.id}
+                    className={`flex items-center gap-2 ${alert.id === linkedAlertId ? "rounded-md border border-primary/40 bg-primary/10 p-2" : ""}`}
+                  >
                     <span>
                       {title}:{" "}
                       {alert.target_price != null
@@ -198,7 +209,12 @@ function WishlistPage() {
                 ))}
               </select>
             </label>
-            {wishlistItemId && (
+            {wishlistItemId && selectedAlert && (
+              <p className="text-sm text-muted-foreground">
+                This game already has a price alert. Cancel it to set a new one.
+              </p>
+            )}
+            {wishlistItemId && !selectedAlert && (
               <PriceAlertForm
                 wishlistItemId={wishlistItemId}
                 onSubmit={(data) => alertMutation.mutate(data)}

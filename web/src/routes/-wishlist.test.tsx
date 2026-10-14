@@ -197,4 +197,37 @@ describe("WishlistPage", () => {
 
     await waitFor(() => expect(api.deletePriceAlert.mock.calls[0]?.[0]).toBe("alert-1"));
   });
+
+  it("opens a linked price alert without offering a duplicate form", async () => {
+    api.getPriceAlerts.mockResolvedValue([
+      {
+        id: "alert-1",
+        wishlist_item_id: wishlistRecordId,
+        wishlist_catalog_game_id: 274755,
+        target_discount: 1,
+        delivery_channels: ["in_app"],
+      },
+    ]);
+    const rootRoute = createRootRoute({ component: Outlet });
+    const wishlistRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: Route.options.component,
+    });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([wishlistRoute]),
+      history: createMemoryHistory({ initialEntries: ["/?alert=alert-1"] }),
+    });
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Price alerts" })).toBeInTheDocument();
+    expect(await screen.findByText(/Hades II: any discount/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save alert" })).not.toBeInTheDocument();
+  });
 });
