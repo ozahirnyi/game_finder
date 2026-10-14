@@ -124,8 +124,8 @@ def test_sale_discovery_returns_only_confirmed_current_deals_matching_all_filter
     )
 
     assert response.status_code == 200
-    assert [(item["id"], item["name"], item["steam_appid"]) for item in response.json()["results"]] == [
-        (30, "Hades", 1),
+    assert [(item["id"], item["name"], item.get("steam_appid")) for item in response.json()["results"]] == [
+        (30, "Hades", None),
     ]
     result = response.json()["results"][0]
     assert result["rating"] == 91.2
@@ -175,8 +175,8 @@ def test_sale_discovery_falls_back_to_an_exact_title_catalog_match(api_client, a
     )
 
     assert response.status_code == 200
-    assert [(item["id"], item["name"], item["steam_appid"]) for item in response.json()["results"]] == [
-        (333, "Black Myth: Wukong", 2358720),
+    assert [(item["id"], item["name"], item.get("steam_appid")) for item in response.json()["results"]] == [
+        (333, "Black Myth: Wukong", None),
     ]
 
 
@@ -232,7 +232,7 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     fetch_igdb.assert_awaited_once_with("hades", page=2, filters=app_main.CatalogSearchFilters())
     cache_keys = [call.args[0] for call in cached.await_args_list]
     assert len(cache_keys) == 2
-    assert any("igdb_search_v11" in key for key in cache_keys)
+    assert any("igdb_search_v12" in key for key in cache_keys)
     assert any("catalog_steam_price_v1" in key for key in cache_keys)
 
 
@@ -284,13 +284,14 @@ def test_catalog_prices_fall_back_to_steam_title_and_label_edition_when_appid_is
     }
     steam_lookup = AsyncMock(return_value=price)
     monkeypatch.setattr(app_main, "fetch_steam_store_game_price", steam_lookup)
+    monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", AsyncMock(return_value=None))
     monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
 
     response = api_client.get(path)
 
     assert response.status_code == 200
     assert response.json()["results"][0]["current"] == price["current"]
-    assert response.json()["results"][0]["steam_appid"] == 1145360
+    assert response.json()["results"][0]["steam_appid"] is None
     assert response.json()["results"][0]["steam_price_title"] == "Hades Complete Edition"
     steam_lookup.assert_awaited_once_with("Hades", country="US", allow_known_editions=True)
 
