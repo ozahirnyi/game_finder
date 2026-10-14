@@ -38,6 +38,13 @@ test("wishlist alert sends exact target price and target discount payloads", asy
   api,
 }) => {
   await signIn(page);
+  api.state.wishlist.push({
+    id: "wishlist-102",
+    catalog_game_id: 102,
+    source: "catalog",
+    external_id: "102",
+    title: "Hades II",
+  });
   await page.goto("/");
   await waitForHydration(page);
   await page.getByRole("link", { name: "Wishlist" }).first().click();
@@ -61,7 +68,13 @@ test("wishlist alert sends exact target price and target discount payloads", asy
       target_price: 19.99,
       delivery_channels: ["in_app"],
     });
+  await expect(page.getByText("Celeste: alert below 19.99")).toBeVisible();
+  await expect(
+    page.getByText("This game already has a price alert. Cancel it to set a new one."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save alert" })).toHaveCount(0);
 
+  await page.getByRole("combobox", { name: "Game" }).selectOption("wishlist-102");
   await page.getByRole("radio", { name: "Target discount" }).check();
   await page.getByRole("spinbutton", { name: "Discount" }).fill("35");
   await page.getByRole("button", { name: "Save alert" }).click();
@@ -73,12 +86,17 @@ test("wishlist alert sends exact target price and target discount payloads", asy
           .at(-1)?.jsonBody,
     )
     .toEqual({
-      wishlist_item_id: "wishlist-101",
+      wishlist_item_id: "wishlist-102",
       target_discount: 35,
       delivery_channels: ["in_app"],
     });
   await expect(page.getByText("Celeste: alert below 19.99")).toBeVisible();
-  await expect(page.getByText("Celeste: alert at 35% off")).toBeVisible();
+  await expect(page.getByText("Hades II: alert at 35% off")).toBeVisible();
+  expect(
+    api.requests
+      .filter((request) => request.path === "/price-alerts" && request.method === "POST")
+      .map((request) => (request.jsonBody as { wishlist_item_id: string }).wishlist_item_id),
+  ).toEqual(["wishlist-101", "wishlist-102"]);
 });
 
 test("catalog details save an owner-scoped favorite while Steam details use the Steam wishlist identity", async ({

@@ -196,6 +196,13 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
         await route.fulfill({ status: 404, json: { detail: "Wishlist item not found" } });
         return;
       }
+      if (state.alerts.some((alert) => alert.wishlist_item_id === item.id)) {
+        await route.fulfill({
+          status: 409,
+          json: { detail: "This wishlist game already has a price alert" },
+        });
+        return;
+      }
       const alert = {
         ...body,
         wishlist_item_id: item.id,
@@ -207,7 +214,7 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
         updated_at: "2026-01-01T00:00:00Z",
       };
       state.alerts.push(alert);
-      await route.fulfill({ json: alert });
+      await route.fulfill({ status: 201, json: alert });
       return;
     }
     if (request.method() === "GET" && path === "/friends") {

@@ -15,3 +15,25 @@ test("records an unhandled API request and returns a diagnostic response", async
     expect.arrayContaining([{ method: "GET", path: "/not-mocked", query: "" }]),
   );
 });
+
+test("rejects a second price alert for the same wishlist entry", async ({ page, api }) => {
+  await page.goto("/");
+  const statuses = await page.evaluate(async () => {
+    const create = async () => {
+      const response = await fetch("/api/price-alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wishlist_item_id: "wishlist-101",
+          target_discount: 25,
+          delivery_channels: ["in_app"],
+        }),
+      });
+      return response.status;
+    };
+    return [await create(), await create()];
+  });
+
+  expect(statuses).toEqual([201, 409]);
+  expect(api.state.alerts).toHaveLength(1);
+});
