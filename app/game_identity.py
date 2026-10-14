@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
+from app.catalog_cache import catalog_steam_appid
 from app.database import Game
 
 
@@ -15,6 +16,8 @@ def owned_library_games(
     catalog_game_id: int | None = None,
     steam_appid: int | None = None,
 ) -> list[Game]:
+    if catalog_game_id is not None and steam_appid is None:
+        steam_appid = catalog_steam_appid(db, catalog_game_id)
     identities = []
     if steam_appid is not None:
         identities.append(and_(Game.source == "steam", Game.external_id == str(steam_appid)))

@@ -29,7 +29,7 @@ from slowapi.errors import RateLimitExceeded
 from app.openai_client import get_catalog_title_suggestions, get_recommendation
 from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations, get_personalized_recommendations
 from app.cache import build_cache_key, get_json_cached
-from app.catalog_cache import get_cached_snapshot
+from app.catalog_cache import catalog_steam_appid, get_cached_snapshot, remember_catalog_steam_identities
 from jose import JWTError, jwt
 from app.integrations.igdb import (
     CatalogSearchFilters,
@@ -707,6 +707,8 @@ async def library_membership_route(
 ):
     if catalog_game_id is None and steam_appid is None:
         raise HTTPException(status_code=422, detail="A game identity is required")
+    if catalog_game_id is not None and steam_appid is None:
+        steam_appid = catalog_steam_appid(db, catalog_game_id)
     matches = owned_library_games(
         db, current_user.id, catalog_game_id=catalog_game_id, steam_appid=steam_appid
     )
@@ -3052,7 +3054,16 @@ async def save_catalog_wishlist_game(
     if igdb_id < 1:
         raise HTTPException(status_code=400, detail="igdb_id must be >= 1")
 
-    if owned_library_games(db, current_user.id, catalog_game_id=igdb_id):
+    try:
+        detail = await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
+    except IGDBError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+    steam_appid = detail.get("steam_appid")
+    if owned_library_games(db, current_user.id, catalog_game_id=igdb_id, steam_appid=steam_appid) or (
+        isinstance(steam_appid, int)
+        and steam_appid > 0
+        and await user_owns_live_steam_app(current_user, steam_appid)
+    ):
         raise HTTPException(status_code=409, detail="Game is already in your library")
 
     existing = (
@@ -3067,11 +3078,6 @@ async def save_catalog_wishlist_game(
     if existing:
         response.status_code = 200
         return collection_response(existing)
-
-    try:
-        detail = await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
-    except IGDBError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
     item = WishlistItem(
         user_id=current_user.id,
@@ -3203,6 +3209,8 @@ async def create_price_alert(
     steam_appid = (
         int(item.external_id)
         if item.source == "steam" and item.external_id and item.external_id.isdigit()
+        else catalog_steam_appid(db, item.catalog_game_id)
+        if item.source == "catalog" and item.catalog_game_id is not None
         else None
     )
     if item_is_owned(db, current_user.id, item) or (
@@ -4083,7 +4091,25 @@ async def _enrich_catalog_game_prices(payload: dict, country: str) -> dict:
             "is_free": bool(detail.get("is_free")),
         }
         if not has_steam_appid and isinstance(detail.get("appid"), int):
-            enriched["steam_appid"] = detail["appid"]
+            candidate_appid = detail["appid"]
+            if candidate_appid > 0 and isinstance(game.get("id"), int):
+                try:
+                    async with semaphore:
+                        verified = await fetch_igdb_game_by_steam_appid(candidate_appid)
+                except IGDBError:
+                    verified = None
+                same_igdb_game = (
+                    verified is not None
+                    and verified.get("id") == game["id"]
+                    and verified.get("steam_appid") == candidate_appid
+                )
+                exact_store_title = (
+                    verified is None
+                    and str(detail.get("title") or "").strip().casefold()
+                    == str(game.get("name") or "").strip().casefold()
+                )
+                if same_igdb_game or exact_store_title:
+                    enriched["steam_appid"] = candidate_appid
             store_title = str(detail.get("title") or "").strip()
             if store_title and _search_title_key(store_title) != _search_title_key(str(game.get("name") or "")):
                 enriched["steam_price_title"] = store_title
@@ -4115,7 +4141,7 @@ async def _fetch_sale_catalog_games(query: str, filters: CatalogSearchFilters, c
             return None
         if query and _search_title_key(query) not in _search_title_key(str(catalog.get("name") or "")):
             return None
-        return {**catalog, "steam_appid": steam_appid, "current": deal.get("current")}
+        return {**catalog, "current": deal.get("current")}
 
     return [game for game in await asyncio.gather(*(enrich(deal) for deal in deals)) if game is not None]
 
@@ -4132,6 +4158,7 @@ async def search(
     on_sale: bool = False,
     country: str = "US",
     current_user: User | None = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
 ):
     q = q.strip().lower()
     if page < 1:
@@ -4146,7 +4173,7 @@ async def search(
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v11", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
+    key = build_cache_key("igdb_search_v12", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
         if on_sale:
@@ -4158,7 +4185,9 @@ async def search(
         return await _enrich_catalog_game_prices(payload, normalized_country)
 
     try:
-        return JSONResponse(content=await get_json_cached(key, CACHE_TTL, fetch))
+        payload = await get_json_cached(key, CACHE_TTL, fetch)
+        remember_catalog_steam_identities(db, payload.get("results", []))
+        return JSONResponse(content=payload)
     except IGDBError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
@@ -4173,7 +4202,11 @@ async def catalog_game_detail(igdb_id: int, db: Session = Depends(get_db)):
         return await get_cached_snapshot(db, igdb_id, fetch_igdb_game_detail)
 
     try:
-        return await get_json_cached(key, CACHE_TTL, fetch)
+        detail = await get_json_cached(key, CACHE_TTL, fetch)
+        known_appid = catalog_steam_appid(db, igdb_id)
+        if detail.get("steam_appid") is None and known_appid is not None:
+            return {**detail, "steam_appid": known_appid}
+        return detail
     except IGDBError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
