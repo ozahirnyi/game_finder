@@ -285,6 +285,28 @@ async def test_igdb_uses_the_real_game_mode_ids(monkeypatch):
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("platforms, expected", [
+    (("playstation",), "platforms = (167,48)"),
+    (("xbox",), "platforms = (169,49)"),
+    (("switch",), "platforms = (130)"),
+    (("playstation", "xbox"), "platforms = (167,48,169,49)"),
+    (("ps5", "ps4", "xbox_series", "xbox_one", "console"), "platforms = (167,48,169,49,167,48,169,49,130)"),
+])
+async def test_igdb_platform_families_use_or_and_preserve_legacy_keys(monkeypatch, platforms, expected):
+    import app.integrations.igdb as client
+
+    captured = {}
+
+    async def query(_endpoint, statement):
+        captured["statement"] = statement
+        return []
+
+    monkeypatch.setattr(client, "_query", query)
+    await client.fetch_igdb_games("", filters=client.CatalogSearchFilters(platforms=platforms))
+    assert expected in captured["statement"]
+
+
+@pytest.mark.anyio
 async def test_igdb_missing_credentials_is_a_service_error(monkeypatch):
     monkeypatch.delenv("IGDB_CLIENT_ID", raising=False)
     monkeypatch.delenv("IGDB_CLIENT_SECRET", raising=False)

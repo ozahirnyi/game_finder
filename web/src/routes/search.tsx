@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
@@ -33,7 +33,9 @@ const filters: Array<{
   { label: "Co-op", type: "feature", value: "co_op" },
   { label: "Solo", type: "feature", value: "single_player" },
   { label: "PC", type: "platform", value: "pc" },
-  { label: "Consoles", type: "platform", value: "console" },
+  { label: "PlayStation", type: "platform", value: "playstation" },
+  { label: "Xbox", type: "platform", value: "xbox" },
+  { label: "Switch", type: "platform", value: "switch" },
   { label: "Adventure", type: "genre", value: "adventure" },
   { label: "Roguelike", type: "genre", value: "roguelike" },
   { label: "RPG", type: "genre", value: "rpg" },
@@ -95,19 +97,42 @@ function getAiSearchError(error: unknown) {
 }
 
 function SearchPage() {
-  const [query, setQuery] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return new URLSearchParams(window.location.search).get("q") ?? "";
-  });
+  const router = useRouter();
+  const returnTo = useSyncExternalStore(
+    router.history.subscribe,
+    () => router.history.location.href,
+    () => router.history.location.href,
+  );
+  const params = new URL(returnTo, "http://localhost").searchParams;
+  const query = params.get("q") ?? "";
   const debouncedQuery = useDebouncedValue(query, 700);
-  const [platforms, setPlatforms] = useState<CatalogPlatform[]>([]);
-  const [features, setFeatures] = useState<CatalogFeature[]>([]);
-  const [genres, setGenres] = useState<CatalogGenre[]>([]);
-  const [onSale, setOnSale] = useState(false);
-  const [mode, setMode] = useState<"catalog" | "ai">(() => {
-    if (typeof window === "undefined") return "catalog";
-    return new URLSearchParams(window.location.search).get("mode") === "ai" ? "ai" : "catalog";
-  });
+  const platforms = params
+    .getAll("platform")
+    .filter((value) =>
+      [
+        "pc",
+        "playstation",
+        "xbox",
+        "switch",
+        "console",
+        "ps4",
+        "ps5",
+        "xbox_one",
+        "xbox_series",
+      ].includes(value),
+    ) as CatalogPlatform[];
+  const features = params
+    .getAll("feature")
+    .filter((value) =>
+      ["single_player", "co_op", "multiplayer"].includes(value),
+    ) as CatalogFeature[];
+  const genres = params
+    .getAll("genre")
+    .filter((value) =>
+      ["adventure", "rpg", "roguelike", "shooter", "strategy"].includes(value),
+    ) as CatalogGenre[];
+  const onSale = params.get("on_sale") === "true";
+  const mode = params.get("mode") === "ai" ? "ai" : "catalog";
   const queryClient = useQueryClient();
   const signedIn = useSyncExternalStore(subscribeToAuthChanges, getAuthSnapshot, () => false);
   const profileQuery = useQuery({
@@ -176,10 +201,10 @@ function SearchPage() {
     nextFeatures = features,
     nextGenres = genres,
     nextOnSale = onSale,
-    nextMode = mode,
+    nextMode: "catalog" | "ai" = mode,
+    replace = false,
   ) {
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
+    const url = new URL(returnTo, "http://localhost");
     if (nextQuery) url.searchParams.set("q", nextQuery);
     else url.searchParams.delete("q");
     url.searchParams.delete("platform");
@@ -192,29 +217,25 @@ function SearchPage() {
     else url.searchParams.delete("on_sale");
     if (nextMode === "ai") url.searchParams.set("mode", "ai");
     else url.searchParams.delete("mode");
-    window.history.replaceState({}, "", url);
+    const href = `${url.pathname}${url.search}${url.hash}`;
+    if (href === returnTo) return;
+    if (replace) router.history.replace(href);
+    else router.history.push(href);
   }
 
   function updateQuery(nextQuery: string) {
-    setQuery(nextQuery);
-    syncUrl(nextQuery);
+    syncUrl(nextQuery, platforms, features, genres, onSale, mode, true);
   }
   function updateMode(nextMode: "catalog" | "ai") {
-    setMode(nextMode);
     syncUrl(query, platforms, features, genres, onSale, nextMode);
   }
   function toggleFilter(filter: (typeof filters)[number]) {
     if (!filter.type) {
-      setPlatforms([]);
-      setFeatures([]);
-      setGenres([]);
-      setOnSale(false);
       syncUrl(query, [], [], [], false);
       return;
     }
     if (filter.type === "sale") {
       const next = !onSale;
-      setOnSale(next);
       syncUrl(query, platforms, features, genres, next);
       return;
     }
@@ -222,21 +243,18 @@ function SearchPage() {
       const next = platforms.includes(filter.value as CatalogPlatform)
         ? platforms.filter((item) => item !== filter.value)
         : [...platforms, filter.value as CatalogPlatform];
-      setPlatforms(next);
       syncUrl(query, next);
     }
     if (filter.type === "feature") {
       const next = features.includes(filter.value as CatalogFeature)
         ? features.filter((item) => item !== filter.value)
         : [...features, filter.value as CatalogFeature];
-      setFeatures(next);
       syncUrl(query, platforms, next);
     }
     if (filter.type === "genre") {
       const next = genres.includes(filter.value as CatalogGenre)
         ? genres.filter((item) => item !== filter.value)
         : [...genres, filter.value as CatalogGenre];
-      setGenres(next);
       syncUrl(query, platforms, features, next);
     }
   }
@@ -257,7 +275,7 @@ function SearchPage() {
           onClick={() => updateMode("ai")}
           className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${mode === "ai" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
         >
-          <Sparkles className="size-3.5" /> AI search
+          <Sparkles className="size-3.5" /> Find a game with AI
         </button>
       </div>
       <form
@@ -314,6 +332,7 @@ function SearchPage() {
               return (
                 <button
                   key={filter.label}
+                  aria-pressed={active}
                   onClick={() => toggleFilter(filter)}
                   className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
                 >
@@ -364,6 +383,7 @@ function SearchPage() {
                           gameId: target?.gameId,
                           source: target?.source,
                           title: game.name,
+                          returnTo,
                           coverFrom: "#312e81",
                           coverTo: "#111827",
                           heroUrl: game.hero_image ?? undefined,
@@ -447,7 +467,7 @@ function SearchPage() {
                       gameId: String(game.id),
                       title: game.name,
                       description: item.reason,
-                      returnTo: `/search?mode=ai&q=${encodeURIComponent(query.trim())}`,
+                      returnTo,
                       coverFrom: "#312e81",
                       coverTo: "#111827",
                       heroUrl: game.hero_image ?? undefined,

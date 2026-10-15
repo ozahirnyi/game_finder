@@ -56,6 +56,8 @@ class CatalogSearchFilters:
 _PLATFORM_IDS = {
     "pc": (6, 14, 3),
     "console": (167, 48, 169, 49, 130),
+    "playstation": (167, 48),
+    "xbox": (169, 49),
     "ps5": (167,),
     "ps4": (48,),
     "xbox_series": (169,),

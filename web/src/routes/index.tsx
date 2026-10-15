@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Search, Tag, Users } from "lucide-react";
+import { ArrowRight, Search, Sparkles, Tag, Users } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameCard } from "@/components/GameCard";
@@ -122,6 +122,34 @@ function Home() {
             Search games
           </button>
         </form>
+        <div className="relative mt-5 rounded-2xl border border-primary/30 bg-primary/5 p-5">
+          <Link
+            to="/search"
+            search={{ mode: "ai" } as never}
+            className="inline-flex items-center gap-2 text-lg font-bold text-primary"
+          >
+            <Sparkles className="size-5" aria-hidden="true" /> Find a game with AI
+          </Link>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Describe what you want to play. Start with an example, then submit your request.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              "Co-op adventures for two",
+              "Relaxing games on Switch",
+              "Story-rich games on PlayStation",
+            ].map((prompt) => (
+              <Link
+                key={prompt}
+                to="/search"
+                search={{ mode: "ai", q: prompt } as never}
+                className="rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-semibold hover:border-primary/60"
+              >
+                {prompt}
+              </Link>
+            ))}
+          </div>
+        </div>
         {query.trim() !== "" && (
           <div className="animate-pop relative mt-4 overflow-hidden rounded-2xl border border-border bg-background/80 backdrop-blur">
             {query.trim().length < 2 ? (
