@@ -1,6 +1,10 @@
-"""Bounded catalog retrieval for the profile genres already offered by PlayFinder."""
+"""Bounded catalog retrieval for personal recommendation seeds and profile genres."""
 
 from app.integrations import igdb
+
+
+MAX_PREFERENCE_SEEDS = 4
+SIMILAR_CANDIDATES_PER_SEED = 6
 
 
 # Profile wording differs from the catalog taxonomy for these three genres.
@@ -23,6 +27,32 @@ _PREFERENCE_FILTERS = {
 def normalize_preference_genre(value: str) -> str:
     key = value.strip().casefold()
     return _GENRE_ALIASES.get(key, key)
+
+
+async def fetch_recommendation_similar_games(seed_ids: list[int], *, limit: int = 6) -> dict[int, list[dict]]:
+    """Read seed links once and hydrate their unique candidate union once."""
+    seeds = list(dict.fromkeys(value for value in seed_ids if isinstance(value, int) and not isinstance(value, bool) and value > 0))[:MAX_PREFERENCE_SEEDS]
+    if not seeds:
+        return {}
+    bounded_limit = min(max(limit, 1), SIMILAR_CANDIDATES_PER_SEED)
+    sources = await igdb._query(
+        "games", f"fields id,similar_games; where id = ({','.join(map(str, seeds))}); limit {len(seeds)};",
+    )
+    similar_ids: dict[int, list[int]] = {seed_id: [] for seed_id in seeds}
+    for source in sources:
+        seed_id = source.get("id")
+        if seed_id not in similar_ids:
+            continue
+        ids = [value.get("id") if isinstance(value, dict) else value for value in source.get("similar_games") or []]
+        similar_ids[seed_id] = list(dict.fromkeys(value for value in ids if isinstance(value, int) and not isinstance(value, bool) and value > 0))[:bounded_limit]
+    candidate_ids = list(dict.fromkeys(game_id for seed_id in seeds for game_id in similar_ids[seed_id]))
+    if not candidate_ids:
+        return {seed_id: [] for seed_id in seeds}
+    candidates = await igdb.fetch_igdb_games_by_ids(candidate_ids)
+    return {
+        seed_id: [candidates[game_id] for game_id in similar_ids[seed_id] if game_id in candidates]
+        for seed_id in seeds
+    }
 
 
 async def fetch_recommendation_catalog_games(source: dict, *, limit: int = 12) -> list[dict]:

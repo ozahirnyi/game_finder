@@ -122,3 +122,49 @@ def test_editionless_alias_does_not_override_full_source_edition_evidence():
     suggestions = rank_suggestions(PsnCatalogEvidence("Ghost of Tsushima Director's Cut", aliases=("Ghost of Tsushima",)),
         [{"id": 1, "name": "Ghost of Tsushima"}], source="psn")
     assert suggestions[0]["confidence"] == "likely"
+
+
+@pytest.mark.parametrize("title,alias,name,released", [
+    ("Just Dance 2017", "Just Dance", "Just Dance", "2009-11-17"),
+    ("FIFA 23", "FIFA", "FIFA", None),
+    ("Portal 2", "Portal", "Portal", "2007-10-10"),
+])
+def test_primary_numbers_cannot_be_erased_by_a_shorter_alias(title, alias, name, released):
+    from app.library_catalog_matching import rank_suggestions
+
+    result = rank_suggestions(PsnCatalogEvidence(title, aliases=(alias,)),
+        [{"id": 1, "name": name, "released": released}], source="manual")
+    assert result[0]["confidence"] == "likely"
+
+
+def test_parenthesized_year_adds_bare_retrieval_but_never_claims_yearless_exact_identity():
+    from app.library_catalog_matching import library_query_variants, rank_suggestions
+
+    evidence = PsnCatalogEvidence("DOOM (2016)")
+    assert "DOOM" in library_query_variants(evidence)
+    result = rank_suggestions(evidence, [
+        {"id": 1, "name": "Doom", "released": "1993-12-10"},
+        {"id": 2, "name": "Doom", "released": "2016-05-13"},
+    ], source="manual")
+    assert {item["id"] for item in result} == {1, 2}
+    assert all(item["confidence"] == "likely" for item in result)
+    assert "Just Dance" not in library_query_variants(PsnCatalogEvidence("Just Dance 2017"))
+
+
+@pytest.mark.parametrize("partial_failure", [False, True])
+def test_preview_demotes_exact_proposals_when_ambiguous_or_incomplete(partial_failure):
+    from app.library_catalog_matching import preview_library_catalog_matches
+    from app.integrations.igdb import IGDBError
+
+    title = "Hades (PS4)" if partial_failure else "Hades"
+    game = SimpleNamespace(id="one", title=title, source="psn", link_state="raw",
+                           catalog_game_id=None, psn_search_aliases=None, psn_source_platforms=None)
+    async def batch(titles):
+        return {query: ([{"id": 1, "name": "Hades"}] if partial_failure else
+                        [{"id": 1, "name": "Hades"}, {"id": 2, "name": "Hades"}])
+                for query in titles if not (partial_failure and query == "Hades")}
+    result = asyncio.run(preview_library_catalog_matches([game], batch_fetcher=batch,
+        single_fetcher=AsyncMock(side_effect=IGDBError("offline", 502)), localization_fetcher=AsyncMock(return_value={})))
+    assert result[0]["status"] == ("unavailable" if partial_failure else "review")
+    assert result[0]["suggestions"]
+    assert all(item["confidence"] == "likely" for item in result[0]["suggestions"])

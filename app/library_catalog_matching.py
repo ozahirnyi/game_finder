@@ -29,6 +29,7 @@ RETRIEVAL_EDITION = re.compile(
     r"(?:стандартное|полное|расширенное)\s+издание|director['’]?s\s+cut)\s*$", re.IGNORECASE
 )
 VARIANT_WORDS = re.compile(r"\b(?:demo|beta|prototype|демо|бета|прототип)\b", re.IGNORECASE)
+DECORATIVE_YEAR = re.compile(r"\s*[\[(](?:19|20)\d{2}[\])]\s*$")
 
 
 def _clean_title(title: str) -> str:
@@ -41,7 +42,8 @@ def library_query_variants(evidence: PsnCatalogEvidence) -> tuple[str, ...]:
     for title in (evidence.title, *evidence.aliases):
         clean = _clean_title(title)
         base = RETRIEVAL_EDITION.sub("", clean).strip(" -:")
-        for value in (title.strip(), clean, base, *build_psn_query_variants(PsnCatalogEvidence(base))):
+        yearless = _clean_title(DECORATIVE_YEAR.sub("", title))
+        for value in (title.strip(), clean, base, yearless, *build_psn_query_variants(PsnCatalogEvidence(base))):
             if value and value.casefold() not in {query.casefold() for query in queries}:
                 queries.append(value)
             if len(queries) >= MAX_LIBRARY_QUERY_VARIANTS:
@@ -61,6 +63,7 @@ def rank_suggestions(evidence: PsnCatalogEvidence, candidates: list[dict], *, so
     """Fuzzy similarities are review proposals, never evidence for auto-linking."""
     source_keys = {_comparison_key(value) for value in (evidence.title, *evidence.aliases)} - {""}
     source_retrieval = {_retrieval_key(value) for value in (evidence.title, *evidence.aliases)} - {""}
+    primary_numbers = re.findall(r"\d+", _comparison_key(evidence.title))
     ranked = []
     hydrated = {}
     for game in candidates:
@@ -82,6 +85,8 @@ def rank_suggestions(evidence: PsnCatalogEvidence, candidates: list[dict], *, so
                  *(value for value in game.get("localized_names") or [] if isinstance(value, str))]
         candidate_keys = {_comparison_key(value) for value in names} - {""}
         exact = bool(source_keys & candidate_keys)
+        if primary_numbers and not any(re.findall(r"\d+", key) == primary_numbers for key in candidate_keys):
+            exact = False
         if _comparison_key(evidence.title) != _retrieval_key(evidence.title) and _comparison_key(evidence.title) not in candidate_keys:
             exact = False
         score = max((SequenceMatcher(None, left, right).ratio()
@@ -135,6 +140,8 @@ async def preview_library_catalog_matches(games, *, batch_fetcher, single_fetche
         unavailable = any(resolutions[query].kind == "unavailable" or query in localization_failed for query in row_queries)
         exact_count = sum(item["confidence"] == "exact" for item in suggestions)
         status = "unavailable" if unavailable else "matched" if exact_count == 1 else "review" if suggestions else "no_match"
+        if unavailable or exact_count > 1:
+            suggestions = [{**item, "confidence": "likely"} for item in suggestions]
         items.append({"game_id": game.id, "title": game.title, "source": game.source,
                       "link_state": game.link_state or ("linked" if game.catalog_game_id else "raw"),
                       "catalog_game_id": game.catalog_game_id, "status": status,
@@ -198,6 +205,8 @@ async def apply_library_catalog_matches(db, owner_id, decisions, *, detail_fetch
     for game in games:
         decision = by_id[game.id]
         if decision.action != "link":
+            if game.catalog_game_id is not None:
+                game.img_icon_url = None
             game.catalog_game_id, game.link_state = None, "raw"
             game.catalog_lookup_state = "skipped" if decision.action == "keep_raw" else None
             continue
@@ -218,6 +227,8 @@ async def apply_library_catalog_matches(db, owner_id, decisions, *, detail_fetch
         cover = detail.get("background_image")
         if isinstance(cover, str) and cover.startswith(("https://", "http://")):
             game.img_icon_url = cover
+        elif decision.catalog_id in details:
+            game.img_icon_url = None
     db.flush()
     pause_owned_alerts(db, owner_id)
     db.commit()

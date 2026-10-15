@@ -2,7 +2,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const api = vi.hoisted(() => ({ getDeals: vi.fn(), getGenreDeals: vi.fn() }));
+const api = vi.hoisted(() => ({
+  getDeals: vi.fn(),
+  getGenreDeals: vi.fn(),
+  getAuthSnapshot: () => false,
+  subscribeToAuthChanges: () => () => {},
+}));
 
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,

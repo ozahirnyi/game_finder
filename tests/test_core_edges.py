@@ -235,7 +235,8 @@ def test_genre_deals_igdb_fallback_and_missing_popular_match():
         return {"results": [{"id": 2, "name": "Other", "genres": ["Puzzle"]}]}
 
     result = asyncio.run(genre_deals.build_genre_deal_groups("UA", [" action ", "ACTION", " ", "RPG"], candidates, igdb))
-    assert result["popular"][0]["id"] == 2
+    assert result["popular"][0]["id"] is None
+    assert result["popular"][0]["steam_appid"] == 2
     assert len(result["sections"]) == 5
 
 

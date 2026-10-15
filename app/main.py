@@ -34,6 +34,7 @@ from jose import JWTError, jwt
 from app.integrations.igdb import (
     CatalogSearchFilters,
     fetch_igdb_game_detail,
+    fetch_igdb_localized_games,
     fetch_igdb_games,
     fetch_igdb_games_batch,
     fetch_igdb_games_batches,
@@ -54,6 +55,7 @@ from app.psn_catalog_matcher import (
     safe_psn_search_aliases,
 )
 from app.psn_catalog_service import PsnCatalogUnavailable, find_psn_catalog_titles
+from app.library_catalog_matching import apply_library_catalog_matches, preview_library_catalog_matches
 from app.psn_library_enrichment import (
     PSN_CANDIDATE_EVIDENCE_LIMIT,
     PSN_CATALOG_ENRICHMENT_BATCH_SIZE,
@@ -87,6 +89,7 @@ from app.alert_ownership import item_is_owned, pause_owned_alerts
 from app import social_policy
 from app.schemas import ConversationReadUpdate
 from app.schemas import PsnCatalogTitleSuggestions
+from app.schemas import LibraryCatalogMatchPreview, LibraryCatalogMatchApplyRequest
 from app.schemas import GameCreate, GameRead, GameUpdate, UserCreate, UserRead, RecommendationRequest, PsnImportConfirmRequest, PsnImportPreview, PsnImportPreviewItem, PsnImportResult, PsnImportSelection, \
     RecommendationResponse, RecommendationQuotaRead, GameCatalogDetail, GameSearchResponse, SteamAccountRead, SteamLibraryRead, SteamLibrarySyncRead, SteamLoginUrl, \
     SteamRecommendationRequest, GamePriceHistory, TelegramAccountRead, TelegramLinkRead, SteamSocialRead, LibraryGameRead, LibraryOverviewRead, LibraryOverviewPageRead, LibraryMembershipRead, SteamLibraryResolveRead, \
@@ -813,6 +816,42 @@ async def library_overview_page_route(
         "total": len(games),
         "has_more": offset + len(page) < len(games),
     })
+
+
+@app.post("/library/catalog-matches/preview", response_model=LibraryCatalogMatchPreview)
+async def preview_library_catalog_matches_route(
+    include_linked: bool = False,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = db.query(Game).filter(Game.owner_id == current_user.id, Game.source.in_(("psn", "manual")),
+                                 or_(Game.link_state.is_(None), Game.link_state != "quarantined"))
+    if not include_linked:
+        query = query.filter(Game.catalog_game_id.is_(None))
+    total = query.count()
+    games = query.order_by(Game.created_at, Game.id).offset(offset).limit(limit).all()
+    return LibraryCatalogMatchPreview(total=total,
+        next_offset=offset + len(games) if offset + len(games) < total else None,
+        items=await preview_library_catalog_matches(
+        games, batch_fetcher=fetch_igdb_games_batch, single_fetcher=fetch_igdb_games,
+        localization_fetcher=fetch_igdb_localized_games,
+    ))
+
+
+@app.post("/library/catalog-matches/apply")
+async def apply_library_catalog_matches_route(
+    data: LibraryCatalogMatchApplyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return await apply_library_catalog_matches(db, current_user.id, data.decisions,
+                                                  detail_fetcher=fetch_igdb_game_detail)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @app.post("/library/steam-games/{appid}/resolve", response_model=SteamLibraryResolveRead)
@@ -4006,6 +4045,8 @@ _PLATFORM_LABELS = {
         "xbox series x", "xbox series s", "xbox one", "nintendo switch", "nintendo switch 2",
     },
     "ps5": {"playstation 5", "playstation 5 pro"},
+    "playstation": {"playstation", "playstation 2", "playstation 3", "playstation 4", "playstation 5", "playstation 5 pro", "playstation vita", "playstation portable"},
+    "xbox": {"xbox", "xbox 360", "xbox one", "xbox series x|s", "xbox series x", "xbox series s"},
     "ps4": {"playstation 4"},
     "xbox_series": {"xbox series x|s", "xbox series x", "xbox series s"},
     "xbox_one": {"xbox one"},
@@ -4015,10 +4056,15 @@ _PLATFORM_LABELS = {
 
 def _matches_catalog_filters(game: dict, filters: CatalogSearchFilters) -> bool:
     platform_labels = {str(platform).casefold() for platform in game.get("platforms") or []}
-    if any(not platform_labels.intersection(_PLATFORM_LABELS[platform]) for platform in filters.platforms):
+    if filters.platforms and not any(platform_labels.intersection(_PLATFORM_LABELS[platform]) for platform in filters.platforms):
         return False
     game_modes = {str(mode).casefold() for mode in game.get("game_modes") or []}
-    if any(feature.replace("_", " ") not in game_modes for feature in filters.features):
+    feature_labels = {
+        "single_player": {"single player", "single-player"},
+        "co_op": {"co op", "co-op", "co-operative", "cooperative"},
+        "multiplayer": {"multiplayer"},
+    }
+    if any(not game_modes.intersection(feature_labels[feature]) for feature in filters.features):
         return False
     genres = {str(genre).casefold() for genre in game.get("genres") or []}
     keywords = {str(keyword).casefold() for keyword in game.get("keywords") or []}
@@ -4163,7 +4209,7 @@ async def search(
     q = q.strip().lower()
     if page < 1:
         raise HTTPException(status_code=400, detail="page must be >= 1")
-    allowed_platforms = {"pc", "console", "ps5", "ps4", "xbox_series", "xbox_one", "switch"}
+    allowed_platforms = {"pc", "console", "playstation", "xbox", "ps5", "ps4", "xbox_series", "xbox_one", "switch"}
     allowed_features = {"single_player", "co_op", "multiplayer"}
     allowed_genres = {"adventure", "rpg", "roguelike", "shooter", "strategy"}
     if set(platform) - allowed_platforms or set(feature) - allowed_features or set(genre) - allowed_genres:
@@ -4173,7 +4219,7 @@ async def search(
         raise HTTPException(status_code=400, detail="country must be a 2-letter code")
     filters = CatalogSearchFilters(tuple(platform), tuple(feature), tuple(genre))
     catalog_query = SEARCH_ALIASES.get(q, q)
-    key = build_cache_key("igdb_search_v12", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
+    key = build_cache_key("igdb_search_v13", q=catalog_query, page=page, platforms=filters.platforms, features=filters.features, genres=filters.genres, on_sale=on_sale, country=normalized_country)
 
     async def fetch():
         if on_sale:
@@ -4519,7 +4565,7 @@ async def homepage_deals(
     if page_size < 1 or page_size > 13:
         raise HTTPException(status_code=400, detail="page_size must be between 1 and 13")
 
-    key = build_cache_key("steam_store_deals_v3", country=normalized_country, page_size=page_size)
+    key = build_cache_key("steam_store_deals_v4", country=normalized_country, page_size=page_size)
 
     async def fetch():
         steam_deals = await fetch_steam_store_deals(country=normalized_country, page_size=page_size)
@@ -4546,7 +4592,7 @@ async def homepage_deals(
                                 (
                                     game
                                     for game in matches.get("results", [])
-                                    if _search_title_key(str(game.get("name") or "")) == title_key
+                                    if game.get("steam_appid") == steam_appid
                                 ),
                                 None,
                             )
@@ -4584,7 +4630,7 @@ async def genre_deals(current_user: User | None = Depends(get_optional_current_u
         current_user.favorite_genres if current_user else []
     )
     key = build_cache_key(
-        "steam_genre_deals_v7",
+        "steam_genre_deals_v8",
         country=country,
         genres=canonical_genres,
     )

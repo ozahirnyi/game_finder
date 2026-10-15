@@ -77,7 +77,8 @@ def test_link_retry_correction_unlink_preserve_source_title_and_pause_once(
     db_session.add(alert)
     db_session.commit()
     async def detail(catalog_id):
-        return {"id": catalog_id, "name": "Catalog Hades", "platforms": ["PC (Microsoft Windows)"]}
+        return {"id": catalog_id, "name": "Catalog Hades", "platforms": ["PC (Microsoft Windows)"],
+                "background_image": "https://images.example/catalog-cover.jpg" if catalog_id == 1 else None}
     monkeypatch.setattr(app_main, "fetch_igdb_game_detail", detail)
     payload = {"decisions": [decision(game)]}
     assert api_client.post("/library/catalog-matches/apply", json=payload).json() == {"updated": 1}
@@ -86,17 +87,21 @@ def test_link_retry_correction_unlink_preserve_source_title_and_pause_once(
     db_session.refresh(alert)
     assert game.title == "My Hades" and game.notes == "Personal notes"
     assert game.catalog_game_id == 1 and alert.pause_reason == "owned"
+    assert game.img_icon_url == "https://images.example/catalog-cover.jpg"
     assert db_session.query(Notification).filter_by(user_id=owner.id, type="price_alert_paused").count() == 1
     stale = {"decisions": [decision(game, catalog_id=2)]}
     assert api_client.post("/library/catalog-matches/apply", json=stale).status_code == 409
     correction = {"decisions": [decision(game, catalog_id=2, expected_catalog_game_id=1)]}
     assert api_client.post("/library/catalog-matches/apply", json=correction).status_code == 200
+    db_session.refresh(game)
+    assert game.img_icon_url is None
     unlink = {"decisions": [decision(game, action="unlink", expected_catalog_game_id=2)]}
     assert api_client.post("/library/catalog-matches/apply", json=unlink).status_code == 200
     assert api_client.post("/library/catalog-matches/apply", json=unlink).status_code == 200
     db_session.refresh(game)
     db_session.refresh(alert)
     assert game.catalog_game_id is None and game.title == "My Hades"
+    assert game.img_icon_url is None
     assert alert.pause_reason == "owned"
 
 
@@ -112,6 +117,24 @@ def test_apply_is_atomic_on_invalid_detail_id(
     assert response.status_code == 422
     db_session.refresh(first)
     assert first.catalog_game_id is None
+
+
+def test_unlink_clears_catalog_cover_without_provider_lookup(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory())
+    game = row(db_session, owner, catalog_game_id=1, link_state="linked",
+               img_icon_url="https://images.example/old-cover.jpg")
+    fetch = AsyncMock(side_effect=RuntimeError("Unlink must not fetch catalog details"))
+    monkeypatch.setattr(app_main, "fetch_igdb_game_detail", fetch)
+    response = api_client.post("/library/catalog-matches/apply", json={"decisions": [
+        decision(game, action="unlink", expected_catalog_game_id=1),
+    ]})
+    assert response.status_code == 200
+    db_session.refresh(game)
+    assert game.catalog_game_id is None and game.img_icon_url is None
+    assert game.title == "Hades"
+    fetch.assert_not_awaited()
 
 
 def test_keep_raw_and_input_validation(api_client, db_session, user_factory, auth_as):
@@ -200,3 +223,29 @@ def test_duplicate_note_overflow_rolls_back_without_dropping_either_entry(
     db_session.refresh(old)
     assert raw.catalog_game_id is None and raw.notes == "b" * 200
     assert old.catalog_game_id == 1 and old.notes == "a" * 200
+
+
+def test_preview_pages_more_than_500_owner_records_in_stable_order(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory())
+    other = user_factory(email="paging-other@example.com")
+    db_session.add_all([Game(owner_id=owner.id, title=f"Game {index}", source="manual") for index in range(513)])
+    db_session.add(Game(owner_id=other.id, title="Foreign", source="manual"))
+    db_session.commit()
+    expected = [str(game.id) for game in db_session.query(Game).filter_by(owner_id=owner.id).order_by(Game.created_at, Game.id)]
+    async def batch(titles):
+        return {title: [] for title in titles}
+    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", batch)
+    monkeypatch.setattr(app_main, "fetch_igdb_localized_games", AsyncMock(return_value={}))
+    ids = []
+    offset = 0
+    while offset is not None:
+        response = api_client.post(f"/library/catalog-matches/preview?offset={offset}&limit=100")
+        assert response.status_code == 200
+        page = response.json()
+        assert page["total"] == 513 and len(page["items"]) <= 100
+        ids.extend(item["game_id"] for item in page["items"])
+        offset = page["next_offset"]
+    assert ids == expected
+    assert api_client.post("/library/catalog-matches/preview?limit=501").status_code == 422

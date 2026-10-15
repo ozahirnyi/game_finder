@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameDetailLink } from "@/components/GameDetailLink";
 import { GameCover } from "@/components/GameCover";
+import { DealCollectionActions } from "@/components/DealCollectionActions";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import { type Deal, getGenreDeals } from "@/lib/api";
 import { getGameMediaCandidates } from "@/lib/gameMedia";
@@ -91,6 +92,7 @@ function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
               </a>
             )}
           </div>
+          <DealCollectionActions deal={deal} />
         </div>
         <div
           className={`${large ? "relative z-20 flex items-end justify-between border-t border-border pt-3" : "text-right"}`}

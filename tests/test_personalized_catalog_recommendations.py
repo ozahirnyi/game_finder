@@ -29,7 +29,7 @@ def stub_catalog_expansion(monkeypatch):
     async def no_identities(*_args, **_kwargs):
         return {}
 
-    monkeypatch.setattr(recommendations, "fetch_igdb_similar_games", no_games)
+    monkeypatch.setattr(recommendations, "fetch_recommendation_similar_games", no_identities)
     monkeypatch.setattr(recommendations, "fetch_recommendation_catalog_games", no_games)
     monkeypatch.setattr(recommendations, "fetch_igdb_games_by_ids", no_identities)
     monkeypatch.setattr(recommendations, "fetch_igdb_games_by_steam_appids", no_identities)
@@ -247,11 +247,11 @@ async def test_contrasting_libraries_retrieve_taste_candidates_outside_shared_tr
     seeds = {10: catalog_game(10, "Owned action"), 20: catalog_game(20, "Owned puzzle", "Puzzle")}
 
     async def details(ids): return {game_id: seeds[game_id] for game_id in ids}
-    async def similar(game_id, *, limit):
+    async def similar(game_ids, *, limit):
         assert limit <= 6
-        return [catalog_game(game_id + 100, f"Taste {game_id}", seeds[game_id]["genres"][0])]
+        return {game_id: [catalog_game(game_id + 100, f"Taste {game_id}", seeds[game_id]["genres"][0])] for game_id in game_ids}
     monkeypatch.setattr(recommendations, "fetch_igdb_games_by_ids", details)
-    monkeypatch.setattr(recommendations, "fetch_igdb_similar_games", similar)
+    monkeypatch.setattr(recommendations, "fetch_recommendation_similar_games", similar)
 
     action = await recommendations.get_personalized_recommendations(User(), [CatalogItem(10, "Owned action")], [])
     puzzle = await recommendations.get_personalized_recommendations(User(), [CatalogItem(20, "Owned puzzle")], [])
@@ -308,12 +308,12 @@ async def test_steam_wishlist_uses_provider_identity_and_not_colliding_catalog_n
     async def steam_details(appids):
         steam_calls.extend(appids)
         return {730: catalog_game(50, "Canonical wished game")}
-    async def similar(game_id, *, limit):
-        assert game_id == 50
-        return [catalog_game(51, "Wishlist taste")]
+    async def similar(game_ids, *, limit):
+        assert game_ids == [50]
+        return {50: [catalog_game(51, "Wishlist taste")]}
     monkeypatch.setattr(recommendations, "fetch_igdb_games_by_ids", details)
     monkeypatch.setattr(recommendations, "fetch_igdb_games_by_steam_appids", steam_details)
-    monkeypatch.setattr(recommendations, "fetch_igdb_similar_games", similar)
+    monkeypatch.setattr(recommendations, "fetch_recommendation_similar_games", similar)
     wishlist = [SimpleNamespace(source="steam", external_id="730", catalog_game_id=730, title="Storefront wished title")]
 
     result = await recommendations.get_personalized_recommendations(User(), [], [], wishlist=wishlist)
@@ -328,9 +328,9 @@ async def test_similar_candidates_deduplicate_and_never_reintroduce_owned_games(
     stub_cache_and_trending(monkeypatch, [catalog_game(11, "Eligible")])
     async def details(ids): return {10: catalog_game(10, "Owned")}
     async def similar(*_args, **_kwargs):
-        return [catalog_game(10, "Canonical owned"), catalog_game(11, "Eligible"), catalog_game(12, "eligible"), {"id": True, "name": "Invalid boolean ID"}, catalog_game(13, "Extra")]
+        return {10: [catalog_game(10, "Canonical owned"), catalog_game(11, "Eligible"), catalog_game(12, "eligible"), {"id": True, "name": "Invalid boolean ID"}, catalog_game(13, "Extra")]}
     monkeypatch.setattr(recommendations, "fetch_igdb_games_by_ids", details)
-    monkeypatch.setattr(recommendations, "fetch_igdb_similar_games", similar)
+    monkeypatch.setattr(recommendations, "fetch_recommendation_similar_games", similar)
 
     result = await recommendations.get_personalized_recommendations(User(), [CatalogItem(10, "Owned")], [])
 
@@ -344,14 +344,14 @@ async def test_preference_retrieval_is_bounded_and_uses_played_steam_seeds(monke
     seeds = []
     genres = []
     async def steam_details(appids): return {appid: catalog_game(appid + 1000, f"Owned {appid}") for appid in appids}
-    async def similar(game_id, *, limit):
-        seeds.append(game_id)
-        return [catalog_game(game_id + 1000, f"Similar {game_id}")]
+    async def similar(game_ids, *, limit):
+        seeds.extend(game_ids)
+        return {game_id: [catalog_game(game_id + 1000, f"Similar {game_id}")] for game_id in game_ids}
     async def related(source, *, limit):
         genres.extend(source["genres"])
         return []
     monkeypatch.setattr(recommendations, "fetch_igdb_games_by_steam_appids", steam_details)
-    monkeypatch.setattr(recommendations, "fetch_igdb_similar_games", similar)
+    monkeypatch.setattr(recommendations, "fetch_recommendation_similar_games", similar)
     monkeypatch.setattr(recommendations, "fetch_recommendation_catalog_games", related)
     steam = [{"appid": appid, "name": f"Owned {appid}", "playtime_forever": appid * 120} for appid in range(20)]
 
@@ -408,11 +408,11 @@ async def test_saved_steam_snapshot_expands_candidates_without_live_library(monk
     async def steam_details(appids):
         assert appids == [730]
         return {730: catalog_game(50, "Canonical owned")}
-    async def similar(game_id, *, limit):
-        assert game_id == 50
-        return [catalog_game(51, "Similar to played snapshot")]
+    async def similar(game_ids, *, limit):
+        assert game_ids == [50]
+        return {50: [catalog_game(51, "Similar to played snapshot")]}
     monkeypatch.setattr(recommendations, "fetch_igdb_games_by_steam_appids", steam_details)
-    monkeypatch.setattr(recommendations, "fetch_igdb_similar_games", similar)
+    monkeypatch.setattr(recommendations, "fetch_recommendation_similar_games", similar)
     saved = [SimpleNamespace(source="steam", external_id="730", catalog_game_id=None, title="Storefront edition", playtime_forever=600)]
 
     result = await recommendations.get_personalized_recommendations(User(), saved, [])
@@ -427,7 +427,7 @@ async def test_expansion_keeps_partial_results_when_similar_or_trending_is_unava
     async def details(ids): return {10: catalog_game(10, "Owned")}
     async def related(*_args, **_kwargs): return [catalog_game(11, "Related despite outage")]
     monkeypatch.setattr(recommendations, "fetch_igdb_trending_games", unavailable)
-    monkeypatch.setattr(recommendations, "fetch_igdb_similar_games", unavailable)
+    monkeypatch.setattr(recommendations, "fetch_recommendation_similar_games", unavailable)
     monkeypatch.setattr(recommendations, "fetch_igdb_games_by_ids", details)
     monkeypatch.setattr(recommendations, "fetch_recommendation_catalog_games", related)
 
@@ -440,7 +440,7 @@ async def test_expansion_keeps_partial_results_when_similar_or_trending_is_unava
 async def test_no_usable_tastes_skips_expansion_and_keeps_deterministic_popular_fallback(monkeypatch):
     stub_cache_and_trending(monkeypatch, [catalog_game(2, "B popular"), catalog_game(1, "A popular")])
     async def unexpected(*_args, **_kwargs): pytest.fail("No usable taste should retrieve personal candidates")
-    monkeypatch.setattr(recommendations, "fetch_igdb_similar_games", unexpected)
+    monkeypatch.setattr(recommendations, "fetch_recommendation_similar_games", unexpected)
     monkeypatch.setattr(recommendations, "fetch_recommendation_catalog_games", unexpected)
     user = User()
     first = await recommendations.get_personalized_recommendations(user, [], [])

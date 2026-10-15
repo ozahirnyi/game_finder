@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { PersonalSectionGate } from "@/components/PersonalSectionGate";
+import { LibraryCatalogMatchLauncher } from "@/components/LibraryCatalogMatches";
 import { applyPsnLibraryRepair, deletePsnLibrary, previewPsnLibraryRepair } from "@/lib/api";
 
 export const Route = createFileRoute("/psn-library-repair")({
@@ -57,6 +58,7 @@ function PsnLibraryRepairPage() {
         <p className="mt-2 text-muted-foreground">
           Review unlinked titles and reversibly remove non-game purchases from your library.
         </p>
+        <LibraryCatalogMatchLauncher />
         <button
           disabled={removeAll.isPending}
           onClick={() => {

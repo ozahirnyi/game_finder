@@ -11,7 +11,11 @@ import {
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-const api = vi.hoisted(() => ({ getGenreDeals: vi.fn() }));
+const api = vi.hoisted(() => ({
+  getGenreDeals: vi.fn(),
+  getAuthSnapshot: () => false,
+  subscribeToAuthChanges: () => () => {},
+}));
 vi.mock("@/lib/api", () => api);
 vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,

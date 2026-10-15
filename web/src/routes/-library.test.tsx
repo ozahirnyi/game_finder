@@ -68,6 +68,25 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Library", () => {
+  it("describes linked PlayStation records as file imports", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [
+        {
+          id: "psn-linked",
+          source: "psn",
+          title: "Imported game",
+          catalog_game_id: 101,
+          detail_game_id: "101",
+          link_state: "linked",
+        },
+      ],
+      steam_available: false,
+      raw_count: 0,
+    });
+    renderLibrary();
+    expect(await screen.findByText("Imported from your PlayStation export")).toBeInTheDocument();
+    expect(screen.queryByText("Synced from your connected library")).not.toBeInTheDocument();
+  });
   it("shows a Library skeleton while its first request is pending", async () => {
     api.getLibraryOverview.mockImplementation(() => new Promise(() => {}));
 

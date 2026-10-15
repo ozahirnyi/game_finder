@@ -18,6 +18,7 @@ import {
   type LibraryOverviewGame,
 } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
+import { LibraryCatalogMatchLauncher } from "@/components/LibraryCatalogMatches";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 export const Route = createFileRoute("/library")({
@@ -142,6 +143,7 @@ function LibraryPage() {
           ))}
         </div>
       </div>
+      <LibraryCatalogMatchLauncher />
       <label className="mb-4 block text-sm font-bold">
         Search games
         <input
@@ -317,7 +319,11 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
         <p className="mt-1 text-xs text-muted-foreground">
           {game.source === "psn" && game.link_state === "raw"
             ? "PlayStation title — catalog details can be added later"
-            : "Synced from your connected library"}
+            : game.source === "psn"
+              ? "Imported from your PlayStation export"
+              : game.source === "manual"
+                ? "Added manually"
+                : "Synced from your connected library"}
         </p>
       </div>
       <div className="hidden text-right sm:block">

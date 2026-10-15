@@ -42,8 +42,11 @@ def _apply_catalog_media(deal: dict[str, Any], catalog: dict[str, Any] | None) -
 
 def _enrich_deal(deal: dict[str, Any], results: list[dict[str, Any]]) -> tuple[dict[str, Any], set[str]]:
     match = next(
-        (game for game in results if normalize_genre(game.get("name") or "") == normalize_genre(deal["name"])),
-        results[0] if results else None,
+        (game for game in results if isinstance(game.get("id"), int)
+         and isinstance(game.get("steam_appid"), int)
+         and not isinstance(game.get("steam_appid"), bool)
+         and game["steam_appid"] == deal["steam_appid"]),
+        None,
     )
     item = _apply_catalog_media({
         "id": match.get("id") if match else None,

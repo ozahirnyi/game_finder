@@ -142,7 +142,7 @@ async def test_build_genre_deal_groups_resolves_all_candidates_in_one_batch():
     async def fetch_igdb_batches(titles):
         assert titles == [deal["name"] for deal in candidates]
         return {
-            title: [{"id": index, "name": title, "genres": ["Action"]}]
+            title: [{"id": index, "steam_appid": index, "name": title, "genres": ["Action"]}]
             for index, title in enumerate(titles, start=1)
         }
 

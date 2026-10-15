@@ -11,15 +11,18 @@ from app.integrations.igdb import (
     fetch_igdb_games_by_ids,
     fetch_igdb_games_by_steam_appids,
     fetch_igdb_games,
-    fetch_igdb_similar_games,
     fetch_igdb_trending_games,
 )
 from app.redis_client import cache_get, cache_set
-from app.recommendation_catalog import fetch_recommendation_catalog_games, normalize_preference_genre
+from app.recommendation_catalog import (
+    MAX_PREFERENCE_SEEDS,
+    SIMILAR_CANDIDATES_PER_SEED,
+    fetch_recommendation_catalog_games,
+    fetch_recommendation_similar_games,
+    normalize_preference_genre,
+)
 
 CACHE_TTL_SECONDS = 24 * 60 * 60
-MAX_PREFERENCE_SEEDS = 4
-SIMILAR_CANDIDATES_PER_SEED = 6
 MAX_PREFERENCE_GENRES = 3
 
 
@@ -212,11 +215,16 @@ async def _preference_candidates(genre_weights: dict[str, float], platform_weigh
     """Expand a small deterministic set of tastes; keep partial provider results."""
     seeds = sorted(seed_weights, key=lambda game_id: (-seed_weights[game_id], game_id))[:MAX_PREFERENCE_SEEDS]
     genres = sorted(genre_weights, key=lambda genre: (-genre_weights[genre], genre))[:MAX_PREFERENCE_GENRES]
-    responses = await asyncio.gather(
-        *(fetch_igdb_similar_games(game_id, limit=SIMILAR_CANDIDATES_PER_SEED) for game_id in seeds),
+    requests = [fetch_recommendation_similar_games(seeds, limit=SIMILAR_CANDIDATES_PER_SEED)] if seeds else []
+    responses = list(await asyncio.gather(
+        *requests,
         *(fetch_recommendation_catalog_games({"genres": [genre], "platforms": list(platform_weights)}, limit=12) for genre in genres),
         return_exceptions=True,
-    )
+    ))
+    similar_by_seed = responses.pop(0) if seeds else {}
+    if not isinstance(similar_by_seed, dict):
+        similar_by_seed = {}
+    responses = [*(similar_by_seed.get(seed_id, []) for seed_id in seeds), *responses]
     candidates: list[dict] = []
     affinities: dict[int, float] = {}
     for index, response in enumerate(responses):

@@ -565,6 +565,8 @@ class LibraryCatalogMatchItem(BaseModel):
 
 class LibraryCatalogMatchPreview(BaseModel):
     items: list[LibraryCatalogMatchItem] = Field(default_factory=list)
+    total: int = 0
+    next_offset: int | None = None
 
 
 class LibraryCatalogMatchDecision(BaseModel):

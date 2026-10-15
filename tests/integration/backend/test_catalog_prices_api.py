@@ -232,7 +232,7 @@ def test_search_games_normalizes_query_and_uses_cache_boundary(api_client, app_m
     fetch_igdb.assert_awaited_once_with("hades", page=2, filters=app_main.CatalogSearchFilters())
     cache_keys = [call.args[0] for call in cached.await_args_list]
     assert len(cache_keys) == 2
-    assert any("igdb_search_v12" in key for key in cache_keys)
+    assert any("igdb_search_v13" in key for key in cache_keys)
     assert any("catalog_steam_price_v1" in key for key in cache_keys)
 
 
@@ -804,20 +804,20 @@ def test_homepage_deals_enriches_and_normalizes_payload(api_client, app_main, mo
     response = api_client.get("/prices/deals", params={"country": "ua", "page_size": 1})
 
     assert response.status_code == 200
-    assert cached.await_args.args[0].startswith("steam_store_deals_v3:")
+    assert cached.await_args.args[0].startswith("steam_store_deals_v4:")
     assert response.json()["results"][0]["id"] == 42
     assert response.json()["results"][0]["hero_image"] == "https://images.test/wide.jpg"
     igdb.assert_awaited_once_with(108600)
 
 
-def test_homepage_deals_falls_back_to_an_exact_catalog_title(api_client, app_main, monkeypatch):
+def test_homepage_deals_falls_back_to_a_verified_catalog_title_result(api_client, app_main, monkeypatch):
     deal = {"steam_appid": 2358720, "name": "Black Myth: Wukong", "background_image": None, "url": "https://deal.test", "current": None, "history_low_all": None}
     monkeypatch.setattr(app_main, "fetch_steam_store_deals", AsyncMock(return_value=[deal]))
     monkeypatch.setattr(app_main, "fetch_igdb_game_by_steam_appid", AsyncMock(return_value=None))
     monkeypatch.setattr(
         app_main,
         "fetch_igdb_games",
-        AsyncMock(return_value={"results": [{"id": 136879, "name": "Black Myth: Wukong"}]}),
+        AsyncMock(return_value={"results": [{"id": 136879, "steam_appid": 2358720, "name": "Black Myth: Wukong"}]}),
     )
     monkeypatch.setattr(app_main, "get_json_cached", AsyncMock(side_effect=run_cached))
 
@@ -832,7 +832,7 @@ def test_genre_deals_uses_authenticated_favorite_genres(api_client, app_main, mo
     auth_as(user)
     candidate = {"steam_appid": 42, "name": "Hades", "background_image": None, "url": "https://deal.test", "current": None, "history_low_all": None}
     monkeypatch.setattr(app_main, "fetch_steam_store_deal_candidates", AsyncMock(return_value={"candidates": [candidate], "popular": [candidate]}))
-    igdb_result = {"id": 42, "name": "Hades", "genres": ["RPG"], "hero_image": "https://images.test/hades-wide.jpg"}
+    igdb_result = {"id": 42, "steam_appid": 42, "name": "Hades", "genres": ["RPG"], "hero_image": "https://images.test/hades-wide.jpg"}
 
     async def steam_cache(_country, fetch):
         return await fetch(_country)
@@ -855,5 +855,5 @@ def test_genre_deals_uses_authenticated_favorite_genres(api_client, app_main, mo
     assert response.json()["sections"][0]["genre"] == "rpg"
     assert response.json()["sections"][0]["results"][0]["id"] == 42
     assert response.json()["sections"][0]["results"][0]["hero_image"] == "https://images.test/hades-wide.jpg"
-    assert cached.await_args.args[0].startswith("steam_genre_deals_v7:")
+    assert cached.await_args.args[0].startswith("steam_genre_deals_v8:")
     igdb_batches.assert_awaited_once_with(["Hades"])
