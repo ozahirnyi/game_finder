@@ -33,7 +33,7 @@ DECORATIVE_YEAR = re.compile(r"\s*[\[(](?:19|20)\d{2}[\])]\s*$")
 
 
 def _clean_title(title: str) -> str:
-    return strip_psn_platform_wrapper(normalize_query_punctuation(title))
+    return strip_psn_platform_wrapper(normalize_query_punctuation(title)).strip('«»"“” ')
 
 
 def library_query_variants(evidence: PsnCatalogEvidence) -> tuple[str, ...]:
@@ -64,6 +64,8 @@ def rank_suggestions(evidence: PsnCatalogEvidence, candidates: list[dict], *, so
     source_keys = {_comparison_key(value) for value in (evidence.title, *evidence.aliases)} - {""}
     source_retrieval = {_retrieval_key(value) for value in (evidence.title, *evidence.aliases)} - {""}
     primary_numbers = re.findall(r"\d+", _comparison_key(evidence.title))
+    source_year = DECORATIVE_YEAR.search(evidence.title)
+    year = int(re.search(r'\d{4}', source_year.group())[0]) if source_year else None
     ranked = []
     hydrated = {}
     for game in candidates:
@@ -101,15 +103,22 @@ def rank_suggestions(evidence: PsnCatalogEvidence, candidates: list[dict], *, so
                 exact = False
             elif expected and not any(left in right.casefold() for left in expected for right in platforms):
                 exact = False
-        ranked.append((exact, score, catalog_id, {
+        release = str(game.get('released') or '')
+        released_year = int(release[:4]) if release[:4].isdigit() else None
+        year_distance = abs(released_year - year) if year and released_year else 1000 if year else 0
+        platform_match = int(source == 'psn' and any('playstation' in value.casefold() for value in platforms))
+        rating_count = game.get('rating_count') if type(game.get('rating_count')) is int else 0
+        ranked.append((exact, platform_match, year_distance, score, rating_count, catalog_id, {
             "id": catalog_id, "title": title, "released": game.get("released"),
             "platforms": platforms, "confidence": "exact" if exact else "likely",
+            "cover_url": game.get("cover_image") or game.get("background_image"),
         }))
-    ranked.sort(key=lambda value: (-value[0], -value[1], value[2]))
-    return [value[3] for value in ranked[:MAX_LIBRARY_SUGGESTIONS]]
+    ranked.sort(key=lambda value: (-value[0], -value[1], value[2], -value[3], -value[4], value[5]))
+    return [value[-1] for value in ranked[:MAX_LIBRARY_SUGGESTIONS]]
 
 
-async def preview_library_catalog_matches(games, *, batch_fetcher, single_fetcher, localization_fetcher=None):
+async def preview_library_catalog_matches(games, *, batch_fetcher, single_fetcher, localization_fetcher=None,
+                                        translation_fetcher=None):
     """Resolve bounded variants, including previously reviewed rows, without writes."""
     evidence = {game.id: _psn_game_catalog_evidence(game) for game in games}
     variants = {key: library_query_variants(value) for key, value in evidence.items()}
@@ -131,6 +140,18 @@ async def preview_library_catalog_matches(games, *, batch_fetcher, single_fetche
             localized.update(result)
         except (IGDBError, ValueError, TypeError):
             localization_failed.update(batch)
+    translations = {}
+    translated_candidates = {}
+    if translation_fetcher:
+        missing = [game.title for game in games
+                   if any(char.isalpha() and ord(char) > 0x024f for char in _clean_title(game.title))
+                   and not rank_suggestions(evidence[game.id], [item for query in variants[game.id]
+                       for item in [*resolutions[query].results, *(localized.get(query) or [])]], source=game.source)]
+        if missing:
+            translations = await translation_fetcher(missing)
+            names = list(dict.fromkeys(name for values in translations.values() if values for name in values))
+            translated_candidates = await resolve_psn_catalog_titles(names, max_fallback_titles=10,
+                batch_fetcher=batch_fetcher, single_fetcher=single_fetcher)
     items = []
     for game in games:
         row_queries = variants[game.id]
@@ -138,6 +159,15 @@ async def preview_library_catalog_matches(games, *, batch_fetcher, single_fetche
             *resolutions[query].results, *(localized.get(query) or [])] if isinstance(item, dict)]
         suggestions = rank_suggestions(evidence[game.id], candidates, source=game.source)
         unavailable = any(resolutions[query].kind == "unavailable" or query in localization_failed for query in row_queries)
+        if game.title in translations:
+            names = translations[game.title]
+            unavailable = unavailable or names is None
+            if names:
+                translated_evidence = PsnCatalogEvidence(evidence[game.id].title,
+                    aliases=(*evidence[game.id].aliases, *names), platforms=evidence[game.id].platforms)
+                suggestions = [{**item, 'confidence': 'likely'} for item in rank_suggestions(
+                    translated_evidence, [item for name in names for item in translated_candidates[name].results], source=game.source)]
+                unavailable = unavailable or any(translated_candidates[name].kind == 'unavailable' for name in names)
         exact_count = sum(item["confidence"] == "exact" for item in suggestions)
         status = "unavailable" if unavailable else "matched" if exact_count == 1 else "review" if suggestions else "no_match"
         if unavailable or exact_count > 1:

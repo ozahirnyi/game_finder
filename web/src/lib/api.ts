@@ -474,6 +474,7 @@ export type LibraryCatalogSuggestion = {
   released?: string | null;
   platforms: string[];
   confidence: "exact" | "likely";
+  cover_url?: string | null;
 };
 export type LibraryCatalogMatch = {
   game_id: string;
@@ -714,7 +715,10 @@ export function previewPsnLibraryRepair() {
   return apiRequest<PsnLibraryRepairPreview>("/psn/library-repair/preview", { auth: true });
 }
 
-export async function previewLibraryCatalogMatches(includeLinked = false) {
+export async function previewLibraryCatalogMatches(
+  includeLinked = false,
+  source?: "psn" | "manual",
+) {
   const items: LibraryCatalogMatch[] = [];
   let offset = 0;
   while (true) {
@@ -723,7 +727,7 @@ export async function previewLibraryCatalogMatches(includeLinked = false) {
       total: number;
       next_offset: number | null;
     }>(
-      `/library/catalog-matches/preview?include_linked=${includeLinked}&offset=${offset}&limit=100`,
+      `/library/catalog-matches/preview?include_linked=${includeLinked}&offset=${offset}&limit=100${source ? `&source=${source}` : ""}`,
       { auth: true, method: "POST", signal: AbortSignal.timeout(120_000) },
     );
     items.push(...page.items);

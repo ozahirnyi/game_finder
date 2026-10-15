@@ -78,6 +78,7 @@ function LibraryPage() {
   const psnCatalogJob = useQuery({
     queryKey: ["psn-catalog-enrichment", "current"],
     queryFn: getCurrentPsnCatalogEnrichment,
+    enabled: tab === "PlayStation",
     retry: false,
     refetchInterval: (query) =>
       query.state.data?.status === "queued" || query.state.data?.status === "running"
@@ -143,37 +144,6 @@ function LibraryPage() {
           ))}
         </div>
       </div>
-      <LibraryCatalogMatchLauncher />
-      <label className="mb-4 block text-sm font-bold">
-        Search games
-        <input
-          aria-label="Search games"
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-          className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
-        />
-      </label>
-      {libraryQuery.data?.pages[0]?.raw_count || libraryQuery.data?.pages[0]?.quarantined_count ? (
-        <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
-          <p className="font-bold">Improve PlayStation details</p>
-          <p className="mt-1 text-muted-foreground">
-            Catalog matching continues in the background. Exact matches will appear automatically;
-            uncertain titles can be chosen below.
-          </p>
-          {psnCatalogProgress ? (
-            <p className="mt-1 text-muted-foreground">
-              {psnCatalogJob.data?.status === "queued" || psnCatalogJob.data?.status === "running"
-                ? `Checking ${psnCatalogProgress.attempted ?? 0} of ${psnCatalogProgress.total ?? 0} PlayStation titles — ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`
-                : `Catalog matching: ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`}
-            </p>
-          ) : null}
-          {libraryQuery.data?.pages[0]?.quarantined_count ? (
-            <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">
-              Review hidden PSN entries
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
 
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4">
         {tabs.map((item) => (
@@ -226,6 +196,45 @@ function LibraryPage() {
         </label>
       </div>
 
+      <label className="mb-4 block text-sm font-bold">
+        Search games
+        <input
+          aria-label="Search games"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
+        />
+      </label>
+
+      {tab === "PlayStation" && (
+        <section aria-label="PlayStation library tools" className="mb-6 space-y-4">
+          <LibraryCatalogMatchLauncher source="psn" />
+          {libraryQuery.data?.pages[0]?.raw_count ||
+          libraryQuery.data?.pages[0]?.quarantined_count ? (
+            <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
+              <p className="font-bold">Improve PlayStation details</p>
+              <p className="mt-1 text-muted-foreground">
+                Find catalog matches to add covers and game details. Review uncertain titles before
+                applying.
+              </p>
+              {psnCatalogProgress ? (
+                <p className="mt-1 text-muted-foreground">
+                  {psnCatalogJob.data?.status === "queued" ||
+                  psnCatalogJob.data?.status === "running"
+                    ? `Checking ${psnCatalogProgress.attempted ?? 0} of ${psnCatalogProgress.total ?? 0} PlayStation titles — ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`
+                    : `Catalog matching: ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`}
+                </p>
+              ) : null}
+              {libraryQuery.data?.pages[0]?.quarantined_count ? (
+                <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">
+                  Review hidden PSN entries
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      )}
+
       {libraryQuery.isPending && !libraryQuery.data && (
         <div
           data-testid="library-loading"
@@ -276,7 +285,7 @@ function LibraryPage() {
       {visible.length > 0 && (
         <div key={tab} className="stagger space-y-3">
           {visible.map((game) => (
-            <LibraryCard key={game.id} game={game} />
+            <LibraryCard key={game.id} game={game} showPsnTools={tab === "PlayStation"} />
           ))}
           <div
             ref={loadMoreRef}
@@ -295,7 +304,7 @@ function LibraryPage() {
   );
 }
 
-function LibraryCard({ game }: { game: LibraryOverviewGame }) {
+function LibraryCard({ game, showPsnTools }: { game: LibraryOverviewGame; showPsnTools: boolean }) {
   const contents = (
     <>
       <GameCover
@@ -356,7 +365,7 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
   return (
     <div className="space-y-2">
       {card}
-      {game.source === "psn" && game.link_state === "raw" ? (
+      {showPsnTools && game.source === "psn" && game.link_state === "raw" ? (
         <PsnCatalogPicker key={`${game.id}:${game.catalog_search_query ?? ""}`} game={game} />
       ) : null}
     </div>

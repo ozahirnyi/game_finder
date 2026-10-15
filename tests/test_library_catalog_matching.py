@@ -7,6 +7,49 @@ import pytest
 from app.psn_catalog_matcher import PsnCatalogEvidence
 
 
+def test_quote_wrapped_localized_title_has_an_unwrapped_query():
+    from app.library_catalog_matching import library_query_variants
+    assert 'Ведьмак 3: Дикая Охота' in library_query_variants(PsnCatalogEvidence('«Ведьмак 3: Дикая Охота»'))
+
+
+def test_year_and_platform_evidence_prioritize_the_intended_hades():
+    from app.library_catalog_matching import rank_suggestions
+    result = rank_suggestions(PsnCatalogEvidence('Hades (2020)', platforms=('PS4',)), [
+        {'id': 1, 'name': 'Hades', 'released': '1995-05-01', 'platforms': ['PC (Microsoft Windows)']},
+        {'id': 113112, 'name': 'Hades', 'released': '2018-12-06', 'platforms': ['PlayStation 4', 'PC (Microsoft Windows)']},
+    ], source='psn')
+    assert result[0]['id'] == 113112
+    assert result[0]['confidence'] == 'likely'
+
+
+def test_unindexed_localized_titles_use_verified_translated_queries_without_claiming_exact():
+    from app.library_catalog_matching import preview_library_catalog_matches
+    title = 'Южный Парк™: Палка Истины™'
+    game = SimpleNamespace(id='one', title=title, source='psn', link_state='raw', catalog_game_id=None,
+                           psn_search_aliases=None, psn_source_platforms=['PS4'])
+    async def batch(titles):
+        return {q: ([{'id': 333, 'name': 'South Park: The Stick of Truth', 'platforms': ['PlayStation 4']}]
+                    if q == 'South Park: The Stick of Truth' else []) for q in titles}
+    translator = AsyncMock(return_value={title: ['South Park: The Stick of Truth']})
+    result = asyncio.run(preview_library_catalog_matches([game], batch_fetcher=batch,
+        single_fetcher=AsyncMock(), localization_fetcher=AsyncMock(return_value={}), translation_fetcher=translator))
+    assert result[0]['suggestions'][0]['id'] == 333
+    assert result[0]['suggestions'][0]['confidence'] == 'likely'
+    assert result[0]['status'] == 'review'
+    translator.assert_awaited_once_with([title])
+    assert game.catalog_game_id is None
+
+
+def test_translation_outage_is_distinct_from_a_completed_empty_lookup():
+    from app.library_catalog_matching import preview_library_catalog_matches
+    game = SimpleNamespace(id='one', title='Неизвестная игра', source='psn', link_state='raw', catalog_game_id=None,
+                           psn_search_aliases=None, psn_source_platforms=None)
+    result = asyncio.run(preview_library_catalog_matches([game], batch_fetcher=AsyncMock(return_value={game.title: []}),
+        single_fetcher=AsyncMock(), localization_fetcher=AsyncMock(return_value={}),
+        translation_fetcher=AsyncMock(return_value={game.title: None})))
+    assert result[0]['status'] == 'unavailable'
+
+
 def test_query_variants_clean_marks_wrappers_and_keep_edition_year_evidence():
     from app.library_catalog_matching import library_query_variants
 

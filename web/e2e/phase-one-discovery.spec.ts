@@ -91,71 +91,88 @@ test("multiple search families survive refresh and a real game detail return", a
   ).toBe(true);
 });
 
-test("mass matching waits for uncertain confirmation and supports later unlinking", async ({
-  page,
-  api,
-}) => {
-  await signIn(page);
-  let linked = false;
-  let applies = 0;
-  await page.route("**/api/library/overview/page*", (route) =>
-    route.fulfill({ json: { games: [], steam_available: false, total: 0, has_more: false } }),
-  );
-  await page.route("**/api/psn/catalog-enrichment/current", (route) =>
-    route.fulfill({ status: 404, json: { detail: "No active job" } }),
-  );
-  await page.route("**/api/library/catalog-matches/preview*", (route) =>
-    route.fulfill({
-      json: {
-        items: [
-          {
-            game_id: "raw-101",
-            title: "Исходное название",
-            source: "psn",
-            link_state: linked ? "linked" : "raw",
-            catalog_game_id: linked ? 101 : null,
-            status: "review",
-            suggestions: [
-              { id: 101, title: "Celeste", confidence: "likely", platforms: ["PlayStation 4"] },
-            ],
-          },
-        ],
-      },
-    }),
-  );
-  await page.route("**/api/library/catalog-matches/apply", async (route) => {
-    applies += 1;
-    const decisions = route.request().postDataJSON().decisions;
-    linked = decisions[0].action === "link";
-    api.state.library.games = linked
-      ? [{ id: "raw-101", source: "psn", catalog_game_id: 101, link_state: "linked" }]
-      : [];
-    await route.fulfill({ json: { updated: 1 } });
+for (const viewport of [
+  { width: 1280, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test(`mass matching confirms and corrects inside PlayStation at ${viewport.width}px`, async ({
+    page,
+    api,
+  }) => {
+    await page.setViewportSize(viewport);
+    await signIn(page);
+    let linked = false;
+    let applies = 0;
+    await page.route("**/api/library/overview/page*", (route) =>
+      route.fulfill({ json: { games: [], steam_available: false, total: 0, has_more: false } }),
+    );
+    await page.route("**/api/psn/catalog-enrichment/current", (route) =>
+      route.fulfill({ status: 404, json: { detail: "No active job" } }),
+    );
+    await page.route("**/api/library/catalog-matches/preview*", (route) =>
+      route.fulfill({
+        json: {
+          items: [
+            {
+              game_id: "raw-101",
+              title: "Исходное название",
+              source: "psn",
+              link_state: linked ? "linked" : "raw",
+              catalog_game_id: linked ? 101 : null,
+              status: "review",
+              suggestions: [
+                { id: 101, title: "Celeste", confidence: "likely", platforms: ["PlayStation 4"] },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    await page.route("**/api/library/catalog-matches/apply", async (route) => {
+      applies += 1;
+      const decisions = route.request().postDataJSON().decisions;
+      linked = decisions[0].action === "link";
+      api.state.library.games = linked
+        ? [{ id: "raw-101", source: "psn", catalog_game_id: 101, link_state: "linked" }]
+        : [];
+      await route.fulfill({ json: { updated: 1 } });
+    });
+    await page.goto("/library");
+    await waitForHydration(page);
+    await expect(
+      page.getByRole("button", { name: "Match PlayStation games", exact: true }),
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "PlayStation", exact: true }).click();
+    await page.getByRole("button", { name: "Match PlayStation games", exact: true }).click();
+    await page.getByRole("button", { name: "Find catalog matches", exact: true }).click();
+    await page.getByRole("button", { name: "Select all matches (including uncertain)" }).click();
+    await page.getByRole("button", { name: "Apply selected (1)" }).click();
+    await expect(page.getByRole("alertdialog")).toContainText("1 uncertain match");
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: `../.superpowers/sdd/phase-one-match-${viewport.width}.png`,
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect(applies).toBe(0);
+    await page.getByRole("button", { name: "Apply selected (1)" }).click();
+    await page.getByRole("button", { name: "Confirm selected matches" }).click();
+    await expect(page.getByRole("status")).toContainText("Updated 1 library entries");
+    expect(linked).toBe(true);
+    await page.getByRole("checkbox", { name: "Include linked entries for correction" }).check();
+    await page.getByRole("button", { name: "Find catalog matches", exact: true }).click();
+    await page.getByRole("button", { name: "Remove link for Исходное название" }).click();
+    await page.getByRole("button", { name: "Apply selected (1)" }).click();
+    await expect.poll(() => applies).toBe(2);
+    expect(linked).toBe(false);
+    await page.getByRole("button", { name: "All games", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Find catalog matches", exact: true }),
+    ).toHaveCount(0);
   });
-  await page.goto("/library");
-  await waitForHydration(page);
-  await page.getByRole("button", { name: "Match library to catalog", exact: true }).click();
-  await page.getByRole("button", { name: "Find catalog matches", exact: true }).click();
-  await page.getByRole("button", { name: "Select all matches (including uncertain)" }).click();
-  await page.getByRole("button", { name: "Apply selected (1)" }).click();
-  await expect(page.getByRole("alertdialog")).toContainText("1 uncertain match");
-  await page.screenshot({
-    path: "../.superpowers/sdd/phase-one-match-confirmation.png",
-    fullPage: true,
-  });
-  await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  expect(applies).toBe(0);
-  await page.getByRole("button", { name: "Apply selected (1)" }).click();
-  await page.getByRole("button", { name: "Confirm selected matches" }).click();
-  await expect(page.getByRole("status")).toContainText("Updated 1 library entries");
-  expect(linked).toBe(true);
-  await page.getByRole("checkbox", { name: "Include linked entries for correction" }).check();
-  await page.getByRole("button", { name: "Find catalog matches", exact: true }).click();
-  await page.getByRole("button", { name: "Remove link for Исходное название" }).click();
-  await page.getByRole("button", { name: "Apply selected (1)" }).click();
-  await expect.poll(() => applies).toBe(2);
-  expect(linked).toBe(false);
-});
+}
 
 test("deals show PlayStation ownership and save a Steam-only offer to wishlist", async ({
   page,

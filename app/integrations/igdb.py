@@ -227,7 +227,12 @@ async def fetch_igdb_games(
     return {"results": [normalize_igdb_game(game) for game in games]}
 
 
-async def fetch_igdb_games_batch(titles: list[str]) -> dict[str, list[dict[str, Any]]]:
+async def fetch_igdb_matching_games_batch(titles: list[str]) -> dict[str, list[dict[str, Any]]]:
+    """Fuzzy catalog candidates for explicit review, separate from exact imports."""
+    return await fetch_igdb_games_batch(titles, fuzzy=True)
+
+
+async def fetch_igdb_games_batch(titles: list[str], *, fuzzy: bool = False) -> dict[str, list[dict[str, Any]]]:
     """Resolve up to ten distinct titles in one official IGDB multiquery call."""
     unique_titles = list(dict.fromkeys(title for title in titles if title))[:10]
     if not unique_titles:
@@ -238,7 +243,9 @@ async def fetch_igdb_games_batch(titles: list[str]) -> dict[str, list[dict[str, 
         alias = f"deal_{index}"
         aliases[alias] = title
         safe_title = title.replace('"', "").replace("\\", "")
-        queries.append(f'query games "{alias}" {{ {_FIELDS} where name ~ "{safe_title}" | alternative_names.name ~ "{safe_title}"; limit 20; }};')
+        lookup = (f'search "{safe_title}";' if fuzzy else
+                  f'where name ~ "{safe_title}" | alternative_names.name ~ "{safe_title}";')
+        queries.append(f'query games "{alias}" {{ {_FIELDS} {lookup} limit 20; }};')
     responses = await _query("multiquery", "".join(queries))
     results: dict[str, list[dict[str, Any]]] = {}
     for response in responses:

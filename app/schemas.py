@@ -550,6 +550,7 @@ class LibraryCatalogSuggestion(BaseModel):
     released: str | None = None
     platforms: list[str] = Field(default_factory=list)
     confidence: Literal["exact", "likely"]
+    cover_url: str | None = None
 
 
 class LibraryCatalogMatchItem(BaseModel):

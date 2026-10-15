@@ -37,6 +37,7 @@ from app.integrations.igdb import (
     fetch_igdb_localized_games,
     fetch_igdb_games,
     fetch_igdb_games_batch,
+    fetch_igdb_matching_games_batch,
     fetch_igdb_games_batches,
     fetch_igdb_related_fallback_games,
     fetch_igdb_similar_games,
@@ -56,6 +57,7 @@ from app.psn_catalog_matcher import (
 )
 from app.psn_catalog_service import PsnCatalogUnavailable, find_psn_catalog_titles
 from app.library_catalog_matching import apply_library_catalog_matches, preview_library_catalog_matches
+from app.catalog_title_translation import translate_library_titles
 from app.psn_library_enrichment import (
     PSN_CANDIDATE_EVIDENCE_LIMIT,
     PSN_CATALOG_ENRICHMENT_BATCH_SIZE,
@@ -821,6 +823,7 @@ async def library_overview_page_route(
 @app.post("/library/catalog-matches/preview", response_model=LibraryCatalogMatchPreview)
 async def preview_library_catalog_matches_route(
     include_linked: bool = False,
+    source: Literal['psn', 'manual'] | None = None,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -830,13 +833,16 @@ async def preview_library_catalog_matches_route(
                                  or_(Game.link_state.is_(None), Game.link_state != "quarantined"))
     if not include_linked:
         query = query.filter(Game.catalog_game_id.is_(None))
+    if source:
+        query = query.filter(Game.source == source)
     total = query.count()
     games = query.order_by(Game.created_at, Game.id).offset(offset).limit(limit).all()
     return LibraryCatalogMatchPreview(total=total,
         next_offset=offset + len(games) if offset + len(games) < total else None,
         items=await preview_library_catalog_matches(
-        games, batch_fetcher=fetch_igdb_games_batch, single_fetcher=fetch_igdb_games,
+        games, batch_fetcher=fetch_igdb_matching_games_batch, single_fetcher=fetch_igdb_games,
         localization_fetcher=fetch_igdb_localized_games,
+        translation_fetcher=translate_library_titles,
     ))
 
 

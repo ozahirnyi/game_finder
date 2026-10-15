@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   deletePsnLibrary: vi.fn(),
   findPsnCatalogTitles: vi.fn(),
   getCurrentPsnCatalogEnrichment: vi.fn(),
+  previewLibraryCatalogMatches: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => api);
@@ -68,6 +69,30 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Library", () => {
+  it("shows PlayStation matching and repair tools only inside the PlayStation tab", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{ id: "psn-raw", title: "Imported game", source: "psn", link_state: "raw" }],
+      raw_count: 1,
+      quarantined_count: 1,
+    });
+    api.previewLibraryCatalogMatches.mockResolvedValue({ items: [] });
+    renderLibrary();
+    await screen.findByRole("heading", { name: "Imported game" });
+    expect(screen.queryByRole("button", { name: /Match .*games/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Find in catalog" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Improve PlayStation details")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "PlayStation" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Match PlayStation games" }));
+    fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
+    await waitFor(() =>
+      expect(api.previewLibraryCatalogMatches).toHaveBeenCalledWith(false, "psn"),
+    );
+    expect(screen.getByRole("button", { name: "Find in catalog" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Steam" }));
+    expect(screen.queryByRole("button", { name: "Find in catalog" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Find catalog matches" })).not.toBeInTheDocument();
+  });
+
   it("describes linked PlayStation records as file imports", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [
@@ -189,9 +214,8 @@ describe("Library", () => {
       pending_catalog_count: 3,
     });
     renderLibrary();
-    expect(
-      await screen.findByText(/Catalog matching continues in the background/),
-    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    expect(await screen.findByText(/Find catalog matches to add covers/)).toBeInTheDocument();
   });
 
   it("does not expose a browser retry when catalog matching is pending", async () => {
@@ -204,9 +228,8 @@ describe("Library", () => {
       pending_catalog_count: 1,
     });
     renderLibrary();
-    expect(
-      await screen.findByText(/Catalog matching continues in the background/),
-    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    expect(await screen.findByText(/Find catalog matches to add covers/)).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Retry catalog matching" }),
     ).not.toBeInTheDocument();
@@ -228,6 +251,7 @@ describe("Library", () => {
     });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
 
     expect(await screen.findByText(/Checking 3 of 10 PlayStation titles/)).toBeInTheDocument();
     expect(screen.getByText(/2 linked, 1 for review, 6 remaining/)).toBeInTheDocument();
@@ -249,6 +273,7 @@ describe("Library", () => {
     });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
 
     expect(await screen.findByText(/Checking 0 of 10 PlayStation titles/)).toBeInTheDocument();
   });
@@ -292,6 +317,7 @@ describe("Library", () => {
     api.applyPsnLibraryRepair.mockResolvedValue({ updated: 1 });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
     fireEvent.change(screen.getByLabelText("Catalog search for STAR WARS Battlefront"), {
@@ -332,6 +358,7 @@ describe("Library", () => {
     });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
     expect(screen.getByLabelText("Catalog search for EA SPORTS™ FIFA 16")).toHaveValue("FIFA 16");
@@ -356,6 +383,7 @@ describe("Library", () => {
     api.searchGames.mockResolvedValue({ results: [] });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
     fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
     fireEvent.click(screen.getByRole("button", { name: "Find catalog title" }));
 
@@ -391,8 +419,7 @@ describe("Library", () => {
       pending_catalog_count: 1,
     });
     renderLibrary();
-    expect(
-      await screen.findByText(/Catalog matching continues in the background/),
-    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    expect(await screen.findByText(/Find catalog matches to add covers/)).toBeInTheDocument();
   });
 });

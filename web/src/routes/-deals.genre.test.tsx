@@ -57,6 +57,26 @@ const deal = (name: string, id: number) => ({
 });
 
 describe("DealsPage genre deals", () => {
+  it("displays canonical genre names while retaining lowercase filter keys", async () => {
+    api.getGenreDeals.mockResolvedValue({
+      popular: [],
+      sections: [
+        { genre: "action", results: [deal("Action game", 10)] },
+        { genre: "rpg", results: [deal("Role playing game", 20)] },
+      ],
+    });
+    const DealsPage = Route.options.component!;
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <DealsPage />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole("button", { name: "Action" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "RPG" }));
+    expect(screen.getByRole("heading", { name: "RPG" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Role playing game" })).toBeInTheDocument();
+  });
+
   it("shows four popular deals and five genre sections with catalog links", async () => {
     api.getGenreDeals.mockResolvedValue({
       popular: [

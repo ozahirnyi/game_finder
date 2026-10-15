@@ -20,6 +20,22 @@ def decision(game, action="link", catalog_id=1, **kwargs):
             **({"catalog_id": catalog_id} if action == "link" else {}), **kwargs}
 
 
+def test_psn_preview_does_not_include_manual_or_foreign_records(
+    api_client, db_session, user_factory, auth_as, app_main, monkeypatch
+):
+    owner = auth_as(user_factory())
+    psn = row(db_session, owner, source='psn')
+    row(db_session, owner, source='manual')
+    row(db_session, user_factory(email='scope-other@example.com'), source='psn')
+    monkeypatch.setattr(app_main, 'fetch_igdb_matching_games_batch', AsyncMock(return_value={'Hades': []}))
+    monkeypatch.setattr(app_main, 'fetch_igdb_localized_games', AsyncMock(return_value={}))
+    response = api_client.post('/library/catalog-matches/preview?source=psn')
+    assert response.status_code == 200
+    assert response.json()['total'] == 1
+    assert [item['game_id'] for item in response.json()['items']] == [str(psn.id)]
+    assert api_client.post('/library/catalog-matches/preview?source=steam').status_code == 422
+
+
 def test_preview_retries_all_unresolved_and_supports_explicit_linked_corrections(
     api_client, db_session, user_factory, auth_as, app_main, monkeypatch
 ):
@@ -33,7 +49,7 @@ def test_preview_retries_all_unresolved_and_supports_explicit_linked_corrections
     row(db_session, owner, source="psn", link_state="quarantined")
     async def batch(titles):
         return {title: [{"id": 1, "name": title, "platforms": ["PC (Microsoft Windows)", "PlayStation 4"]}] for title in titles}
-    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", batch)
+    monkeypatch.setattr(app_main, "fetch_igdb_matching_games_batch", batch)
     monkeypatch.setattr(app_main, "fetch_igdb_localized_games", AsyncMock(return_value={}), raising=False)
     response = api_client.post("/library/catalog-matches/preview")
     assert response.status_code == 200
@@ -236,7 +252,7 @@ def test_preview_pages_more_than_500_owner_records_in_stable_order(
     expected = [str(game.id) for game in db_session.query(Game).filter_by(owner_id=owner.id).order_by(Game.created_at, Game.id)]
     async def batch(titles):
         return {title: [] for title in titles}
-    monkeypatch.setattr(app_main, "fetch_igdb_games_batch", batch)
+    monkeypatch.setattr(app_main, "fetch_igdb_matching_games_batch", batch)
     monkeypatch.setattr(app_main, "fetch_igdb_localized_games", AsyncMock(return_value={}))
     ids = []
     offset = 0

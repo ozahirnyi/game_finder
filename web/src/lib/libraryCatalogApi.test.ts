@@ -21,6 +21,18 @@ afterEach(() => {
 });
 
 describe("library matching requests", () => {
+  it("keeps the PlayStation source scope on each preview page", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(response({ items: [{ game_id: "a" }], total: 2, next_offset: 1 }))
+      .mockResolvedValueOnce(response({ items: [{ game_id: "b" }], total: 2, next_offset: null }));
+    vi.stubGlobal("fetch", fetcher);
+    await previewLibraryCatalogMatches(false, "psn");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    for (const [url] of fetcher.mock.calls)
+      expect(new URL(url, "http://localhost").searchParams.get("source")).toBe("psn");
+  });
+
   it("collects all 513 rows across bounded owner-scoped preview pages", async () => {
     const fetcher = vi.fn(async (url: string) => {
       const params = new URL(url, "http://localhost").searchParams;

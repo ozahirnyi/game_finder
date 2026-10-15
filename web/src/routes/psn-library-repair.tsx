@@ -58,7 +58,7 @@ function PsnLibraryRepairPage() {
         <p className="mt-2 text-muted-foreground">
           Review unlinked titles and reversibly remove non-game purchases from your library.
         </p>
-        <LibraryCatalogMatchLauncher />
+        <LibraryCatalogMatchLauncher source="psn" />
         <button
           disabled={removeAll.isPending}
           onClick={() => {

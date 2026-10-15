@@ -3,6 +3,21 @@ from datetime import datetime, timedelta, timezone
 
 
 @pytest.mark.anyio
+async def test_explicit_matching_batch_uses_fuzzy_search_without_changing_strict_imports(monkeypatch):
+    import app.integrations.igdb as client
+    statements = []
+    async def query(endpoint, statement):
+        statements.append((endpoint, statement))
+        return [{"name": "deal_0", "result": [{"id": 74701, "name": "Star Wars Jedi: Fallen Order"}]}]
+    monkeypatch.setattr(client, "_query", query)
+    result = await client.fetch_igdb_matching_games_batch(['STAR WARS JEDI FALLEN ORDER'])
+    assert result['STAR WARS JEDI FALLEN ORDER'][0]['id'] == 74701
+    assert 'search "STAR WARS JEDI FALLEN ORDER";' in statements[-1][1]
+    await client.fetch_igdb_games_batch(['STAR WARS JEDI FALLEN ORDER'])
+    assert 'where name ~' in statements[-1][1] and ' search ' not in statements[-1][1]
+
+
+@pytest.mark.anyio
 async def test_igdb_batches_more_than_ten_titles(monkeypatch):
     import app.integrations.igdb as client
 

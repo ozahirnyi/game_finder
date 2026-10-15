@@ -61,6 +61,40 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 describe("library catalog confirmation", () => {
+  it("distinguishes same-name catalog choices by release year and platform", async () => {
+    api.previewLibraryCatalogMatches.mockResolvedValue({
+      items: [
+        {
+          ...preview.items[0],
+          suggestions: [
+            {
+              id: 1,
+              title: "Hades",
+              released: "1995-05-01",
+              platforms: ["PC"],
+              confidence: "likely",
+            },
+            {
+              id: 2,
+              title: "Hades",
+              released: "2018-12-06",
+              platforms: ["PlayStation 4"],
+              confidence: "likely",
+            },
+          ],
+        },
+      ],
+    });
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
+    const intended = await screen.findByRole("button", {
+      name: "Choose Hades, 2018, PlayStation 4",
+    });
+    expect(screen.getByRole("button", { name: "Choose Hades, 1995, PC" })).toBeInTheDocument();
+    fireEvent.click(intended);
+    expect(intended).toHaveAttribute("aria-pressed", "true");
+  });
+
   it.each(["review", "unavailable"])(
     "requires uncertainty confirmation for %s rows even with exact proposal flags",
     async (status) => {
