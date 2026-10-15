@@ -511,11 +511,25 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
                   type="button"
                   disabled={link.isPending}
                   onClick={() => link.mutate(result.id)}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-sm hover:border-primary/50 disabled:opacity-50"
+                  className="flex min-w-0 items-center gap-3 rounded-lg border border-border px-3 py-2 text-left text-sm hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                   aria-label={`Use ${result.name}`}
                 >
-                  <span className="font-bold">{result.name}</span>
-                  <span className="text-xs text-muted-foreground">Use this game</span>
+                  <GameCover
+                    from="#1d4ed8"
+                    to="#111827"
+                    title={result.name}
+                    image={result.cover_image ?? result.background_image ?? undefined}
+                    fallbackImage={result.background_image ?? undefined}
+                    compact
+                    bare
+                    fit="contain"
+                    sizes="48px"
+                    className="h-16 w-12 shrink-0 rounded-md"
+                  />
+                  <span className="min-w-0 flex-1 break-words font-bold">{result.name}</span>
+                  <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                    Use this game
+                  </span>
                 </button>
               ))}
             </div>

@@ -95,6 +95,73 @@ for (const viewport of [
   { width: 1280, height: 900 },
   { width: 390, height: 844 },
 ]) {
+  test(`individual matching shows covers and missing-image fallback at ${viewport.width}px`, async ({
+    page,
+    api,
+  }) => {
+    await page.setViewportSize(viewport);
+    await signIn(page);
+    api.state.library.games = [
+      { id: "raw-1020", title: "Grand Theft Auto V (PS4)", source: "psn", link_state: "raw" },
+    ];
+    await page.route("**/api/library/overview/page*", (route) =>
+      route.fulfill({ json: { ...api.state.library, total: 1, has_more: false } }),
+    );
+    await page.route("**/test-cover.svg", (route) =>
+      route.fulfill({
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="64"><rect width="48" height="64" fill="#24456a"/><text x="24" y="36" text-anchor="middle" fill="white">V</text></svg>',
+      }),
+    );
+    await page.route("**/missing-cover.jpg", (route) => route.fulfill({ status: 404 }));
+    await page.route("**/api/search/games*", (route) =>
+      route.fulfill({
+        json: {
+          results: [
+            { id: 1020, name: "Grand Theft Auto V", cover_image: "/test-cover.svg" },
+            { id: 1021, name: "Game with a broken cover", cover_image: "/missing-cover.jpg" },
+            { id: 1022, name: "A game with a very long title and no image in the catalog" },
+          ],
+        },
+      }),
+    );
+    let applied: unknown;
+    await page.route("**/api/psn/library-repair/apply", async (route) => {
+      applied = route.request().postDataJSON();
+      await route.fulfill({ json: { updated: 1 } });
+    });
+    await page.goto("/library");
+    await waitForHydration(page);
+    await page.getByRole("button", { name: "PlayStation", exact: true }).click();
+    await page.getByRole("button", { name: "Find in catalog", exact: true }).click();
+    await page.getByRole("button", { name: "Search catalog", exact: true }).click();
+    const choice = page.getByRole("button", { name: "Use Grand Theft Auto V", exact: true });
+    const cover = choice.getByRole("img", { name: "Grand Theft Auto V", exact: true });
+    await expect(cover).toBeVisible();
+    await expect.poll(() => cover.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(48);
+    await expect(page.getByLabel("Game with a broken cover image unavailable")).toBeVisible();
+    await expect(
+      page.getByLabel(
+        "A game with a very long title and no image in the catalog image unavailable",
+      ),
+    ).toBeVisible();
+    expect(applied).toBeUndefined();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: `../.superpowers/sdd/individual-match-covers-${viewport.width}.png`,
+      fullPage: true,
+      animations: "disabled",
+    });
+    await choice.click();
+    await expect
+      .poll(() => applied)
+      .toEqual({
+        decisions: [{ game_id: "raw-1020", action: "link", catalog_id: 1020 }],
+      });
+  });
+
   test(`library guidance opens PlayStation without matching at ${viewport.width}px`, async ({
     page,
     api,

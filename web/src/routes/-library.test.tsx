@@ -7,7 +7,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -28,7 +28,9 @@ vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/components/GameCover", () => ({
-  GameCover: ({ title }: { title: string }) => <div data-testid="game-cover">{title}</div>,
+  GameCover: ({ title, image }: { title: string; image?: string }) => (
+    <div data-testid="game-cover">{image ? <img alt={title} src={image} /> : title}</div>
+  ),
 }));
 
 import { Route } from "./library";
@@ -69,6 +71,42 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Library", () => {
+  it("shows covers for individual catalog choices and keeps choices usable without images", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{ id: "raw", title: "Imported game", source: "psn", link_state: "raw" }],
+      raw_count: 1,
+    });
+    api.searchGames.mockResolvedValue({
+      results: [
+        {
+          id: 101,
+          name: "Cover game",
+          cover_image: "https://covers/portrait.jpg",
+          background_image: "https://covers/banner.jpg",
+        },
+        { id: 102, name: "Legacy game", background_image: "https://covers/legacy.jpg" },
+        { id: 103, name: "No image game", background_image: null },
+      ],
+    });
+    renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search catalog" }));
+
+    const cover = await screen.findByRole("button", { name: "Use Cover game" });
+    expect(within(cover).getByRole("img", { name: "Cover game" })).toHaveAttribute(
+      "src",
+      "https://covers/portrait.jpg",
+    );
+    const legacy = screen.getByRole("button", { name: "Use Legacy game" });
+    expect(within(legacy).getByRole("img", { name: "Legacy game" })).toHaveAttribute(
+      "src",
+      "https://covers/legacy.jpg",
+    );
+    expect(screen.getByRole("button", { name: "Use No image game" })).toBeEnabled();
+    expect(api.applyPsnLibraryRepair).not.toHaveBeenCalled();
+  });
+
   it("guides users from All games to PlayStation without starting catalog matching", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [{ id: "psn-raw", title: "Imported game", source: "psn", link_state: "raw" }],
