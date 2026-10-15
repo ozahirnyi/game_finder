@@ -95,6 +95,46 @@ for (const viewport of [
   { width: 1280, height: 900 },
   { width: 390, height: 844 },
 ]) {
+  test(`library guidance opens PlayStation without matching at ${viewport.width}px`, async ({
+    page,
+    api,
+  }) => {
+    await page.setViewportSize(viewport);
+    await signIn(page);
+    api.state.library.games = [
+      { id: "import-101", title: "Imported game", source: "psn", link_state: "raw" },
+    ];
+    await page.route("**/api/library/overview/page*", (route) =>
+      route.fulfill({
+        json: { ...api.state.library, total: 1, has_more: false },
+      }),
+    );
+    await page.goto("/library");
+    await waitForHydration(page);
+    await expect(page.getByRole("heading", { name: "Imported game" })).toBeVisible();
+    const guidance = page.getByRole("region", { name: "PlayStation game details" });
+    await expect(guidance).toBeVisible();
+    await expect(guidance).toContainText("Match PlayStation games");
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: `../.superpowers/sdd/library-guidance-${viewport.width}.png`,
+      fullPage: true,
+      animations: "disabled",
+    });
+    await page.getByRole("button", { name: "Open PlayStation library" }).click();
+    await expect(page.getByRole("button", { name: "Match PlayStation games" })).toBeVisible();
+    await expect(guidance).toHaveCount(0);
+    expect(
+      api.requests.some((request) => request.path.startsWith("/library/catalog-matches/")),
+    ).toBe(false);
+    await page.getByRole("button", { name: "Steam", exact: true }).click();
+    await expect(guidance).toHaveCount(0);
+    await page.getByRole("button", { name: "All games", exact: true }).click();
+    await expect(guidance).toBeVisible();
+  });
+
   test(`mass matching confirms and corrects inside PlayStation at ${viewport.width}px`, async ({
     page,
     api,

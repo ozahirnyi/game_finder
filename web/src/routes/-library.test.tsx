@@ -69,6 +69,49 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Library", () => {
+  it("guides users from All games to PlayStation without starting catalog matching", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{ id: "psn-raw", title: "Imported game", source: "psn", link_state: "raw" }],
+      raw_count: 1,
+    });
+    renderLibrary();
+
+    const guidance = await screen.findByRole("region", { name: "PlayStation game details" });
+    expect(guidance).toHaveTextContent(/PlayStation tab.*Match PlayStation games/);
+    expect(api.getCurrentPsnCatalogEnrichment).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Open PlayStation library" }));
+
+    expect(await screen.findByRole("button", { name: "Match PlayStation games" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "PlayStation game details" })).toBeNull();
+    expect(api.previewLibraryCatalogMatches).not.toHaveBeenCalled();
+    expect(api.applyPsnLibraryRepair).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Steam" }));
+    expect(screen.queryByRole("button", { name: "Open PlayStation library" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "All games" }));
+    expect(screen.getByRole("button", { name: "Open PlayStation library" })).toBeVisible();
+  });
+
+  it("keeps the PlayStation entry discoverable when the loaded page only contains Steam", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{ id: "psn-linked", source: "psn", link_state: "linked" }],
+    });
+    api.getLibraryOverviewPage.mockResolvedValue({
+      games: [{ id: "steam-1", title: "Steam game", source: "steam" }],
+      total: 1,
+      has_more: false,
+    });
+    renderLibrary();
+
+    expect(await screen.findByRole("button", { name: "Open PlayStation library" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Steam game" })).toBeVisible();
+  });
+
+  it("does not offer PlayStation matching guidance without imported PlayStation games", async () => {
+    renderLibrary();
+    await screen.findByText("Your library is empty");
+    expect(screen.queryByRole("button", { name: "Open PlayStation library" })).toBeNull();
+  });
+
   it("shows PlayStation matching and repair tools only inside the PlayStation tab", async () => {
     api.getLibraryOverview.mockResolvedValue({
       games: [{ id: "psn-raw", title: "Imported game", source: "psn", link_state: "raw" }],

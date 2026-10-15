@@ -196,6 +196,33 @@ function LibraryPage() {
         </label>
       </div>
 
+      {tab === "All games" && totals.some((game) => game.source === "psn") && (
+        <section
+          aria-labelledby="psn-details-guidance"
+          className="mb-6 flex flex-col gap-4 rounded-xl border border-primary/25 bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-3">
+            <Gamepad2 className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+            <div>
+              <h3 id="psn-details-guidance" className="text-sm font-bold">
+                PlayStation game details
+              </h3>
+              <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+                For covers and game details, open the PlayStation tab and choose “Match PlayStation
+                games” to link your imported games to the catalog.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTab("PlayStation")}
+            className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            Open PlayStation library
+          </button>
+        </section>
+      )}
+
       <label className="mb-4 block text-sm font-bold">
         Search games
         <input
