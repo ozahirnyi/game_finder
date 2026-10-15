@@ -257,40 +257,46 @@ describe("Library", () => {
     renderLibrary();
 
     await screen.findByText("Library");
-    expect(screen.queryByRole("region", { name: "PlayStation library management" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Manage" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete all PlayStation games" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "PlayStation" }));
-    const management = await screen.findByRole("region", {
-      name: "PlayStation library management",
-    });
-    expect(
-      within(management).getByRole("button", {
-        name: "Delete all PlayStation games",
-        hidden: true,
-      }),
-    ).not.toBeVisible();
+    const management = await screen.findByRole("button", { name: "Manage" });
+    expect(screen.queryByRole("menuitem", { name: "Delete all PlayStation games" })).toBeNull();
     expect(api.deletePsnLibrary).not.toHaveBeenCalled();
-    fireEvent.click(within(management).getByText("Manage PlayStation library"));
-    fireEvent.click(
-      within(management).getByRole("button", { name: "Delete all PlayStation games" }),
-    );
+    fireEvent.keyDown(management, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete all PlayStation games" }));
 
     await waitFor(() => expect(api.deletePsnLibrary).toHaveBeenCalledOnce());
     expect(window.confirm).toHaveBeenCalledWith(
       "Delete every PlayStation entry from your library? This cannot be undone.",
     );
+    expect(await screen.findByRole("status")).toHaveTextContent("Deleted 2 PlayStation games.");
     fireEvent.click(screen.getByRole("button", { name: "Steam" }));
-    expect(screen.queryByRole("region", { name: "PlayStation library management" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Manage" })).toBeNull();
   });
 
   it("keeps the library when deletion confirmation is cancelled", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     renderLibrary();
     fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
-    fireEvent.click(await screen.findByText("Manage PlayStation library"));
-    fireEvent.click(screen.getByRole("button", { name: "Delete all PlayStation games" }));
+    fireEvent.keyDown(await screen.findByRole("button", { name: "Manage" }), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete all PlayStation games" }));
     expect(window.confirm).toHaveBeenCalled();
     expect(api.deletePsnLibrary).not.toHaveBeenCalled();
+  });
+
+  it("shows deletion errors after the management menu closes", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    api.deletePsnLibrary.mockRejectedValue(new Error("Service unavailable"));
+    renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    fireEvent.keyDown(await screen.findByRole("button", { name: "Manage" }), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete all PlayStation games" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Could not delete PlayStation games: Service unavailable",
+    );
+    expect(screen.queryByRole("menuitem", { name: "Delete all PlayStation games" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Manage" })).toBeEnabled();
   });
 
   it("renders raw PSN entries without catalog links and keeps linked entries navigable", async () => {

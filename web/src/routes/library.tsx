@@ -1,12 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Gamepad2, Library as LibraryIcon } from "lucide-react";
+import { ChevronDown, Gamepad2, Library as LibraryIcon, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { GameCover } from "@/components/GameCover";
 import { GameDetailLink } from "@/components/GameDetailLink";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   applyPsnLibraryRepair,
   deletePsnLibrary,
@@ -199,15 +207,57 @@ function LibraryPage() {
         </section>
       )}
 
-      <label className="mb-4 block text-sm font-bold">
-        Search games
-        <input
-          aria-label="Search games"
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-          className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
-        />
-      </label>
+      <div className="mb-4 flex items-end gap-3">
+        <label className="block min-w-0 flex-1 text-sm font-bold">
+          Search games
+          <input
+            aria-label="Search games"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
+          />
+        </label>
+        {tab === "PlayStation" && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={removePsnLibrary.isPending}
+                className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+              >
+                {removePsnLibrary.isPending ? "Deleting…" : "Manage"}
+                <ChevronDown className="size-4" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" aria-label="PlayStation library management">
+              <DropdownMenuLabel>PlayStation library</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={removePsnLibrary.isPending}
+                onSelect={() => {
+                  setDeleteMessage(null);
+                  if (
+                    window.confirm(
+                      "Delete every PlayStation entry from your library? This cannot be undone.",
+                    )
+                  ) {
+                    removePsnLibrary.mutate();
+                  }
+                }}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 aria-hidden="true" />
+                Delete all PlayStation games
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+      {tab === "PlayStation" && deleteMessage && (
+        <p role="status" className="mb-4 text-sm text-muted-foreground">
+          {deleteMessage}
+        </p>
+      )}
 
       {tab === "PlayStation" && (
         <section aria-label="PlayStation library tools" className="mb-6 space-y-4">
@@ -302,49 +352,6 @@ function LibraryPage() {
                 : null}
           </div>
         </div>
-      )}
-      {tab === "PlayStation" && (
-        <section
-          aria-label="PlayStation library management"
-          className="mt-10 border-t border-border pt-6"
-        >
-          <details>
-            <summary className="w-fit cursor-pointer rounded-md py-2 text-sm font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-              Manage PlayStation library
-            </summary>
-            <div className="mt-3 space-y-3 rounded-xl border border-border bg-surface p-4">
-              <h3 className="text-sm font-bold">Remove PlayStation library</h3>
-              <p className="max-w-prose text-sm text-muted-foreground">
-                Removes every imported PlayStation game from your Playfinder library. This cannot be
-                undone.
-              </p>
-              <button
-                type="button"
-                disabled={removePsnLibrary.isPending}
-                onClick={() => {
-                  setDeleteMessage(null);
-                  if (
-                    window.confirm(
-                      "Delete every PlayStation entry from your library? This cannot be undone.",
-                    )
-                  ) {
-                    removePsnLibrary.mutate();
-                  }
-                }}
-                className="rounded-lg border border-red-500 px-3 py-2 text-sm font-bold text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50"
-              >
-                {removePsnLibrary.isPending
-                  ? "Deleting PlayStation games…"
-                  : "Delete all PlayStation games"}
-              </button>
-              {deleteMessage && (
-                <p role="status" className="text-sm text-muted-foreground">
-                  {deleteMessage}
-                </p>
-              )}
-            </div>
-          </details>
-        </section>
       )}
     </AppShell>
   );

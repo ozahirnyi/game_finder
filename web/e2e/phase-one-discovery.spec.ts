@@ -95,7 +95,7 @@ for (const viewport of [
   { width: 1280, height: 900 },
   { width: 390, height: 844 },
 ]) {
-  test(`PlayStation deletion stays in footer management at ${viewport.width}px`, async ({
+  test(`PlayStation management menu stays above the list at ${viewport.width}px`, async ({
     page,
     api,
   }) => {
@@ -109,34 +109,39 @@ for (const viewport of [
     );
     await page.goto("/library");
     await waitForHydration(page);
-    const management = page.getByRole("region", { name: "PlayStation library management" });
+    const management = page.getByRole("button", { name: "Manage", exact: true });
     await expect(management).toHaveCount(0);
     await page.getByRole("button", { name: "PlayStation", exact: true }).click();
-    const deleteButton = page.getByRole("button", { name: "Delete all PlayStation games" });
+    const deleteButton = page.getByRole("menuitem", { name: "Delete all PlayStation games" });
     await expect(deleteButton).toBeHidden();
     const game = page.getByRole("heading", { name: "Imported game" });
     await expect(game).toBeVisible();
     const gameBox = await game.boundingBox();
     const managementBox = await management.boundingBox();
-    expect(managementBox!.y).toBeGreaterThan(gameBox!.y + gameBox!.height);
-    await management.getByText("Manage PlayStation library", { exact: true }).click();
+    expect(managementBox!.y + managementBox!.height).toBeLessThan(gameBox!.y);
+    expect(managementBox!.y).toBeLessThan(viewport.height);
+    await management.click();
     await expect(deleteButton).toBeVisible();
-    await expect(management).toContainText("This cannot be undone");
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: `../.superpowers/sdd/psn-manage-menu-${viewport.width}.png`,
+      fullPage: true,
+      animations: "disabled",
+    });
+    await page.keyboard.press("Escape");
+    await expect(deleteButton).toBeHidden();
+    await expect(management).toBeFocused();
+    await management.click();
     page.once("dialog", (dialog) => dialog.dismiss());
     await deleteButton.click();
+    await expect(deleteButton).toBeHidden();
     expect(
       api.requests.some(
         (request) => request.method === "DELETE" && request.path.startsWith("/psn"),
       ),
     ).toBe(false);
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    ).toBe(true);
-    await page.screenshot({
-      path: `../.superpowers/sdd/psn-delete-management-${viewport.width}.png`,
-      fullPage: true,
-      animations: "disabled",
-    });
     await page.getByRole("button", { name: "All games", exact: true }).click();
     await expect(management).toHaveCount(0);
   });
