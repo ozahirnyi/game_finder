@@ -7,7 +7,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   deletePsnLibrary: vi.fn(),
   findPsnCatalogTitles: vi.fn(),
   getCurrentPsnCatalogEnrichment: vi.fn(),
+  previewLibraryCatalogMatches: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => api);
@@ -27,7 +28,9 @@ vi.mock("@/components/AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/components/GameCover", () => ({
-  GameCover: ({ title }: { title: string }) => <div data-testid="game-cover">{title}</div>,
+  GameCover: ({ title, image }: { title: string; image?: string }) => (
+    <div data-testid="game-cover">{image ? <img alt={title} src={image} /> : title}</div>
+  ),
 }));
 
 import { Route } from "./library";
@@ -68,6 +71,146 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Library", () => {
+  it("shows covers for individual catalog choices and keeps choices usable without images", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{ id: "raw", title: "Imported game", source: "psn", link_state: "raw" }],
+      raw_count: 1,
+    });
+    api.searchGames.mockResolvedValue({
+      results: [
+        {
+          id: 101,
+          name: "Cover game",
+          cover_image: "https://covers/portrait.jpg",
+          background_image: "https://covers/banner.jpg",
+        },
+        { id: 102, name: "Legacy game", background_image: "https://covers/legacy.jpg" },
+        { id: 103, name: "No image game", background_image: null },
+      ],
+    });
+    renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search catalog" }));
+
+    const cover = await screen.findByRole("button", { name: "Use Cover game" });
+    expect(within(cover).getByRole("img", { name: "Cover game" })).toHaveAttribute(
+      "src",
+      "https://covers/portrait.jpg",
+    );
+    const legacy = screen.getByRole("button", { name: "Use Legacy game" });
+    expect(within(legacy).getByRole("img", { name: "Legacy game" })).toHaveAttribute(
+      "src",
+      "https://covers/legacy.jpg",
+    );
+    expect(screen.getByRole("button", { name: "Use No image game" })).toBeEnabled();
+    expect(api.applyPsnLibraryRepair).not.toHaveBeenCalled();
+  });
+
+  it("guides users from All games to PlayStation without starting catalog matching", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{ id: "psn-raw", title: "Imported game", source: "psn", link_state: "raw" }],
+      raw_count: 1,
+    });
+    renderLibrary();
+
+    const guidance = await screen.findByRole("region", { name: "PlayStation game details" });
+    expect(guidance).toHaveTextContent(/PlayStation tab.*Match PlayStation games/);
+    expect(api.getCurrentPsnCatalogEnrichment).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Open PlayStation library" }));
+
+    expect(await screen.findByRole("button", { name: "Match PlayStation games" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "PlayStation game details" })).toBeNull();
+    expect(api.previewLibraryCatalogMatches).not.toHaveBeenCalled();
+    expect(api.applyPsnLibraryRepair).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Steam" }));
+    expect(screen.queryByRole("button", { name: "Open PlayStation library" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "All games" }));
+    expect(screen.getByRole("button", { name: "Open PlayStation library" })).toBeVisible();
+  });
+
+  it("keeps the PlayStation entry discoverable when the loaded page only contains Steam", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{ id: "psn-raw", source: "psn", link_state: "raw" }],
+    });
+    api.getLibraryOverviewPage.mockResolvedValue({
+      games: [{ id: "steam-1", title: "Steam game", source: "steam" }],
+      total: 1,
+      has_more: false,
+    });
+    renderLibrary();
+
+    expect(await screen.findByRole("button", { name: "Open PlayStation library" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Steam game" })).toBeVisible();
+  });
+
+  it("does not offer PlayStation matching guidance without imported PlayStation games", async () => {
+    renderLibrary();
+    await screen.findByText("Your library is empty");
+    expect(screen.queryByRole("button", { name: "Open PlayStation library" })).toBeNull();
+  });
+
+  it("hides guidance when every PlayStation game is matched even if a manual game is raw", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [
+        {
+          id: "psn-linked",
+          title: "Matched game",
+          source: "psn",
+          link_state: "linked",
+          catalog_game_id: 101,
+        },
+        { id: "manual-raw", title: "Manual game", source: "manual", link_state: "raw" },
+      ],
+    });
+    renderLibrary();
+    await screen.findByRole("heading", { name: "Matched game" });
+    expect(screen.queryByRole("region", { name: "PlayStation game details" })).toBeNull();
+  });
+
+  it("shows PlayStation matching and repair tools only inside the PlayStation tab", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [{ id: "psn-raw", title: "Imported game", source: "psn", link_state: "raw" }],
+      raw_count: 1,
+      quarantined_count: 1,
+    });
+    api.previewLibraryCatalogMatches.mockResolvedValue({ items: [] });
+    renderLibrary();
+    await screen.findByRole("heading", { name: "Imported game" });
+    expect(screen.queryByRole("button", { name: /Match .*games/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Find in catalog" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Improve PlayStation details")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "PlayStation" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Match PlayStation games" }));
+    fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
+    await waitFor(() =>
+      expect(api.previewLibraryCatalogMatches).toHaveBeenCalledWith(false, "psn"),
+    );
+    expect(screen.getByRole("button", { name: "Find in catalog" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Steam" }));
+    expect(screen.queryByRole("button", { name: "Find in catalog" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Find catalog matches" })).not.toBeInTheDocument();
+  });
+
+  it("describes linked PlayStation records as file imports", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [
+        {
+          id: "psn-linked",
+          source: "psn",
+          title: "Imported game",
+          catalog_game_id: 101,
+          detail_game_id: "101",
+          link_state: "linked",
+        },
+      ],
+      steam_available: false,
+      raw_count: 0,
+    });
+    renderLibrary();
+    expect(await screen.findByText("Imported from your PlayStation export")).toBeInTheDocument();
+    expect(screen.queryByText("Synced from your connected library")).not.toBeInTheDocument();
+  });
   it("shows a Library skeleton while its first request is pending", async () => {
     api.getLibraryOverview.mockImplementation(() => new Promise(() => {}));
 
@@ -107,18 +250,53 @@ describe("Library", () => {
     });
   });
 
-  it("offers PSN deletion only on the PlayStation tab", async () => {
+  it("keeps PSN deletion behind library management only on the PlayStation tab", async () => {
     api.deletePsnLibrary.mockResolvedValue({ deleted: 2 });
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderLibrary();
 
     await screen.findByText("Library");
+    expect(screen.queryByRole("button", { name: "Manage" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete all PlayStation games" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "PlayStation" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete all PlayStation games" }));
+    const management = await screen.findByRole("button", { name: "Manage" });
+    expect(screen.queryByRole("menuitem", { name: "Delete all PlayStation games" })).toBeNull();
+    expect(api.deletePsnLibrary).not.toHaveBeenCalled();
+    fireEvent.keyDown(management, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete all PlayStation games" }));
 
     await waitFor(() => expect(api.deletePsnLibrary).toHaveBeenCalledOnce());
+    expect(window.confirm).toHaveBeenCalledWith(
+      "Delete every PlayStation entry from your library? This cannot be undone.",
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent("Deleted 2 PlayStation games.");
+    fireEvent.click(screen.getByRole("button", { name: "Steam" }));
+    expect(screen.queryByRole("button", { name: "Manage" })).toBeNull();
+  });
+
+  it("keeps the library when deletion confirmation is cancelled", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    fireEvent.keyDown(await screen.findByRole("button", { name: "Manage" }), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete all PlayStation games" }));
+    expect(window.confirm).toHaveBeenCalled();
+    expect(api.deletePsnLibrary).not.toHaveBeenCalled();
+  });
+
+  it("shows deletion errors after the management menu closes", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    api.deletePsnLibrary.mockRejectedValue(new Error("Service unavailable"));
+    renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    fireEvent.keyDown(await screen.findByRole("button", { name: "Manage" }), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete all PlayStation games" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Could not delete PlayStation games: Service unavailable",
+    );
+    expect(screen.queryByRole("menuitem", { name: "Delete all PlayStation games" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Manage" })).toBeEnabled();
   });
 
   it("renders raw PSN entries without catalog links and keeps linked entries navigable", async () => {
@@ -170,9 +348,8 @@ describe("Library", () => {
       pending_catalog_count: 3,
     });
     renderLibrary();
-    expect(
-      await screen.findByText(/Catalog matching continues in the background/),
-    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    expect(await screen.findByText(/Find catalog matches to add covers/)).toBeInTheDocument();
   });
 
   it("does not expose a browser retry when catalog matching is pending", async () => {
@@ -185,9 +362,8 @@ describe("Library", () => {
       pending_catalog_count: 1,
     });
     renderLibrary();
-    expect(
-      await screen.findByText(/Catalog matching continues in the background/),
-    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    expect(await screen.findByText(/Find catalog matches to add covers/)).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Retry catalog matching" }),
     ).not.toBeInTheDocument();
@@ -209,6 +385,7 @@ describe("Library", () => {
     });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
 
     expect(await screen.findByText(/Checking 3 of 10 PlayStation titles/)).toBeInTheDocument();
     expect(screen.getByText(/2 linked, 1 for review, 6 remaining/)).toBeInTheDocument();
@@ -230,6 +407,7 @@ describe("Library", () => {
     });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
 
     expect(await screen.findByText(/Checking 0 of 10 PlayStation titles/)).toBeInTheDocument();
   });
@@ -270,9 +448,24 @@ describe("Library", () => {
         },
       ],
     });
-    api.applyPsnLibraryRepair.mockResolvedValue({ updated: 1 });
+    api.applyPsnLibraryRepair.mockImplementation(async () => {
+      api.getLibraryOverview.mockResolvedValue({
+        games: [
+          {
+            id: "raw",
+            title: "STAR WARS Battlefront",
+            source: "psn",
+            link_state: "linked",
+            catalog_game_id: 777,
+          },
+        ],
+        raw_count: 0,
+      });
+      return { updated: 1 };
+    });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
     fireEvent.change(screen.getByLabelText("Catalog search for STAR WARS Battlefront"), {
@@ -287,6 +480,10 @@ describe("Library", () => {
       ]),
     );
     expect(api.searchGames).toHaveBeenCalledWith({ query: "Star Wars Battlefront 2015" });
+    fireEvent.click(screen.getByRole("button", { name: "All games" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "PlayStation game details" })).toBeNull(),
+    );
   });
 
   it("starts manual catalog search from the cleaned backend query", async () => {
@@ -313,6 +510,7 @@ describe("Library", () => {
     });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
     expect(screen.getByLabelText("Catalog search for EA SPORTS™ FIFA 16")).toHaveValue("FIFA 16");
@@ -337,6 +535,7 @@ describe("Library", () => {
     api.searchGames.mockResolvedValue({ results: [] });
 
     renderLibrary();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
     fireEvent.click(await screen.findByRole("button", { name: "Find in catalog" }));
     fireEvent.click(screen.getByRole("button", { name: "Find catalog title" }));
 
@@ -372,8 +571,7 @@ describe("Library", () => {
       pending_catalog_count: 1,
     });
     renderLibrary();
-    expect(
-      await screen.findByText(/Catalog matching continues in the background/),
-    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
+    expect(await screen.findByText(/Find catalog matches to add covers/)).toBeInTheDocument();
   });
 });

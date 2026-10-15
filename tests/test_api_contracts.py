@@ -1040,8 +1040,8 @@ def test_genre_deals_returns_popular_discounts_and_fallback_sections(monkeypatch
         assert page == 1
         return {
             "results": {
-                "Hades": [{"id": 1, "name": "Hades", "released": "2020-09-17", "background_image": "igdb-hades", "genres": ["Action", "RPG"]}],
-                "Civilization VII": [{"id": 2, "name": "Civilization VII", "released": "2025-02-11", "background_image": "igdb-civ", "genres": ["Strategy"]}],
+                "Hades": [{"id": 1, "steam_appid": 1, "name": "Hades", "released": "2020-09-17", "background_image": "igdb-hades", "genres": ["Action", "RPG"]}],
+                "Civilization VII": [{"id": 2, "steam_appid": 4, "name": "Civilization VII", "released": "2025-02-11", "background_image": "igdb-civ", "genres": ["Strategy"]}],
             }.get(query, [])
         }
 
@@ -1111,7 +1111,7 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
         }
 
     async def fake_fetch_igdb_games(query: str, _page: int):
-        return {"results": [{"id": int(query.split()[-1]), "name": query, "released": None, "background_image": None, "genres": ["ACTION"]}]}
+        return {"results": [{"id": int(query.split()[-1]), "steam_appid": int(query.split()[-1]), "name": query, "released": None, "background_image": None, "genres": ["ACTION"]}]}
 
     user = SimpleNamespace(favorite_genres=[" Action "], steam_country_code="us")
     main.app.dependency_overrides[main.get_optional_current_user] = lambda: user
@@ -1128,7 +1128,7 @@ def test_genre_deals_caps_sections_and_uses_stable_cache_key(monkeypatch):
     assert len(first.json()["sections"][0]["results"]) == 5
     assert second.status_code == 200
     assert cache_keys[0] == cache_keys[1]
-    assert cache_keys[0].startswith("steam_genre_deals_v7:")
+    assert cache_keys[0].startswith("steam_genre_deals_v8:")
 
 
 def test_genre_deals_share_canonical_completed_responses_and_country_sources(monkeypatch):
@@ -1195,7 +1195,8 @@ def test_genre_deals_fill_profile_genres_with_current_sale_genres(monkeypatch):
 
     async def fake_fetch_igdb_games(query: str, _page: int):
         genre = query.split()[0]
-        return {"results": [{"id": hash(query), "name": query, "released": None, "background_image": None, "genres": [genre]}]}
+        appid = {"Action One": 1, "Action Two": 2, "Action Three": 3, "Adventure One": 4, "Adventure Two": 5, "RPG One": 6}[query]
+        return {"results": [{"id": appid, "steam_appid": appid, "name": query, "released": None, "background_image": None, "genres": [genre]}]}
 
     main.app.dependency_overrides[main.get_optional_current_user] = lambda: SimpleNamespace(
         favorite_genres=["Sports"], steam_country_code="US"

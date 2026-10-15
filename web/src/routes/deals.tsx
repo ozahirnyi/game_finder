@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { GameDetailLink } from "@/components/GameDetailLink";
 import { GameCover } from "@/components/GameCover";
+import { DealCollectionActions } from "@/components/DealCollectionActions";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
 import { type Deal, getGenreDeals } from "@/lib/api";
 import { getGameMediaCandidates } from "@/lib/gameMedia";
@@ -17,6 +18,30 @@ export const Route = createFileRoute("/deals")({
   }),
   component: DealsPage,
 });
+
+function genreLabel(value: string) {
+  const labels: Record<string, string> = {
+    action: "Action",
+    rpg: "RPG",
+    adventure: "Adventure",
+    strategy: "Strategy",
+    indie: "Indie",
+    shooter: "Shooter",
+    puzzle: "Puzzle",
+    simulation: "Simulation",
+    sports: "Sports",
+    racing: "Racing",
+    horror: "Horror",
+    "role-playing (rpg)": "RPG",
+  };
+  return (
+    labels[value.trim().toLowerCase()] ??
+    value
+      .trim()
+      .replace(/\brpg\b/gi, "RPG")
+      .replace(/^./, (letter) => letter.toUpperCase())
+  );
+}
 
 function gameLink(deal: Deal) {
   return deal.id != null
@@ -91,6 +116,7 @@ function DealCard({ deal, large = false }: { deal: Deal; large?: boolean }) {
               </a>
             )}
           </div>
+          <DealCollectionActions deal={deal} />
         </div>
         <div
           className={`${large ? "relative z-20 flex items-end justify-between border-t border-border pt-3" : "text-right"}`}
@@ -177,11 +203,11 @@ function DealsPage() {
                 onClick={() => setSelectedGenre(section.genre)}
                 className={`rounded-full border px-4 py-2 text-sm font-bold ${activeGenre === section.genre ? "border-primary bg-primary/15 text-primary" : "border-border hover:border-primary/50"}`}
               >
-                {section.genre}
+                {genreLabel(section.genre)}
               </button>
             ))}
           </div>
-          <h2 className="mt-8 text-2xl font-bold">{activeSection.genre}</h2>
+          <h2 className="mt-8 text-2xl font-bold">{genreLabel(activeSection.genre)}</h2>
           <div
             data-testid="selected-genre-deals"
             className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5"

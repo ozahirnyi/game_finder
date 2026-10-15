@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({
@@ -37,6 +37,9 @@ it("shows linked Google and imported PlayStation data", async () => {
     </QueryClientProvider>,
   );
   expect(await screen.findByText("178 imported games")).toBeInTheDocument();
+  const playstation = screen.getByText("PlayStation").closest(".rounded-xl")!;
+  expect(within(playstation as HTMLElement).getByText("Imported")).toBeInTheDocument();
+  expect(within(playstation as HTMLElement).queryByText("Connected")).not.toBeInTheDocument();
   expect(screen.getByText("Google sign-in connected")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Disconnect Google" })).toBeInTheDocument();
 });

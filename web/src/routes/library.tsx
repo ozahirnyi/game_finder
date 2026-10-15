@@ -1,12 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Gamepad2, Library as LibraryIcon } from "lucide-react";
+import { ChevronDown, Gamepad2, Library as LibraryIcon, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PersonalSectionGate } from "@/components/PersonalSectionGate";
 import { GameCover } from "@/components/GameCover";
 import { GameDetailLink } from "@/components/GameDetailLink";
 import { Chip, EmptyState, SectionHeader } from "@/components/ui-bits";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   applyPsnLibraryRepair,
   deletePsnLibrary,
@@ -18,6 +26,7 @@ import {
   type LibraryOverviewGame,
 } from "@/lib/api";
 import { libraryPlaytime, librarySource } from "@/lib/collectionPresentation";
+import { LibraryCatalogMatchLauncher } from "@/components/LibraryCatalogMatches";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 export const Route = createFileRoute("/library")({
@@ -77,6 +86,7 @@ function LibraryPage() {
   const psnCatalogJob = useQuery({
     queryKey: ["psn-catalog-enrichment", "current"],
     queryFn: getCurrentPsnCatalogEnrichment,
+    enabled: tab === "PlayStation",
     retry: false,
     refetchInterval: (query) =>
       query.state.data?.status === "queued" || query.state.data?.status === "running"
@@ -94,11 +104,15 @@ function LibraryPage() {
     | undefined;
   useEffect(() => {
     if (psnCatalogJob.data?.status === "succeeded") {
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
       void queryClient.invalidateQueries({ queryKey: ["library-overview-page"] });
     }
   }, [psnCatalogJob.data?.status, queryClient]);
   const owned = libraryQuery.data?.pages.flatMap((page) => page.games) ?? [];
   const totals = overviewQuery.data?.games ?? [];
+  const hasUnmatchedPsnGames = totals.some(
+    (game) => game.source === "psn" && game.link_state !== "linked",
+  );
   const removePsnLibrary = useMutation({
     mutationFn: deletePsnLibrary,
     onSuccess: async ({ deleted }) => {
@@ -142,36 +156,6 @@ function LibraryPage() {
           ))}
         </div>
       </div>
-      <label className="mb-4 block text-sm font-bold">
-        Search games
-        <input
-          aria-label="Search games"
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-          className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
-        />
-      </label>
-      {libraryQuery.data?.pages[0]?.raw_count || libraryQuery.data?.pages[0]?.quarantined_count ? (
-        <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
-          <p className="font-bold">Improve PlayStation details</p>
-          <p className="mt-1 text-muted-foreground">
-            Catalog matching continues in the background. Exact matches will appear automatically;
-            uncertain titles can be chosen below.
-          </p>
-          {psnCatalogProgress ? (
-            <p className="mt-1 text-muted-foreground">
-              {psnCatalogJob.data?.status === "queued" || psnCatalogJob.data?.status === "running"
-                ? `Checking ${psnCatalogProgress.attempted ?? 0} of ${psnCatalogProgress.total ?? 0} PlayStation titles — ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`
-                : `Catalog matching: ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`}
-            </p>
-          ) : null}
-          {libraryQuery.data?.pages[0]?.quarantined_count ? (
-            <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">
-              Review hidden PSN entries
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
 
       <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4">
         {tabs.map((item) => (
@@ -183,34 +167,6 @@ function LibraryPage() {
             {item}
           </button>
         ))}
-        {tab === "PlayStation" && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={removePsnLibrary.isPending}
-              onClick={() => {
-                setDeleteMessage(null);
-                if (
-                  window.confirm(
-                    "Delete every PlayStation entry from your library? This cannot be undone.",
-                  )
-                ) {
-                  removePsnLibrary.mutate();
-                }
-              }}
-              className="rounded-full border border-red-500 px-3 py-1.5 text-xs font-bold text-red-600 disabled:opacity-50"
-            >
-              {removePsnLibrary.isPending
-                ? "Deleting PlayStation games…"
-                : "Delete all PlayStation games"}
-            </button>
-            {deleteMessage && (
-              <span role="status" className="text-xs text-muted-foreground">
-                {deleteMessage}
-              </span>
-            )}
-          </div>
-        )}
         <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
           Sort by time
           <select
@@ -223,6 +179,114 @@ function LibraryPage() {
           </select>
         </label>
       </div>
+
+      {tab === "All games" && hasUnmatchedPsnGames && (
+        <section
+          aria-labelledby="psn-details-guidance"
+          className="mb-6 flex flex-col gap-4 rounded-xl border border-primary/25 bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-3">
+            <Gamepad2 className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+            <div>
+              <h3 id="psn-details-guidance" className="text-sm font-bold">
+                PlayStation game details
+              </h3>
+              <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+                For covers and game details, open the PlayStation tab and choose “Match PlayStation
+                games” to link your imported games to the catalog.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTab("PlayStation")}
+            className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            Open PlayStation library
+          </button>
+        </section>
+      )}
+
+      <div className="mb-4 flex items-end gap-3">
+        <label className="block min-w-0 flex-1 text-sm font-bold">
+          Search games
+          <input
+            aria-label="Search games"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
+          />
+        </label>
+        {tab === "PlayStation" && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={removePsnLibrary.isPending}
+                className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+              >
+                {removePsnLibrary.isPending ? "Deleting…" : "Manage"}
+                <ChevronDown className="size-4" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" aria-label="PlayStation library management">
+              <DropdownMenuLabel>PlayStation library</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={removePsnLibrary.isPending}
+                onSelect={() => {
+                  setDeleteMessage(null);
+                  if (
+                    window.confirm(
+                      "Delete every PlayStation entry from your library? This cannot be undone.",
+                    )
+                  ) {
+                    removePsnLibrary.mutate();
+                  }
+                }}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 aria-hidden="true" />
+                Delete all PlayStation games
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+      {tab === "PlayStation" && deleteMessage && (
+        <p role="status" className="mb-4 text-sm text-muted-foreground">
+          {deleteMessage}
+        </p>
+      )}
+
+      {tab === "PlayStation" && (
+        <section aria-label="PlayStation library tools" className="mb-6 space-y-4">
+          <LibraryCatalogMatchLauncher source="psn" />
+          {libraryQuery.data?.pages[0]?.raw_count ||
+          libraryQuery.data?.pages[0]?.quarantined_count ? (
+            <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">
+              <p className="font-bold">Improve PlayStation details</p>
+              <p className="mt-1 text-muted-foreground">
+                Find catalog matches to add covers and game details. Review uncertain titles before
+                applying.
+              </p>
+              {psnCatalogProgress ? (
+                <p className="mt-1 text-muted-foreground">
+                  {psnCatalogJob.data?.status === "queued" ||
+                  psnCatalogJob.data?.status === "running"
+                    ? `Checking ${psnCatalogProgress.attempted ?? 0} of ${psnCatalogProgress.total ?? 0} PlayStation titles — ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`
+                    : `Catalog matching: ${psnCatalogProgress.linked ?? 0} linked, ${psnCatalogProgress.review ?? 0} for review, ${psnCatalogProgress.remaining ?? 0} remaining.`}
+                </p>
+              ) : null}
+              {libraryQuery.data?.pages[0]?.quarantined_count ? (
+                <Link to="/psn-library-repair" className="mt-2 block font-bold text-primary">
+                  Review hidden PSN entries
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      )}
 
       {libraryQuery.isPending && !libraryQuery.data && (
         <div
@@ -274,7 +338,7 @@ function LibraryPage() {
       {visible.length > 0 && (
         <div key={tab} className="stagger space-y-3">
           {visible.map((game) => (
-            <LibraryCard key={game.id} game={game} />
+            <LibraryCard key={game.id} game={game} showPsnTools={tab === "PlayStation"} />
           ))}
           <div
             ref={loadMoreRef}
@@ -293,7 +357,7 @@ function LibraryPage() {
   );
 }
 
-function LibraryCard({ game }: { game: LibraryOverviewGame }) {
+function LibraryCard({ game, showPsnTools }: { game: LibraryOverviewGame; showPsnTools: boolean }) {
   const contents = (
     <>
       <GameCover
@@ -317,7 +381,11 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
         <p className="mt-1 text-xs text-muted-foreground">
           {game.source === "psn" && game.link_state === "raw"
             ? "PlayStation title — catalog details can be added later"
-            : "Synced from your connected library"}
+            : game.source === "psn"
+              ? "Imported from your PlayStation export"
+              : game.source === "manual"
+                ? "Added manually"
+                : "Synced from your connected library"}
         </p>
       </div>
       <div className="hidden text-right sm:block">
@@ -350,7 +418,7 @@ function LibraryCard({ game }: { game: LibraryOverviewGame }) {
   return (
     <div className="space-y-2">
       {card}
-      {game.source === "psn" && game.link_state === "raw" ? (
+      {showPsnTools && game.source === "psn" && game.link_state === "raw" ? (
         <PsnCatalogPicker key={`${game.id}:${game.catalog_search_query ?? ""}`} game={game} />
       ) : null}
     </div>
@@ -378,6 +446,7 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
     onSuccess: async () => {
       setOpen(false);
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["library"] }),
         queryClient.invalidateQueries({ queryKey: ["library-overview-page"] }),
         queryClient.invalidateQueries({ queryKey: ["psn-library-repair"] }),
       ]);
@@ -464,11 +533,25 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
                   type="button"
                   disabled={link.isPending}
                   onClick={() => link.mutate(result.id)}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-sm hover:border-primary/50 disabled:opacity-50"
+                  className="flex min-w-0 items-center gap-3 rounded-lg border border-border px-3 py-2 text-left text-sm hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                   aria-label={`Use ${result.name}`}
                 >
-                  <span className="font-bold">{result.name}</span>
-                  <span className="text-xs text-muted-foreground">Use this game</span>
+                  <GameCover
+                    from="#1d4ed8"
+                    to="#111827"
+                    title={result.name}
+                    image={result.cover_image ?? result.background_image ?? undefined}
+                    fallbackImage={result.background_image ?? undefined}
+                    compact
+                    bare
+                    fit="contain"
+                    sizes="48px"
+                    className="h-16 w-12 shrink-0 rounded-md"
+                  />
+                  <span className="min-w-0 flex-1 break-words font-bold">{result.name}</span>
+                  <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                    Use this game
+                  </span>
                 </button>
               ))}
             </div>

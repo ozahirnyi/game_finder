@@ -208,7 +208,7 @@ async def test_genre_deals_fills_defaults_and_tolerates_steam_genre_failure():
     async def candidates(_):
         return {"candidates": [{"steam_appid": 1, "name": "One"}], "popular": []}
     async def igdb(*_):
-        return {"results": [{"id": 1, "name": "One", "genres": ["Puzzle"]}]}
+        return {"results": [{"id": 1, "steam_appid": 1, "name": "One", "genres": ["Puzzle"]}]}
     async def unavailable_steam(*_):
         raise RuntimeError("steam down")
 

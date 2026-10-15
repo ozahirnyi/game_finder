@@ -19,7 +19,7 @@ def steam_deal_candidates_key(country: str) -> str:
 
 
 def igdb_deal_match_key(steam_appid: int) -> str:
-    return build_cache_key("igdb_deal_match_v2", steam_appid=steam_appid)
+    return build_cache_key("igdb_deal_match_v3", steam_appid=steam_appid)
 
 
 async def get_cached_steam_deal_candidates(

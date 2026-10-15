@@ -1,5 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  createBrowserHistory,
+  createRootRoute,
+  createRouter,
+  defaultParseSearch,
+  defaultStringifySearch,
+  RouterContextProvider,
+} from "@tanstack/react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/AppShell", () => ({
@@ -33,11 +41,18 @@ vi.mock("@/components/GameCard", () => ({
 }));
 import { Route } from "./search";
 
+const histories: ReturnType<typeof createBrowserHistory>[] = [];
+
 function renderSearch(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const SearchPage = Route.options.component!;
+  const history = createBrowserHistory();
+  histories.push(history);
+  const router = createRouter({ routeTree: createRootRoute(), history });
   render(
     <QueryClientProvider client={client}>
-      <SearchPage />
+      <RouterContextProvider router={router}>
+        <SearchPage />
+      </RouterContextProvider>
     </QueryClientProvider>,
   );
   return client;
@@ -46,10 +61,168 @@ function renderSearch(client = new QueryClient({ defaultOptions: { queries: { re
 describe("SearchPage", () => {
   afterEach(() => {
     cleanup();
+    histories
+      .splice(0)
+      .reverse()
+      .forEach((history) => history.destroy());
     vi.useRealTimers();
     vi.unstubAllGlobals();
     window.localStorage.removeItem("game_finder_token");
     window.history.replaceState({}, "", "/search");
+  });
+
+  it("restores multiple facets after the router serializes a detail return URL", async () => {
+    const originalSearch =
+      "?q=Hades&platform=playstation&platform=xbox&feature=co_op&feature=single_player&genre=adventure&genre=rpg&on_sale=true";
+    const routerReturnTo = `/search${defaultStringifySearch(defaultParseSearch(originalSearch))}`;
+    // GameDetailLink captures the router-normalized location, which serializes arrays as JSON.
+    expect(new URL(routerReturnTo, window.location.origin).searchParams.get("platform")).toBe(
+      '["playstation","xbox"]',
+    );
+    const detailUrl = new URL(
+      `/games/42?${new URLSearchParams({ returnTo: routerReturnTo })}`,
+      window.location.origin,
+    );
+    window.history.replaceState({}, "", detailUrl.searchParams.get("returnTo"));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ results: [{ id: 42, name: "Hades" }] })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+
+    await screen.findByRole("link", { name: "Hades" });
+    for (const label of ["PlayStation", "Xbox", "Co-op", "Solo", "Adventure", "RPG", "On sale"]) {
+      expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-pressed", "true");
+    }
+    const request = new URL(String(fetchMock.mock.calls[0][0]), window.location.origin);
+    expect(request.searchParams.getAll("platform")).toEqual(["playstation", "xbox"]);
+    expect(request.searchParams.getAll("feature")).toEqual(["co_op", "single_player"]);
+    expect(request.searchParams.getAll("genre")).toEqual(["adventure", "rpg"]);
+    expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("Hades");
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+    expect(screen.getByRole("button", { name: "PlayStation" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Xbox" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Switch" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("restores every catalog facet and carries the complete search into game details", async () => {
+    const search =
+      "?q=Hades&platform=playstation&platform=xbox&feature=co_op&genre=roguelike&on_sale=true";
+    window.history.replaceState({}, "", `/search${search}`);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ results: [{ id: 42, name: "Hades" }] })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+
+    const card = await screen.findByRole("link", { name: "Hades" });
+    expect(card).toHaveAttribute(
+      "href",
+      `/games/42?returnTo=${encodeURIComponent(`/search${search}`)}`,
+    );
+    for (const label of ["PlayStation", "Xbox", "Co-op", "Roguelike", "On sale"]) {
+      expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-pressed", "true");
+    }
+    const request = new URL(String(fetchMock.mock.calls[0][0]), window.location.origin);
+    expect(request.searchParams.getAll("platform")).toEqual(["playstation", "xbox"]);
+    expect(request.searchParams.get("feature")).toBe("co_op");
+    expect(request.searchParams.get("genre")).toBe("roguelike");
+    expect(request.searchParams.get("on_sale")).toBe("true");
+  });
+
+  it("restores query, mode and filters on browser Back and Forward", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] }))),
+    );
+    window.history.replaceState(
+      {},
+      "",
+      "/search?q=Hades&platform=ps4&feature=single_player&genre=rpg&on_sale=true",
+    );
+    renderSearch();
+    fireEvent.click(screen.getByRole("button", { name: /find a game with ai/i }));
+    await waitFor(() => expect(window.location.search).toContain("mode=ai"));
+    fireEvent.change(screen.getByPlaceholderText(/describe what you want/i), {
+      target: { value: "co-op on Switch" },
+    });
+    await waitFor(() => expect(window.location.search).toContain("co-op+on+Switch"));
+    await act(async () => {
+      window.history.back();
+    });
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("Hades"),
+    );
+    expect(screen.getByRole("button", { name: "Solo" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "RPG" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "On sale" })).toHaveAttribute("aria-pressed", "true");
+    expect(window.location.search).toContain("platform=ps4");
+    await act(async () => {
+      window.history.forward();
+    });
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/describe what you want/i)).toHaveValue("co-op on Switch"),
+    );
+  });
+
+  it("prefills an AI example without submitting a recommendation request", async () => {
+    window.history.replaceState({}, "", "/search?mode=ai&q=Relaxing+games+on+Switch");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ limit: 3, remaining: 3 })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+    expect(screen.getByPlaceholderText(/describe what you want/i)).toHaveValue(
+      "Relaxing games on Switch",
+    );
+    expect(screen.getByRole("button", { name: /find a game with ai/i })).toBeInTheDocument();
+    await act(async () => {});
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
+  it("restores platform selections through history and same-route navigation", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] }))),
+    );
+    window.history.replaceState({}, "", "/search?platform=playstation");
+    renderSearch();
+    fireEvent.click(screen.getByRole("button", { name: "Xbox" }));
+    await waitFor(() => expect(window.location.search).toContain("platform=xbox"));
+    await act(async () => {
+      window.history.back();
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Xbox" })).toHaveAttribute("aria-pressed", "false"),
+    );
+    expect(screen.getByRole("button", { name: "PlayStation" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await act(async () => {
+      window.history.forward();
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Xbox" })).toHaveAttribute("aria-pressed", "true"),
+    );
+
+    act(() =>
+      histories
+        .at(-1)!
+        .push("/search?q=Portal&platform=switch&genre=adventure&feature=co_op&on_sale=true"),
+    );
+    expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("Portal");
+    for (const label of ["Switch", "Adventure", "Co-op", "On sale"]) {
+      expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-pressed", "true");
+    }
+    expect(screen.getByRole("button", { name: "Xbox" })).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(screen.getByRole("button", { name: "All" }));
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("Portal");
   });
 
   it("does not log a missing queryFn for the disabled AI recommendation query", () => {
@@ -325,7 +498,7 @@ describe("SearchPage", () => {
     window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
 
-    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /find a game with ai/i }));
 
     expect(await screen.findByText("2 of 3 AI searches remaining today")).toBeInTheDocument();
   });
@@ -354,7 +527,7 @@ describe("SearchPage", () => {
     window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
 
-    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /find a game with ai/i }));
 
     const quotaStatus = await screen.findByRole("status");
     expect(quotaStatus).toHaveTextContent("0 of 3 AI searches remaining today");
@@ -363,7 +536,7 @@ describe("SearchPage", () => {
   });
 
   it("submits an AI prompt and displays returned recommendations", async () => {
-    const fetchMock = vi.fn((url: string) =>
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) =>
       Promise.resolve(
         new Response(
           JSON.stringify(
@@ -398,7 +571,7 @@ describe("SearchPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
-    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /find a game with ai/i }));
     const prompt = await screen.findByPlaceholderText(/describe what you want/i);
     fireEvent.change(prompt, { target: { value: "co-op games for two" } });
     fireEvent.submit(screen.getByRole("form", { name: /search form/i }));
@@ -407,12 +580,19 @@ describe("SearchPage", () => {
     expect(recommendation).toContainElement(screen.getByText("Fits your prompt"));
     expect(recommendation).toHaveAttribute(
       "href",
-      "/games/42?returnTo=%2Fsearch%3Fmode%3Dai%26q%3Dco-op%2520games%2520for%2520two",
+      "/games/42?returnTo=%2Fsearch%3Fmode%3Dai%26q%3Dco-op%2Bgames%2Bfor%2Btwo",
     );
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/recommendations"),
       expect.any(Object),
     );
+    const submitted = fetchMock.mock.calls.find(
+      ([url, init]) => String(url).endsWith("/recommendations") && init?.method === "POST",
+    );
+    expect(JSON.parse(submitted![1]!.body as string)).toEqual({
+      prompt: "co-op games for two",
+      liked_game_ids: [],
+    });
   });
 
   it("restores completed AI recommendations after returning from a game page without another request", async () => {
@@ -444,7 +624,7 @@ describe("SearchPage", () => {
     window.localStorage.setItem("game_finder_token", "test-token");
     const client = renderSearch();
 
-    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /find a game with ai/i }));
     fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
       target: { value: "roguelike" },
     });
@@ -465,7 +645,7 @@ describe("SearchPage", () => {
     renderSearch();
 
     fireEvent.click(screen.getByRole("button", { name: "Co-op" }));
-    fireEvent.click(screen.getByRole("button", { name: "Consoles" }));
+    fireEvent.click(screen.getByRole("button", { name: "PlayStation" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -475,27 +655,28 @@ describe("SearchPage", () => {
     );
     expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("");
     expect(window.location.search).toContain("feature=co_op");
-    expect(window.location.search).toContain("platform=console");
+    expect(window.location.search).toContain("platform=playstation");
     expect(screen.getByRole("button", { name: "Co-op" })).toHaveClass("border-primary");
   });
 
-  it("offers Solo and a console group instead of a single promoted console", async () => {
+  it("offers Solo alongside PC, PlayStation, Xbox and Switch families", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] })));
     vi.stubGlobal("fetch", fetchMock);
     renderSearch();
 
     fireEvent.click(screen.getByRole("button", { name: "Solo" }));
-    fireEvent.click(screen.getByRole("button", { name: "Consoles" }));
+    fireEvent.click(screen.getByRole("button", { name: "Xbox" }));
+    fireEvent.click(screen.getByRole("button", { name: "Switch" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringMatching(
-          /feature=single_player.*platform=console|platform=console.*feature=single_player/,
-        ),
+        expect.stringMatching(/platform=xbox.*platform=switch.*feature=single_player/),
         expect.anything(),
       ),
     );
     expect(screen.queryByRole("button", { name: "PS5" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "PC" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "PlayStation" })).toBeInTheDocument();
   });
 
   it("offers additional catalog genres as structured filters", async () => {
@@ -527,11 +708,13 @@ describe("SearchPage", () => {
         expect.anything(),
       ),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Consoles" }));
+    fireEvent.click(screen.getByRole("button", { name: "PlayStation" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringMatching(/on_sale=true.*platform=console|platform=console.*on_sale=true/),
+        expect.stringMatching(
+          /on_sale=true.*platform=playstation|platform=playstation.*on_sale=true/,
+        ),
         expect.anything(),
       ),
     );
@@ -576,7 +759,7 @@ describe("SearchPage", () => {
     );
     window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
-    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /find a game with ai/i }));
     fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
       target: { value: "roguelike" },
     });
@@ -612,7 +795,7 @@ describe("SearchPage", () => {
     );
     window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
-    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /find a game with ai/i }));
     fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
       target: { value: "obscure niche" },
     });
@@ -634,7 +817,7 @@ describe("SearchPage", () => {
     );
     window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
-    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /find a game with ai/i }));
     fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
       target: { value: "co-op" },
     });
@@ -656,7 +839,7 @@ describe("SearchPage", () => {
     );
     window.localStorage.setItem("game_finder_token", "test-token");
     renderSearch();
-    fireEvent.click(screen.getByRole("button", { name: /ai search/i }));
+    fireEvent.click(screen.getByRole("button", { name: /find a game with ai/i }));
     fireEvent.change(await screen.findByPlaceholderText(/describe what you want/i), {
       target: { value: "co-op" },
     });

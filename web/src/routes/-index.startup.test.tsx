@@ -79,6 +79,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("home startup", () => {
+  it("offers a prominent AI entry and ready-to-edit example requests", async () => {
+    renderHome();
+    expect(await screen.findByRole("link", { name: "Find a game with AI" })).toHaveAttribute(
+      "href",
+      "/search?mode=ai",
+    );
+    const example = screen.getByRole("link", { name: "Relaxing games on Switch" });
+    const url = new URL(example.getAttribute("href")!, window.location.origin);
+    expect(url.pathname).toBe("/search");
+    expect(url.searchParams.get("mode")).toBe("ai");
+    expect(url.searchParams.get("q")).toBe("Relaxing games on Switch");
+  });
   it("renders the authenticated home heading before deferred sidebar deals resolve", async () => {
     renderHome();
 

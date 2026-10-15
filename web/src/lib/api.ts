@@ -468,6 +468,30 @@ export type PsnLibraryRepairPreview = {
   raw_count: number;
   quarantined_count: number;
 };
+export type LibraryCatalogSuggestion = {
+  id: number;
+  title: string;
+  released?: string | null;
+  platforms: string[];
+  confidence: "exact" | "likely";
+  cover_url?: string | null;
+};
+export type LibraryCatalogMatch = {
+  game_id: string;
+  title: string;
+  source: "psn" | "manual";
+  link_state?: string | null;
+  catalog_game_id?: number | null;
+  status: "matched" | "review" | "no_match" | "unavailable";
+  reason?: string | null;
+  suggestions: LibraryCatalogSuggestion[];
+};
+export type LibraryCatalogDecision = {
+  game_id: string;
+  action: "link" | "keep_raw" | "unlink";
+  catalog_id?: number;
+  expected_catalog_game_id: number | null;
+};
 export type PsnCatalogEnrichmentResult = {
   attempted: number;
   linked: number;
@@ -691,6 +715,67 @@ export function previewPsnLibraryRepair() {
   return apiRequest<PsnLibraryRepairPreview>("/psn/library-repair/preview", { auth: true });
 }
 
+export async function previewLibraryCatalogMatches(
+  includeLinked = false,
+  source?: "psn" | "manual",
+) {
+  const items: LibraryCatalogMatch[] = [];
+  let offset = 0;
+  while (true) {
+    const page = await apiRequest<{
+      items: LibraryCatalogMatch[];
+      total: number;
+      next_offset: number | null;
+    }>(
+      `/library/catalog-matches/preview?include_linked=${includeLinked}&offset=${offset}&limit=100${source ? `&source=${source}` : ""}`,
+      { auth: true, method: "POST", signal: AbortSignal.timeout(120_000) },
+    );
+    items.push(...page.items);
+    if (page.next_offset == null) return { items };
+    if (
+      !Number.isSafeInteger(page.next_offset) ||
+      page.next_offset <= offset ||
+      !page.items.length
+    ) {
+      throw new Error("Catalog preview cursor did not advance. Refresh catalog matches.");
+    }
+    offset = page.next_offset;
+  }
+}
+
+export class LibraryCatalogApplyError extends ApiError {
+  constructor(
+    public readonly appliedCount: number,
+    error: unknown,
+  ) {
+    const reason = error instanceof Error ? error.message : "Request failed";
+    super(
+      `Applied ${appliedCount} entries; next batch failed: ${reason}. Refresh catalog matches before trying again.`,
+      error instanceof ApiError ? error.status : 0,
+      error instanceof ApiError ? error.detail : null,
+    );
+    this.name = "LibraryCatalogApplyError";
+  }
+}
+
+export async function applyLibraryCatalogMatches(decisions: LibraryCatalogDecision[]) {
+  let updated = 0;
+  for (let offset = 0; offset < decisions.length; offset += 100) {
+    try {
+      const result = await apiRequest<{ updated: number }>("/library/catalog-matches/apply", {
+        auth: true,
+        method: "POST",
+        body: { decisions: decisions.slice(offset, offset + 100) },
+        signal: AbortSignal.timeout(120_000),
+      });
+      updated += result.updated;
+    } catch (error) {
+      throw new LibraryCatalogApplyError(updated, error);
+    }
+  }
+  return { updated };
+}
+
 export function applyPsnLibraryRepair(
   decisions: {
     game_id: string;
@@ -710,7 +795,7 @@ export function deletePsnLibrary() {
 }
 
 export type CatalogPlatform =
-  "pc" | "console" | "ps5" | "ps4" | "xbox_series" | "xbox_one" | "switch";
+  "pc" | "playstation" | "xbox" | "console" | "ps5" | "ps4" | "xbox_series" | "xbox_one" | "switch";
 export type CatalogFeature = "single_player" | "co_op" | "multiplayer";
 export type CatalogGenre = "adventure" | "rpg" | "roguelike" | "shooter" | "strategy";
 export type CatalogSearchOptions = {
@@ -969,6 +1054,13 @@ export function addWishlist(game: CatalogGame) {
 
 export function addSteamWishlist(appid: string | number) {
   return apiRequest<CollectionGame>(`/wishlist/steam-games/${appid}`, {
+    auth: true,
+    method: "POST",
+  });
+}
+
+export function saveCatalogGameToWishlist(igdbId: number) {
+  return apiRequest<CollectionGame>(`/wishlist/catalog-games/${igdbId}`, {
     auth: true,
     method: "POST",
   });

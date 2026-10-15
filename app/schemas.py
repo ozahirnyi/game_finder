@@ -544,6 +544,55 @@ class PsnCatalogTitleSuggestions(BaseModel):
     suggestions: list[str] = Field(default_factory=list, max_length=3)
 
 
+class LibraryCatalogSuggestion(BaseModel):
+    id: int
+    title: str
+    released: str | None = None
+    platforms: list[str] = Field(default_factory=list)
+    confidence: Literal["exact", "likely"]
+    cover_url: str | None = None
+
+
+class LibraryCatalogMatchItem(BaseModel):
+    game_id: uuid.UUID
+    title: str
+    source: Literal["psn", "manual"]
+    link_state: str
+    catalog_game_id: int | None = None
+    status: Literal["matched", "review", "no_match", "unavailable"]
+    reason: str | None = None
+    suggestions: list[LibraryCatalogSuggestion] = Field(default_factory=list)
+
+
+class LibraryCatalogMatchPreview(BaseModel):
+    items: list[LibraryCatalogMatchItem] = Field(default_factory=list)
+    total: int = 0
+    next_offset: int | None = None
+
+
+class LibraryCatalogMatchDecision(BaseModel):
+    game_id: uuid.UUID
+    action: Literal["link", "keep_raw", "unlink"]
+    catalog_id: int | None = Field(default=None, ge=1)
+    expected_catalog_game_id: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_catalog_action(self):
+        if (self.action == "link") != (self.catalog_id is not None):
+            raise ValueError("catalog_id is required only when linking")
+        return self
+
+
+class LibraryCatalogMatchApplyRequest(BaseModel):
+    decisions: list[LibraryCatalogMatchDecision] = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def unique_games(self):
+        if len({decision.game_id for decision in self.decisions}) != len(self.decisions):
+            raise ValueError("Each library entry can have only one decision")
+        return self
+
+
 class PsnLibraryRepairItem(BaseModel):
     game_id: uuid.UUID
     title: str

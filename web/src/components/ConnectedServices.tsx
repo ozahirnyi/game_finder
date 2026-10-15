@@ -28,6 +28,8 @@ function ServiceRow({
   name,
   status,
   connected,
+  connectionLabel = "Connected",
+  disconnectedLabel = "Not connected",
   state = "success",
   children,
 }: {
@@ -35,6 +37,8 @@ function ServiceRow({
   name: string;
   status: React.ReactNode;
   connected: boolean;
+  connectionLabel?: string;
+  disconnectedLabel?: string;
   state?: "pending" | "error" | "success";
   children: React.ReactNode;
 }) {
@@ -51,10 +55,10 @@ function ServiceRow({
               <Chip tone="outline">{state === "pending" ? "Loading…" : "Unavailable"}</Chip>
             ) : connected ? (
               <Chip tone="primary">
-                <Check className="mr-1 size-3" /> Connected
+                <Check className="mr-1 size-3" /> {connectionLabel}
               </Chip>
             ) : (
-              <Chip tone="outline">Not connected</Chip>
+              <Chip tone="outline">{disconnectedLabel}</Chip>
             )}
           </div>
           <div className="label-mono mt-1.5 text-muted-foreground">
@@ -270,6 +274,8 @@ export function ConnectedServices() {
         <ServiceRow
           icon={<span className="font-display text-sm font-bold">PS</span>}
           name="PlayStation"
+          connectionLabel="Imported"
+          disconnectedLabel="No imports yet"
           state={onboardingQuery.status}
           connected={(onboardingQuery.data?.psn_library_games ?? 0) > 0}
           status={
