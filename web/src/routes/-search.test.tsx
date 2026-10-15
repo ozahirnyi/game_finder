@@ -4,6 +4,8 @@ import {
   createBrowserHistory,
   createRootRoute,
   createRouter,
+  defaultParseSearch,
+  defaultStringifySearch,
   RouterContextProvider,
 } from "@tanstack/react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -67,6 +69,44 @@ describe("SearchPage", () => {
     vi.unstubAllGlobals();
     window.localStorage.removeItem("game_finder_token");
     window.history.replaceState({}, "", "/search");
+  });
+
+  it("restores multiple facets after the router serializes a detail return URL", async () => {
+    const originalSearch =
+      "?q=Hades&platform=playstation&platform=xbox&feature=co_op&feature=single_player&genre=adventure&genre=rpg&on_sale=true";
+    const routerReturnTo = `/search${defaultStringifySearch(defaultParseSearch(originalSearch))}`;
+    // GameDetailLink captures the router-normalized location, which serializes arrays as JSON.
+    expect(new URL(routerReturnTo, window.location.origin).searchParams.get("platform")).toBe(
+      '["playstation","xbox"]',
+    );
+    const detailUrl = new URL(
+      `/games/42?${new URLSearchParams({ returnTo: routerReturnTo })}`,
+      window.location.origin,
+    );
+    window.history.replaceState({}, "", detailUrl.searchParams.get("returnTo"));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ results: [{ id: 42, name: "Hades" }] })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderSearch();
+
+    await screen.findByRole("link", { name: "Hades" });
+    for (const label of ["PlayStation", "Xbox", "Co-op", "Solo", "Adventure", "RPG", "On sale"]) {
+      expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-pressed", "true");
+    }
+    const request = new URL(String(fetchMock.mock.calls[0][0]), window.location.origin);
+    expect(request.searchParams.getAll("platform")).toEqual(["playstation", "xbox"]);
+    expect(request.searchParams.getAll("feature")).toEqual(["co_op", "single_player"]);
+    expect(request.searchParams.getAll("genre")).toEqual(["adventure", "rpg"]);
+    expect(screen.getByPlaceholderText(/search by title/i)).toHaveValue("Hades");
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+    expect(screen.getByRole("button", { name: "PlayStation" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Xbox" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Switch" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("restores every catalog facet and carries the complete search into game details", async () => {

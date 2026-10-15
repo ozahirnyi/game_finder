@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, defaultParseSearch, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
@@ -55,6 +55,13 @@ function useDebouncedValue(value: string, delayMs: number) {
   return debouncedValue;
 }
 
+function filterValues(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
 function getAiSearchError(error: unknown) {
   const detail =
     error instanceof ApiError && typeof error.detail === "object" && error.detail !== null
@@ -104,33 +111,28 @@ function SearchPage() {
     () => router.history.location.href,
   );
   const params = new URL(returnTo, "http://localhost").searchParams;
+  const restoredSearch = defaultParseSearch(params.toString()) as Record<string, unknown>;
   const query = params.get("q") ?? "";
   const debouncedQuery = useDebouncedValue(query, 700);
-  const platforms = params
-    .getAll("platform")
-    .filter((value) =>
-      [
-        "pc",
-        "playstation",
-        "xbox",
-        "switch",
-        "console",
-        "ps4",
-        "ps5",
-        "xbox_one",
-        "xbox_series",
-      ].includes(value),
-    ) as CatalogPlatform[];
-  const features = params
-    .getAll("feature")
-    .filter((value) =>
-      ["single_player", "co_op", "multiplayer"].includes(value),
-    ) as CatalogFeature[];
-  const genres = params
-    .getAll("genre")
-    .filter((value) =>
-      ["adventure", "rpg", "roguelike", "shooter", "strategy"].includes(value),
-    ) as CatalogGenre[];
+  const platforms = filterValues(restoredSearch.platform).filter((value) =>
+    [
+      "pc",
+      "playstation",
+      "xbox",
+      "switch",
+      "console",
+      "ps4",
+      "ps5",
+      "xbox_one",
+      "xbox_series",
+    ].includes(value),
+  ) as CatalogPlatform[];
+  const features = filterValues(restoredSearch.feature).filter((value) =>
+    ["single_player", "co_op", "multiplayer"].includes(value),
+  ) as CatalogFeature[];
+  const genres = filterValues(restoredSearch.genre).filter((value) =>
+    ["adventure", "rpg", "roguelike", "shooter", "strategy"].includes(value),
+  ) as CatalogGenre[];
   const onSale = params.get("on_sale") === "true";
   const mode = params.get("mode") === "ai" ? "ai" : "catalog";
   const queryClient = useQueryClient();
