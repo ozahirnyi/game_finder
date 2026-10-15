@@ -93,7 +93,7 @@ describe("Library", () => {
 
   it("keeps the PlayStation entry discoverable when the loaded page only contains Steam", async () => {
     api.getLibraryOverview.mockResolvedValue({
-      games: [{ id: "psn-linked", source: "psn", link_state: "linked" }],
+      games: [{ id: "psn-raw", source: "psn", link_state: "raw" }],
     });
     api.getLibraryOverviewPage.mockResolvedValue({
       games: [{ id: "steam-1", title: "Steam game", source: "steam" }],
@@ -110,6 +110,24 @@ describe("Library", () => {
     renderLibrary();
     await screen.findByText("Your library is empty");
     expect(screen.queryByRole("button", { name: "Open PlayStation library" })).toBeNull();
+  });
+
+  it("hides guidance when every PlayStation game is matched even if a manual game is raw", async () => {
+    api.getLibraryOverview.mockResolvedValue({
+      games: [
+        {
+          id: "psn-linked",
+          title: "Matched game",
+          source: "psn",
+          link_state: "linked",
+          catalog_game_id: 101,
+        },
+        { id: "manual-raw", title: "Manual game", source: "manual", link_state: "raw" },
+      ],
+    });
+    renderLibrary();
+    await screen.findByRole("heading", { name: "Matched game" });
+    expect(screen.queryByRole("region", { name: "PlayStation game details" })).toBeNull();
   });
 
   it("shows PlayStation matching and repair tools only inside the PlayStation tab", async () => {
@@ -357,7 +375,21 @@ describe("Library", () => {
         },
       ],
     });
-    api.applyPsnLibraryRepair.mockResolvedValue({ updated: 1 });
+    api.applyPsnLibraryRepair.mockImplementation(async () => {
+      api.getLibraryOverview.mockResolvedValue({
+        games: [
+          {
+            id: "raw",
+            title: "STAR WARS Battlefront",
+            source: "psn",
+            link_state: "linked",
+            catalog_game_id: 777,
+          },
+        ],
+        raw_count: 0,
+      });
+      return { updated: 1 };
+    });
 
     renderLibrary();
     fireEvent.click(await screen.findByRole("button", { name: "PlayStation" }));
@@ -375,6 +407,10 @@ describe("Library", () => {
       ]),
     );
     expect(api.searchGames).toHaveBeenCalledWith({ query: "Star Wars Battlefront 2015" });
+    fireEvent.click(screen.getByRole("button", { name: "All games" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "PlayStation game details" })).toBeNull(),
+    );
   });
 
   it("starts manual catalog search from the cleaned backend query", async () => {

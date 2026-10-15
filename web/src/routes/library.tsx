@@ -96,11 +96,15 @@ function LibraryPage() {
     | undefined;
   useEffect(() => {
     if (psnCatalogJob.data?.status === "succeeded") {
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
       void queryClient.invalidateQueries({ queryKey: ["library-overview-page"] });
     }
   }, [psnCatalogJob.data?.status, queryClient]);
   const owned = libraryQuery.data?.pages.flatMap((page) => page.games) ?? [];
   const totals = overviewQuery.data?.games ?? [];
+  const hasUnmatchedPsnGames = totals.some(
+    (game) => game.source === "psn" && game.link_state !== "linked",
+  );
   const removePsnLibrary = useMutation({
     mutationFn: deletePsnLibrary,
     onSuccess: async ({ deleted }) => {
@@ -196,7 +200,7 @@ function LibraryPage() {
         </label>
       </div>
 
-      {tab === "All games" && totals.some((game) => game.source === "psn") && (
+      {tab === "All games" && hasUnmatchedPsnGames && (
         <section
           aria-labelledby="psn-details-guidance"
           className="mb-6 flex flex-col gap-4 rounded-xl border border-primary/25 bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
@@ -420,6 +424,7 @@ function PsnCatalogPicker({ game }: { game: LibraryOverviewGame }) {
     onSuccess: async () => {
       setOpen(false);
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["library"] }),
         queryClient.invalidateQueries({ queryKey: ["library-overview-page"] }),
         queryClient.invalidateQueries({ queryKey: ["psn-library-repair"] }),
       ]);

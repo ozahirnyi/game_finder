@@ -143,6 +143,9 @@ for (const viewport of [
     await signIn(page);
     let linked = false;
     let applies = 0;
+    api.state.library.games = [
+      { id: "raw-101", title: "Исходное название", source: "psn", link_state: "raw" },
+    ];
     await page.route("**/api/library/overview/page*", (route) =>
       route.fulfill({ json: { games: [], steam_available: false, total: 0, has_more: false } }),
     );
@@ -201,6 +204,10 @@ for (const viewport of [
     await page.getByRole("button", { name: "Confirm selected matches" }).click();
     await expect(page.getByRole("status")).toContainText("Updated 1 library entries");
     expect(linked).toBe(true);
+    await page.getByRole("button", { name: "All games", exact: true }).click();
+    await expect(page.getByRole("region", { name: "PlayStation game details" })).toHaveCount(0);
+    await page.getByRole("button", { name: "PlayStation", exact: true }).click();
+    await page.getByRole("button", { name: "Match PlayStation games", exact: true }).click();
     await page.getByRole("checkbox", { name: "Include linked entries for correction" }).check();
     await page.getByRole("button", { name: "Find catalog matches", exact: true }).click();
     await page.getByRole("button", { name: "Remove link for Исходное название" }).click();
