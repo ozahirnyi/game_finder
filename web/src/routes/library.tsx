@@ -159,34 +159,6 @@ function LibraryPage() {
             {item}
           </button>
         ))}
-        {tab === "PlayStation" && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={removePsnLibrary.isPending}
-              onClick={() => {
-                setDeleteMessage(null);
-                if (
-                  window.confirm(
-                    "Delete every PlayStation entry from your library? This cannot be undone.",
-                  )
-                ) {
-                  removePsnLibrary.mutate();
-                }
-              }}
-              className="rounded-full border border-red-500 px-3 py-1.5 text-xs font-bold text-red-600 disabled:opacity-50"
-            >
-              {removePsnLibrary.isPending
-                ? "Deleting PlayStation games…"
-                : "Delete all PlayStation games"}
-            </button>
-            {deleteMessage && (
-              <span role="status" className="text-xs text-muted-foreground">
-                {deleteMessage}
-              </span>
-            )}
-          </div>
-        )}
         <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
           Sort by time
           <select
@@ -330,6 +302,49 @@ function LibraryPage() {
                 : null}
           </div>
         </div>
+      )}
+      {tab === "PlayStation" && (
+        <section
+          aria-label="PlayStation library management"
+          className="mt-10 border-t border-border pt-6"
+        >
+          <details>
+            <summary className="w-fit cursor-pointer rounded-md py-2 text-sm font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+              Manage PlayStation library
+            </summary>
+            <div className="mt-3 space-y-3 rounded-xl border border-border bg-surface p-4">
+              <h3 className="text-sm font-bold">Remove PlayStation library</h3>
+              <p className="max-w-prose text-sm text-muted-foreground">
+                Removes every imported PlayStation game from your Playfinder library. This cannot be
+                undone.
+              </p>
+              <button
+                type="button"
+                disabled={removePsnLibrary.isPending}
+                onClick={() => {
+                  setDeleteMessage(null);
+                  if (
+                    window.confirm(
+                      "Delete every PlayStation entry from your library? This cannot be undone.",
+                    )
+                  ) {
+                    removePsnLibrary.mutate();
+                  }
+                }}
+                className="rounded-lg border border-red-500 px-3 py-2 text-sm font-bold text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50"
+              >
+                {removePsnLibrary.isPending
+                  ? "Deleting PlayStation games…"
+                  : "Delete all PlayStation games"}
+              </button>
+              {deleteMessage && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  {deleteMessage}
+                </p>
+              )}
+            </div>
+          </details>
+        </section>
       )}
     </AppShell>
   );
