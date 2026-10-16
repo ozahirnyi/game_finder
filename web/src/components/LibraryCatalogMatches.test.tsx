@@ -83,6 +83,12 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 describe("library catalog confirmation", () => {
+  it("explains catalog matching without offering AI translation", () => {
+    show();
+    expect(screen.getByText(/You confirm every link/)).toBeInTheDocument();
+    expect(screen.queryByText(/AI may suggest/)).not.toBeInTheDocument();
+  });
+
   it("distinguishes same-name catalog choices by release year and platform", async () => {
     previewRequest.mockResolvedValue({
       items: [

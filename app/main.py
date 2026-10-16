@@ -26,7 +26,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from app.openai_client import get_catalog_title_suggestions, get_recommendation
+from app.openai_client import get_recommendation
 from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations, get_personalized_recommendations
 from app.cache import build_cache_key, get_json_cached
 from app.catalog_cache import catalog_steam_appid, get_cached_snapshot, remember_catalog_steam_identities

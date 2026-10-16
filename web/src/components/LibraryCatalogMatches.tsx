@@ -361,8 +361,7 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Add covers and game details to your imported titles. Review each suggestion or select all.
-          For names the catalog cannot recognize, AI may suggest an English title. You confirm every
-          link.
+          You confirm every link. If a game is not found, search the catalog manually.
         </p>
       </div>
       <label className="flex items-center gap-2 text-sm">
