@@ -46,6 +46,13 @@ it("restores a running task with progress and saved results after leaving Librar
   expect(screen.getByRole("status")).toHaveTextContent("1 game");
   expect(screen.getByRole("status")).toHaveTextContent("3 remaining");
   expect(screen.getByRole("button", { name: "Finding catalog matches…" })).toBeDisabled();
+  expect(document.querySelectorAll(".animate-spin")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Close catalog matching" }));
+  expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  expect(document.querySelectorAll(".animate-spin")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Match PlayStation games" }));
+  expect(screen.getByRole("progressbar")).toBeVisible();
+  expect(document.querySelectorAll(".animate-spin")).toHaveLength(1);
   first.unmount();
   const completed = {
     ...running,

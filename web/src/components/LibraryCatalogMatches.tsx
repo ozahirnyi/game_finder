@@ -340,6 +340,10 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
         previewData?.items.find((item) => item.game_id === row.game_id)?.status !== "matched"),
   ).length;
   const busy = task.running || apply.isPending;
+  const progressPercent = Math.min(
+    100,
+    Math.round(((result?.processed ?? 0) / Math.max(result?.total ?? 1, 1)) * 100),
+  );
   function updateDecision(id: string, decision?: LibraryCatalogDecision) {
     setDecisions((previous) => {
       const next = { ...previous };
@@ -350,68 +354,99 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
   }
   return (
     <section
-      className="space-y-5 rounded-2xl border border-border bg-surface p-4 sm:p-6"
+      className="space-y-6 rounded-2xl border border-border bg-surface p-4 sm:p-6"
       aria-label="Match library to catalog"
     >
-      <div>
-        <h2 className="text-lg font-bold">
-          {source === "psn"
-            ? "Complete your PlayStation library"
-            : "Match your library to the catalog"}
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Add covers and game details to your imported titles. Review each suggestion or select all.
-          You confirm every link. If a game is not found, search the catalog manually.
-        </p>
+      <div className="flex items-start gap-3 sm:gap-4">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Search className="size-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold leading-tight sm:text-xl">
+            {source === "psn"
+              ? "Complete your PlayStation library"
+              : "Match your library to the catalog"}
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            Find covers and game details for your imported titles. You confirm every link.
+          </p>
+        </div>
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={includeLinked}
+      <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <label className="inline-flex items-center gap-2.5 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={includeLinked}
+              disabled={busy}
+              className="size-4 shrink-0 accent-[var(--primary)]"
+              aria-describedby="catalog-correction-help"
+              onChange={(event) => setIncludeLinked(event.target.checked)}
+            />
+            Recheck already matched games
+          </label>
+          <p
+            id="catalog-correction-help"
+            className="mt-1.5 pl-[26px] text-xs leading-relaxed text-muted-foreground"
+          >
+            Include linked titles to review or correct their matches.
+          </p>
+        </div>
+        <button
+          className={
+            button +
+            " min-h-10 shrink-0 border-primary bg-primary px-4 text-primary-foreground hover:bg-primary/90"
+          }
           disabled={busy}
-          onChange={(event) => setIncludeLinked(event.target.checked)}
-        />
-        Recheck already matched games
-      </label>
-      <p className="text-sm text-muted-foreground">
-        Leave this off to check only unmatched games. Turn it on to correct an existing link.
-      </p>
-      <button
-        className={button}
-        disabled={busy}
-        onClick={() => {
-          apply.reset();
-          setMessage("");
-          task.start.mutate(includeLinked);
-        }}
-      >
-        {task.running && (
-          <LoaderCircle
-            className="size-4 animate-spin motion-reduce:animate-none"
-            aria-hidden="true"
-          />
-        )}
-        {task.running ? "Finding catalog matches…" : "Find catalog matches"}
-      </button>
+          onClick={() => {
+            apply.reset();
+            setMessage("");
+            task.start.mutate(includeLinked);
+          }}
+        >
+          {task.running ? "Finding catalog matches…" : "Find catalog matches"}
+        </button>
+      </div>
       {task.running && (
         <div
-          className="space-y-2 rounded-xl border border-primary/25 bg-primary/5 p-4"
+          className="rounded-xl border border-primary/20 bg-background p-4 sm:p-5"
           aria-busy="true"
+          role="status"
+          aria-live="polite"
         >
-          <p role="status" aria-live="polite" className="text-sm font-semibold">
-            Checked {result?.processed ?? 0} of {result?.total ?? 0} games · Matches for{" "}
-            {result?.matched ?? 0} {result?.matched === 1 ? "game" : "games"} ·{" "}
-            {result?.remaining ?? 0} remaining
-          </p>
+          <div className="flex items-center gap-3">
+            <LoaderCircle
+              className="size-5 shrink-0 animate-spin text-primary motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">Finding your games</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Checked {result?.processed ?? 0} of {result?.total ?? 0} games
+              </p>
+            </div>
+            <span className="text-xl font-semibold tabular-nums tracking-tight" aria-hidden="true">
+              {progressPercent}%
+            </span>
+          </div>
           <progress
             aria-label="Catalog matching progress"
             value={result?.processed ?? 0}
             max={Math.max(result?.total ?? 1, 1)}
-            className="h-2 w-full accent-primary"
+            className="mt-4 block h-1.5 w-full overflow-hidden rounded-full bg-surface accent-primary [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-surface [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-webkit-progress-value]:transition-[width] motion-reduce:[&::-webkit-progress-value]:transition-none"
           />
-          <p className="text-sm text-muted-foreground">
-            You can leave this page. Matching continues in the background; your results will be here
-            when you return.
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <Check className="size-3.5 text-primary" aria-hidden="true" />
+              Matches for {result?.matched ?? 0} {result?.matched === 1 ? "game" : "games"}
+            </span>
+            <span className="tabular-nums text-muted-foreground">
+              {result?.remaining ?? 0} remaining
+            </span>
+          </div>
+          <p className="mt-4 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+            Feel free to leave this page. Matching continues in the background, and your results
+            will be saved here.
           </p>
         </div>
       )}
@@ -432,10 +467,13 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
       )}
       {previewData && (
         <>
-          <p className="text-sm">
-            {previewData.processed} games checked. Matches for {previewData.matched}{" "}
-            {previewData.matched === 1 ? "game" : "games"}. Nothing changes until you apply your
-            choices.
+          <p className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">
+            <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>
+              {previewData.processed} games checked. Matches for {previewData.matched}{" "}
+              {previewData.matched === 1 ? "game" : "games"}. Nothing changes until you apply your
+              choices. If a game is not found, search the catalog manually.
+            </span>
           </p>
           <div className="sticky top-3 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface/95 p-3 shadow-sm backdrop-blur">
             <button
@@ -546,7 +584,7 @@ export function LibraryCatalogMatchLauncher({ source }: MatchScope = {}) {
   return (
     <div>
       <button className={button} onClick={() => setOpen(!open)} aria-expanded={open}>
-        {running && (
+        {running && !open && (
           <LoaderCircle
             className="size-4 animate-spin motion-reduce:animate-none"
             aria-hidden="true"
@@ -557,6 +595,10 @@ export function LibraryCatalogMatchLauncher({ source }: MatchScope = {}) {
           : source === "psn"
             ? "Match PlayStation games"
             : "Match library to catalog"}
+        <ChevronDown
+          className={`size-4 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
       </button>
       {open && (
         <div className="mt-3">
