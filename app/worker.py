@@ -15,6 +15,7 @@ from app.recommendations import enrich_recommendations
 from app.background_jobs import dispatch_job_id
 from app.psn_catalog_service import PsnCatalogUnavailable
 from app.psn_library_enrichment import enrich_pending_psn_catalog_batch
+from app.library_catalog_jobs import MATCH_JOB_OPERATION, process_matching_job
 from app.steam import fetch_owned_games
 from app.steam_library import persist_steam_library_snapshot
 
@@ -41,6 +42,8 @@ async def execute_background_operation(_db, job) -> dict:
         return await _enrich_psn_catalog_job(_db, job)
     if job.operation == "steam_library_sync":
         return await _sync_steam_library_job(_db, job)
+    if job.operation == MATCH_JOB_OPERATION:
+        return await process_matching_job(_db, job)
     raise BackgroundJobOperationError("Unsupported background operation")
 
 
@@ -123,7 +126,8 @@ async def run_background_job(_ctx: dict, job_id: str) -> None:
         heartbeat_task = asyncio.create_task(
             _extend_lease_until_complete(parsed_job_id, lease_token, heartbeat_stop)
         )
-        job.result = jsonable_encoder(await execute_background_operation(db, job))
+        result = jsonable_encoder(await execute_background_operation(db, job))
+        continue_matching = job.operation == MATCH_JOB_OPERATION and result["remaining"] > 0
         completed = (
             db.query(BackgroundJob)
             .filter(
@@ -133,7 +137,8 @@ async def run_background_job(_ctx: dict, job_id: str) -> None:
             )
             .update(
                 {
-                    "status": "succeeded",
+                    "status": "queued" if continue_matching else "succeeded",
+                    "result": result,
                     "error": None,
                     "lease_token": None,
                     "lease_expires_at": None,
@@ -145,6 +150,12 @@ async def run_background_job(_ctx: dict, job_id: str) -> None:
         db.commit()
         if not completed:
             return
+        if continue_matching:
+            try:
+                await dispatch_job_id(job_id)
+            except Exception:
+                # The durable queued snapshot is recovered by the next cron pass.
+                pass
     except PsnCatalogUnavailable:
         db.rollback()
         if job is not None:

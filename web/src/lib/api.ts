@@ -486,6 +486,17 @@ export type LibraryCatalogMatch = {
   reason?: string | null;
   suggestions: LibraryCatalogSuggestion[];
 };
+export type LibraryCatalogMatchingJob = Omit<BackgroundJob, "result"> & {
+  result?: {
+    items: LibraryCatalogMatch[];
+    total: number;
+    processed: number;
+    matched: number;
+    remaining: number;
+    include_linked: boolean;
+    dismissed?: boolean;
+  } | null;
+};
 export type LibraryCatalogDecision = {
   game_id: string;
   action: "link" | "keep_raw" | "unlink";
@@ -713,6 +724,32 @@ export function getCurrentPsnCatalogEnrichment() {
 
 export function previewPsnLibraryRepair() {
   return apiRequest<PsnLibraryRepairPreview>("/psn/library-repair/preview", { auth: true });
+}
+
+export function startLibraryCatalogMatchingJob(includeLinked = false, source?: "psn" | "manual") {
+  return apiRequest<LibraryCatalogMatchingJob>(
+    `/library/catalog-matches/jobs?include_linked=${includeLinked}${source ? `&source=${source}` : ""}`,
+    { auth: true, method: "POST" },
+  );
+}
+
+export async function getCurrentLibraryCatalogMatchingJob(source?: "psn" | "manual") {
+  try {
+    return await apiRequest<LibraryCatalogMatchingJob>(
+      `/library/catalog-matches/jobs/current${source ? `?source=${source}` : ""}`,
+      { auth: true },
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export function dismissLibraryCatalogMatchingJob(jobId: string) {
+  return apiRequest<{ dismissed: boolean }>(
+    `/library/catalog-matches/jobs/${encodeURIComponent(jobId)}`,
+    { auth: true, method: "DELETE" },
+  );
 }
 
 export async function previewLibraryCatalogMatches(

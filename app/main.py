@@ -26,7 +26,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from app.openai_client import get_catalog_title_suggestions, get_recommendation
+from app.openai_client import get_recommendation
 from app.steam_recommendations import build_steam_recommendation_prompt, get_cached_steam_recommendations, get_personalized_recommendations
 from app.cache import build_cache_key, get_json_cached
 from app.catalog_cache import catalog_steam_appid, get_cached_snapshot, remember_catalog_steam_identities
@@ -58,6 +58,9 @@ from app.psn_catalog_matcher import (
 from app.psn_catalog_service import PsnCatalogUnavailable, find_psn_catalog_titles
 from app.library_catalog_matching import apply_library_catalog_matches, preview_library_catalog_matches
 from app.catalog_title_translation import translate_library_titles
+from app.library_catalog_jobs import (
+    MATCH_JOB_OPERATION, eligible_matching_games, initial_matching_progress,
+)
 from app.psn_library_enrichment import (
     PSN_CANDIDATE_EVIDENCE_LIMIT,
     PSN_CATALOG_ENRICHMENT_BATCH_SIZE,
@@ -818,6 +821,60 @@ async def library_overview_page_route(
         "total": len(games),
         "has_more": offset + len(page) < len(games),
     })
+
+
+@app.post("/library/catalog-matches/jobs", status_code=202, response_model=BackgroundJobRead)
+async def start_library_catalog_matching_job(
+    include_linked: bool = False,
+    source: Literal['psn', 'manual'] | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    games = eligible_matching_games(db, current_user.id, source, include_linked)
+    payload = {"game_ids": [str(game_id) for (game_id,) in games.with_entities(Game.id)
+                           .order_by(Game.created_at, Game.id).all()],
+               "source": source, "include_linked": include_linked}
+    job = enqueue_or_get_job(db, current_user.id, MATCH_JOB_OPERATION,
+                             f"review:{source or 'all'}", payload,
+                             initial_result=initial_matching_progress(payload))
+    try:
+        await dispatch_job(job)
+    except Exception:
+        logger.warning("Catalog matching job queued for broker recovery")
+    return BackgroundJobRead.model_validate(job)
+
+
+@app.get("/library/catalog-matches/jobs/current", response_model=BackgroundJobRead)
+def current_library_catalog_matching_job(
+    source: Literal['psn', 'manual'] | None = None,
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    job = db.query(BackgroundJob).filter(
+        BackgroundJob.owner_id == current_user.id,
+        BackgroundJob.operation == MATCH_JOB_OPERATION,
+        BackgroundJob.idempotency_key == f"review:{source or 'all'}",
+    ).order_by(BackgroundJob.created_at.desc(), BackgroundJob.id.desc()).first()
+    if not job or (job.result or {}).get("dismissed"):
+        raise HTTPException(status_code=404, detail="Background job not found")
+    return BackgroundJobRead.model_validate(job)
+
+
+@app.delete("/library/catalog-matches/jobs/{job_id}")
+def dismiss_library_catalog_matching_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    job = db.query(BackgroundJob).filter(
+        BackgroundJob.id == job_id, BackgroundJob.owner_id == current_user.id,
+        BackgroundJob.operation == MATCH_JOB_OPERATION,
+    ).with_for_update().first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Background job not found")
+    if job.status not in {"succeeded", "failed"}:
+        raise HTTPException(status_code=409, detail="Catalog matching is still running")
+    job.result = {**(job.result or {}), "items": [], "dismissed": True}
+    db.commit()
+    return {"dismissed": True}
 
 
 @app.post("/library/catalog-matches/preview", response_model=LibraryCatalogMatchPreview)

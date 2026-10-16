@@ -5,6 +5,9 @@ import {
   clearToken,
   previewLibraryCatalogMatches,
   setToken,
+  startLibraryCatalogMatchingJob,
+  getCurrentLibraryCatalogMatchingJob,
+  dismissLibraryCatalogMatchingJob,
 } from "./api";
 
 function response(data: unknown, status = 200) {
@@ -21,6 +24,36 @@ afterEach(() => {
 });
 
 describe("library matching requests", () => {
+  it("starts a durable source-scoped job without waiting for matching", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ id: "job", status: "queued" }, 202));
+    vi.stubGlobal("fetch", fetcher);
+    expect(await startLibraryCatalogMatchingJob(true, "psn")).toMatchObject({ status: "queued" });
+    const [url, options] = fetcher.mock.calls[0];
+    expect(url).toContain("/library/catalog-matches/jobs?include_linked=true&source=psn");
+    expect(options.method).toBe("POST");
+    expect(options.headers.Authorization).toBe("Bearer test-token");
+  });
+
+  it("restores a saved job and treats only 404 as no task", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(response({ id: "saved", status: "running" }))
+      .mockResolvedValueOnce(response({ detail: "No task" }, 404))
+      .mockResolvedValueOnce(response({ detail: "Server down" }, 503));
+    vi.stubGlobal("fetch", fetcher);
+    expect(await getCurrentLibraryCatalogMatchingJob("psn")).toMatchObject({ id: "saved" });
+    expect(fetcher.mock.calls[0][0]).toContain("/jobs/current?source=psn");
+    expect(await getCurrentLibraryCatalogMatchingJob()).toBeNull();
+    await expect(getCurrentLibraryCatalogMatchingJob()).rejects.toMatchObject({ status: 503 });
+  });
+
+  it("dismisses a saved preview without deleting library games", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ dismissed: true }));
+    vi.stubGlobal("fetch", fetcher);
+    await dismissLibraryCatalogMatchingJob("job-id");
+    expect(fetcher.mock.calls[0][0]).toContain("/library/catalog-matches/jobs/job-id");
+    expect(fetcher.mock.calls[0][1].method).toBe("DELETE");
+  });
   it("keeps the PlayStation source scope on each preview page", async () => {
     const fetcher = vi
       .fn()

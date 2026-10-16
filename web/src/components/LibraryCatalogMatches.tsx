@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { ArrowRight, Check, Gamepad2, Search, ChevronDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, Check, Gamepad2, Search, ChevronDown, LoaderCircle } from "lucide-react";
 import { GameCover } from "@/components/GameCover";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   applyLibraryCatalogMatches,
-  previewLibraryCatalogMatches,
   searchGames,
   type LibraryCatalogMatch,
   type LibraryCatalogSuggestion,
   type LibraryCatalogDecision,
 } from "@/lib/api";
+import { useLibraryCatalogJob } from "@/hooks/useLibraryCatalogJob";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -281,38 +281,42 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
   const [decisions, setDecisions] = useState<Record<string, LibraryCatalogDecision>>({});
   const [confirmation, setConfirmation] = useState<LibraryCatalogDecision[] | null>(null);
   const [message, setMessage] = useState("");
-  const preview = useMutation({
-    mutationFn: () =>
-      source
-        ? previewLibraryCatalogMatches(includeLinked, source)
-        : previewLibraryCatalogMatches(includeLinked),
-    onSuccess: (data) => {
-      setDecisions({});
-      setProposals(
-        Object.fromEntries(
-          data.items
-            .filter((row) => row.suggestions.length)
-            .map((row) => [row.game_id, row.suggestions[0]]),
-        ),
-      );
-      setMessage("");
-    },
-  });
+  const task = useLibraryCatalogJob(source);
+  const result = task.job?.result;
+  const previewData = task.job?.status === "succeeded" && !result?.dismissed ? result : undefined;
+  const savedCorrectionOption = result?.include_linked;
+  useEffect(() => {
+    if (savedCorrectionOption !== undefined) setIncludeLinked(savedCorrectionOption);
+  }, [savedCorrectionOption]);
+  useEffect(() => {
+    setDecisions({});
+    setProposals(
+      Object.fromEntries(
+        (previewData?.items ?? [])
+          .filter((row) => row.suggestions.length)
+          .map((row) => [row.game_id, row.suggestions[0]]),
+      ),
+    );
+  }, [previewData]);
   const apply = useMutation({
     mutationFn: (choices: LibraryCatalogDecision[]) => applyLibraryCatalogMatches(choices),
+    onMutate: () => task.job?.id,
     onSuccess: ({ updated }) => {
       setMessage(`Updated ${updated} library entries. Your source records are preserved.`);
       setDecisions({});
       setProposals({});
-      preview.reset();
     },
     onError: () => {
       setDecisions({});
       setProposals({});
-      preview.reset();
     },
-    onSettled: () =>
-      Promise.all(
+    onSettled: async (_data, _error, _choices, previewJobId) => {
+      try {
+        if (previewJobId) await task.dismiss(previewJobId);
+      } catch {
+        setMessage("Could not clear the saved preview. Find fresh matches before applying again.");
+      }
+      await Promise.all(
         [
           "library",
           "library-overview",
@@ -325,16 +329,21 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
           "price-alerts",
           "psn-library-repair",
         ].map((key) => client.invalidateQueries({ queryKey: [key] })),
-      ),
+      );
+    },
   });
   const selected = Object.values(decisions);
   const uncertainCount = selected.filter(
     (row) =>
       row.action === "link" &&
       (proposals[row.game_id]?.confidence !== "exact" ||
-        preview.data?.items.find((item) => item.game_id === row.game_id)?.status !== "matched"),
+        previewData?.items.find((item) => item.game_id === row.game_id)?.status !== "matched"),
   ).length;
-  const busy = preview.isPending || apply.isPending;
+  const busy = task.running || apply.isPending;
+  const progressPercent = Math.min(
+    100,
+    Math.round(((result?.processed ?? 0) / Math.max(result?.total ?? 1, 1)) * 100),
+  );
   function updateDecision(id: string, decision?: LibraryCatalogDecision) {
     setDecisions((previous) => {
       const next = { ...previous };
@@ -345,49 +354,110 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
   }
   return (
     <section
-      className="space-y-5 rounded-2xl border border-border bg-surface p-4 sm:p-6"
+      className="space-y-6 rounded-2xl border border-border bg-surface p-4 sm:p-6"
       aria-label="Match library to catalog"
     >
-      <div>
-        <h2 className="text-lg font-bold">
-          {source === "psn"
-            ? "Complete your PlayStation library"
-            : "Match your library to the catalog"}
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Add covers and game details to your imported titles. Review each suggestion or select all.
-          Missing translations can use AI assistance. You confirm every link.
-        </p>
+      <div className="flex items-start gap-3 sm:gap-4">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Search className="size-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold leading-tight sm:text-xl">
+            {source === "psn"
+              ? "Complete your PlayStation library"
+              : "Match your library to the catalog"}
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            Find covers and game details for your imported titles. You confirm every link.
+          </p>
+        </div>
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={includeLinked}
+      <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <label className="inline-flex items-center gap-2.5 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={includeLinked}
+              disabled={busy}
+              className="size-4 shrink-0 accent-[var(--primary)]"
+              aria-describedby="catalog-correction-help"
+              onChange={(event) => setIncludeLinked(event.target.checked)}
+            />
+            Recheck already matched games
+          </label>
+          <p
+            id="catalog-correction-help"
+            className="mt-1.5 pl-[26px] text-xs leading-relaxed text-muted-foreground"
+          >
+            Include linked titles to review or correct their matches.
+          </p>
+        </div>
+        <button
+          className={
+            button +
+            " min-h-10 shrink-0 border-primary bg-primary px-4 text-primary-foreground hover:bg-primary/90"
+          }
           disabled={busy}
-          onChange={(event) => setIncludeLinked(event.target.checked)}
-        />
-        Include linked entries for correction
-      </label>
-      <button
-        className={button}
-        disabled={busy}
-        onClick={() => {
-          apply.reset();
-          preview.mutate();
-        }}
-      >
-        {preview.isPending ? "Finding catalog matches…" : "Find catalog matches"}
-      </button>
-      {preview.isPending && (
-        <p role="status" className="text-sm">
-          Searching the catalog. Larger libraries can take a moment.
-        </p>
+          onClick={() => {
+            apply.reset();
+            setMessage("");
+            task.start.mutate(includeLinked);
+          }}
+        >
+          {task.running ? "Finding catalog matches…" : "Find catalog matches"}
+        </button>
+      </div>
+      {task.running && (
+        <div
+          className="rounded-xl border border-primary/20 bg-background p-4 sm:p-5"
+          aria-busy="true"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-center gap-3">
+            <LoaderCircle
+              className="size-5 shrink-0 animate-spin text-primary motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">Finding your games</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Checked {result?.processed ?? 0} of {result?.total ?? 0} games
+              </p>
+            </div>
+            <span className="text-xl font-semibold tabular-nums tracking-tight" aria-hidden="true">
+              {progressPercent}%
+            </span>
+          </div>
+          <progress
+            aria-label="Catalog matching progress"
+            value={result?.processed ?? 0}
+            max={Math.max(result?.total ?? 1, 1)}
+            className="mt-4 block h-1.5 w-full overflow-hidden rounded-full bg-surface accent-primary [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-surface [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-webkit-progress-value]:transition-[width] motion-reduce:[&::-webkit-progress-value]:transition-none"
+          />
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <Check className="size-3.5 text-primary" aria-hidden="true" />
+              Matches for {result?.matched ?? 0} {result?.matched === 1 ? "game" : "games"}
+            </span>
+            <span className="tabular-nums text-muted-foreground">
+              {result?.remaining ?? 0} remaining
+            </span>
+          </div>
+          <p className="mt-4 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+            Feel free to leave this page. Matching continues in the background, and your results
+            will be saved here.
+          </p>
+        </div>
       )}
-      {(preview.isError || apply.isError) && (
+      {(task.start.isError ||
+        task.current.isError ||
+        task.job?.status === "failed" ||
+        apply.isError) && (
         <p role="alert" className="text-sm text-red-600">
-          {(preview.error ?? apply.error) instanceof Error
-            ? (preview.error ?? apply.error)?.message
-            : "Could not update catalog links. Try again."}
+          {(task.start.error ?? task.current.error ?? apply.error)?.message ??
+            task.job?.error ??
+            "Could not update catalog links. Try again."}
         </p>
       )}
       {message && (
@@ -395,11 +465,15 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
           {message}
         </p>
       )}
-      {preview.data && (
+      {previewData && (
         <>
-          <p className="text-sm">
-            {preview.data.items.length} entries checked. Nothing changes until you apply your
-            choices.
+          <p className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">
+            <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>
+              {previewData.processed} games checked. Matches for {previewData.matched}{" "}
+              {previewData.matched === 1 ? "game" : "games"}. Nothing changes until you apply your
+              choices. If a game is not found, search the catalog manually.
+            </span>
           </p>
           <div className="sticky top-3 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface/95 p-3 shadow-sm backdrop-blur">
             <button
@@ -408,8 +482,8 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
               onClick={() =>
                 setDecisions(
                   Object.fromEntries(
-                    preview
-                      .data!.items.filter((item) => proposals[item.game_id])
+                    previewData.items
+                      .filter((item) => proposals[item.game_id])
                       .map((item) => [
                         item.game_id,
                         {
@@ -444,7 +518,7 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
             </button>
           </div>
           <div className="space-y-3">
-            {preview.data.items.map((item) => (
+            {previewData.items.map((item) => (
               <CatalogMatchRow
                 key={item.game_id}
                 item={item}
@@ -502,14 +576,29 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
 
 export function LibraryCatalogMatchLauncher({ source }: MatchScope = {}) {
   const [open, setOpen] = useState(false);
+  const { job, running } = useLibraryCatalogJob(source);
+  const restoredJobId = job && !job.result?.dismissed ? job.id : undefined;
+  useEffect(() => {
+    if (restoredJobId) setOpen(true);
+  }, [restoredJobId]);
   return (
     <div>
       <button className={button} onClick={() => setOpen(!open)} aria-expanded={open}>
+        {running && !open && (
+          <LoaderCircle
+            className="size-4 animate-spin motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+        )}
         {open
           ? "Close catalog matching"
           : source === "psn"
             ? "Match PlayStation games"
             : "Match library to catalog"}
+        <ChevronDown
+          className={`size-4 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
       </button>
       {open && (
         <div className="mt-3">

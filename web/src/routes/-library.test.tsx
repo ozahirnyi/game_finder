@@ -11,6 +11,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
+  getToken: vi.fn(() => "test-token"),
   getAuthSnapshot: vi.fn(() => true),
   subscribeToAuthChanges: vi.fn(() => () => {}),
   getLibraryOverview: vi.fn(),
@@ -20,7 +21,9 @@ const api = vi.hoisted(() => ({
   deletePsnLibrary: vi.fn(),
   findPsnCatalogTitles: vi.fn(),
   getCurrentPsnCatalogEnrichment: vi.fn(),
-  previewLibraryCatalogMatches: vi.fn(),
+  startLibraryCatalogMatchingJob: vi.fn(),
+  getCurrentLibraryCatalogMatchingJob: vi.fn(),
+  dismissLibraryCatalogMatchingJob: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => api);
@@ -67,6 +70,19 @@ beforeEach(() => {
   });
   api.getLibraryOverviewPage.mockImplementation(() => api.getLibraryOverview());
   api.getCurrentPsnCatalogEnrichment.mockRejectedValue(new Error("Background job not found"));
+  api.getCurrentLibraryCatalogMatchingJob.mockResolvedValue(null);
+  api.startLibraryCatalogMatchingJob.mockResolvedValue({
+    id: "job",
+    status: "succeeded",
+    result: {
+      items: [],
+      total: 0,
+      processed: 0,
+      matched: 0,
+      remaining: 0,
+      include_linked: false,
+    },
+  });
 });
 afterEach(cleanup);
 
@@ -121,7 +137,7 @@ describe("Library", () => {
 
     expect(await screen.findByRole("button", { name: "Match PlayStation games" })).toBeVisible();
     expect(screen.queryByRole("region", { name: "PlayStation game details" })).toBeNull();
-    expect(api.previewLibraryCatalogMatches).not.toHaveBeenCalled();
+    expect(api.startLibraryCatalogMatchingJob).not.toHaveBeenCalled();
     expect(api.applyPsnLibraryRepair).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Steam" }));
     expect(screen.queryByRole("button", { name: "Open PlayStation library" })).toBeNull();
@@ -174,7 +190,6 @@ describe("Library", () => {
       raw_count: 1,
       quarantined_count: 1,
     });
-    api.previewLibraryCatalogMatches.mockResolvedValue({ items: [] });
     renderLibrary();
     await screen.findByRole("heading", { name: "Imported game" });
     expect(screen.queryByRole("button", { name: /Match .*games/ })).not.toBeInTheDocument();
@@ -184,7 +199,7 @@ describe("Library", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Match PlayStation games" }));
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     await waitFor(() =>
-      expect(api.previewLibraryCatalogMatches).toHaveBeenCalledWith(false, "psn"),
+      expect(api.startLibraryCatalogMatchingJob).toHaveBeenCalledWith(false, "psn"),
     );
     expect(screen.getByRole("button", { name: "Find in catalog" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Steam" }));
