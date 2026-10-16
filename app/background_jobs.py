@@ -41,7 +41,8 @@ def find_active_job(
 
 
 def enqueue_or_get_job(
-    db, owner_id: uuid.UUID, operation: str, idempotency_key: str, payload: dict, reserve=None
+    db, owner_id: uuid.UUID, operation: str, idempotency_key: str, payload: dict, reserve=None,
+    initial_result=None,
 ) -> BackgroundJob:
     existing = find_active_job(db, owner_id, operation, idempotency_key)
     if existing:
@@ -51,6 +52,7 @@ def enqueue_or_get_job(
         operation=operation,
         idempotency_key=idempotency_key,
         payload=payload,
+        result=initial_result,
     )
     db.add(job)
     try:

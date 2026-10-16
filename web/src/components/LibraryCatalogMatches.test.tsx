@@ -3,10 +3,14 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
-  previewLibraryCatalogMatches: vi.fn(),
+  getToken: vi.fn(() => "test-token"),
+  startLibraryCatalogMatchingJob: vi.fn(),
+  getCurrentLibraryCatalogMatchingJob: vi.fn(),
+  dismissLibraryCatalogMatchingJob: vi.fn(),
   applyLibraryCatalogMatches: vi.fn(),
   searchGames: vi.fn(),
 }));
+const previewRequest = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => api);
 import { LibraryCatalogMatches } from "./LibraryCatalogMatches";
 
@@ -55,14 +59,32 @@ function show() {
 }
 beforeEach(() => {
   vi.resetAllMocks();
-  api.previewLibraryCatalogMatches.mockResolvedValue(preview);
+  previewRequest.mockResolvedValue(preview);
+  api.getCurrentLibraryCatalogMatchingJob.mockResolvedValue(null);
+  api.dismissLibraryCatalogMatchingJob.mockResolvedValue({ dismissed: true });
+  api.startLibraryCatalogMatchingJob.mockImplementation(async (...args) => {
+    const result = await previewRequest(...args);
+    return {
+      id: "job",
+      status: "succeeded",
+      result: {
+        ...result,
+        total: result.items.length,
+        processed: result.items.length,
+        remaining: 0,
+        matched: result.items.filter((item: { suggestions: unknown[] }) => item.suggestions.length)
+          .length,
+        include_linked: args[0],
+      },
+    };
+  });
   api.applyLibraryCatalogMatches.mockResolvedValue({ updated: 2 });
   api.searchGames.mockResolvedValue({ results: [] });
 });
 afterEach(cleanup);
 describe("library catalog confirmation", () => {
   it("distinguishes same-name catalog choices by release year and platform", async () => {
-    api.previewLibraryCatalogMatches.mockResolvedValue({
+    previewRequest.mockResolvedValue({
       items: [
         {
           ...preview.items[0],
@@ -98,7 +120,7 @@ describe("library catalog confirmation", () => {
   it.each(["review", "unavailable"])(
     "requires uncertainty confirmation for %s rows even with exact proposal flags",
     async (status) => {
-      api.previewLibraryCatalogMatches.mockResolvedValue({
+      previewRequest.mockResolvedValue({
         items: [{ ...preview.items[1], status }],
       });
       show();
@@ -113,7 +135,7 @@ describe("library catalog confirmation", () => {
     },
   );
   it("invalidates collections after a partial apply failure and requires a fresh preview", async () => {
-    api.previewLibraryCatalogMatches.mockResolvedValue({ items: [preview.items[1]] });
+    previewRequest.mockResolvedValue({ items: [preview.items[1]] });
     api.applyLibraryCatalogMatches.mockRejectedValue(
       new Error(
         "Applied 100 entries; next batch failed: Catalog unavailable. Refresh catalog matches before trying again.",
@@ -131,11 +153,11 @@ describe("library catalog confirmation", () => {
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["library"] }));
     expect(screen.queryByRole("button", { name: /Apply selected/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
-    await waitFor(() => expect(api.previewLibraryCatalogMatches).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(previewRequest).toHaveBeenCalledTimes(2));
   });
   it("starts only on request, selects all proposals and requires a counted uncertain confirmation", async () => {
     show();
-    expect(api.previewLibraryCatalogMatches).not.toHaveBeenCalled();
+    expect(previewRequest).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     await screen.findByText("Ведьмак 3");
     fireEvent.click(screen.getByRole("button", { name: /Select all matches/ }));
@@ -177,14 +199,14 @@ describe("library catalog confirmation", () => {
     );
   });
   it("loads linked entries for correction and unlinks without deleting the library row", async () => {
-    api.previewLibraryCatalogMatches.mockResolvedValue({
+    previewRequest.mockResolvedValue({
       items: [{ ...preview.items[1], catalog_game_id: 72, link_state: "linked", suggestions: [] }],
     });
     show();
-    fireEvent.click(screen.getByLabelText("Include linked entries for correction"));
+    fireEvent.click(screen.getByLabelText("Recheck already matched games"));
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     await screen.findByRole("heading", { name: "Portal 2" });
-    expect(api.previewLibraryCatalogMatches).toHaveBeenCalledWith(true);
+    expect(previewRequest).toHaveBeenCalledWith(true);
     fireEvent.click(screen.getByRole("button", { name: "Remove link for Portal 2" }));
     fireEvent.click(screen.getByRole("button", { name: "Apply selected (1)" }));
     await waitFor(() =>
@@ -194,7 +216,7 @@ describe("library catalog confirmation", () => {
     );
   });
   it("distinguishes lookup failure and permits retry without changing entries", async () => {
-    api.previewLibraryCatalogMatches.mockRejectedValueOnce(new Error("Catalog unavailable"));
+    previewRequest.mockRejectedValueOnce(new Error("Catalog unavailable"));
     show();
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Catalog unavailable");

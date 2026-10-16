@@ -106,6 +106,14 @@ export async function installGuestHomeRoutes(page: Page): Promise<ApiRoutes> {
       await route.fulfill({ json: state.library });
       return;
     }
+    if (request.method() === "GET" && path === "/library/catalog-matches/jobs/current") {
+      await route.fulfill({ status: 404, json: { detail: "No matching job" } });
+      return;
+    }
+    if (request.method() === "DELETE" && path.startsWith("/library/catalog-matches/jobs/")) {
+      await route.fulfill({ json: { dismissed: true } });
+      return;
+    }
     if (request.method() === "GET" && path === "/library/membership") {
       const steamAppId = url.searchParams.get("steam_appid");
       const catalogGameId = Number(url.searchParams.get("catalog_game_id"));
