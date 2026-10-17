@@ -8,8 +8,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.database import BackgroundJob
 
-JOB_STATUSES = frozenset({"queued", "running", "succeeded", "failed"})
-TERMINAL_JOB_STATUSES = frozenset({"succeeded", "failed"})
+JOB_STATUSES = frozenset({"queued", "running", "succeeded", "failed", "cancelled"})
+TERMINAL_JOB_STATUSES = frozenset({"succeeded", "failed", "cancelled"})
 
 
 def is_terminal_status(status: str) -> bool:

@@ -8,6 +8,7 @@ import {
   startLibraryCatalogMatchingJob,
   getCurrentLibraryCatalogMatchingJob,
   dismissLibraryCatalogMatchingJob,
+  cancelLibraryCatalogMatchingJob,
 } from "./api";
 
 function response(data: unknown, status = 200) {
@@ -24,6 +25,21 @@ afterEach(() => {
 });
 
 describe("library matching requests", () => {
+  it("cancels the specified job with authentication and receives its saved progress", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        response({ id: "job-id", status: "cancelled", result: { processed: 10 } }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    expect(await cancelLibraryCatalogMatchingJob("job-id")).toMatchObject({
+      status: "cancelled",
+      result: { processed: 10 },
+    });
+    expect(fetcher.mock.calls[0][0]).toContain("/library/catalog-matches/jobs/job-id/cancel");
+    expect(fetcher.mock.calls[0][1].method).toBe("POST");
+    expect(fetcher.mock.calls[0][1].headers.Authorization).toBe("Bearer test-token");
+  });
   it("starts a durable source-scoped job without waiting for matching", async () => {
     const fetcher = vi.fn().mockResolvedValue(response({ id: "job", status: "queued" }, 202));
     vi.stubGlobal("fetch", fetcher);

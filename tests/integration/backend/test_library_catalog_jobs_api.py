@@ -30,6 +30,7 @@ def test_jobs_require_authentication(api_client):
     assert api_client.post("/library/catalog-matches/jobs").status_code == 401
     assert api_client.get("/library/catalog-matches/jobs/current").status_code == 401
     assert api_client.delete(f"/library/catalog-matches/jobs/{uuid.uuid4()}").status_code == 401
+    assert api_client.post(f"/library/catalog-matches/jobs/{uuid.uuid4()}/cancel").status_code == 401
 
 
 def test_start_snapshots_owner_source_and_reuses_active_job(
@@ -166,3 +167,90 @@ def test_empty_snapshot_completes_and_scope_is_validated(
     assert job.owner_id == owner.id and job.result["total"] == 0
     result = asyncio.run(process_matching_job(db_session, job))
     assert result["processed"] == result["remaining"] == result["matched"] == 0
+
+
+@pytest.mark.parametrize('status', ['queued', 'running'])
+def test_cancellation_preserves_progress_is_private_and_allows_restart(
+    api_client, db_session, user_factory, auth_as, monkeypatch, status
+):
+    from app import worker
+
+    owner = auth_as(user_factory())
+    game = add_game(db_session, owner, link_state='raw')
+    job_id = api_client.post('/library/catalog-matches/jobs?source=psn').json()['id']
+    job = db_session.get(BackgroundJob, uuid.UUID(job_id))
+    job.status, job.lease_token = status, 'old-worker'
+    progress = {**job.result, 'processed': 1, 'remaining': 3, 'items': [{'title': 'Saved suggestion'}]}
+    job.result = progress
+    db_session.commit()
+    response = api_client.post(f'/library/catalog-matches/jobs/{job_id}/cancel')
+    assert response.status_code == 200
+    assert response.json()['status'] == 'cancelled'
+    assert response.json()['result'] == progress
+    assert job.lease_token is None and job.lease_expires_at is None
+    assert api_client.post(f'/library/catalog-matches/jobs/{job_id}/cancel').json() == response.json()
+    assert api_client.get('/library/catalog-matches/jobs/current?source=psn').json() == response.json()
+    monkeypatch.setattr(worker, 'SessionLocal', lambda: db_session)
+    monkeypatch.setattr(db_session, 'close', lambda: None)
+    lookup = AsyncMock(side_effect=AssertionError('Cancelled jobs must not run'))
+    monkeypatch.setattr(worker, 'process_matching_job', lookup)
+    asyncio.run(worker.run_background_job({}, job_id))
+    lookup.assert_not_awaited()
+    assert game.catalog_game_id is None
+    retry = api_client.post('/library/catalog-matches/jobs?source=psn').json()
+    assert retry['id'] != job_id and retry['status'] == 'queued'
+    auth_as(user_factory(email='other-canceller@example.com'))
+    assert api_client.post(f'/library/catalog-matches/jobs/{job_id}/cancel').status_code == 404
+    assert api_client.post(f'/library/catalog-matches/jobs/{uuid.uuid4()}/cancel').status_code == 404
+    auth_as(owner)
+    assert api_client.delete(f'/library/catalog-matches/jobs/{job_id}').status_code == 200
+
+
+@pytest.mark.parametrize('status', ['succeeded', 'failed'])
+def test_cancel_does_not_relabel_finished_or_unrelated_jobs(
+    api_client, db_session, user_factory, auth_as, status
+):
+    owner = auth_as(user_factory())
+    job_id = api_client.post('/library/catalog-matches/jobs?source=psn').json()['id']
+    job = db_session.get(BackgroundJob, uuid.UUID(job_id))
+    job.status = status
+    db_session.commit()
+    assert api_client.post(f'/library/catalog-matches/jobs/{job_id}/cancel').json()['status'] == status
+    job.operation = 'recommendations'
+    db_session.commit()
+    assert api_client.post(f'/library/catalog-matches/jobs/{job_id}/cancel').status_code == 404
+
+
+@pytest.mark.parametrize('blocked', [True, False])
+def test_worker_stops_inflight_matching_without_overwriting_cancellation(
+    api_client, db_session, user_factory, auth_as, monkeypatch, blocked
+):
+    from app import worker, library_catalog_jobs
+
+    owner = auth_as(user_factory())
+    add_game(db_session, owner, link_state='raw')
+    job_id = api_client.post('/library/catalog-matches/jobs?source=psn').json()['id']
+    monkeypatch.setattr(worker, 'SessionLocal', lambda: db_session)
+    monkeypatch.setattr(db_session, 'close', lambda: None)
+    monkeypatch.setattr(worker, 'MATCH_CANCELLATION_POLL_SECONDS', 0.01, raising=False)
+    dispatched = AsyncMock()
+    monkeypatch.setattr(worker, 'dispatch_job_id', dispatched)
+    interrupted = []
+
+    async def lookup(rows, **kwargs):
+        response = api_client.post(f'/library/catalog-matches/jobs/{job_id}/cancel')
+        assert response.status_code == 200
+        if blocked:
+            try:
+                await asyncio.Event().wait()
+            finally:
+                interrupted.append(True)
+        return [{'game_id': rows[0].id, 'suggestions': [{'id': 1}]}]
+
+    monkeypatch.setattr(library_catalog_jobs, 'preview_library_catalog_matches', lookup)
+    asyncio.run(asyncio.wait_for(worker.run_background_job({}, job_id), timeout=2))
+    saved = api_client.get('/library/catalog-matches/jobs/current?source=psn').json()
+    assert saved['status'] == 'cancelled'
+    assert saved['result']['processed'] == 0 and saved['result']['items'] == []
+    assert interrupted == ([True] if blocked else [])
+    dispatched.assert_not_awaited()

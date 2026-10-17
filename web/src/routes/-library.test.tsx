@@ -22,6 +22,7 @@ const api = vi.hoisted(() => ({
   findPsnCatalogTitles: vi.fn(),
   getCurrentPsnCatalogEnrichment: vi.fn(),
   startLibraryCatalogMatchingJob: vi.fn(),
+  cancelLibraryCatalogMatchingJob: vi.fn(),
   getCurrentLibraryCatalogMatchingJob: vi.fn(),
   dismissLibraryCatalogMatchingJob: vi.fn(),
 }));

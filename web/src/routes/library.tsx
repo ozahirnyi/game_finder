@@ -261,7 +261,12 @@ function LibraryPage() {
 
       {tab === "PlayStation" && (
         <section aria-label="PlayStation library tools" className="mb-6 space-y-4">
-          <LibraryCatalogMatchLauncher source="psn" />
+          <LibraryCatalogMatchLauncher
+            source="psn"
+            hasMatchedGames={totals.some(
+              (game) => game.source === "psn" && game.link_state === "linked",
+            )}
+          />
           {libraryQuery.data?.pages[0]?.raw_count ||
           libraryQuery.data?.pages[0]?.quarantined_count ? (
             <div className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm">

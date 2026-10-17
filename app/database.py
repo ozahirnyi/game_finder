@@ -379,7 +379,7 @@ class BackgroundJob(Base):
             unique=True,
             postgresql_where=text("status IN ('queued', 'running')"),
         ),
-        CheckConstraint("status IN ('queued', 'running', 'succeeded', 'failed')", name="ck_background_jobs_status"),
+        CheckConstraint("status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')", name="ck_background_jobs_status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

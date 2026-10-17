@@ -6,10 +6,36 @@ import pytest
 def test_alembic_has_a_single_upgrade_head():
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["f2b0c4d6e8a1"]
+    assert script.get_heads() == ["f3c1d5e7a9b2"]
+    assert script.get_revision("f3c1d5e7a9b2").down_revision == "f2b0c4d6e8a1"
     assert script.get_revision("f2b0c4d6e8a1").down_revision == "f1a2b3c4d5e6"
     assert script.get_revision("f1a2b3c4d5e6").down_revision == "a4b6c8d0e2f4"
     assert script.get_revision("a4b6c8d0e2f4").down_revision == "c6d8e0f2a4b6"
+
+
+def test_cancelled_background_jobs_migration_round_trip(monkeypatch):
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import CheckConstraint, Column, Integer, MetaData, String, Table, create_engine, text
+    from sqlalchemy.exc import IntegrityError
+
+    engine = create_engine('sqlite://')
+    metadata = MetaData()
+    Table('background_jobs', metadata, Column('id', Integer, primary_key=True),
+          Column('status', String(16), nullable=False),
+          CheckConstraint("status IN ('queued', 'running', 'succeeded', 'failed')", name='ck_background_jobs_status'))
+    metadata.create_all(engine)
+    migration = ScriptDirectory.from_config(Config('alembic.ini')).get_revision('f3c1d5e7a9b2').module
+    with engine.begin() as connection:
+        monkeypatch.setattr(migration, 'op', Operations(MigrationContext.configure(connection)))
+        connection.execute(text("INSERT INTO background_jobs (id, status) VALUES (1, 'succeeded')"))
+        migration.upgrade()
+        connection.execute(text("INSERT INTO background_jobs (id, status) VALUES (2, 'cancelled')"))
+        migration.downgrade()
+        assert connection.execute(text('SELECT status FROM background_jobs ORDER BY id')).scalars().all() == ['succeeded', 'failed']
+        with pytest.raises(IntegrityError):
+            connection.execute(text("INSERT INTO background_jobs (id, status) VALUES (3, 'cancelled')"))
+    engine.dispose()
 
 
 def test_price_alert_pause_migration_round_trip(monkeypatch):
