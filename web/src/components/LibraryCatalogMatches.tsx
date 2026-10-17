@@ -24,7 +24,7 @@ import {
 const button =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold transition-colors hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50";
 
-type MatchScope = { source?: "psn" | "manual" };
+type MatchScope = { source?: "psn" | "manual"; hasMatchedGames?: boolean };
 
 function CandidateChoice({
   candidate,
@@ -274,16 +274,19 @@ function CatalogMatchRow({
   );
 }
 
-export function LibraryCatalogMatches({ source }: MatchScope = {}) {
+export function LibraryCatalogMatches({ source, hasMatchedGames = false }: MatchScope = {}) {
   const client = useQueryClient();
   const [includeLinked, setIncludeLinked] = useState(false);
   const [proposals, setProposals] = useState<Record<string, LibraryCatalogSuggestion>>({});
   const [decisions, setDecisions] = useState<Record<string, LibraryCatalogDecision>>({});
   const [confirmation, setConfirmation] = useState<LibraryCatalogDecision[] | null>(null);
+  const [restartWith, setRestartWith] = useState<boolean | null>(null);
   const [message, setMessage] = useState("");
   const task = useLibraryCatalogJob(source);
   const result = task.job?.result;
-  const previewData = task.job?.status === "succeeded" && !result?.dismissed ? result : undefined;
+  const cancelled = task.job?.status === "cancelled";
+  const previewData =
+    (task.job?.status === "succeeded" || cancelled) && !result?.dismissed ? result : undefined;
   const savedCorrectionOption = result?.include_linked;
   useEffect(() => {
     if (savedCorrectionOption !== undefined) setIncludeLinked(savedCorrectionOption);
@@ -339,7 +342,7 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
       (proposals[row.game_id]?.confidence !== "exact" ||
         previewData?.items.find((item) => item.game_id === row.game_id)?.status !== "matched"),
   ).length;
-  const busy = task.running || apply.isPending;
+  const busy = task.running || task.cancel.isPending || apply.isPending;
   const progressPercent = Math.min(
     100,
     Math.round(((result?.processed ?? 0) / Math.max(result?.total ?? 1, 1)) * 100),
@@ -351,6 +354,13 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
       else delete next[id];
       return next;
     });
+  }
+  function startSearch(include: boolean) {
+    setRestartWith(null);
+    apply.reset();
+    task.cancel.reset();
+    setMessage("");
+    task.start.mutate(include);
   }
   return (
     <section
@@ -397,14 +407,26 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
             button +
             " min-h-10 shrink-0 border-primary bg-primary px-4 text-primary-foreground hover:bg-primary/90"
           }
-          disabled={busy}
+          disabled={
+            task.running
+              ? task.start.isPending || task.cancel.isPending || !task.job?.id
+              : busy || task.current.isPending
+          }
           onClick={() => {
-            apply.reset();
-            setMessage("");
-            task.start.mutate(includeLinked);
+            if (task.running) {
+              if (task.job?.id) task.cancel.mutate(task.job.id);
+            } else if (previewData || hasMatchedGames || result?.items.length) {
+              setRestartWith(includeLinked);
+            } else {
+              startSearch(includeLinked);
+            }
           }}
         >
-          {task.running ? "Finding catalog matches…" : "Find catalog matches"}
+          {task.running
+            ? task.cancel.isPending
+              ? "Cancelling…"
+              : "Cancel"
+            : "Find catalog matches"}
         </button>
       </div>
       {task.running && (
@@ -420,7 +442,9 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
               aria-hidden="true"
             />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Finding your games</p>
+              <p className="text-sm font-semibold">
+                {task.cancel.isPending ? "Stopping search" : "Finding your games"}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Checked {result?.processed ?? 0} of {result?.total ?? 0} games
               </p>
@@ -451,11 +475,12 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
         </div>
       )}
       {(task.start.isError ||
+        task.cancel.isError ||
         task.current.isError ||
         task.job?.status === "failed" ||
         apply.isError) && (
         <p role="alert" className="text-sm text-red-600">
-          {(task.start.error ?? task.current.error ?? apply.error)?.message ??
+          {(task.start.error ?? task.cancel.error ?? task.current.error ?? apply.error)?.message ??
             task.job?.error ??
             "Could not update catalog links. Try again."}
         </p>
@@ -463,6 +488,17 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
       {message && (
         <p role="status" className="text-sm">
           {message}
+        </p>
+      )}
+      {cancelled && (
+        <p
+          role="status"
+          className="rounded-xl border border-border bg-background p-4 text-sm leading-relaxed"
+        >
+          Search cancelled. Checked {result?.processed ?? 0} of {result?.total ?? 0} games.{" "}
+          {result?.items.length
+            ? "Your completed results are saved below."
+            : "You can start a new search whenever you are ready."}
         </p>
       )}
       {previewData && (
@@ -542,6 +578,32 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
         </>
       )}
       <AlertDialog
+        open={restartWith !== null}
+        onOpenChange={(open) => {
+          if (!open) setRestartWith(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Find catalog matches again?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will start a new search and replace your current suggestions and selections. Your
+              existing library links will stay unchanged until you apply new choices.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep current results</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (restartWith !== null) startSearch(restartWith);
+              }}
+            >
+              Search again
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
         open={confirmation !== null}
         onOpenChange={(open) => {
           if (!open) setConfirmation(null);
@@ -574,7 +636,7 @@ export function LibraryCatalogMatches({ source }: MatchScope = {}) {
   );
 }
 
-export function LibraryCatalogMatchLauncher({ source }: MatchScope = {}) {
+export function LibraryCatalogMatchLauncher({ source, hasMatchedGames }: MatchScope = {}) {
   const [open, setOpen] = useState(false);
   const { job, running } = useLibraryCatalogJob(source);
   const restoredJobId = job && !job.result?.dismissed ? job.id : undefined;
@@ -602,7 +664,7 @@ export function LibraryCatalogMatchLauncher({ source }: MatchScope = {}) {
       </button>
       {open && (
         <div className="mt-3">
-          <LibraryCatalogMatches source={source} />
+          <LibraryCatalogMatches source={source} hasMatchedGames={hasMatchedGames} />
         </div>
       )}
     </div>

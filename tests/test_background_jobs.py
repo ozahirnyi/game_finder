@@ -5,6 +5,7 @@ def test_background_job_terminal_statuses_are_explicit():
     assert not is_terminal_status("running")
     assert is_terminal_status("succeeded")
     assert is_terminal_status("failed")
+    assert is_terminal_status("cancelled")
 
 
 def test_background_job_model_records_owner_operation_and_state():

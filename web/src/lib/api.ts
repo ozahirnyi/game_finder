@@ -374,7 +374,7 @@ export type RecommendationResponse = {
 };
 export type BackgroundJob = {
   id: string;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   result?: Record<string, unknown> | null;
   error?: string | null;
 };
@@ -743,6 +743,13 @@ export async function getCurrentLibraryCatalogMatchingJob(source?: "psn" | "manu
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
   }
+}
+
+export function cancelLibraryCatalogMatchingJob(jobId: string) {
+  return apiRequest<LibraryCatalogMatchingJob>(
+    `/library/catalog-matches/jobs/${encodeURIComponent(jobId)}/cancel`,
+    { auth: true, method: "POST" },
+  );
 }
 
 export function dismissLibraryCatalogMatchingJob(jobId: string) {

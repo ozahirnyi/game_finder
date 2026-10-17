@@ -370,7 +370,7 @@ class BackgroundJobRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    status: Literal["queued", "running", "succeeded", "failed"]
+    status: Literal["queued", "running", "succeeded", "failed", "cancelled"]
     result: dict | None = None
     error: str | None = None
 

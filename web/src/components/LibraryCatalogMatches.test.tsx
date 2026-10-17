@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({
   getToken: vi.fn(() => "test-token"),
   startLibraryCatalogMatchingJob: vi.fn(),
+  cancelLibraryCatalogMatchingJob: vi.fn(),
   getCurrentLibraryCatalogMatchingJob: vi.fn(),
   dismissLibraryCatalogMatchingJob: vi.fn(),
   applyLibraryCatalogMatches: vi.fn(),
@@ -114,6 +115,9 @@ describe("library catalog confirmation", () => {
       ],
     });
     show();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Find catalog matches" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     const intended = await screen.findByRole("button", {
       name: "Choose Hades, 2018, PlayStation 4",
@@ -130,6 +134,9 @@ describe("library catalog confirmation", () => {
         items: [{ ...preview.items[1], status }],
       });
       show();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Find catalog matches" })).toBeEnabled(),
+      );
       fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
       await screen.findByRole("heading", { name: "Portal 2" });
       fireEvent.click(screen.getByRole("button", { name: /Select all matches/ }));
@@ -149,6 +156,9 @@ describe("library catalog confirmation", () => {
     );
     const client = show();
     const invalidate = vi.spyOn(client, "invalidateQueries");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Find catalog matches" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     await screen.findByRole("heading", { name: "Portal 2" });
     fireEvent.click(screen.getByRole("button", { name: /Select all matches/ }));
@@ -158,12 +168,18 @@ describe("library catalog confirmation", () => {
     );
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["library"] }));
     expect(screen.queryByRole("button", { name: /Apply selected/ })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Find catalog matches" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     await waitFor(() => expect(previewRequest).toHaveBeenCalledTimes(2));
   });
   it("starts only on request, selects all proposals and requires a counted uncertain confirmation", async () => {
     show();
     expect(previewRequest).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Find catalog matches" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     await screen.findByText("Ведьмак 3");
     fireEvent.click(screen.getByRole("button", { name: /Select all matches/ }));
@@ -188,6 +204,9 @@ describe("library catalog confirmation", () => {
   it("allows replacing an uncertain proposal through catalog search before applying", async () => {
     api.searchGames.mockResolvedValue({ results: [{ id: 90, name: "Different game" }] });
     show();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Find catalog matches" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     await screen.findByText("Ведьмак 3");
     fireEvent.change(screen.getByLabelText("Search catalog for Ведьмак 3"), {
@@ -210,6 +229,9 @@ describe("library catalog confirmation", () => {
     });
     show();
     fireEvent.click(screen.getByLabelText("Recheck already matched games"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Find catalog matches" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     await screen.findByRole("heading", { name: "Portal 2" });
     expect(previewRequest).toHaveBeenCalledWith(true);
@@ -224,8 +246,14 @@ describe("library catalog confirmation", () => {
   it("distinguishes lookup failure and permits retry without changing entries", async () => {
     previewRequest.mockRejectedValueOnce(new Error("Catalog unavailable"));
     show();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Find catalog matches" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Catalog unavailable");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Find catalog matches" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Find catalog matches" }));
     await screen.findByText("Ведьмак 3");
     expect(api.applyLibraryCatalogMatches).not.toHaveBeenCalled();

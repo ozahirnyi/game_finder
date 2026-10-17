@@ -1,6 +1,7 @@
 """ARQ worker handlers for durable user-initiated actions."""
 
 import asyncio
+import contextlib
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,7 @@ from app.steam_library import persist_steam_library_snapshot
 
 LEASE_DURATION = timedelta(minutes=15)
 LEASE_HEARTBEAT_SECONDS = 30
+MATCH_CANCELLATION_POLL_SECONDS = 1
 
 
 class BackgroundJobOperationError(RuntimeError):
@@ -96,6 +98,29 @@ def redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(os.getenv("REDIS_URL", "redis://redis:6379/0"))
 
 
+async def _execute_cancellable_matching(db, job, lease_token):
+    """Interrupt pending catalog I/O when cancellation revokes this worker's lease."""
+    operation = asyncio.create_task(execute_background_operation(db, job))
+    try:
+        while True:
+            done, _ = await asyncio.wait({operation}, timeout=MATCH_CANCELLATION_POLL_SECONDS)
+            if done:
+                return await operation
+            with SessionLocal() as state_db:
+                active = state_db.query(BackgroundJob.id).filter(
+                    BackgroundJob.id == job.id,
+                    BackgroundJob.status == "running",
+                    BackgroundJob.lease_token == lease_token,
+                ).first()
+            if not active:
+                return None
+    finally:
+        if not operation.done():
+            operation.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await operation
+
+
 async def run_background_job(_ctx: dict, job_id: str) -> None:
     """Claim one queued job and persist a safe terminal result."""
     db = SessionLocal()
@@ -126,7 +151,13 @@ async def run_background_job(_ctx: dict, job_id: str) -> None:
         heartbeat_task = asyncio.create_task(
             _extend_lease_until_complete(parsed_job_id, lease_token, heartbeat_stop)
         )
-        result = jsonable_encoder(await execute_background_operation(db, job))
+        if job.operation == MATCH_JOB_OPERATION:
+            result = await _execute_cancellable_matching(db, job, lease_token)
+            if result is None:
+                return
+        else:
+            result = await execute_background_operation(db, job)
+        result = jsonable_encoder(result)
         continue_matching = job.operation == MATCH_JOB_OPERATION and result["remaining"] > 0
         completed = (
             db.query(BackgroundJob)

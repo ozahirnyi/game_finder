@@ -138,7 +138,7 @@ for (const viewport of [
     await expect(page.getByRole("progressbar")).toHaveAttribute("value", "2");
     await expect(page.getByRole("status")).toContainText("2 of 5 games");
     await expect(page.getByRole("status")).toContainText("3 remaining");
-    await expect(page.getByRole("button", { name: "Finding catalog matches…" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeEnabled();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -344,6 +344,94 @@ for (const viewport of [
     await expect(guidance).toBeVisible();
   });
 
+  test(`repeat matching requires confirmation and cancellation survives reload at ${viewport.width}px`, async ({
+    page,
+    api,
+  }) => {
+    await page.setViewportSize(viewport);
+    await signIn(page);
+    api.state.library.games = [
+      { id: "raw", title: "Imported title", source: "psn", link_state: "raw" },
+    ];
+    await page.route("**/api/library/overview/page*", (route) =>
+      route.fulfill({ json: { ...api.state.library, total: 1, has_more: false } }),
+    );
+    const result = {
+      total: 5,
+      processed: 5,
+      matched: 1,
+      remaining: 0,
+      include_linked: false,
+      items: [
+        {
+          game_id: "raw",
+          title: "Imported title",
+          source: "psn",
+          status: "matched",
+          catalog_game_id: null,
+          suggestions: [
+            { id: 101, title: "Celeste", confidence: "exact", platforms: ["PlayStation 4"] },
+          ],
+        },
+      ],
+    };
+    let job = { id: "saved", status: "succeeded", result };
+    let starts = 0,
+      cancels = 0;
+    await page.route("**/api/library/catalog-matches/jobs/current?*", (route) =>
+      route.fulfill({ json: job }),
+    );
+    await page.route("**/api/library/catalog-matches/jobs?*", (route) => {
+      starts++;
+      job = {
+        id: "new-search",
+        status: "running",
+        result: { ...result, processed: 2, remaining: 3 },
+      };
+      return route.fulfill({ status: 202, json: job });
+    });
+    await page.route("**/api/library/catalog-matches/jobs/new-search/cancel", (route) => {
+      cancels++;
+      job = { ...job, status: "cancelled" };
+      return route.fulfill({ json: job });
+    });
+    await page.goto("/library");
+    await waitForHydration(page);
+    await page.getByRole("button", { name: "PlayStation", exact: true }).click();
+    await expect(page.getByText("Celeste", { exact: true })).toBeVisible();
+    await page.getByRole("checkbox", { name: "Select Imported title" }).check();
+    await page.getByRole("button", { name: "Find catalog matches", exact: true }).click();
+    await expect(page.getByRole("alertdialog")).toContainText("Find catalog matches again?");
+    await page.screenshot({
+      path: `../.superpowers/sdd/repeat-matching-${viewport.width}.png`,
+      fullPage: true,
+      animations: "disabled",
+    });
+    expect(starts).toBe(0);
+    await page.getByRole("button", { name: "Keep current results" }).click();
+    await expect(page.getByRole("checkbox", { name: "Select Imported title" })).toBeChecked();
+    await page.getByRole("button", { name: "Find catalog matches", exact: true }).click();
+    await page.getByRole("button", { name: "Search again" }).click();
+    await expect(page.getByRole("progressbar")).toBeVisible();
+    await expect(page.locator(".animate-spin:visible")).toHaveCount(1);
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Search cancelled");
+    await expect(page.getByText("Celeste", { exact: true })).toBeVisible();
+    await expect(page.locator(".animate-spin:visible")).toHaveCount(0);
+    await page.reload();
+    await waitForHydration(page);
+    await page.getByRole("button", { name: "PlayStation", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("2 of 5 games");
+    expect(starts).toBe(1);
+    expect(cancels).toBe(1);
+    expect(api.requests.some((request) => request.path === "/library/catalog-matches/apply")).toBe(
+      false,
+    );
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  });
+
   test(`mass matching confirms and corrects inside PlayStation at ${viewport.width}px`, async ({
     page,
     api,
@@ -428,6 +516,7 @@ for (const viewport of [
     await page.getByRole("button", { name: "Match PlayStation games", exact: true }).click();
     await page.getByRole("checkbox", { name: "Recheck already matched games" }).check();
     await page.getByRole("button", { name: "Find catalog matches", exact: true }).click();
+    await page.getByRole("button", { name: "Search again" }).click();
     await page.getByRole("button", { name: "Remove link for Исходное название" }).click();
     await page.getByRole("button", { name: "Apply selected (1)" }).click();
     await expect.poll(() => applies).toBe(2);

@@ -859,6 +859,27 @@ def current_library_catalog_matching_job(
     return BackgroundJobRead.model_validate(job)
 
 
+@app.post("/library/catalog-matches/jobs/{job_id}/cancel", response_model=BackgroundJobRead)
+def cancel_library_catalog_matching_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    job = db.query(BackgroundJob).filter(
+        BackgroundJob.id == job_id, BackgroundJob.owner_id == current_user.id,
+        BackgroundJob.operation == MATCH_JOB_OPERATION,
+    ).with_for_update().first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Background job not found")
+    if job.status in {"queued", "running"}:
+        job.status = "cancelled"
+        job.lease_token = None
+        job.lease_expires_at = None
+        job.error = None
+    db.commit()
+    db.refresh(job)
+    return BackgroundJobRead.model_validate(job)
+
+
 @app.delete("/library/catalog-matches/jobs/{job_id}")
 def dismiss_library_catalog_matching_job(
     job_id: uuid.UUID,
@@ -870,7 +891,7 @@ def dismiss_library_catalog_matching_job(
     ).with_for_update().first()
     if not job:
         raise HTTPException(status_code=404, detail="Background job not found")
-    if job.status not in {"succeeded", "failed"}:
+    if job.status not in {"succeeded", "failed", "cancelled"}:
         raise HTTPException(status_code=409, detail="Catalog matching is still running")
     job.result = {**(job.result or {}), "items": [], "dismissed": True}
     db.commit()
